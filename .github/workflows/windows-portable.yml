@@ -17,6 +17,9 @@ jobs:
     name: Windows x64 portable ZIP
     runs-on: windows-2022
     timeout-minutes: 60
+    env:
+      CMAKE_GENERATOR: Visual Studio 17 2022
+      CMAKE_GENERATOR_PLATFORM: x64
 
     steps:
       - name: Checkout repository
