@@ -17,6 +17,9 @@ jobs:
     name: Windows x64 portable ZIP
     runs-on: windows-2022
     timeout-minutes: 60
+    env:
+      CMAKE_GENERATOR: Visual Studio 17 2022
+      CMAKE_GENERATOR_PLATFORM: x64
 
     steps:
       - name: Checkout repository
@@ -30,9 +33,9 @@ jobs:
         shell: powershell
         run: .\scripts\package.ps1 -SkipBuild
 
-      - name: Verify extracted ZIP and offline launch
+      - name: Verify extracted ZIP, launcher and checksums
         shell: powershell
-        run: .\scripts\check-package.ps1 -SmokeLaunch
+        run: .\scripts\check-package.ps1
 
       - name: Upload portable ZIP and checksum
         uses: actions/upload-artifact@v4

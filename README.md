@@ -14,6 +14,19 @@ Per usare il programma **non servono Visual Studio, Build Tools, CMake, Git o Py
 
 Il runtime C/C++ è collegato staticamente; l'eseguibile verificato dipende solo da DLL di Windows. `Avvia.cmd` cerca l'eseguibile accanto a sé, in `portable` o nella build locale; non avvia mai una compilazione.
 
+## Scaricare l'eseguibile portable da GitHub Actions
+
+Il workflow **Build Windows portable** compila automaticamente su Windows x64, esegue i test, crea lo ZIP e ne verifica l'estrazione, il contenuto e gli hash. Un test grafico opzionale di avvio offline (`--offline`) e disponibile in locale con `scripts/check-package.ps1 -SmokeLaunch`. Non e necessario possedere Visual Studio per **utilizzare** il pacchetto.
+
+1. Apri la scheda **Actions** del repository e scegli **Build Windows portable**.
+2. Apri un'esecuzione riuscita (segno di spunta verde) e, nella sezione **Artifacts**, scarica **The-Cuelist-0.5.0-Windows-x64-portable**.
+3. Estrai lo ZIP scaricato da Actions; al suo interno trovi **The-Cuelist-0.5.0-Windows-x64.zip** e il checksum `.sha256`.
+4. Estrai anche il secondo ZIP in una cartella a tua scelta (anche su una chiavetta USB) e apri **The Cuelist.exe**. Non e richiesta un'installazione.
+
+Il workflow viene eseguito sui commit al ramo `feat/desktop-foundation`, nelle pull request dirette a quel ramo oppure manualmente dalla scheda Actions. Gli artifact GitHub scadono dopo 30 giorni; per conservarli scarica lo ZIP.
+
+**Portabilita dei dati:** il programma non richiede un profilo utente per memorizzare gli show. Quando salvi, scegli una posizione accessibile (per esempio una cartella vicino all'eseguibile): porta sempre con te il file `.cuelist` e la relativa cartella `_media`. I percorsi dei media all'interno dello show sono relativi. La configurazione delle interfacce audio e MIDI puo dipendere dall'hardware del PC su cui esegui il programma; Windows e i driver possono mantenere propri dati di sistema.
+
 ## Cue e riproduzione
 
 La sessione iniziale contiene una cue e una colonna Audio senza nomi precompilati. **+ Cue** e **+ Colonna** estendono la griglia.
