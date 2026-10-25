@@ -1,5 +1,7 @@
 /build/
 /vendor/
+/dist/
+/portable/
 /.superpowers/
 /.vs/
 *.user

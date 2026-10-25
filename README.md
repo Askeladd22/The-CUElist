@@ -4,11 +4,21 @@ Applicazione desktop Windows per cue multimediali. Primo incremento C++/JUCE: au
 
 ## Avvio
 
-Doppio click su **Avvia.cmd** nella cartella del progetto. Se la build esiste si apre direttamente; altrimenti viene compilata. **Compila.cmd** ricompila sorgenti e test dopo una modifica.
+Per **usare il programma non servono Visual Studio, Build Tools, Git o CMake**.
+
+1. Copia sul computer di destinazione il pacchetto **The-Cuelist-0.1.0-Windows-x64.zip** (prodotto nella cartella `dist`).
+2. Estrai tutto lo ZIP in una cartella a scelta.
+3. Fai doppio click su **The Cuelist.exe** oppure **Avvia.cmd** nella cartella estratta.
+
+L'archivio ZIP dei **sorgenti** scaricato dal repository non include automaticamente l'eseguibile. In quel caso occorre anche il pacchetto portatile, non installare strumenti di sviluppo. Il launcher cerca un eseguibile accanto a se stesso, in `portable`, oppure nella build locale; se manca, mostra queste istruzioni e **non compila**.
 
 Eseguibile: `build/TheCuelist_artefacts/Release/The Cuelist.exe`.
 
-Il computer di sviluppo dispone di Visual Studio Build Tools 2026 con C++ e CMake. Su un altro computer di sviluppo installare Visual Studio Build Tools con il carico **Sviluppo desktop con C++**, Windows SDK e strumenti CMake, e Git. Il primo build scarica JUCE 8.0.12 dal repository ufficiale. L'eseguibile compilato non richiede Python, Node o il compilatore per funzionare; la distribuzione su una macchina pulita va ancora verificata.
+Il runtime C/C++ viene collegato staticamente. La verifica delle dipendenze dell'eseguibile mostra solo DLL di Windows, senza DLL di Visual C++ da distribuire. Il pacchetto e destinato a Windows x64; una prova sul computer di destinazione rimane necessaria.
+
+## Solo per sviluppare o ricompilare
+
+**Compila.cmd** ricompila sorgenti e test dopo una modifica. Il computer di sviluppo dispone di Visual Studio Build Tools 2026 con C++ e CMake. Su un altro computer di sviluppo installare Visual Studio Build Tools con il carico **Sviluppo desktop con C++**, Windows SDK e strumenti CMake, e Git. Il primo build scarica JUCE 8.0.12 dal repository ufficiale.
 
 Da PowerShell, nella cartella del progetto:
 
@@ -17,6 +27,8 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build.ps1
 ```
 
 Risultato atteso: compilazione Release, test CTest con `100% tests passed`, eseguibile nel percorso indicato. L'opzione `-Run` lo apre; `-TestOnly` compila soltanto i test. Avviando l'eseguibile con `--offline` l'editor non apre il dispositivo audio.
+
+Per creare il pacchetto portatile, eseguire `powershell -NoProfile -ExecutionPolicy Bypass -File scripts/package.ps1`. Questo compila, esegue i test e prepara lo ZIP in `dist`. L'opzione `-SkipBuild` riutilizza una build Release gia verificata. Lo script di packaging e destinato allo sviluppatore, non all'utilizzatore del programma.
 
 ## Primo utilizzo
 

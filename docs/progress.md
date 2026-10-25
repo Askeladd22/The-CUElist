@@ -44,3 +44,12 @@ I primi tre casi sono stati riprodotti con test fallenti prima della correzione;
 ## Prossimo incremento
 
 Streaming WAV e routing hardware verificato, poi invio MIDI/OSC con test su loopback; mantenere separati tempo relativo, musicale e timecode.
+
+## Correzione distribuzione — 25 ottobre 2026
+
+- Risolto il launcher che, in assenza di `build`, tentava di compilare e richiedeva Visual Studio sul computer dell'utilizzatore.
+- `Avvia.cmd` ora avvia esclusivamente un eseguibile esistente; se manca, spiega come ottenere il pacchetto portatile. La compilazione resta un'azione separata dello sviluppatore.
+- Creato `dist/The-Cuelist-0.1.0-Windows-x64.zip`: eseguibile Release, launcher, guida, informazioni JUCE e hash SHA256.
+- Verifica `dumpbin /dependents`: solo DLL di Windows; nessuna DLL runtime Visual C++ esterna. Runtime C/C++ collegato staticamente.
+- `scripts/check-package.ps1` eseguito: estrazione ZIP riuscita, eseguibile identico alla build verificata, avvio senza eseguibile restituisce istruzioni senza compilare.
+- Nessuna installazione o prova eseguita sul computer `C:\Users\admin`: il pacchetto va copiato ed estratto su quel computer. Nessun upload o rilascio pubblico effettuato.
