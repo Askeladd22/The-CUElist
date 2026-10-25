@@ -40,6 +40,7 @@ void CueGrid::paint(juce::Graphics& g) {
     }
     const int tail=nameWidth+(int)show.columns.size()*columnWidth;
     label(g,"BPM",{tail+12,31,70,24},11,palette::muted,true); label(g,"METRICA",{tail+88,31,80,24},11,palette::muted,true);
+    label(g,"AUTO STOP",{tail+178,31,96,24},10,palette::muted,true);
     const auto clip=g.getClipBounds();
     const int first=std::max(0,(clip.getY()-headerHeight)/rowHeight), last=std::min((int)show.rows.size(),(clip.getBottom()-headerHeight)/rowHeight+1);
     for (int r=first;r<last;++r) {
@@ -65,10 +66,17 @@ void CueGrid::paint(juce::Graphics& g) {
             g.setColour(drop ? palette::amber : selected && c==owner.selectedColumn ? colour : palette::line.withAlpha(.65f));
             g.drawRoundedRectangle(box,5,drop || (selected && c==owner.selectedColumn) ? 1.5f : .6f);
             if (loaded) {
-                label(g,cell.name.isEmpty() ? juce::File(cell.file).getFileNameWithoutExtension() : cell.name,{x+13,y+10,columnWidth-26,22},12,palette::text);
+                auto playback=owner.engine.getCellPlayback(cell.id);
+                if (!owner.engine.connected.load()) playback.playing=playback.waiting=playback.paused=false;
+                label(g,cell.name.isEmpty() ? juce::File(cell.file).getFileNameWithoutExtension() : cell.name,{x+13,y+10,columnWidth-40,22},12,palette::text);
                 const auto seconds=found->second->samples.getNumSamples()/found->second->sampleRate;
-                label(g,(cell.loop ? "LOOP  " : "")+timeText(seconds)+(cell.startSeconds>0 ? "  +"+juce::String(cell.startSeconds,1)+"s" : ""),
+                label(g,playback.waiting ? "ATTESA" : timeText(playback.positionSeconds)+" / "+timeText(seconds),
                       {x+13,y+30,columnWidth-72,14},9,colour);
+                const auto progress=seconds>0 ? juce::jlimit(0.0,1.0,playback.positionSeconds/seconds) : 0;
+                g.setColour(palette::line); g.fillRect(x+8,y+rowHeight-6,columnWidth-16,2);
+                g.setColour(playback.paused || playback.waiting ? palette::amber : colour);
+                g.fillRect((float)x+8,(float)y+rowHeight-6,(float)((columnWidth-16)*progress),2.0f);
+                if (playback.playing || playback.paused) g.fillEllipse((float)x+columnWidth-19,(float)y+13,6,6);
             } else label(g,missing ? "! File non disponibile" : show.columns[c].type==ColumnType::audio ? "+ WAV / MP3" : "previsto",
                          {x+10,y+8,columnWidth-20,18},11,missing ? palette::red : palette::muted,false,juce::Justification::centred);
             if (show.columns[c].type==ColumnType::audio) {
@@ -79,6 +87,11 @@ void CueGrid::paint(juce::Graphics& g) {
         const auto tempo=row.tempo.front();
         label(g,juce::String(tempo.bpm,1),{tail+12,y+14,70,24},12,palette::muted);
         label(g,juce::String(tempo.numerator)+"/"+juce::String(tempo.denominator),{tail+88,y+14,70,24},12,palette::muted);
+        g.setColour(row.stopOnNext ? palette::teal.withAlpha(.25f) : palette::raised);
+        g.fillRoundedRectangle((float)tail+188,(float)y+18,34,19,9.5f);
+        g.setColour(row.stopOnNext ? palette::teal : palette::muted);
+        g.fillEllipse((float)tail+(row.stopOnNext ? 207 : 191),(float)y+21,13,13);
+        label(g,row.stopOnNext ? "ON" : "OFF",{tail+228,y+17,38,20},10,row.stopOnNext ? palette::teal : palette::muted);
         g.setColour(palette::line.withAlpha(.6f)); g.drawHorizontalLine(y+rowHeight-1,0,(float)getWidth());
     }
 }
@@ -102,6 +115,11 @@ void CueGrid::mouseDown(const juce::MouseEvent& e) {
     }
     const int row=(e.y-headerHeight)/rowHeight, localY=(e.y-headerHeight)%rowHeight;
     if (row>=(int)owner.show.rows.size()) return;
+    const int tail=nameWidth+(int)owner.show.columns.size()*columnWidth;
+    if (e.x>=tail+178 && e.x<tail+274 && localY>=10 && localY<44) {
+        if (e.getNumberOfClicks()==1) owner.setAutoStop(row,!owner.show.rows[row].stopOnNext);
+        return;
+    }
     if (e.x>=nameWidth && column<(int)owner.show.columns.size() && localY>=28 && localY<46) {
         const int localX=(e.x-nameWidth)%columnWidth;
         if ((localX>=columnWidth-54 && localX<columnWidth-33) || (localX>=columnWidth-29 && localX<columnWidth-8)) {

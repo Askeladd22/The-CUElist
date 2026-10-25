@@ -120,16 +120,16 @@ juce::String encodeShow(const Show& show) {
         for (const auto& c : r.cells) cells.add(object({{"id",c.id},{"name",c.name},{"file",c.file},{"followsRow",c.followsRow},
             {"loop",c.loop},{"gain",c.gain},{"startSeconds",c.startSeconds},{"behaviour",(int)c.behaviour}}));
         rows.add(object({{"id",r.id},{"name",r.name},{"tempo",tempo},{"cells",cells},{"gain",r.gain},
-            {"muted",r.muted},{"loop",r.loop},{"overrideBehaviour",r.overrideBehaviour},{"behaviour",(int)r.behaviour}}));
+            {"muted",r.muted},{"loop",r.loop},{"overrideBehaviour",r.overrideBehaviour},{"behaviour",(int)r.behaviour},{"stopOnNext",r.stopOnNext}}));
     }
-    return juce::JSON::toString(object({{"format","TheCuelist"},{"version",3},{"name",show.name},{"nextId",show.nextId},{"columns",columns},{"rows",rows}}));
+    return juce::JSON::toString(object({{"format","TheCuelist"},{"version",4},{"name",show.name},{"nextId",show.nextId},{"columns",columns},{"rows",rows}}));
 }
 juce::Result decodeShow(const juce::String& text, Show& destination) {
     if (text.length() > 32*1024*1024) return juce::Result::fail("Progetto troppo grande (massimo 32 MB). ");
     try {
         auto root = juce::JSON::parse(text);
         const auto version = integer(root,"version");
-        if (string(root,"format") != "TheCuelist" || (version != 1 && version != 2 && version != 3)) return juce::Result::fail("Formato o versione progetto non supportati.");
+        if (string(root,"format") != "TheCuelist" || version < 1 || version > 4) return juce::Result::fail("Formato o versione progetto non supportati.");
         const auto activation = [version](int value) {
             if (version < 3 && (value == 1 || value == 4)) return Behaviour::retrigger;
             return (Behaviour)value;
@@ -145,6 +145,7 @@ juce::Result decodeShow(const juce::String& text, Show& destination) {
         }
         for (auto& r : array(root,"rows")) {
             Row row; row.id = integer(r,"id"); row.name = string(r,"name"); row.tempo.clear();
+            if (version >= 4) row.stopOnNext=boolean(r,"stopOnNext");
             if (version >= 2) {
                 row.gain=(float)number(r,"gain"); row.muted=boolean(r,"muted"); row.loop=boolean(r,"loop");
                 row.overrideBehaviour=boolean(r,"overrideBehaviour"); row.behaviour=activation(integer(r,"behaviour"));

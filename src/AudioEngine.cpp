@@ -1,6 +1,33 @@
 #include "AudioEngine.h"
 #include <cmath>
 namespace cuelist {
+static_assert(std::atomic<double>::is_always_lock_free && std::atomic<uint64_t>::is_always_lock_free
+              && std::atomic<unsigned>::is_always_lock_free, "Playback telemetry requires lock-free atomics");
+CellPlaybackInfo CellPlaybackTelemetry::read() const noexcept {
+    for (;;) {
+        const auto before=sequence.load();
+        if (before & 1) continue;
+        CellPlaybackInfo result;
+        result.positionSeconds=positionSeconds.load(); result.durationSeconds=durationSeconds.load();
+        const auto state=flags.load();
+        result.playing=(state & 1)!=0; result.waiting=(state & 2)!=0; result.paused=(state & 4)!=0;
+        if (sequence.load()==before) return result;
+    }
+}
+void CellPlaybackTelemetry::write(CellPlaybackInfo value) noexcept {
+    sequence.fetch_add(1);
+    positionSeconds.store(value.positionSeconds); durationSeconds.store(value.durationSeconds);
+    flags.store((value.playing ? 1u : 0u) | (value.waiting ? 2u : 0u) | (value.paused ? 4u : 0u));
+    sequence.fetch_add(1);
+}
+void RenderState::updateTelemetry() noexcept {
+    for (const auto& v:voices) if (v.telemetry) {
+        const double rate=v.clip ? v.clip->sampleRate : 0;
+        v.telemetry->write({rate>0 ? v.position/rate : 0,
+            rate>0 ? v.clip->samples.getNumSamples()/rate : 0,
+            v.playing, v.playing && v.rowMode && v.delaySeconds>1.0e-12, v.paused});
+    }
+}
 namespace {
 void placeOnTimeline(Voice& v, double seconds) noexcept {
     v.delaySeconds=std::max(0.0,v.startSeconds-seconds);
@@ -18,14 +45,14 @@ void RenderState::inheritPlayback(const RenderState& previous) noexcept {
     // Copy only scalar runtime state. Shared media ownership stays entirely on the UI thread.
     for (auto& v:voices) for (const auto& old:previous.voices)
         if (v.cellId==old.cellId && v.clip.get()==old.clip.get()) {
-            v.position=old.position; v.playing=old.playing; v.delaySeconds=old.delaySeconds;
+            v.position=old.position; v.playing=old.playing; v.paused=old.paused; v.delaySeconds=old.delaySeconds;
             v.rowMode=old.rowMode; v.pendingSeek=old.pendingSeek;
             if (v.rowMode && v.startSeconds!=old.startSeconds)
                 for (const auto& row:previous.rows) if (row.id==v.rowId) placeOnTimeline(v,row.seconds);
             break;
         }
     for (auto& row:rows) for (const auto& old:previous.rows)
-        if (row.id==old.id) { row=old; break; }
+        if (row.id==old.id) { const bool stopOnNext=row.stopOnNext; row=old; row.stopOnNext=stopOnNext; break; }
 }
 void RenderState::seekRow(int id,double seconds) noexcept {
     if (!std::isfinite(seconds)) return;
@@ -36,9 +63,25 @@ void RenderState::seekRow(int id,double seconds) noexcept {
     }
     for (auto& v:voices) if (v.rowId==id && v.followsRow) {
         v.rowMode=true; v.pendingSeek=true; placeOnTimeline(v,seconds); v.playing=running;
+        if (running) v.paused=false;
     }
 }
 void RenderState::trigger(int id,bool row,bool stop) noexcept {
+    // A valid row GO is one callback transaction, including empty cues. Direct
+    // launches and explicit Stops never change another row's transport.
+    if (row && !stop) {
+        bool exists=false;
+        for (const auto& target:rows) if (target.id==id) { exists=true; break; }
+        if (exists) {
+            for (auto& other:rows) if (other.id!=id && other.stopOnNext) {
+                other.seconds=0; other.playing=false; other.pendingSeek=false; other.ended=false;
+            }
+            for (auto& v:voices) if (v.rowId!=id && v.stopOnNext) {
+                v.playing=false; v.paused=false; v.position=0; v.delaySeconds=0;
+                v.pendingSeek=false; v.rowMode=false;
+            }
+        }
+    }
     // Natural completion is distinct from a paused row. Its next GO starts a
     // fresh timeline, while a paused row keeps its media cursor and delay.
     if (row) for (auto& clock:rows) if (clock.id==id && clock.ended && !clock.pendingSeek) {
@@ -57,7 +100,7 @@ void RenderState::trigger(int id,bool row,bool stop) noexcept {
         if (row ? (v.rowId!=id || (!stop && !v.followsRow)) : v.cellId!=id) continue;
         const auto behaviour=row && v.overrideBehaviour ? v.rowBehaviour : v.behaviour;
         if (stop || behaviour==Behaviour::stop) {
-            v.playing=false; v.position=0; v.delaySeconds=0; v.pendingSeek=false; v.rowMode=false;
+            v.playing=false; v.paused=false; v.position=0; v.delaySeconds=0; v.pendingSeek=false; v.rowMode=false;
             stopClock=true; continue;
         }
         if (!v.clip || v.clip->samples.getNumSamples()==0) continue;
@@ -83,6 +126,7 @@ void RenderState::trigger(int id,bool row,bool stop) noexcept {
                 v.playing=true; break;
             case Behaviour::stop: break;
         }
+        v.paused=!v.playing;
         v.pendingSeek=false;
     }
     if (row) for (auto& clock:rows) if (clock.id==id) {
@@ -94,7 +138,7 @@ void RenderState::trigger(int id,bool row,bool stop) noexcept {
     }
 }
 void RenderState::panic() noexcept {
-    for (auto& v:voices) { v.playing=false; v.position=0; v.delaySeconds=0; v.pendingSeek=false; v.rowMode=false; }
+    for (auto& v:voices) { v.playing=false; v.paused=false; v.position=0; v.delaySeconds=0; v.pendingSeek=false; v.rowMode=false; }
     for (auto& row:rows) { row.seconds=0; row.playing=false; row.pendingSeek=false; row.ended=false; }
 }
 void RenderState::render(float* const* outputs,int channels,int frames,double sampleRate) noexcept {
@@ -105,7 +149,7 @@ void RenderState::render(float* const* outputs,int channels,int frames,double sa
         if (!v.playing || !v.clip) continue;
         const auto& audio=v.clip->samples;
         const int length=audio.getNumSamples();
-        if (length==0 || audio.getNumChannels()==0) { v.playing=false; continue; }
+        if (length==0 || audio.getNumChannels()==0) { v.playing=false; v.paused=false; continue; }
         const bool looping=v.loop || v.rowLoop;
         const double step=v.clip->sampleRate/sampleRate;
         const float gain=(v.rowMuted || v.columnMuted) ? 0
@@ -166,19 +210,22 @@ juce::Result loadClip(const juce::File& file,std::shared_ptr<const AudioClip>& d
 std::unique_ptr<RenderState> makeRenderState(const Show& show,const ClipMap& clips) {
     auto state=std::make_unique<RenderState>();
     for (const auto& row : show.rows) {
-      state->rows.push_back({row.id});
+      state->rows.push_back({row.id}); state->rows.back().stopOnNext=row.stopOnNext;
       for (size_t i=0; i<row.cells.size() && i<show.columns.size(); ++i) {
         if (show.columns[i].type!=ColumnType::audio) continue;
         const auto& c=row.cells[i]; const auto it=clips.find(c.id); if (it==clips.end()) continue;
         Voice v; v.cellId=c.id; v.rowId=row.id; v.clip=it->second; v.output=show.columns[i].output;
+        v.telemetry=std::make_shared<CellPlaybackTelemetry>();
         v.gain=c.gain; v.loop=c.loop; v.followsRow=c.followsRow; v.behaviour=c.behaviour;
         v.startSeconds=c.startSeconds; v.rowGain=row.gain; v.rowMuted=row.muted;
+        v.stopOnNext=row.stopOnNext;
         v.columnGain=show.columns[i].gain; v.columnPan=show.columns[i].pan;
         v.columnMuted=show.columns[i].muted; v.columnPhaseInverted=show.columns[i].phaseInverted;
         v.rowLoop=row.loop; v.overrideBehaviour=row.overrideBehaviour; v.rowBehaviour=row.behaviour;
         state->voices.push_back(std::move(v));
       }
     }
+    state->updateTelemetry();
     return state;
 }
 AudioEngine::AudioEngine() = default;
@@ -192,12 +239,28 @@ juce::String AudioEngine::initialise() {
 void AudioEngine::collectRetired() { delete retired.exchange(nullptr); }
 void AudioEngine::publish(std::unique_ptr<RenderState> state,bool preservePlayback) {
     if (!state) return;
+    std::map<int, PlaybackEntry> nextPlayback;
+    for (auto& v:state->voices) {
+        if (!v.telemetry) v.telemetry=std::make_shared<CellPlaybackTelemetry>();
+        CellPlaybackInfo display;
+        if (v.clip && v.clip->sampleRate>0) display.durationSeconds=v.clip->samples.getNumSamples()/v.clip->sampleRate;
+        const auto old=playback.find(v.cellId);
+        if (preservePlayback && old!=playback.end() && old->second.clip.get()==v.clip.get())
+            display=old->second.telemetry->read();
+        v.telemetry->write(display);
+        nextPlayback.emplace(v.cellId,PlaybackEntry{v.clip,v.telemetry});
+    }
+    playback=std::move(nextPlayback);
     state->revision=++revision;
     if (!preservePlayback) structuralRevision=revision;
     state->minimumCommandRevision=structuralRevision;
     state->preservePlayback=preservePlayback;
     // exchange gives sole ownership of the displaced pending snapshot to the UI.
     delete pending.exchange(state.release());
+}
+CellPlaybackInfo AudioEngine::getCellPlayback(int cellId) const noexcept {
+    const auto found=playback.find(cellId);
+    return found==playback.end() ? CellPlaybackInfo{} : found->second.telemetry->read();
 }
 bool AudioEngine::send(int id,bool row,bool stop) noexcept {
     const unsigned w=writeIndex.load(std::memory_order_relaxed);
@@ -252,6 +315,7 @@ void AudioEngine::processBlock(float* const* outputs,int channels,int frames,dou
         if (current) current->panic();
         for (int ch=0; ch<channels; ++ch) if (outputs[ch]) juce::FloatVectorOperations::clear(outputs[ch],frames);
     }
+    if (current) current->updateTelemetry();
     float level=0; int active=0;
     for (int ch=0; ch<channels; ++ch) if (outputs[ch])
         for (int i=0; i<frames; ++i) level=std::max(level,std::abs(outputs[ch][i]));

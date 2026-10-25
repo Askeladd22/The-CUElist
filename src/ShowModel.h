@@ -22,7 +22,7 @@ struct Cell {
 struct Row {
     int id = 0; juce::String name; std::vector<TempoPoint> tempo {{}}; std::vector<Cell> cells;
     float gain = 1.0f;
-    bool muted = false, loop = false, overrideBehaviour = false;
+    bool muted = false, loop = false, overrideBehaviour = false, stopOnNext = true;
     Behaviour behaviour = Behaviour::retrigger;
 };
 struct Show { juce::String name = "Show 001"; int nextId = 1; std::vector<Column> columns; std::vector<Row> rows; };

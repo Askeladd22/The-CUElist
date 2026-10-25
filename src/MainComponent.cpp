@@ -28,7 +28,7 @@ MainComponent::MainComponent(bool startAudio) {
     setLookAndFeel(&theme); setWantsKeyboardFocus(true); setSize(1440,900);
     for (juce::Component* c : std::initializer_list<juce::Component*>{&openButton,&saveButton,&newButton,&addRowButton,&addColumnButton,
          &goButton,&panicButton,&deviceButton,&importButton,&playCellButton,&stopCellButton,&clearButton,&tempoButton,&applyButton,
-         &cellTab,&rowTab,&rowGain,&rowBehaviour,&rowMute,&rowLoop,&rowName,&cellName,&bpm,&behaviour,&meter,&output,&follow,&loop,&gain,&viewport,&timeline,&utilities}) addAndMakeVisible(c);
+         &cellTab,&rowTab,&rowGain,&rowBehaviour,&rowMute,&rowLoop,&rowName,&cellName,&bpm,&behaviour,&meter,&follow,&loop,&gain,&viewport,&timeline,&utilities}) addAndMakeVisible(c);
     for (auto* b : {&openButton,&saveButton,&newButton,&addRowButton,&addColumnButton,&goButton,&panicButton,&deviceButton,
                     &importButton,&playCellButton,&stopCellButton,&clearButton,&tempoButton,&applyButton}) b->setWantsKeyboardFocus(false);
     viewport.setViewedComponent(&grid,false); viewport.setScrollBarsShown(true,true);
@@ -54,7 +54,7 @@ MainComponent::MainComponent(bool startAudio) {
     bpm.setSelectAllWhenFocused(true);
     for (auto* editor : {&rowName,&cellName,&bpm}) editor->onReturnKey=[this] { if (applyInspector()) grabKeyboardFocus(); };
     gain.onValueChange=[this] { applyInspector(); }; rowGain.onValueChange=[this] { applyInspector(); };
-    for (auto* combo : {&behaviour,&output,&rowBehaviour}) combo->onChange=[this] { applyInspector(); };
+    for (auto* combo : {&behaviour,&rowBehaviour}) combo->onChange=[this] { applyInspector(); };
     for (auto* toggle : {&follow,&loop,&rowMute,&rowLoop}) toggle->onClick=[this] { applyInspector(); };
     newButton.onClick=[this] { withDiscardConfirmation([this] { stopAll(); show=makeShow(); clips.clear(); projectFile={}; selectedRow=selectedColumn=nextCue=0;
         dirty=false; engine.publish(makeRenderState(show,clips)); refresh(); status="Nuovo show. Importa i file nelle celle Audio."; }); };
@@ -81,7 +81,6 @@ MainComponent::MainComponent(bool startAudio) {
     importButton.setTooltip("WAV e MP3 mono/stereo. Importare ferma tutte le riproduzioni.");
     applyButton.setTooltip("Applica i parametri senza interrompere il trasporto. Invio conferma i nomi.");
     addColumnButton.setTooltip("Aggiungi colonne. Doppio click sul titolo per rinominare; frecce per riordinare.");
-    output.setTooltip("Coppia numerata tra le uscite attive nel pannello Dispositivi audio.");
     if (startAudio) { auto error=engine.initialise(); if (error.isNotEmpty()) status="Audio non disponibile: "+error; }
     else status="Modalita offline: dispositivo audio non aperto.";
     engine.publish(makeRenderState(show,clips)); refresh(); startTimerHz(25);
@@ -102,7 +101,7 @@ void MainComponent::paint(juce::Graphics& g) {
     label(g,"SHOW CONTROL",{61,45,130,15},10,palette::muted,true);
     label(g,"SESSION",{232,25,100,22},12,palette::teal,true);
     g.setColour(palette::teal); g.fillRect(232,69,65,3);
-    label(g,"0.3  /  PORTABLE",{334,25,160,22},11,palette::muted);
+    label(g,"0.4  /  PORTABLE",{334,25,160,22},11,palette::muted);
     g.setColour(engine.connected.load() ? palette::teal : palette::red); g.fillEllipse((float)w-367,32,6,6);
     label(g,engine.connected.load() ? "Audio disponibile" : "Audio non disponibile",{w-352,22,160,25},12,palette::muted);
     label(g,"WORKSPACE",{20,99,140,18},10,palette::muted,true);
@@ -144,8 +143,7 @@ void MainComponent::paint(juce::Graphics& g) {
     if (!rowSettings) {
     label(g,"CELLA  /  "+col.name,{x,420,228,20},11,palette::muted,true);
     label(g,"Attivazione",{x,490,228,18},11,palette::muted);
-    label(g,"Uscite attive",{x,553,228,18},11,palette::muted);
-    label(g,"Livello",{x,682,70,20},11,palette::muted);
+    label(g,"Livello",{x,621,70,20},11,palette::muted);
     if (col.type!=ColumnType::audio)
         label(g,"Motore "+typeName(col.type)+" previsto",{x,707,228,14},10,palette::amber);
     } else {
@@ -163,8 +161,8 @@ void MainComponent::resized() {
     deviceButton.setBounds(20,188,140,33);
     addRowButton.setBounds(editorX-188,98,76,33); addColumnButton.setBounds(editorX-104,98,92,33);
     const int gridHeight=std::max(235,h-438);
-    viewport.setBounds(204,154,editorX-220,gridHeight-88);
-    utilities.setBounds(204,154+gridHeight-88,editorX-220,88);
+    viewport.setBounds(204,154,editorX-220,gridHeight-116);
+    utilities.setBounds(204,154+gridHeight-116,editorX-220,116);
     utilities.syncScroll(viewport.getViewPositionX());
     timeline.setBounds(204,168+gridHeight,editorX-220,h-gridHeight-215);
     int x=editorX+16;
@@ -172,19 +170,19 @@ void MainComponent::resized() {
     rowBehaviour.setBounds(x,479,228,30); rowMute.setBounds(x,527,228,24); rowLoop.setBounds(x,553,228,24); rowGain.setBounds(x,610,228,27);
     rowName.setBounds(x,258,228,31); bpm.setBounds(x,326,100,31); meter.setBounds(x+112,326,116,31);
     tempoButton.setBounds(x,368,228,27); cellName.setBounds(x,450,228,29);
-    behaviour.setBounds(x,512,228,30); output.setBounds(x,575,228,30);
-    follow.setBounds(x-3,619,235,24); loop.setBounds(x-3,650,230,24); gain.setBounds(x+56,680,175,26);
+    behaviour.setBounds(x,512,228,30);
+    follow.setBounds(x-3,556,235,24); loop.setBounds(x-3,587,230,24); gain.setBounds(x+56,619,175,26);
     importButton.setBounds(x,722,228,33); playCellButton.setBounds(x,765,142,30); stopCellButton.setBounds(x+150,765,78,30);
     clearButton.setBounds(x,804,105,28); applyButton.setBounds(x+113,804,115,28);
     // Compact inspector on smaller displays, keeping all actions reachable.
     if (h<890) {
         const float factor=(float)(h-232)/658.0f;
-        for (juce::Component* c : std::initializer_list<juce::Component*>{&rowBehaviour,&rowMute,&rowLoop,&rowGain,&rowName,&bpm,&meter,&tempoButton,&cellName,&behaviour,&output,&follow,&loop,&gain,&importButton,&playCellButton,&stopCellButton,&clearButton,&applyButton}) {
+        for (juce::Component* c : std::initializer_list<juce::Component*>{&rowBehaviour,&rowMute,&rowLoop,&rowGain,&rowName,&bpm,&meter,&tempoButton,&cellName,&behaviour,&follow,&loop,&gain,&importButton,&playCellButton,&stopCellButton,&clearButton,&applyButton}) {
             auto b=c->getBounds(); b.setY(226+(int)((b.getY()-226)*factor)); b.setHeight(std::max(22,(int)(b.getHeight()*factor))); c->setBounds(b);
         }
     }
     goButton.setBounds(20,h-282,140,34); panicButton.setBounds(20,h-239,140,34);
-    grid.setSize(std::max(viewport.getWidth()-14,CueGrid::nameWidth+(int)show.columns.size()*CueGrid::columnWidth+180),
+    grid.setSize(std::max(viewport.getWidth()-14,CueGrid::nameWidth+(int)show.columns.size()*CueGrid::columnWidth+280),
                  std::max(viewport.getHeight()-14,CueGrid::headerHeight+(int)show.rows.size()*CueGrid::rowHeight));
 }
 void MainComponent::refresh() { selectedRow=juce::jlimit(0,(int)show.rows.size()-1,selectedRow); selectedColumn=juce::jlimit(0,(int)show.columns.size()-1,selectedColumn); refreshInspector(); utilities.refresh(); resized(); repaint(); grid.repaint(); timeline.repaint(); }
@@ -203,15 +201,10 @@ void MainComponent::refreshInspector() {
     rowGain.setValue(juce::Decibels::gainToDecibels(row.gain,-60.0f),juce::dontSendNotification);
     rowMute.setToggleState(row.muted,juce::dontSendNotification); rowLoop.setToggleState(row.loop,juce::dontSendNotification);
     rowBehaviour.setSelectedId(row.overrideBehaviour ? (int)row.behaviour+2 : 1,juce::dontSendNotification);
-    for (juce::Component* component : std::initializer_list<juce::Component*>{&cellName,&behaviour,&output,&follow,&loop,&gain,&importButton,&playCellButton,&stopCellButton,&clearButton}) component->setVisible(!rowSettings);
+    for (juce::Component* component : std::initializer_list<juce::Component*>{&cellName,&behaviour,&follow,&loop,&gain,&importButton,&playCellButton,&stopCellButton,&clearButton}) component->setVisible(!rowSettings);
     for (juce::Component* component : std::initializer_list<juce::Component*>{&rowBehaviour,&rowGain,&rowMute,&rowLoop}) component->setVisible(rowSettings);
-    output.clear(juce::dontSendNotification); int channels=2;
-    if (auto* device=engine.devices.getCurrentAudioDevice()) channels=std::max(2,device->getActiveOutputChannels().countNumberOfSetBits());
-    for (int i=0;i<channels;i+=2) output.addItem(juce::String(i+1)+" / "+juce::String(i+2),i+1);
-    if (col.output>=channels || col.output%2!=0) output.addItem(juce::String(col.output+1)+" / "+juce::String(col.output+2)+" (assente)",col.output+1);
-    output.setSelectedId(col.output+1,juce::dontSendNotification);
     bool audio=col.type==ColumnType::audio;
-    for (juce::Component* component : std::initializer_list<juce::Component*>{&importButton,&playCellButton,&stopCellButton,&clearButton,&output,&gain,&loop,&behaviour,&follow,&cellName}) component->setEnabled(audio);
+    for (juce::Component* component : std::initializer_list<juce::Component*>{&importButton,&playCellButton,&stopCellButton,&clearButton,&gain,&loop,&behaviour,&follow,&cellName}) component->setEnabled(audio);
     playCellButton.setEnabled(audio && clips.count(c.id)>0); stopCellButton.setEnabled(audio && clips.count(c.id)>0); clearButton.setEnabled(audio && c.file.isNotEmpty());
 }
 bool MainComponent::select(int row,int column) {
@@ -233,7 +226,7 @@ bool MainComponent::inspectorDiffers() const {
         || std::abs(rowGain.getValue()-juce::Decibels::gainToDecibels(row.gain,-60.0f))>0.051) return true;
     if (show.columns[selectedColumn].type!=ColumnType::audio) return false;
     return cellName.getText().trim()!=cell.name || behaviour.getSelectedId()!=(int)cell.behaviour+1 || follow.getToggleState()!=cell.followsRow
-        || loop.getToggleState()!=cell.loop || std::abs(gain.getValue()-juce::Decibels::gainToDecibels(cell.gain,-60.0f))>0.051 || output.getSelectedId()!=show.columns[selectedColumn].output+1;
+        || loop.getToggleState()!=cell.loop || std::abs(gain.getValue()-juce::Decibels::gainToDecibels(cell.gain,-60.0f))>0.051;
 }
 bool MainComponent::applyInspector() {
     if (!inspectorDiffers()) return true;
@@ -249,7 +242,6 @@ bool MainComponent::applyInspector() {
     if (candidate.columns[selectedColumn].type==ColumnType::audio) {
         cell.name=cellName.getText().trim(); cell.behaviour=(Behaviour)(behaviour.getSelectedId()-1);
         cell.followsRow=follow.getToggleState(); cell.loop=loop.getToggleState(); cell.gain=juce::Decibels::decibelsToGain((float)gain.getValue(),-60.0f);
-        candidate.columns[selectedColumn].output=output.getSelectedId()-1;
     }
     auto result=validateShow(candidate); if (result.failed()) { message(result.getErrorMessage()); return false; }
     show=std::move(candidate); changed("Parametri applicati. Il BPM non modifica la velocita audio.");
@@ -316,6 +308,19 @@ void MainComponent::setColumnUtilities(int column,float level,float pan,bool mut
     dirty=true; engine.publish(makeRenderState(show,clips));
     status="Utility colonna aggiornate."; repaint();
 }
+void MainComponent::setColumnOutput(int column,int outputIndex) {
+    if (column<0 || column>=(int)show.columns.size() || show.columns[column].type!=ColumnType::audio
+        || outputIndex<0 || outputIndex>1022) return;
+    show.columns[column].output=outputIndex; dirty=true;
+    engine.publish(makeRenderState(show,clips));
+    status="Uscita audio della colonna aggiornata."; repaint();
+}
+void MainComponent::setAutoStop(int row,bool enabled) {
+    if (row<0 || row>=(int)show.rows.size()) return;
+    show.rows[row].stopOnNext=enabled; dirty=true; engine.publish(makeRenderState(show,clips));
+    status=enabled ? "La riga si fermera al GO di un'altra cue." : "La riga continuera anche al GO di un'altra cue.";
+    grid.repaint(); repaint();
+}
 void MainComponent::stopAll() { engine.panic(); status="PANIC / tutte le riproduzioni audio fermate."; repaint(); }
 bool MainComponent::keyPressed(const juce::KeyPress& key) {
     if (key==juce::KeyPress::escapeKey) { stopAll(); return true; }
@@ -324,7 +329,7 @@ bool MainComponent::keyPressed(const juce::KeyPress& key) {
     if (key==juce::KeyPress::downKey) { select(std::min(selectedRow+1,(int)show.rows.size()-1),selectedColumn); return true; }
     if (key==juce::KeyPress::upKey) { select(std::max(0,selectedRow-1),selectedColumn); return true; } return false;
 }
-void MainComponent::timerCallback() { engine.collectRetired(); utilities.syncScroll(viewport.getViewPositionX()); displayPeak=std::max(engine.peak.load(),displayPeak*.88f); repaint(); timeline.repaint(); }
+void MainComponent::timerCallback() { engine.collectRetired(); utilities.syncScroll(viewport.getViewPositionX()); utilities.refreshRouting(); grid.repaint(); displayPeak=std::max(engine.peak.load(),displayPeak*.88f); repaint(); timeline.repaint(); }
 void MainComponent::withDiscardConfirmation(std::function<void()> action) {
     if (!hasUnsavedChanges()) { action(); return; }
     juce::AlertWindow::showAsync(juce::MessageBoxOptions().withIconType(juce::MessageBoxIconType::QuestionIcon)

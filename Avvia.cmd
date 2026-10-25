@@ -17,7 +17,7 @@ echo.
 echo Questa cartella contiene i sorgenti, ma non il programma compilato.
 echo Per usare The Cuelist NON serve installare Visual Studio.
 echo.
-echo Estrai il pacchetto The-Cuelist-0.3.0-Windows-x64.zip
+echo Estrai il pacchetto The-Cuelist-0.4.0-Windows-x64.zip
 echo e apri "The Cuelist.exe" nella cartella estratta.
 echo In alternativa, copia l'eseguibile nella cartella di questo launcher.
 echo.

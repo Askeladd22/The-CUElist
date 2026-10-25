@@ -6,7 +6,7 @@ inline void modelV3Tests() {
         c.gain=0.25f; c.pan=-0.75f; c.muted=true; c.phaseInverted=true;
         show.rows[0].behaviour=Behaviour::pauseRestart;
         show.rows[0].cells[0].behaviour=Behaviour::pauseRestart;
-        const auto text=encodeShow(show); near((int)juce::JSON::parse(text)["version"],3);
+        const auto text=encodeShow(show); near((int)juce::JSON::parse(text)["version"],4);
         Show restored; check(decodeShow(text,restored).wasOk(),"v3 rejected");
         const auto& col=restored.columns[0]; near(col.gain,0.25); near(col.pan,-0.75);
         check(col.muted && col.phaseInverted,"Column flags lost");

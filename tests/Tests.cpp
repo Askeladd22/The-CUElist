@@ -18,6 +18,8 @@ void test(const char* name, const std::function<void()>& body) {
 #include "ModelV3Tests.h"
 #include "TimelineV3Tests.h"
 #include "ControlsV3Tests.h"
+#include "EngineV4Tests.h"
+#include "ControlsV4Tests.h"
 int main() {
     juce::ScopedJuceInitialiser_GUI initialiseJuce;
     test("tempo changes integrate seconds, independent of other rows", [] {
@@ -60,6 +62,8 @@ int main() {
     modelV3Tests();
     timelineV3Tests();
     controlsV3Tests();
+    engineV4Tests();
+    controlsV4Tests();
     test("inspector activation menu and dB fader control live PCM without resetting cursor", [] {
         MainComponent ui(false); ui.engine.connected.store(true);
         auto clip=std::make_shared<AudioClip>(); clip->sampleRate=4; clip->samples.setSize(1,20);
@@ -172,6 +176,13 @@ int main() {
         MainComponent preview(false); preview.importFile(folder.getChildFile("verification.wav"));
         preview.setSize(1440,900);
         auto stream=folder.getChildFile("interface-preview.png").createOutputStream();
+        if (stream) { stream->setPosition(0); stream->truncate(); juce::PNGImageFormat{}.writeImageToStream(preview.createComponentSnapshot(preview.getLocalBounds()),*stream); }
+        addColumn(preview.show,ColumnType::midi,"MIDI"); addColumn(preview.show,ColumnType::osc,"OSC");
+        cueViewFixtures::find<ColumnUtilities>(preview)->refresh(); preview.setSize(1700,900);
+        preview.engine.connected.store(true); preview.triggerCell();
+        juce::AudioBuffer<float> visualAudio(2,96000); preview.engine.collectRetired();
+        preview.engine.processBlock(visualAudio.getArrayOfWritePointers(),2,96000,48000);
+        stream=folder.getChildFile("interface-mixed-progress.png").createOutputStream();
         if (stream) { stream->setPosition(0); stream->truncate(); juce::PNGImageFormat{}.writeImageToStream(preview.createComponentSnapshot(preview.getLocalBounds()),*stream); }
         for (auto* child : preview.getChildren()) if (auto* button=dynamic_cast<juce::TextButton*>(child))
             if (button->getButtonText()=="Intera cue") button->onClick();

@@ -1,12 +1,12 @@
 # The Cuelist
 
-Applicazione desktop Windows per cue multimediali. Versione 0.3 C++/JUCE: audio WAV/MP3 reale e interfaccia ispirata al riferimento fornito. Non gestisce video.
+Applicazione desktop Windows per cue multimediali. Versione 0.4 C++/JUCE: audio WAV/MP3 reale e interfaccia ispirata al riferimento fornito. Non gestisce video.
 
 ## Avvio
 
 Per **usare il programma non servono Visual Studio, Build Tools, Git o CMake**.
 
-1. Copia sul computer di destinazione il pacchetto **The-Cuelist-0.3.0-Windows-x64.zip** (prodotto nella cartella `dist`).
+1. Copia sul computer di destinazione il pacchetto **The-Cuelist-0.4.0-Windows-x64.zip** (prodotto nella cartella `dist`).
 2. Estrai tutto lo ZIP in una cartella a scelta.
 3. Fai doppio click su **The Cuelist.exe** oppure **Avvia.cmd** nella cartella estratta.
 
@@ -30,22 +30,24 @@ Risultato atteso: compilazione Release, test CTest con `100% tests passed`, eseg
 
 Per creare il pacchetto portatile, eseguire `powershell -NoProfile -ExecutionPolicy Bypass -File scripts/package.ps1`. Questo compila, esegue i test e prepara lo ZIP in `dist`. L'opzione `-SkipBuild` riutilizza una build Release gia verificata. Lo script di packaging e destinato allo sviluppatore, non all'utilizzatore del programma.
 
-## Uso della versione 0.3
+## Uso della versione 0.4
 
 Si parte da una cue e una colonna Audio senza nomi precompilati. **+ Cue** e **+ Colonna** estendono la griglia.
 
 - Importa **WAV o MP3** con il pulsante o trascinandoli sulla cella. Doppio click sulla cella avvia l'audio.
-- **Spazio / GO** avvia la prossima cue, indicata in giallo, poi avanza. Alla fine si ferma senza ripartire dalla prima. Seleziona una riga per riarmare la sequenza da li. Il GO sulla riga avvia quella cue. Le righe possono suonare contemporaneamente.
+- **Spazio / GO** avvia la prossima cue, indicata in giallo, poi avanza. Alla fine si ferma senza ripartire dalla prima. Seleziona una riga per riarmare la sequenza da li. Il GO sulla riga avvia quella cue. Il toggle **Auto Stop** a destra della riga e attivo per default: al GO di un’altra cue ferma tutte le clip di quella riga, anche quelle escluse dal GO. Disattivalo per lasciare la riga in sovrapposizione. Anche il GO di una cue vuota ferma le altre righe abilitate; Play delle celle e Stop espliciti non fermano altre righe.
 - **ESC / PANIC** ferma tutto. **Ferma** arresta la cella selezionata. Ogni cella ha Play e Stop separati: Play usa il comportamento scelto nel menu, Stop ferma e azzera. Il quadrato rosso a destra del titolo cue ferma tutte le clip della riga, anche quelle escluse dal GO. Questi pulsanti non cambiano la prossima cue della sequenza.
 - Doppio click sul titolo della cue o della colonna per rinominarla: il campo riceve subito il focus e il testo viene selezionato; **Invio** conferma anche i nomi nell'inspector.
 - Le frecce visibili riordinano righe e colonne, **X** elimina. Eliminando l'ultima rimane una riga/colonna vuota. I file originali restano sul disco.
 - Trascina una clip nella griglia per spostarla: la destinazione occupata viene scambiata; serve una colonna dello stesso tipo.
 - Trascina una clip nella **timeline** per impostarne l'inizio nella cue. Trascina il cursore sul righello per cambiare posizione di riproduzione. La rotella scorre le tracce. **− / +** regolano lo zoom; **Fit** mostra tutta la cue. **Ctrl+rotella** fa zoom attorno al puntatore e la barra orizzontale permette di spostare la vista ingrandita.
 - Il fader **dB** cambia il livello immediatamente, da silenzio (-60) a +12 dB; doppio click riporta a 0 dB. La scheda **Intera cue** offre gain, mute, loop di tutte le clip e comportamento del GO. Il gain della cue moltiplica quello delle singole celle.
-- La riga **Utility colonne** sotto la griglia controlla tutte le clip di ciascuna colonna: fader in dB, pan, mute e inversione di polarita (**Fase**). I parametri restano salvati nello show. Il pan e un bilanciamento stereo: centro invariato, estremi con canale opposto silenziato; doppio click centra il pan o riporta il fader a 0 dB. Mute non ferma la riproduzione.
+- La riga **Utility colonne** sotto la griglia controlla tutte le clip di ciascuna colonna: fader in dB, pan, mute e inversione di polarita (**cerchio barrato**). I parametri restano salvati nello show. Il pan e un bilanciamento stereo: centro invariato, estremi con canale opposto silenziato; doppio click centra il pan o riporta il fader a 0 dB. Mute (altoparlante barrato) non ferma la riproduzione. I simboli sono evidenziati quando attivi. Nelle colonne MIDI/OSC questi controlli sono nascosti e resta solo il selettore uscita non ancora operativo.
+- Il menu **Out** nelle utility sceglie la coppia di uscite audio di ogni colonna; le voci si aggiornano al cambio dei canali attivi. Il routing non e piu nell’inspector. Le uscite memorizzate ma assenti sono segnalate senza sostituzione automatica.
+- Ogni cella caricata mostra **tempo trascorso / durata** e una barra legata al cursore audio effettivo. Il punto si illumina durante playback; pausa e attesa sono evidenziate in giallo. Il progresso segue seek e loop e si azzera allo Stop.
 - I parametri audio non fermano il trasporto. Invio, **Applica modifiche**, Salva o un cambio selezione confermano i campi testo.
 
-**Salva** raccoglie i media in una cartella `<nome>_media` accanto al `.cuelist`, con percorsi relativi. Per trasferire lo show copia **entrambi**, mantenendoli affiancati. Ad ogni salvataggio la versione precedente del progetto resta in `.cuelist.bak`; le generazioni precedenti dei media sono conservate per rendere utilizzabile il backup. Questo puo aumentare lo spazio occupato. **Apri** legge anche progetti v1/v2 e backup; il formato corrente e v3. Nei vecchi progetti Restart e Stop vengono convertiti in Retrigger e le utility di colonna partono neutre; salva di nuovo un progetto vecchio per raccoglierne i media. Nessun installatore o compilatore serve sul PC di utilizzo.
+**Salva** raccoglie i media in una cartella `<nome>_media` accanto al `.cuelist`, con percorsi relativi. Per trasferire lo show copia **entrambi**, mantenendoli affiancati. Ad ogni salvataggio la versione precedente del progetto resta in `.cuelist.bak`; le generazioni precedenti dei media sono conservate per rendere utilizzabile il backup. Questo puo aumentare lo spazio occupato. **Apri** legge anche progetti v1/v2/v3 e backup; il formato corrente e v4. I progetti precedenti ricevono Auto Stop attivo su tutte le righe. Nei vecchi progetti Restart e Stop vengono convertiti in Retrigger e le utility di colonna partono neutre; salva di nuovo un progetto vecchio per raccoglierne i media. Nessun installatore o compilatore serve sul PC di utilizzo.
 
 **Dispositivi audio** seleziona dispositivo e uscite attive. Il routing usa la numerazione delle uscite attive: ricontrollarlo dopo un cambio di dispositivo. Nessun ripiego automatico su altre uscite.
 
@@ -58,7 +60,7 @@ Si parte da una cue e una colonna Audio senza nomi precompilati. **+ Cue** e **+
 | Pause / Resume | Alterna pausa e ripresa mantenendo la posizione |
 | Continue | Continua se già in esecuzione, altrimenti riprende dalla posizione conservata |
 
-**Loop** è indipendente dal comportamento di attivazione. **Partecipa al GO della riga** esclude o include la cella nel trigger collettivo; l'attivazione diretta rimane possibile. Le cue non si escludono a vicenda: più righe possono suonare contemporaneamente.
+**Loop** è indipendente dal comportamento di attivazione. **Partecipa al GO della riga** esclude o include la cella nel trigger collettivo; l'attivazione diretta rimane possibile. Le righe con Auto Stop disattivato possono continuare a suonare quando viene attivata un’altra cue.
 
 Ogni cue ha una mappa tempo separata, modificabile con **Mappa tempo**. Formato: `beat BPM numeratore/denominatore`, un punto per riga, primo beat `0`; beat espresso in quarti. Esempio:
 

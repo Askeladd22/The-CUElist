@@ -1,5 +1,17 @@
 # Registro sviluppo
 
+## Versione 0.4 portable — 25 ottobre 2026
+
+- Uscite audio spostate dall'inspector alle utility di colonna, con aggiornamento dei canali attivi. Le colonne MIDI/OSC mostrano solo un selettore non operativo; controlli audio nascosti.
+- Icone vettoriali altoparlante barrato e cerchio barrato per mute e polarita, con evidenza dello stato e tooltip.
+- Cella audio con tempo trascorso/durata, barra di progresso e indicatori di playback/pausa/attesa. Telemetria atomica separata dallo stato mutabile del renderer, senza accessi concorrenti alle voci. A dispositivo disconnesso la GUI nasconde gli stati attivi e conserva l'ultima posizione nota.
+- Auto Stop per riga, attivo per default: GO di qualsiasi altra cue ferma tutte le voci delle righe abilitate, anche dirette/escluse dal GO. Anche una cue vuota attiva l'arresto; Play singolo e Stop non interferiscono con altre righe. Disattivando il toggle si mantiene la sovrapposizione.
+- JSON v4 conserva stopOnNext; v1/v2/v3 vengono importati con Auto Stop attivo. Salvataggio e media restano portable.
+- Build Release completa: **68 casi, 20.472 asserzioni, zero fallimenti**. Il conteggio include verifiche di 10.000 righe nel test di grandezza. Verificati routing PCM live, editor draft conservati, hitbox del toggle, stop selettivo, telemetria e migrazione.
+- Revisione indipendente: eliminato il costo quadratico dell'Auto Stop nel callback; ora scansioni O(righe + voci). Seconda revisione senza ulteriori rilievi.
+- Anteprime native verificate con Audio/MIDI/OSC affiancate e clip a 2 secondi su 5; controllata anche la dimensione minima. ZIP `dist/The-Cuelist-0.4.0-Windows-x64.zip` verificato per estrazione, hash, launcher non compilante, avvio offline e chiusura normale.
+- Nessuna prova di ascolto o cambio dispositivo su hardware esterno; test PCM con uscite simulate. Nessun push o rilascio pubblico.
+
 ## Versione 0.3 portable — 25 ottobre 2026
 
 - Rinomina: focus immediato nel campo e testo selezionato, verificato su dialogo JUCE reale.

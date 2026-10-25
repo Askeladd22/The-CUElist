@@ -5,7 +5,7 @@ Set-Location $repo
 if (!$SkipBuild) { & (Join-Path $PSScriptRoot 'build.ps1') }
 $exe = Join-Path $repo 'build\TheCuelist_artefacts\Release\The Cuelist.exe'
 if (!(Test-Path -LiteralPath $exe)) { throw 'Eseguibile Release assente. Compilare sul computer di sviluppo prima di creare il pacchetto.' }
-$packageName = 'The-Cuelist-0.3.0-Windows-x64'
+$packageName = 'The-Cuelist-0.4.0-Windows-x64'
 $dist = Join-Path $repo 'dist'
 $stagingRoot = Join-Path $repo ('build\package-' + [guid]::NewGuid().ToString('N'))
 $package = Join-Path $stagingRoot $packageName
@@ -16,7 +16,7 @@ Copy-Item -LiteralPath (Join-Path $repo 'Avvia.cmd') -Destination $package
 Copy-Item -LiteralPath (Join-Path $repo 'README.md') -Destination $package
 Copy-Item -LiteralPath (Join-Path $repo 'vendor\JUCE\LICENSE.md') -Destination (Join-Path $package 'JUCE-LICENSE.md')
 @'
-THE CUELIST 0.3.0 - WINDOWS x64
+THE CUELIST 0.4.0 - WINDOWS x64
 
 1. Estrai TUTTO questo ZIP in una cartella sul tuo computer.
 2. Apri "The Cuelist.exe" con un doppio click.

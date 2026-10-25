@@ -47,6 +47,7 @@ public:
     ~ColumnUtilities() override;
     void refresh();
     void syncScroll(int);
+    void refreshRouting();
     void resized() override;
     void paint(juce::Graphics&) override;
 private:
@@ -72,6 +73,8 @@ public:
     void stopCellAt(int row,int column);
     void stopRow(int row);
     void setColumnUtilities(int column,float gain,float pan,bool muted,bool inverted);
+    void setColumnOutput(int column,int output);
+    void setAutoStop(int row,bool enabled);
     void renameTitle(bool column,int index);
     void reorderRow(int index,int delta);
     void reorderColumn(int index,int delta);
@@ -99,7 +102,7 @@ private:
     juce::TextButton cellTab{"Cella"},rowTab{"Intera cue"};
     juce::TextButton tempoButton{"Mappa tempo"},applyButton{"Applica modifiche"};
     juce::TextEditor rowName,cellName,bpm;
-    juce::ComboBox behaviour,meter,output;
+    juce::ComboBox behaviour,meter;
     juce::ToggleButton follow{"Partecipa al GO della riga"},loop{"Ripeti in loop"};
     juce::Slider gain;
     juce::Slider rowGain;
