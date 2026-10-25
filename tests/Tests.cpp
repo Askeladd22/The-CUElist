@@ -15,6 +15,9 @@ void test(const char* name, const std::function<void()>& body) {
 #include "AudioTests.h"
 #include "ModelV2Tests.h"
 #include "CueViewTests.h"
+#include "ModelV3Tests.h"
+#include "TimelineV3Tests.h"
+#include "ControlsV3Tests.h"
 int main() {
     juce::ScopedJuceInitialiser_GUI initialiseJuce;
     test("tempo changes integrate seconds, independent of other rows", [] {
@@ -54,6 +57,9 @@ int main() {
     audioTests();
     modelV2Tests();
     cueViewTests();
+    modelV3Tests();
+    timelineV3Tests();
+    controlsV3Tests();
     test("inspector activation menu and dB fader control live PCM without resetting cursor", [] {
         MainComponent ui(false); ui.engine.connected.store(true);
         auto clip=std::make_shared<AudioClip>(); clip->sampleRate=4; clip->samples.setSize(1,20);
@@ -71,9 +77,11 @@ int main() {
         behaviour->setSelectedId(3,juce::sendNotificationSync); ui.triggerCell(); near(sample(),0);
         ui.triggerCell(); near(sample(),0.03*level);
         behaviour->setSelectedId(4,juce::sendNotificationSync); ui.triggerCell(); near(sample(),0.04*level);
-        behaviour->setSelectedId(5,juce::sendNotificationSync); ui.triggerCell(); near(sample(),0);
+        check(behaviour->getNumItems()==4,"Removed Stop remains in menu");
+        ui.stopCellAt(0,0); near(sample(),0);
         behaviour->setSelectedId(1,juce::sendNotificationSync); ui.triggerCell(); near(sample(),0.01*level);
-        behaviour->setSelectedId(2,juce::sendNotificationSync); ui.triggerCell(); near(sample(),0.01*level);
+        behaviour->setSelectedId(2,juce::sendNotificationSync); ui.triggerCell(); near(sample(),0);
+        ui.triggerCell(); near(sample(),0.01*level);
     });
     test("Enter commits names and GO advances without wrapping", [] {
         MainComponent ui(false); addRow(ui.show,{}); ui.engine.connected.store(true);

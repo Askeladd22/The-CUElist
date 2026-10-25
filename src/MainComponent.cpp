@@ -17,6 +17,10 @@ void prompt(juce::Component* parent,const juce::String& title,const juce::String
     alert->enterModalState(true,juce::ModalCallbackFunction::create([alert,result](int answer) {
         if (answer==1) result(alert->getTextEditorContents("value"));
     }),true);
+    editor->grabKeyboardFocus(); editor->selectAll();
+    juce::MessageManager::callAsync([safe=juce::Component::SafePointer<juce::TextEditor>(editor)] {
+        if (safe && safe->isShowing()) { safe->grabKeyboardFocus(); safe->selectAll(); }
+    });
 }
 }
 
@@ -24,7 +28,7 @@ MainComponent::MainComponent(bool startAudio) {
     setLookAndFeel(&theme); setWantsKeyboardFocus(true); setSize(1440,900);
     for (juce::Component* c : std::initializer_list<juce::Component*>{&openButton,&saveButton,&newButton,&addRowButton,&addColumnButton,
          &goButton,&panicButton,&deviceButton,&importButton,&playCellButton,&stopCellButton,&clearButton,&tempoButton,&applyButton,
-         &cellTab,&rowTab,&rowGain,&rowBehaviour,&rowMute,&rowLoop,&rowName,&cellName,&bpm,&behaviour,&meter,&output,&follow,&loop,&gain,&viewport,&timeline}) addAndMakeVisible(c);
+         &cellTab,&rowTab,&rowGain,&rowBehaviour,&rowMute,&rowLoop,&rowName,&cellName,&bpm,&behaviour,&meter,&output,&follow,&loop,&gain,&viewport,&timeline,&utilities}) addAndMakeVisible(c);
     for (auto* b : {&openButton,&saveButton,&newButton,&addRowButton,&addColumnButton,&goButton,&panicButton,&deviceButton,
                     &importButton,&playCellButton,&stopCellButton,&clearButton,&tempoButton,&applyButton}) b->setWantsKeyboardFocus(false);
     viewport.setViewedComponent(&grid,false); viewport.setScrollBarsShown(true,true);
@@ -32,7 +36,7 @@ MainComponent::MainComponent(bool startAudio) {
     panicButton.setColour(juce::TextButton::buttonColourId,juce::Colour(0xff422133));
     panicButton.setColour(juce::TextButton::textColourOffId,palette::red);
     importButton.setColour(juce::TextButton::buttonColourId,palette::teal.darker(0.65f));
-    behaviour.addItemList({"Retrigger","Restart","Pause / Resume","Continue","Stop"},1);
+    behaviour.addItemList({"Retrigger","Pausa / Restart","Pausa / Resume","Continue"},1);
     meter.addItemList({"4/4","3/4","6/8","7/8","5/4"},1);
     gain.setSliderStyle(juce::Slider::LinearHorizontal); gain.setTextBoxStyle(juce::Slider::TextBoxRight,false,52,24);
     for (auto* slider : {&gain,&rowGain}) {
@@ -40,7 +44,7 @@ MainComponent::MainComponent(bool startAudio) {
         slider->setRange(-60,12,0.1); slider->setNumDecimalPlacesToDisplay(1); slider->setTextValueSuffix(" dB"); slider->setDoubleClickReturnValue(true,0);
     }
     gain.setName("cellGainDb"); rowGain.setName("rowGainDb");
-    rowBehaviour.addItemList({"Usa impostazioni celle","Retrigger","Restart","Pause / Resume","Continue","Stop"},1);
+    rowBehaviour.addItemList({"Usa impostazioni celle","Retrigger","Pausa / Restart","Pausa / Resume","Continue"},1);
     cellTab.setWantsKeyboardFocus(false); rowTab.setWantsKeyboardFocus(false);
     cellTab.onClick=[this] { if (applyInspector()) { rowSettings=false; refresh(); } };
     rowTab.onClick=[this] { if (applyInspector()) { rowSettings=true; refresh(); } };
@@ -98,7 +102,7 @@ void MainComponent::paint(juce::Graphics& g) {
     label(g,"SHOW CONTROL",{61,45,130,15},10,palette::muted,true);
     label(g,"SESSION",{232,25,100,22},12,palette::teal,true);
     g.setColour(palette::teal); g.fillRect(232,69,65,3);
-    label(g,"0.2  /  PORTABLE",{334,25,160,22},11,palette::muted);
+    label(g,"0.3  /  PORTABLE",{334,25,160,22},11,palette::muted);
     g.setColour(engine.connected.load() ? palette::teal : palette::red); g.fillEllipse((float)w-367,32,6,6);
     label(g,engine.connected.load() ? "Audio disponibile" : "Audio non disponibile",{w-352,22,160,25},12,palette::muted);
     label(g,"WORKSPACE",{20,99,140,18},10,palette::muted,true);
@@ -159,7 +163,9 @@ void MainComponent::resized() {
     deviceButton.setBounds(20,188,140,33);
     addRowButton.setBounds(editorX-188,98,76,33); addColumnButton.setBounds(editorX-104,98,92,33);
     const int gridHeight=std::max(235,h-438);
-    viewport.setBounds(204,154,editorX-220,gridHeight);
+    viewport.setBounds(204,154,editorX-220,gridHeight-88);
+    utilities.setBounds(204,154+gridHeight-88,editorX-220,88);
+    utilities.syncScroll(viewport.getViewPositionX());
     timeline.setBounds(204,168+gridHeight,editorX-220,h-gridHeight-215);
     int x=editorX+16;
     cellTab.setBounds(x,198,106,27); rowTab.setBounds(x+114,198,114,27);
@@ -181,7 +187,7 @@ void MainComponent::resized() {
     grid.setSize(std::max(viewport.getWidth()-14,CueGrid::nameWidth+(int)show.columns.size()*CueGrid::columnWidth+180),
                  std::max(viewport.getHeight()-14,CueGrid::headerHeight+(int)show.rows.size()*CueGrid::rowHeight));
 }
-void MainComponent::refresh() { selectedRow=juce::jlimit(0,(int)show.rows.size()-1,selectedRow); selectedColumn=juce::jlimit(0,(int)show.columns.size()-1,selectedColumn); refreshInspector(); resized(); repaint(); grid.repaint(); timeline.repaint(); }
+void MainComponent::refresh() { selectedRow=juce::jlimit(0,(int)show.rows.size()-1,selectedRow); selectedColumn=juce::jlimit(0,(int)show.columns.size()-1,selectedColumn); refreshInspector(); utilities.refresh(); resized(); repaint(); grid.repaint(); timeline.repaint(); }
 void MainComponent::refreshInspector() {
     const auto& row=show.rows[selectedRow]; const auto& c=row.cells[selectedColumn]; const auto& col=show.columns[selectedColumn];
     engine.monitoredRowId.store(row.id);
@@ -288,6 +294,28 @@ void MainComponent::triggerCell() {
     if (show.columns[selectedColumn].type!=ColumnType::audio) { message("Il motore MIDI/OSC e previsto in un incremento successivo."); return; }
     if (!clips.count(c.id)) { importDialog(); return; } send(c.id,false);
 }
+void MainComponent::triggerCellAt(int row,int column) {
+    const int armed=nextCue;
+    if (!select(row,column)) return;
+    nextCue=armed; triggerCell(); grid.repaint();
+}
+void MainComponent::stopCellAt(int row,int column) {
+    if (row<0 || row>=(int)show.rows.size() || column<0 || column>=(int)show.columns.size()) return;
+    send(show.rows[row].cells[column].id,false,true); repaint();
+}
+void MainComponent::stopRow(int row) {
+    if (row<0 || row>=(int)show.rows.size()) return;
+    if (send(show.rows[row].id,true,true)) status="Tutte le clip della cue "+juce::String(row+1)+" fermate.";
+    repaint();
+}
+void MainComponent::setColumnUtilities(int column,float level,float pan,bool muted,bool inverted) {
+    if (column<0 || column>=(int)show.columns.size() || !std::isfinite(level) || !std::isfinite(pan)) return;
+    auto& col=show.columns[column];
+    col.gain=juce::jlimit(0.0f,4.0f,level); col.pan=juce::jlimit(-1.0f,1.0f,pan);
+    col.muted=muted; col.phaseInverted=inverted;
+    dirty=true; engine.publish(makeRenderState(show,clips));
+    status="Utility colonna aggiornate."; repaint();
+}
 void MainComponent::stopAll() { engine.panic(); status="PANIC / tutte le riproduzioni audio fermate."; repaint(); }
 bool MainComponent::keyPressed(const juce::KeyPress& key) {
     if (key==juce::KeyPress::escapeKey) { stopAll(); return true; }
@@ -296,7 +324,7 @@ bool MainComponent::keyPressed(const juce::KeyPress& key) {
     if (key==juce::KeyPress::downKey) { select(std::min(selectedRow+1,(int)show.rows.size()-1),selectedColumn); return true; }
     if (key==juce::KeyPress::upKey) { select(std::max(0,selectedRow-1),selectedColumn); return true; } return false;
 }
-void MainComponent::timerCallback() { engine.collectRetired(); displayPeak=std::max(engine.peak.load(),displayPeak*.88f); repaint(); timeline.repaint(); }
+void MainComponent::timerCallback() { engine.collectRetired(); utilities.syncScroll(viewport.getViewPositionX()); displayPeak=std::max(engine.peak.load(),displayPeak*.88f); repaint(); timeline.repaint(); }
 void MainComponent::withDiscardConfirmation(std::function<void()> action) {
     if (!hasUnsavedChanges()) { action(); return; }
     juce::AlertWindow::showAsync(juce::MessageBoxOptions().withIconType(juce::MessageBoxIconType::QuestionIcon)

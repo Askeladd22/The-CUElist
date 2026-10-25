@@ -50,7 +50,8 @@ void RenderState::trigger(int id,bool row,bool stop) noexcept {
     bool anyPlaying=false;
     if (row) for (const auto& v:voices)
         if (v.rowId==id && v.followsRow && v.playing
-            && (v.overrideBehaviour ? v.rowBehaviour : v.behaviour)==Behaviour::pauseResume) anyPlaying=true;
+            && ((v.overrideBehaviour ? v.rowBehaviour : v.behaviour)==Behaviour::pauseResume
+                || (v.overrideBehaviour ? v.rowBehaviour : v.behaviour)==Behaviour::pauseRestart)) anyPlaying=true;
     bool restartClock=false, stopClock=stop;
     for (auto& v:voices) {
         if (row ? (v.rowId!=id || (!stop && !v.followsRow)) : v.cellId!=id) continue;
@@ -63,7 +64,12 @@ void RenderState::trigger(int id,bool row,bool stop) noexcept {
         if (!row) { v.delaySeconds=0; v.pendingSeek=false; }
         const bool wasRowMode=v.rowMode; v.rowMode=row;
         switch (behaviour) {
-            case Behaviour::retrigger: case Behaviour::restart:
+            case Behaviour::pauseRestart:
+                if (row ? anyPlaying : v.playing) { v.playing=false; break; }
+                // An explicit seek wins once, otherwise a paused voice restarts
+                // from the row origin (including its offset), or sample zero.
+                [[fallthrough]];
+            case Behaviour::retrigger:
                 if (!row || !v.pendingSeek) {
                     if (row) placeOnTimeline(v,0); else v.position=0;
                     restartClock=true;
@@ -102,7 +108,10 @@ void RenderState::render(float* const* outputs,int channels,int frames,double sa
         if (length==0 || audio.getNumChannels()==0) { v.playing=false; continue; }
         const bool looping=v.loop || v.rowLoop;
         const double step=v.clip->sampleRate/sampleRate;
-        const float gain=v.rowMuted ? 0 : v.gain*v.rowGain;
+        const float gain=(v.rowMuted || v.columnMuted) ? 0
+            : v.gain*v.rowGain*v.columnGain*(v.columnPhaseInverted ? -1.0f : 1.0f);
+        const float sideGain[2] {gain*(1.0f-std::max(0.0f,v.columnPan)),
+                                 gain*(1.0f+std::min(0.0f,v.columnPan))};
         for (int i=0;i<frames && v.playing;++i) {
             if (v.rowMode && v.delaySeconds>1.0e-12) { v.delaySeconds=std::max(0.0,v.delaySeconds-1.0/sampleRate); continue; }
             v.delaySeconds=0;
@@ -116,7 +125,7 @@ void RenderState::render(float* const* outputs,int channels,int frames,double sa
                 const int output=v.output+side;
                 if (output>=channels || output<0 || !outputs[output]) continue;
                 const float* data=audio.getReadPointer(std::min(side,audio.getNumChannels()-1));
-                outputs[output][i]+=(data[a]+fraction*(data[b]-data[a]))*gain;
+                outputs[output][i]+=(data[a]+fraction*(data[b]-data[a]))*sideGain[side];
             }
             v.position+=step;
             if (v.position>=length) {
@@ -164,6 +173,8 @@ std::unique_ptr<RenderState> makeRenderState(const Show& show,const ClipMap& cli
         Voice v; v.cellId=c.id; v.rowId=row.id; v.clip=it->second; v.output=show.columns[i].output;
         v.gain=c.gain; v.loop=c.loop; v.followsRow=c.followsRow; v.behaviour=c.behaviour;
         v.startSeconds=c.startSeconds; v.rowGain=row.gain; v.rowMuted=row.muted;
+        v.columnGain=show.columns[i].gain; v.columnPan=show.columns[i].pan;
+        v.columnMuted=show.columns[i].muted; v.columnPhaseInverted=show.columns[i].phaseInverted;
         v.rowLoop=row.loop; v.overrideBehaviour=row.overrideBehaviour; v.rowBehaviour=row.behaviour;
         state->voices.push_back(std::move(v));
       }

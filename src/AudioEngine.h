@@ -17,6 +17,8 @@ struct Voice {
     double position = 0;
     double startSeconds = 0, delaySeconds = 0;
     float rowGain = 1;
+    float columnGain = 1, columnPan = 0;
+    bool columnMuted = false, columnPhaseInverted = false;
     bool rowMuted = false, rowLoop = false, overrideBehaviour = false;
     Behaviour rowBehaviour = Behaviour::retrigger;
     bool rowMode = false, pendingSeek = false;

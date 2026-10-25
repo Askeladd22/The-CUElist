@@ -58,11 +58,13 @@ juce::Result validateShow(const Show& show) {
     auto unique = [&](int id) { return id > 0 && id < 1000000000 && ids.insert(id).second; };
     for (const auto& column : show.columns) {
         if (!unique(column.id) || column.output < 0 || column.output > 1022
-            || (int)column.type < 0 || (int)column.type > 2) return fail("Colonna non valida.");
+            || (int)column.type < 0 || (int)column.type > 2
+            || !std::isfinite(column.gain) || column.gain < 0 || column.gain > 4
+            || !std::isfinite(column.pan) || column.pan < -1 || column.pan > 1) return fail("Colonna non valida.");
     }
     for (const auto& row : show.rows) {
         if (!unique(row.id) || row.cells.size()!=show.columns.size() || row.tempo.empty()
-            || !std::isfinite(row.gain) || row.gain < 0 || row.gain > 4 || (int)row.behaviour < 0 || (int)row.behaviour > 4) return fail("Riga non valida.");
+            || !std::isfinite(row.gain) || row.gain < 0 || row.gain > 4 || (int)row.behaviour < 0 || (int)row.behaviour > 3) return fail("Riga non valida.");
         double previous = -1;
         for (const auto& p : row.tempo) {
             if (!std::isfinite(p.beat) || p.beat < 0 || p.beat <= previous || (previous < 0 && p.beat != 0)
@@ -73,7 +75,7 @@ juce::Result validateShow(const Show& show) {
         }
         for (size_t i=0; i<row.cells.size(); ++i) {
             const auto& c = row.cells[i];
-            if (!unique(c.id) || !std::isfinite(c.gain) || c.gain < 0 || c.gain > 4 || (int)c.behaviour < 0 || (int)c.behaviour > 4
+            if (!unique(c.id) || !std::isfinite(c.gain) || c.gain < 0 || c.gain > 4 || (int)c.behaviour < 0 || (int)c.behaviour > 3
                 || !std::isfinite(c.startSeconds) || c.startSeconds < 0 || c.startSeconds > 86400)
                 return fail("Cella non valida.");
             if (c.file.isNotEmpty() && (show.columns[i].type != ColumnType::audio || (!juce::File::isAbsolutePath(c.file) && !safeRelative(c.file))))
@@ -110,7 +112,8 @@ juce::Array<juce::var> array(const juce::var& o,const char* key) {
 }
 juce::String encodeShow(const Show& show) {
     juce::Array<juce::var> columns, rows;
-    for (const auto& c : show.columns) columns.add(object({{"id",c.id},{"name",c.name},{"type",(int)c.type},{"output",c.output}}));
+    for (const auto& c : show.columns) columns.add(object({{"id",c.id},{"name",c.name},{"type",(int)c.type},{"output",c.output},
+        {"gain",c.gain},{"pan",c.pan},{"muted",c.muted},{"phaseInverted",c.phaseInverted}}));
     for (const auto& r : show.rows) {
         juce::Array<juce::var> tempo, cells;
         for (const auto& p : r.tempo) tempo.add(object({{"beat",p.beat},{"bpm",p.bpm},{"numerator",p.numerator},{"denominator",p.denominator}}));
@@ -119,27 +122,38 @@ juce::String encodeShow(const Show& show) {
         rows.add(object({{"id",r.id},{"name",r.name},{"tempo",tempo},{"cells",cells},{"gain",r.gain},
             {"muted",r.muted},{"loop",r.loop},{"overrideBehaviour",r.overrideBehaviour},{"behaviour",(int)r.behaviour}}));
     }
-    return juce::JSON::toString(object({{"format","TheCuelist"},{"version",2},{"name",show.name},{"nextId",show.nextId},{"columns",columns},{"rows",rows}}));
+    return juce::JSON::toString(object({{"format","TheCuelist"},{"version",3},{"name",show.name},{"nextId",show.nextId},{"columns",columns},{"rows",rows}}));
 }
 juce::Result decodeShow(const juce::String& text, Show& destination) {
     if (text.length() > 32*1024*1024) return juce::Result::fail("Progetto troppo grande (massimo 32 MB). ");
     try {
         auto root = juce::JSON::parse(text);
         const auto version = integer(root,"version");
-        if (string(root,"format") != "TheCuelist" || (version != 1 && version != 2)) return juce::Result::fail("Formato o versione progetto non supportati.");
+        if (string(root,"format") != "TheCuelist" || (version != 1 && version != 2 && version != 3)) return juce::Result::fail("Formato o versione progetto non supportati.");
+        const auto activation = [version](int value) {
+            if (version < 3 && (value == 1 || value == 4)) return Behaviour::retrigger;
+            return (Behaviour)value;
+        };
         Show show; show.name = string(root,"name"); show.nextId = integer(root,"nextId");
-        for (auto& c : array(root,"columns")) show.columns.push_back({integer(c,"id"),string(c,"name"),(ColumnType)integer(c,"type"),integer(c,"output")});
+        for (auto& c : array(root,"columns")) {
+            Column column {integer(c,"id"),string(c,"name"),(ColumnType)integer(c,"type"),integer(c,"output")};
+            if (version >= 3) {
+                column.gain=(float)number(c,"gain"); column.pan=(float)number(c,"pan");
+                column.muted=boolean(c,"muted"); column.phaseInverted=boolean(c,"phaseInverted");
+            }
+            show.columns.push_back(column);
+        }
         for (auto& r : array(root,"rows")) {
             Row row; row.id = integer(r,"id"); row.name = string(r,"name"); row.tempo.clear();
-            if (version == 2) {
+            if (version >= 2) {
                 row.gain=(float)number(r,"gain"); row.muted=boolean(r,"muted"); row.loop=boolean(r,"loop");
-                row.overrideBehaviour=boolean(r,"overrideBehaviour"); row.behaviour=(Behaviour)integer(r,"behaviour");
+                row.overrideBehaviour=boolean(r,"overrideBehaviour"); row.behaviour=activation(integer(r,"behaviour"));
             }
             for (auto& p : array(r,"tempo")) row.tempo.push_back({number(p,"beat"),number(p,"bpm"),integer(p,"numerator"),integer(p,"denominator")});
             for (auto& c : array(r,"cells")) {
                 Cell cell; cell.id=integer(c,"id"); cell.name=string(c,"name"); cell.file=string(c,"file");
-                cell.followsRow=boolean(c,"followsRow"); cell.loop=boolean(c,"loop"); cell.gain=(float)number(c,"gain"); cell.behaviour=(Behaviour)integer(c,"behaviour");
-                if (version == 2) cell.startSeconds=number(c,"startSeconds");
+                cell.followsRow=boolean(c,"followsRow"); cell.loop=boolean(c,"loop"); cell.gain=(float)number(c,"gain"); cell.behaviour=activation(integer(c,"behaviour"));
+                if (version >= 2) cell.startSeconds=number(c,"startSeconds");
                 if (version == 1 && cell.file.isNotEmpty() && !juce::File::isAbsolutePath(cell.file)) return juce::Result::fail("Percorso v1 non assoluto.");
                 row.cells.push_back(cell);
             }

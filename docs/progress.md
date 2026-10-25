@@ -1,5 +1,17 @@
 # Registro sviluppo
 
+## Versione 0.3 portable — 25 ottobre 2026
+
+- Rinomina: focus immediato nel campo e testo selezionato, verificato su dialogo JUCE reale.
+- Pausa/Restart sostituisce Restart: prima mette in pausa, successiva attivazione riparte dall'inizio; Pausa/Resume conserva la posizione. Stop rimosso dai menu, mantenuto come comando esplicito.
+- Stop a destra del titolo cue ferma anche le clip escluse dal GO. Pulsanti Play/Stop nelle celle indipendenti dalla sequenza; Play applica il comportamento scelto.
+- Timeline con zoom 1x–32x, meno/piu/Fit, Ctrl+rotella attorno al puntatore, barra orizzontale. Seek e drag testati anche con zoom e resize.
+- Utility sotto ogni colonna Audio: fader dB, pan/bilanciamento stereo, mute e inversione polarita. Aggiornamenti live senza azzerare il cursore; valori non modificati conservati senza quantizzazione indiretta.
+- Progetti v3 con utility persistenti; lettura v1/v2 e migrazione dei vecchi Restart/Stop a Retrigger. Il salvataggio resta portable con media raccolti.
+- Build completa Release: **58 casi, 389 asserzioni, zero fallimenti**. Revisione indipendente senza problemi bloccanti; corretta la precisione dei parametri non toccati dai toggle.
+- Rendering GUI verificato a 1440x900 e 1180x820. ZIP `dist/The-Cuelist-0.3.0-Windows-x64.zip` estratto e verificato: hash uguale alla build, launcher non compilante, avvio offline e chiusura normale.
+- Nessun test di ascolto o lunga durata su hardware esterno, nessun push o rilascio pubblico. Motori MIDI/OSC ancora previsti.
+
 ## Versione 0.2 portable — 25 ottobre 2026
 
 Questa sezione aggiorna e sostituisce i limiti della versione 0.1 descritti sotto.

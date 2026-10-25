@@ -2,6 +2,69 @@
 #include "AudioEngine.h"
 #include <limits>
 inline void audioTests() {
+    test("column utilities process mono and stereo without resetting live cursor", [&] {
+        for (int channels : {1,2}) {
+            auto show=makeShow(); auto& cell=show.rows[0].cells[0]; cell.followsRow=false;
+            cell.gain=0.5f; show.rows[0].gain=0.5f;
+            auto clip=std::make_shared<AudioClip>(); clip->sampleRate=4; clip->samples.setSize(channels,16);
+            for(int ch=0;ch<channels;++ch) for(int i=0;i<16;++i) clip->samples.setSample(ch,i,0.04f*(i+1)*(ch+1));
+            ClipMap clips; clips[cell.id]=clip; AudioEngine engine; juce::AudioBuffer<float> out(2,1);
+            auto block=[&] { engine.processBlock(out.getArrayOfWritePointers(),2,1,4); engine.collectRetired(); };
+            auto& col=show.columns[0];
+            engine.publish(makeRenderState(show,clips)); engine.send(cell.id,false); block();
+            near(out.getSample(0,0),0.01); near(out.getSample(1,0),channels==2 ? 0.02 : 0.01);
+            col.gain=0.5f; col.pan=-1; col.phaseInverted=true;
+            engine.publish(makeRenderState(show,clips)); block();
+            near(out.getSample(0,0),-0.01); near(out.getSample(1,0),0);
+            col.pan=1; engine.publish(makeRenderState(show,clips)); block();
+            near(out.getSample(0,0),0); near(out.getSample(1,0),channels==2 ? -0.03 : -0.015);
+            col.muted=true; engine.publish(makeRenderState(show,clips)); block(); near(out.getMagnitude(0,1),0);
+            check(engine.activeVoices.load()==1,"Column mute stopped playback");
+            col.muted=false; col.pan=0.5f; col.phaseInverted=false;
+            engine.publish(makeRenderState(show,clips)); block();
+            near(out.getSample(0,0),0.0125); near(out.getSample(1,0),channels==2 ? 0.05 : 0.025);
+            engine.send(show.rows[0].id,true,true); block(); near(out.getMagnitude(0,1),0);
+            check(engine.activeVoices.load()==0,"Explicit row stop ignored opted out cell");
+        }
+    });
+    test("PauseRestart pauses then restarts PCM while PauseResume retains cursor", [&] {
+        for (bool rowTrigger : {false,true}) for (bool overrideRow : {false,true}) for (int mode : {1,2}) {
+            auto show=makeShow(); auto& row=show.rows[0]; auto& cell=row.cells[0];
+            cell.behaviour=(Behaviour)mode; cell.startSeconds=0.5;
+            row.overrideBehaviour=overrideRow; row.behaviour=(Behaviour)mode;
+            auto clip=std::make_shared<AudioClip>(); clip->sampleRate=4; clip->samples.setSize(1,8);
+            for(int i=0;i<8;++i) clip->samples.setSample(0,i,0.1f*(i+1));
+            ClipMap clips; clips[cell.id]=clip; auto state=makeRenderState(show,clips);
+            juce::AudioBuffer<float> out(2,3); const int id=rowTrigger ? row.id : cell.id;
+            state->trigger(id,rowTrigger); state->render(out.getArrayOfWritePointers(),2,rowTrigger ? 3 : 1,4);
+            near(state->voices[0].position,1); state->trigger(id,rowTrigger);
+            check(!state->voices[0].playing,"Second activation must pause"); near(state->voices[0].position,1);
+            state->render(out.getArrayOfWritePointers(),2,1,4); near(out.getSample(0,0),0);
+            state->trigger(id,rowTrigger); state->render(out.getArrayOfWritePointers(),2,1,4);
+            near(out.getSample(0,0),mode==2 ? 0.2 : (rowTrigger ? 0 : 0.1));
+            if (mode==1 && rowTrigger) {
+                near(state->rows[0].seconds,0.25);
+                state->render(out.getArrayOfWritePointers(),2,2,4);
+                near(out.getSample(0,0),0); near(out.getSample(0,1),0.1);
+            }
+        }
+    });
+    test("paused PauseRestart survives a column snapshot then restarts its offset", [&] {
+        auto show=makeShow(); auto& row=show.rows[0]; auto& cell=row.cells[0];
+        cell.behaviour=Behaviour::pauseRestart; cell.startSeconds=0.5;
+        auto clip=std::make_shared<AudioClip>(); clip->sampleRate=4; clip->samples.setSize(1,8);
+        for(int i=0;i<8;++i) clip->samples.setSample(0,i,0.1f*(i+1));
+        ClipMap clips; clips[cell.id]=clip; AudioEngine engine; engine.monitoredRowId.store(row.id);
+        juce::AudioBuffer<float> out(2,3); engine.publish(makeRenderState(show,clips)); engine.send(row.id,true);
+        engine.processBlock(out.getArrayOfWritePointers(),2,3,4);
+        engine.send(row.id,true); engine.processBlock(out.getArrayOfWritePointers(),2,1,4);
+        near(engine.playheadSeconds.load(),0.75); check(!engine.rowPlaying.load(),"Row did not pause");
+        show.columns[0].gain=0.5f; engine.publish(makeRenderState(show,clips));
+        engine.processBlock(out.getArrayOfWritePointers(),2,1,4);
+        near(engine.playheadSeconds.load(),0.75); near(out.getSample(0,0),0);
+        engine.send(row.id,true); engine.processBlock(out.getArrayOfWritePointers(),2,3,4);
+        near(out.getSample(0,0),0); near(out.getSample(0,1),0); near(out.getSample(0,2),0.05);
+    });
     test("completed PauseResume and Continue rows replay offset and clock; true pause preserves cursor", [&] {
         for (auto behaviour : {Behaviour::pauseResume,Behaviour::continuePlaying}) {
             Show show; addColumn(show,ColumnType::audio,""); addRow(show,"");

@@ -4,9 +4,13 @@
 
 namespace cuelist {
 enum class ColumnType { audio, midi, osc };
-enum class Behaviour { retrigger, restart, pauseResume, continuePlaying, stop };
+enum class Behaviour { retrigger, pauseRestart, pauseResume, continuePlaying, stop };
 struct TempoPoint { double beat = 0, bpm = 120; int numerator = 4, denominator = 4; };
-struct Column { int id = 0; juce::String name; ColumnType type = ColumnType::audio; int output = 0; };
+struct Column {
+    int id = 0; juce::String name; ColumnType type = ColumnType::audio; int output = 0;
+    float gain = 1.0f, pan = 0.0f;
+    bool muted = false, phaseInverted = false;
+};
 struct Cell {
     int id = 0;
     juce::String name, file;

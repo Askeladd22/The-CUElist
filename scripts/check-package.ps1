@@ -1,7 +1,7 @@
 param([switch]$SmokeLaunch)
 $ErrorActionPreference = 'Stop'
 $repo = Split-Path $PSScriptRoot -Parent
-$name = 'The-Cuelist-0.2.0-Windows-x64'
+$name = 'The-Cuelist-0.3.0-Windows-x64'
 $zip = Join-Path $repo ('dist\' + $name + '.zip')
 $checkRoot = Join-Path $repo ('build\package-check-' + [guid]::NewGuid().ToString('N'))
 New-Item -ItemType Directory -Path $checkRoot | Out-Null

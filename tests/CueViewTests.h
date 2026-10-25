@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 namespace cueViewFixtures {
 template <typename T> T* find(juce::Component& parent) {
@@ -28,9 +28,9 @@ void cueViewTests() {
         click(*grid,16,68+54+27); check(ui.show.rows[0].id==row,"Middle row up arrow did not move one step");
         click(*grid,40,68+27); check(ui.show.rows[1].id==row,"Row down arrow did not move one step");
         click(*grid,40,68+54+27,2); check(ui.show.rows[1].id==row,"Second double click reordered again");
-        click(*grid,270+160+98,21); check(ui.show.columns[0].id==column,"Middle column left arrow did not move one step");
-        click(*grid,270+122,21); check(ui.show.columns[1].id==column,"Column right arrow did not move one step");
-        click(*grid,270+160+122,21,2); check(ui.show.columns[1].id==column,"Second double click moved column");
+        click(*grid,CueGrid::nameWidth+160+98,21); check(ui.show.columns[0].id==column,"Middle column left arrow did not move one step");
+        click(*grid,CueGrid::nameWidth+122,21); check(ui.show.columns[1].id==column,"Column right arrow did not move one step");
+        click(*grid,CueGrid::nameWidth+160+122,21,2); check(ui.show.columns[1].id==column,"Second double click moved column");
     });
     test("grid clip drag swaps real identities and retains loaded audio", [] {
         MainComponent ui(false); addRow(ui.show,{}); addColumn(ui.show,ColumnType::audio,{});
@@ -38,7 +38,7 @@ void cueViewTests() {
         const int source=ui.show.rows[0].cells[0].id, target=ui.show.rows[1].cells[1].id;
         ui.clips[source]=clip;
         auto* grid=find<CueGrid>(ui); check(grid!=nullptr,"Grid absent");
-        const juce::Point<float> from{300,90}, to{460,144};
+        const juce::Point<float> from{340,90}, to{500,144};
         grid->mouseDown(event(*grid,from,from)); grid->mouseDrag(event(*grid,to,from,1,true)); grid->mouseUp(event(*grid,to,from,1,true));
         check(ui.show.rows[1].cells[1].id==source && ui.show.rows[0].cells[0].id==target,"Grid drag did not swap");
         check(ui.clips.at(source)==clip && ui.selectedRow==1 && ui.selectedColumn==1,"Dragged clip identity or selection lost");
@@ -61,7 +61,7 @@ void cueViewTests() {
         MainComponent ui(false); auto* grid=find<CueGrid>(ui); check(grid!=nullptr,"Grid absent");
         const auto rowId=ui.show.rows[0].id, columnId=ui.show.columns[0].id;
         click(*grid,64,95); check(ui.show.rows.size()==1 && ui.show.rows[0].id!=rowId,"Last cue delete was disabled");
-        click(*grid,270+146,21); check(ui.show.columns.size()==1 && ui.show.columns[0].id!=columnId,"Last column delete was disabled");
+        click(*grid,CueGrid::nameWidth+146,21); check(ui.show.columns.size()==1 && ui.show.columns[0].id!=columnId,"Last column delete was disabled");
         check(validateShow(ui.show).wasOk(),"Delete hitboxes left invalid show");
     });
 }
