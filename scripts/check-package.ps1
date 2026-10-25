@@ -1,6 +1,7 @@
+param([switch]$SmokeLaunch)
 $ErrorActionPreference = 'Stop'
 $repo = Split-Path $PSScriptRoot -Parent
-$name = 'The-Cuelist-0.1.0-Windows-x64'
+$name = 'The-Cuelist-0.2.0-Windows-x64'
 $zip = Join-Path $repo ('dist\' + $name + '.zip')
 $checkRoot = Join-Path $repo ('build\package-check-' + [guid]::NewGuid().ToString('N'))
 New-Item -ItemType Directory -Path $checkRoot | Out-Null
@@ -24,3 +25,13 @@ Write-Host 'PASS: ZIP estratto con tutti i file richiesti.'
 Write-Host 'PASS: SHA256 eseguibile identico alla build verificata.'
 Write-Host 'PASS: launcher senza eseguibile mostra istruzioni e non tenta la compilazione.'
 Write-Host "Cartella verificata: $package"
+if ($SmokeLaunch) {
+    $application = Start-Process -FilePath (Join-Path $package 'The Cuelist.exe') -ArgumentList '--offline' -WorkingDirectory $package -WindowStyle Hidden -PassThru
+    Start-Sleep -Seconds 2
+    $application.Refresh()
+    if ($application.HasExited) { throw "Avvio portable fallito: uscita anticipata $($application.ExitCode)." }
+    if (!$application.CloseMainWindow()) { throw 'Impossibile chiedere la chiusura della finestra di verifica.' }
+    if (!$application.WaitForExit(5000)) { throw 'La finestra di verifica non si e chiusa entro 5 secondi.' }
+    if ($application.ExitCode -ne 0) { throw "Chiusura portable con errore: $($application.ExitCode)." }
+    Write-Host 'PASS: eseguibile estratto avviato offline e chiuso normalmente.'
+}

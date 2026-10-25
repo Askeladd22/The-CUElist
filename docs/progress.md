@@ -1,5 +1,20 @@
 # Registro sviluppo
 
+## Versione 0.2 portable — 25 ottobre 2026
+
+Questa sezione aggiorna e sostituisce i limiti della versione 0.1 descritti sotto.
+
+- Implementate tutte le richieste elencate in `docs/TODO-0.2.md`: MP3, nomi cue/colonne vuoti, Invio e doppio click per rinomina, GO sequenziale, controlli visibili di riordino/eliminazione, drag nella griglia e timeline, seek reale, livello dB live e parametri globali di cue.
+- I parametri audio preservano posizione e pausa; importazioni, riordino, eliminazione e apertura possono fermare il trasporto. La selezione scorre verticalmente fino alla cue.
+- Persistenza v2: offset e controlli globali, raccolta media con percorsi relativi, migrazione v1, backup e test di trasferimento senza file originali. Le generazioni media precedenti restano disponibili per i backup e occupano spazio.
+- Build Release completa: 46 casi, 234 asserzioni, zero fallimenti. Inclusi PCM MP3 reali, controlli effettivi dell'inspector, eventi mouse di riordino/drag/seek, pausa, replay dopo fine e comandi accodati durante aggiornamenti dei parametri.
+- Revisione indipendente: corretti perdita di comandi in coda durante pubblicazione parametri e replay delle cue concluse che saltava gli offset. Regressioni riprodotte prima delle correzioni; seconda revisione senza problemi gravi residui.
+- Anteprime native verificate a 1440x900 e 1180x820, schede Cella e Intera cue. Corretta sovrapposizione sidebar alla dimensione minima.
+- Pacchetto `dist/The-Cuelist-0.2.0-Windows-x64.zip` creato e verificato: estrazione, hash, launcher senza compilazione, avvio offline e chiusura normale dell'eseguibile estratto. Dipendenze verificate: solo DLL Windows, runtime C/C++ statico.
+- Nessun test sul PC `C:\Users\admin`, nessun test di ascolto o lunga durata. MIDI/OSC, ASIO, streaming e timecode restano fuori da questo incremento. Nessun push o rilascio pubblico effettuato.
+
+Per usare il programma estrarre tutto lo ZIP e aprire `The Cuelist.exe`. Per trasferire un progetto copiare insieme `.cuelist` e relativa cartella `_media`.
+
 - Autorizzazione utente: C++/JUCE; inizio implementazione e autonomia tecnica.
 - Baseline: repository vuoto, nessun codice o test precedente.
 - Ambiente trovato: MSVC 14.51, CMake integrato in Visual Studio Build Tools 2026.

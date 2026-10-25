@@ -5,7 +5,7 @@ Set-Location $repo
 if (!$SkipBuild) { & (Join-Path $PSScriptRoot 'build.ps1') }
 $exe = Join-Path $repo 'build\TheCuelist_artefacts\Release\The Cuelist.exe'
 if (!(Test-Path -LiteralPath $exe)) { throw 'Eseguibile Release assente. Compilare sul computer di sviluppo prima di creare il pacchetto.' }
-$packageName = 'The-Cuelist-0.1.0-Windows-x64'
+$packageName = 'The-Cuelist-0.2.0-Windows-x64'
 $dist = Join-Path $repo 'dist'
 $stagingRoot = Join-Path $repo ('build\package-' + [guid]::NewGuid().ToString('N'))
 $package = Join-Path $stagingRoot $packageName
@@ -16,7 +16,7 @@ Copy-Item -LiteralPath (Join-Path $repo 'Avvia.cmd') -Destination $package
 Copy-Item -LiteralPath (Join-Path $repo 'README.md') -Destination $package
 Copy-Item -LiteralPath (Join-Path $repo 'vendor\JUCE\LICENSE.md') -Destination (Join-Path $package 'JUCE-LICENSE.md')
 @'
-THE CUELIST 0.1.0 - WINDOWS x64
+THE CUELIST 0.2.0 - WINDOWS x64
 
 1. Estrai TUTTO questo ZIP in una cartella sul tuo computer.
 2. Apri "The Cuelist.exe" con un doppio click.
@@ -24,7 +24,8 @@ THE CUELIST 0.1.0 - WINDOWS x64
 Non occorre installare Visual Studio, Build Tools, CMake, Git o Python.
 Avvia.cmd e un avvio alternativo; non compila e non installa nulla.
 
-Importa un WAV in una cella Audio. GO avvia la riga. ESC/PANIC ferma l'audio.
+Importa WAV o MP3. SPAZIO avvia la cue successiva. ESC/PANIC ferma l'audio.
+Per trasferire uno show copia il file .cuelist e la cartella _media accanto.
 Per tutte le istruzioni e i limiti della prima versione leggi README.md.
 MIDI, OSC e timecode non sono ancora operativi in questa versione.
 

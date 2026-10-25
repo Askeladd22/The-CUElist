@@ -1,12 +1,12 @@
 # The Cuelist
 
-Applicazione desktop Windows per cue multimediali. Primo incremento C++/JUCE: audio WAV reale e interfaccia ispirata al riferimento fornito. Non gestisce video.
+Applicazione desktop Windows per cue multimediali. Versione 0.2 C++/JUCE: audio WAV/MP3 reale e interfaccia ispirata al riferimento fornito. Non gestisce video.
 
 ## Avvio
 
 Per **usare il programma non servono Visual Studio, Build Tools, Git o CMake**.
 
-1. Copia sul computer di destinazione il pacchetto **The-Cuelist-0.1.0-Windows-x64.zip** (prodotto nella cartella `dist`).
+1. Copia sul computer di destinazione il pacchetto **The-Cuelist-0.2.0-Windows-x64.zip** (prodotto nella cartella `dist`).
 2. Estrai tutto lo ZIP in una cartella a scelta.
 3. Fai doppio click su **The Cuelist.exe** oppure **Avvia.cmd** nella cartella estratta.
 
@@ -30,17 +30,23 @@ Risultato atteso: compilazione Release, test CTest con `100% tests passed`, eseg
 
 Per creare il pacchetto portatile, eseguire `powershell -NoProfile -ExecutionPolicy Bypass -File scripts/package.ps1`. Questo compila, esegue i test e prepara lo ZIP in `dist`. L'opzione `-SkipBuild` riutilizza una build Release gia verificata. Lo script di packaging e destinato allo sviluppatore, non all'utilizzatore del programma.
 
-## Primo utilizzo
+## Uso della versione 0.2
 
-1. Seleziona una cella Audio e premi **Importa WAV**, oppure trascina un WAV sulla cella.
-2. Doppio click sulla cella o **Avvia cella** per riprodurla. La freccia a sinistra della cue, **GO** o **Spazio** avviano tutte le celle Audio partecipanti della riga. Spazio non attiva cue mentre si scrive in un campo testo.
-3. **ESC** o **PANIC** fermano l'audio; **Ferma** agisce sulla cella selezionata.
-4. Nell'inspector modifica nome, BPM iniziali, metrica, comportamento, loop, livello e uscite. **Applica modifiche**, **Salva** e il cambio di selezione applicano i parametri. L'applicazione dei parametri ferma il trasporto.
-5. **Salva** crea un progetto JSON `.cuelist`; sovrascrivendo un progetto viene mantenuta la versione precedente in `.bak`. **Apri** carica il progetto e segnala i file mancanti, da ricollegare con **Importa WAV**.
+Si parte da una cue e una colonna Audio senza nomi precompilati. **+ Cue** e **+ Colonna** estendono la griglia.
 
-**+ Cue** e **+ Colonna** estendono la griglia. Click sul titolo della colonna per rinominare, spostare o eliminare; tasto destro sul nome della cue per spostarla o eliminarla. Eliminare celle o cue non cancella i WAV originali.
+- Importa **WAV o MP3** con il pulsante o trascinandoli sulla cella. Doppio click sulla cella avvia l'audio.
+- **Spazio / GO** avvia la prossima cue, indicata in giallo, poi avanza. Alla fine si ferma senza ripartire dalla prima. Seleziona una riga per riarmare la sequenza da li. Il GO sulla riga avvia quella cue. Le righe possono suonare contemporaneamente.
+- **ESC / PANIC** ferma tutto. **Ferma** arresta la cella selezionata.
+- Doppio click sul titolo della cue o della colonna per rinominarla; **Invio** conferma anche i nomi nell'inspector.
+- Le frecce visibili riordinano righe e colonne, **X** elimina. Eliminando l'ultima rimane una riga/colonna vuota. I file originali restano sul disco.
+- Trascina una clip nella griglia per spostarla: la destinazione occupata viene scambiata; serve una colonna dello stesso tipo.
+- Trascina una clip nella **timeline** per impostarne l'inizio nella cue. Trascina il cursore sul righello per cambiare posizione di riproduzione. La rotella scorre le tracce.
+- Il fader **dB** cambia il livello immediatamente, da silenzio (-60) a +12 dB; doppio click riporta a 0 dB. La scheda **Intera cue** offre gain, mute, loop di tutte le clip e comportamento del GO. Il gain della cue moltiplica quello delle singole celle.
+- I parametri audio non fermano il trasporto. Invio, **Applica modifiche**, Salva o un cambio selezione confermano i campi testo.
 
-**Dispositivi audio** seleziona dispositivo, canali attivi, sample rate e buffer. Il routing delle colonne usa la numerazione delle uscite *attive* del dispositivo; ricontrollarlo dopo un cambio di dispositivo. Non viene effettuato un ripiego automatico su altre uscite.
+**Salva** raccoglie i media in una cartella `<nome>_media` accanto al `.cuelist`, con percorsi relativi. Per trasferire lo show copia **entrambi**, mantenendoli affiancati. Ad ogni salvataggio la versione precedente del progetto resta in `.cuelist.bak`; le generazioni precedenti dei media sono conservate per rendere utilizzabile il backup. Questo puo aumentare lo spazio occupato. **Apri** legge anche progetti v1 e backup; salva di nuovo un progetto vecchio per raccoglierne i media. Nessun installatore o compilatore serve sul PC di utilizzo.
+
+**Dispositivi audio** seleziona dispositivo e uscite attive. Il routing usa la numerazione delle uscite attive: ricontrollarlo dopo un cambio di dispositivo. Nessun ripiego automatico su altre uscite.
 
 ## Semantica audio di questo incremento
 
@@ -61,15 +67,15 @@ Ogni cue ha una mappa tempo separata, modificabile con **Mappa tempo**. Formato:
 8 90 3/4
 ```
 
-I BPM non cambiano la velocità dei file. Il renderer adatta il sample rate del file a quello del dispositivo con interpolazione lineare. La timeline mostra le durate e un'anteprima del segnale delle prime tracce visibili della cue selezionata: non è ancora un editor di eventi né un riferimento timecode.
+I BPM non cambiano la velocità dei file. Il renderer adatta il sample rate del file a quello del dispositivo con interpolazione lineare. La timeline modifica gli offset in secondi e la posizione della cue. Il trigger diretto di una cella parte subito, senza il suo offset. Il loop globale ripete ciascuna clip indipendentemente; non riavvolge il clock della riga.
 
 ## Implementato e limiti
 
-- Riproduzione simultanea WAV mono/stereo, una traccia per cella; mono duplicato sulla coppia di uscite.
+- Riproduzione simultanea WAV/MP3 mono/stereo, una traccia per cella; mono duplicato sulla coppia di uscite.
 - PCM precaricato: massimo 128 MB per file e 512 MB per show. Lo streaming da disco e più tracce interne per cella sono previsti.
 - Callback del nostro renderer senza letture file, allocazioni o mutex. Importazione/decodifica avvengono sul thread UI: l'interfaccia può attendere durante file grandi. Le modifiche strutturali, importazione e apertura fermano l'audio.
 - Panic prioritario rispetto ai comandi precedenti; coda trasporto limitata e errore esplicito se piena.
-- Salvataggio versionato con file temporaneo e backup; riferimenti assoluti ai media. Raccolta portatile, autosave e recupero dopo crash non ancora implementati.
+- Salvataggio versionato con file temporaneo e backup; media raccolti con riferimenti relativi. Autosave e recupero dopo crash non ancora implementati.
 - Colonne MIDI/OSC modificabili come struttura, ma **nessun invio/ricezione MIDI o OSC**. Nessun LTC, MTC, mappatura ingressi o gruppo di attivazione in questa versione.
 - WASAPI disponibile tramite JUCE; ASIO disabilitato in questa build.
 - Nessuna certificazione live: test di durata, jitter, disconnessioni hardware e carico professionale restano da eseguire. L'interpolazione lineare e il taglio ai limiti +/-1 non sostituiscono un ricampionatore professionale o un limiter.
@@ -77,7 +83,7 @@ I BPM non cambiano la velocità dei file. Il renderer adatta il sample rate del 
 ## Struttura
 
 - `src/ShowModel.*`: modello, mappa tempo, validazione e persistenza.
-- `src/AudioEngine.*`: decoding WAV, renderer, trasporto e snapshot atomici.
+- `src/AudioEngine.*`: decoding WAV/MP3, renderer, trasporto e snapshot atomici.
 - `src/MainComponent.*`, `src/Theme.h`, `src/Main.cpp`: editor desktop e avvio.
 - `tests/`: test reali del modello, renderer, coda trasporto e inspector.
 - `docs/design.md`, `docs/progress.md`: decisioni e stato verificato.

@@ -2,7 +2,27 @@
 #include <cmath>
 #include <set>
 #include <stdexcept>
+#include <filesystem>
+#include <map>
 namespace cuelist {
+namespace {
+bool safeRelative(const juce::String& path) {
+    if (path.isEmpty() || juce::File::isAbsolutePath(path) || path.containsChar(':') || path.startsWithChar('/') || path.startsWithChar('\\')) return false;
+    for (const auto& part : juce::StringArray::fromTokens(path.replaceCharacter('\\', '/'), "/", ""))
+        if (part.isEmpty() || part == "." || part == "..") return false;
+    return true;
+}
+bool contained(const juce::File& child, const juce::File& parent) {
+    std::error_code ec;
+    auto base = std::filesystem::weakly_canonical(std::filesystem::u8path(parent.getFullPathName().toStdString()), ec);
+    if (ec) return false;
+    auto path = std::filesystem::weakly_canonical(std::filesystem::u8path(child.getFullPathName().toStdString()), ec);
+    if (ec) return false;
+    auto p = path.begin();
+    for (auto b = base.begin(); b != base.end(); ++b, ++p) if (p == path.end() || *p != *b) return false;
+    return p != path.end();
+}
+}
 void addRow(Show& show, const juce::String& name) {
     Row row; row.id = show.nextId++; row.name = name;
     for (size_t i = 0; i < show.columns.size(); ++i) { Cell c; c.id = show.nextId++; row.cells.push_back(c); }
@@ -14,10 +34,8 @@ void addColumn(Show& show, ColumnType type, const juce::String& name) {
 }
 Show makeShow() {
     Show show;
-    addColumn(show, ColumnType::audio, "Voce"); addColumn(show, ColumnType::audio, "Ambiente");
-    addColumn(show, ColumnType::audio, "Effetti"); addColumn(show, ColumnType::midi, "MIDI 01");
-    addColumn(show, ColumnType::osc, "OSC 01");
-    for (auto name : {"Intro", "Ingresso", "Scena 01", "Transizione", "Scena 02", "Finale"}) addRow(show,name);
+    addColumn(show, ColumnType::audio, {});
+    addRow(show, {});
     return show;
 }
 double secondsAtBeat(const std::vector<TempoPoint>& points, double beat) {
@@ -39,11 +57,12 @@ juce::Result validateShow(const Show& show) {
     std::set<int> ids;
     auto unique = [&](int id) { return id > 0 && id < 1000000000 && ids.insert(id).second; };
     for (const auto& column : show.columns) {
-        if (!unique(column.id) || column.name.trim().isEmpty() || column.output < 0 || column.output > 1022
+        if (!unique(column.id) || column.output < 0 || column.output > 1022
             || (int)column.type < 0 || (int)column.type > 2) return fail("Colonna non valida.");
     }
     for (const auto& row : show.rows) {
-        if (!unique(row.id) || row.name.trim().isEmpty() || row.cells.size()!=show.columns.size() || row.tempo.empty()) return fail("Riga non valida.");
+        if (!unique(row.id) || row.cells.size()!=show.columns.size() || row.tempo.empty()
+            || !std::isfinite(row.gain) || row.gain < 0 || row.gain > 4 || (int)row.behaviour < 0 || (int)row.behaviour > 4) return fail("Riga non valida.");
         double previous = -1;
         for (const auto& p : row.tempo) {
             if (!std::isfinite(p.beat) || p.beat < 0 || p.beat <= previous || (previous < 0 && p.beat != 0)
@@ -54,10 +73,11 @@ juce::Result validateShow(const Show& show) {
         }
         for (size_t i=0; i<row.cells.size(); ++i) {
             const auto& c = row.cells[i];
-            if (!unique(c.id) || !std::isfinite(c.gain) || c.gain < 0 || c.gain > 1 || (int)c.behaviour < 0 || (int)c.behaviour > 4)
+            if (!unique(c.id) || !std::isfinite(c.gain) || c.gain < 0 || c.gain > 4 || (int)c.behaviour < 0 || (int)c.behaviour > 4
+                || !std::isfinite(c.startSeconds) || c.startSeconds < 0 || c.startSeconds > 86400)
                 return fail("Cella non valida.");
-            if (c.file.isNotEmpty() && (show.columns[i].type != ColumnType::audio || !juce::File::isAbsolutePath(c.file)))
-                return fail("Il file audio deve avere un percorso assoluto e una colonna Audio.");
+            if (c.file.isNotEmpty() && (show.columns[i].type != ColumnType::audio || (!juce::File::isAbsolutePath(c.file) && !safeRelative(c.file))))
+                return fail("Percorso audio non valido o colonna non Audio.");
         }
     }
     if (show.nextId <= *ids.rbegin() || show.nextId >= 1000000000) return fail("Contatore identificativi non valido.");
@@ -95,24 +115,32 @@ juce::String encodeShow(const Show& show) {
         juce::Array<juce::var> tempo, cells;
         for (const auto& p : r.tempo) tempo.add(object({{"beat",p.beat},{"bpm",p.bpm},{"numerator",p.numerator},{"denominator",p.denominator}}));
         for (const auto& c : r.cells) cells.add(object({{"id",c.id},{"name",c.name},{"file",c.file},{"followsRow",c.followsRow},
-            {"loop",c.loop},{"gain",c.gain},{"behaviour",(int)c.behaviour}}));
-        rows.add(object({{"id",r.id},{"name",r.name},{"tempo",tempo},{"cells",cells}}));
+            {"loop",c.loop},{"gain",c.gain},{"startSeconds",c.startSeconds},{"behaviour",(int)c.behaviour}}));
+        rows.add(object({{"id",r.id},{"name",r.name},{"tempo",tempo},{"cells",cells},{"gain",r.gain},
+            {"muted",r.muted},{"loop",r.loop},{"overrideBehaviour",r.overrideBehaviour},{"behaviour",(int)r.behaviour}}));
     }
-    return juce::JSON::toString(object({{"format","TheCuelist"},{"version",1},{"name",show.name},{"nextId",show.nextId},{"columns",columns},{"rows",rows}}));
+    return juce::JSON::toString(object({{"format","TheCuelist"},{"version",2},{"name",show.name},{"nextId",show.nextId},{"columns",columns},{"rows",rows}}));
 }
 juce::Result decodeShow(const juce::String& text, Show& destination) {
     if (text.length() > 32*1024*1024) return juce::Result::fail("Progetto troppo grande (massimo 32 MB). ");
     try {
         auto root = juce::JSON::parse(text);
-        if (string(root,"format") != "TheCuelist" || integer(root,"version") != 1) return juce::Result::fail("Formato o versione progetto non supportati.");
+        const auto version = integer(root,"version");
+        if (string(root,"format") != "TheCuelist" || (version != 1 && version != 2)) return juce::Result::fail("Formato o versione progetto non supportati.");
         Show show; show.name = string(root,"name"); show.nextId = integer(root,"nextId");
         for (auto& c : array(root,"columns")) show.columns.push_back({integer(c,"id"),string(c,"name"),(ColumnType)integer(c,"type"),integer(c,"output")});
         for (auto& r : array(root,"rows")) {
             Row row; row.id = integer(r,"id"); row.name = string(r,"name"); row.tempo.clear();
+            if (version == 2) {
+                row.gain=(float)number(r,"gain"); row.muted=boolean(r,"muted"); row.loop=boolean(r,"loop");
+                row.overrideBehaviour=boolean(r,"overrideBehaviour"); row.behaviour=(Behaviour)integer(r,"behaviour");
+            }
             for (auto& p : array(r,"tempo")) row.tempo.push_back({number(p,"beat"),number(p,"bpm"),integer(p,"numerator"),integer(p,"denominator")});
             for (auto& c : array(r,"cells")) {
                 Cell cell; cell.id=integer(c,"id"); cell.name=string(c,"name"); cell.file=string(c,"file");
                 cell.followsRow=boolean(c,"followsRow"); cell.loop=boolean(c,"loop"); cell.gain=(float)number(c,"gain"); cell.behaviour=(Behaviour)integer(c,"behaviour");
+                if (version == 2) cell.startSeconds=number(c,"startSeconds");
+                if (version == 1 && cell.file.isNotEmpty() && !juce::File::isAbsolutePath(cell.file)) return juce::Result::fail("Percorso v1 non assoluto.");
                 row.cells.push_back(cell);
             }
             show.rows.push_back(std::move(row));
@@ -123,11 +151,72 @@ juce::Result decodeShow(const juce::String& text, Show& destination) {
 }
 juce::Result saveShow(const Show& show,const juce::File& file) {
     auto valid = validateShow(show); if (valid.failed()) return valid;
+    const auto parent = file.getParentDirectory();
+    if (!parent.isDirectory() || file.isDirectory()) return juce::Result::fail("Cartella destinazione non valida.");
+    // Each save owns a new media generation. Older generations remain available to backups.
+    const auto media = parent.getChildFile(file.getFileNameWithoutExtension()+"_media");
+    const auto generation = media.getChildFile(juce::Uuid().toString());
+    if (!contained(media, parent) || generation.exists()) return juce::Result::fail("Cartella media non sicura.");
+    Show portable = show;
+    std::map<juce::String, juce::String> copied;
+    bool createdGeneration = false;
+    struct Cleanup {
+        juce::File folder; bool& created; bool committed = false;
+        ~Cleanup() { if (created && !committed) folder.deleteRecursively(); }
+    } cleanup { generation, createdGeneration };
+    for (auto& row : portable.rows) for (auto& cell : row.cells) {
+        if (cell.file.isEmpty()) continue;
+        if (!juce::File::isAbsolutePath(cell.file)) return juce::Result::fail("Caricare il progetto prima di salvarlo: percorso media relativo.");
+        auto found = copied.find(cell.file);
+        if (found != copied.end()) { cell.file = found->second; continue; }
+        const juce::File source(cell.file);
+        if (!source.existsAsFile()) return juce::Result::fail("Media mancante: " + cell.file);
+        if (!createdGeneration) {
+            if (generation.createDirectory().failed()) return juce::Result::fail("Impossibile creare la cartella media.");
+            createdGeneration = true;
+        }
+        const auto target = generation.getChildFile(juce::String((int)copied.size()) + source.getFileExtension());
+        if (target.exists() || !source.copyFileTo(target)) return juce::Result::fail("Copia media non riuscita.");
+        const auto relative = target.getRelativePathFrom(parent).replaceCharacter('\\','/');
+        copied.emplace(cell.file, relative); cell.file = relative;
+    }
     juce::TemporaryFile temp(file);
-    if (!temp.getFile().replaceWithText(encodeShow(show))) return juce::Result::fail("Impossibile scrivere il file temporaneo.");
-    if (file.existsAsFile() && !file.copyFileTo(file.getSiblingFile(file.getFileName()+".bak")))
-        return juce::Result::fail("Backup non riuscito: il progetto originale non e stato modificato.");
-    if (!temp.overwriteTargetFileWithTemporary()) return juce::Result::fail("Impossibile sostituire il progetto. Controllare permessi e spazio libero.");
+    if (!temp.getFile().replaceWithText(encodeShow(portable))) return juce::Result::fail("Impossibile scrivere il file temporaneo.");
+    const auto backup = file.getSiblingFile(file.getFileName()+".bak");
+    juce::TemporaryFile stagedBackup(backup), oldBackup(backup);
+    const bool existing = file.existsAsFile(), hadBackup = backup.existsAsFile();
+    if (existing) {
+        if (backup.isDirectory() || (hadBackup && !backup.copyFileTo(oldBackup.getFile()))
+            || !file.copyFileTo(stagedBackup.getFile()) || !stagedBackup.overwriteTargetFileWithTemporary())
+            return juce::Result::fail("Backup non riuscito: il progetto originale non e stato modificato.");
+    }
+    if (!temp.overwriteTargetFileWithTemporary()) {
+        if (existing) { if (hadBackup) oldBackup.overwriteTargetFileWithTemporary(); else backup.deleteFile(); }
+        return juce::Result::fail("Impossibile sostituire il progetto. Controllare permessi e spazio libero.");
+    }
+    cleanup.committed = true;
+    return juce::Result::ok();
+}
+juce::Result loadShow(const juce::File& file, Show& destination) {
+    if (!file.existsAsFile() || file.getSize() > 32*1024*1024) return juce::Result::fail("Progetto assente o troppo grande.");
+    Show loaded;
+    auto result = decodeShow(file.loadFileAsString(), loaded); if (result.failed()) return result;
+    for (auto& row : loaded.rows) for (auto& cell : row.cells) {
+        if (cell.file.isEmpty() || juce::File::isAbsolutePath(cell.file)) continue;
+        if (!safeRelative(cell.file)) return juce::Result::fail("Percorso relativo non sicuro.");
+        const auto resolved = file.getParentDirectory().getChildFile(cell.file);
+        if (!contained(resolved, file.getParentDirectory())) return juce::Result::fail("Il media esce dalla cartella progetto.");
+        cell.file = resolved.getFullPathName();
+    }
+    destination = std::move(loaded);
+    return juce::Result::ok();
+}
+juce::Result moveCell(Show& show, int sr, int sc, int tr, int tc) {
+    const auto valid = [&](int r, int c) { return r >= 0 && c >= 0 && (size_t)r < show.rows.size()
+        && (size_t)c < show.columns.size() && (size_t)c < show.rows[(size_t)r].cells.size(); };
+    if (!valid(sr,sc) || !valid(tr,tc)) return juce::Result::fail("Posizione cella non valida.");
+    if (show.columns[(size_t)sc].type != show.columns[(size_t)tc].type) return juce::Result::fail("Colonne di tipo diverso.");
+    std::swap(show.rows[(size_t)sr].cells[(size_t)sc], show.rows[(size_t)tr].cells[(size_t)tc]);
     return juce::Result::ok();
 }
 }

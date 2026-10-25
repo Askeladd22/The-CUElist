@@ -13,6 +13,8 @@ void test(const char* name, const std::function<void()>& body) {
     catch (const std::exception& e) { ++failures; std::cerr << "FAIL " << name << ": " << e.what() << '\n'; }
 }
 #include "AudioTests.h"
+#include "ModelV2Tests.h"
+#include "CueViewTests.h"
 int main() {
     juce::ScopedJuceInitialiser_GUI initialiseJuce;
     test("tempo changes integrate seconds, independent of other rows", [] {
@@ -50,6 +52,52 @@ int main() {
         show.rows[0].cells[0].id = show.rows[0].id; check(validateShow(show).failed(), "Duplicate identity accepted");
     });
     audioTests();
+    modelV2Tests();
+    cueViewTests();
+    test("inspector activation menu and dB fader control live PCM without resetting cursor", [] {
+        MainComponent ui(false); ui.engine.connected.store(true);
+        auto clip=std::make_shared<AudioClip>(); clip->sampleRate=4; clip->samples.setSize(1,20);
+        for (int i=0;i<20;++i) clip->samples.setSample(0,i,0.01f*(i+1));
+        ui.clips[ui.show.rows[0].cells[0].id]=clip; ui.engine.publish(makeRenderState(ui.show,ui.clips)); ui.select(0,0);
+        juce::ComboBox* behaviour=nullptr; juce::Slider* gain=nullptr;
+        for (auto* child : ui.getChildren()) {
+            if (auto* combo=dynamic_cast<juce::ComboBox*>(child)) if (combo->getItemText(0)=="Retrigger") behaviour=combo;
+            if (child->getName()=="cellGainDb") gain=dynamic_cast<juce::Slider*>(child);
+        }
+        check(behaviour && gain,"Audio inspector controls absent");
+        auto sample=[&] { float value=0; float* out[]{&value}; ui.engine.collectRetired(); ui.engine.processBlock(out,1,1,4); return value; };
+        ui.triggerCell(); near(sample(),0.01);
+        gain->setValue(-6,juce::sendNotificationSync); const auto level=std::pow(10.0,-6.0/20.0); near(sample(),0.02*level);
+        behaviour->setSelectedId(3,juce::sendNotificationSync); ui.triggerCell(); near(sample(),0);
+        ui.triggerCell(); near(sample(),0.03*level);
+        behaviour->setSelectedId(4,juce::sendNotificationSync); ui.triggerCell(); near(sample(),0.04*level);
+        behaviour->setSelectedId(5,juce::sendNotificationSync); ui.triggerCell(); near(sample(),0);
+        behaviour->setSelectedId(1,juce::sendNotificationSync); ui.triggerCell(); near(sample(),0.01*level);
+        behaviour->setSelectedId(2,juce::sendNotificationSync); ui.triggerCell(); near(sample(),0.01*level);
+    });
+    test("Enter commits names and GO advances without wrapping", [] {
+        MainComponent ui(false); addRow(ui.show,{}); ui.engine.connected.store(true);
+        for (auto* child : ui.getChildren()) if (child->getName()=="cueName") {
+            auto* editor=dynamic_cast<juce::TextEditor*>(child); editor->setText("Scena",false); editor->onReturnKey();
+        }
+        check(ui.show.rows[0].name=="Scena","Enter did not commit");
+        ui.goNext(); check(ui.nextCueIndex()==1,"First GO did not advance");
+        ui.goNext(); check(ui.nextCueIndex()==2 && ui.selectedRow==1,"Second GO did not advance");
+        ui.goNext(); check(ui.nextCueIndex()==2,"Sequence wrapped");
+        ui.select(0,0); check(ui.nextCueIndex()==0,"Selection did not rearm");
+    });
+    test("dB slider updates model immediately and structural controls preserve shape", [] {
+        MainComponent ui(false);
+        for (auto* child : ui.getChildren()) if (child->getName()=="cellGainDb") {
+            auto* slider=dynamic_cast<juce::Slider*>(child); slider->setValue(-6,juce::sendNotificationSync);
+        }
+        near(ui.show.rows[0].cells[0].gain,std::pow(10.0,-6.0/20.0));
+        ui.setClipStart(0,2.37); near(ui.show.rows[0].cells[0].startSeconds,2.37);
+        addRow(ui.show,{}); int id=ui.show.rows[0].id; ui.reorderRow(0,1); check(ui.show.rows[1].id==id,"Row move failed");
+        addColumn(ui.show,ColumnType::audio,{}); id=ui.show.columns[0].id; ui.reorderColumn(0,1); check(ui.show.columns[1].id==id,"Column move failed");
+        ui.deleteRow(1); ui.deleteRow(0); ui.deleteColumn(1); ui.deleteColumn(0);
+        check(validateShow(ui.show).wasOk(),"Deleting final row/column broke model");
+    });
     test("inspector drafts count as unsaved work", [] {
         MainComponent ui(false);
         for (auto* child : ui.getChildren()) if (child->getName()=="cueName") {
@@ -60,6 +108,7 @@ int main() {
     });
     test("changing selection commits pending cue name", [] {
         MainComponent ui(false);
+        addRow(ui.show, {});
         for (auto* child : ui.getChildren()) if (child->getName()=="cueName") dynamic_cast<juce::TextEditor*>(child)->setText("Nuovo nome",false);
         ui.select(1,0); check(ui.show.rows[0].name=="Nuovo nome","Selection lost pending edit");
     });
@@ -115,6 +164,11 @@ int main() {
         MainComponent preview(false); preview.importFile(folder.getChildFile("verification.wav"));
         preview.setSize(1440,900);
         auto stream=folder.getChildFile("interface-preview.png").createOutputStream();
+        if (stream) { stream->setPosition(0); stream->truncate(); juce::PNGImageFormat{}.writeImageToStream(preview.createComponentSnapshot(preview.getLocalBounds()),*stream); }
+        for (auto* child : preview.getChildren()) if (auto* button=dynamic_cast<juce::TextButton*>(child))
+            if (button->getButtonText()=="Intera cue") button->onClick();
+        preview.setSize(1180,820);
+        stream=folder.getChildFile("interface-row-small.png").createOutputStream();
         if (stream) { stream->setPosition(0); stream->truncate(); juce::PNGImageFormat{}.writeImageToStream(preview.createComponentSnapshot(preview.getLocalBounds()),*stream); }
     }
     std::cout << checks << " assertions, " << failures << " failed tests\n";

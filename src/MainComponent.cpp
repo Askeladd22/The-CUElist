@@ -12,6 +12,7 @@ void prompt(juce::Component* parent,const juce::String& title,const juce::String
     auto* alert=new juce::AlertWindow(title,hint,juce::MessageBoxIconType::NoIcon,parent);
     alert->addTextEditor("value",initial,{},false); auto* editor=alert->getTextEditor("value");
     if (multiline) { editor->setMultiLine(true); editor->setReturnKeyStartsNewLine(true); editor->setSize(440,180); }
+    if (!multiline) editor->onReturnKey=[alert] { alert->exitModalState(1); };
     alert->addButton("Applica",1); alert->addButton("Annulla",0,juce::KeyPress(juce::KeyPress::escapeKey));
     alert->enterModalState(true,juce::ModalCallbackFunction::create([alert,result](int answer) {
         if (answer==1) result(alert->getTextEditorContents("value"));
@@ -23,7 +24,7 @@ MainComponent::MainComponent(bool startAudio) {
     setLookAndFeel(&theme); setWantsKeyboardFocus(true); setSize(1440,900);
     for (juce::Component* c : std::initializer_list<juce::Component*>{&openButton,&saveButton,&newButton,&addRowButton,&addColumnButton,
          &goButton,&panicButton,&deviceButton,&importButton,&playCellButton,&stopCellButton,&clearButton,&tempoButton,&applyButton,
-         &rowName,&cellName,&bpm,&behaviour,&meter,&output,&follow,&loop,&gain,&viewport,&timeline}) addAndMakeVisible(c);
+         &cellTab,&rowTab,&rowGain,&rowBehaviour,&rowMute,&rowLoop,&rowName,&cellName,&bpm,&behaviour,&meter,&output,&follow,&loop,&gain,&viewport,&timeline}) addAndMakeVisible(c);
     for (auto* b : {&openButton,&saveButton,&newButton,&addRowButton,&addColumnButton,&goButton,&panicButton,&deviceButton,
                     &importButton,&playCellButton,&stopCellButton,&clearButton,&tempoButton,&applyButton}) b->setWantsKeyboardFocus(false);
     viewport.setViewedComponent(&grid,false); viewport.setScrollBarsShown(true,true);
@@ -34,36 +35,48 @@ MainComponent::MainComponent(bool startAudio) {
     behaviour.addItemList({"Retrigger","Restart","Pause / Resume","Continue","Stop"},1);
     meter.addItemList({"4/4","3/4","6/8","7/8","5/4"},1);
     gain.setSliderStyle(juce::Slider::LinearHorizontal); gain.setTextBoxStyle(juce::Slider::TextBoxRight,false,52,24);
-    gain.setRange(0,100,0); gain.setNumDecimalPlacesToDisplay(1); gain.setTextValueSuffix(" %");
+    for (auto* slider : {&gain,&rowGain}) {
+        slider->setSliderStyle(juce::Slider::LinearHorizontal); slider->setTextBoxStyle(juce::Slider::TextBoxRight,false,72,24);
+        slider->setRange(-60,12,0.1); slider->setNumDecimalPlacesToDisplay(1); slider->setTextValueSuffix(" dB"); slider->setDoubleClickReturnValue(true,0);
+    }
+    gain.setName("cellGainDb"); rowGain.setName("rowGainDb");
+    rowBehaviour.addItemList({"Usa impostazioni celle","Retrigger","Restart","Pause / Resume","Continue","Stop"},1);
+    cellTab.setWantsKeyboardFocus(false); rowTab.setWantsKeyboardFocus(false);
+    cellTab.onClick=[this] { if (applyInspector()) { rowSettings=false; refresh(); } };
+    rowTab.onClick=[this] { if (applyInspector()) { rowSettings=true; refresh(); } };
     rowName.setSelectAllWhenFocused(true); cellName.setSelectAllWhenFocused(true); bpm.setInputRestrictions(6,"0123456789.");
     rowName.setName("cueName"); cellName.setName("cellName"); bpm.setName("cueBpm");
     for (auto* editor : {&rowName,&cellName,&bpm}) editor->setEscapeAndReturnKeysConsumed(false);
     bpm.setSelectAllWhenFocused(true);
-    newButton.onClick=[this] { withDiscardConfirmation([this] { stopAll(); show=makeShow(); clips.clear(); projectFile={}; selectedRow=selectedColumn=0;
+    for (auto* editor : {&rowName,&cellName,&bpm}) editor->onReturnKey=[this] { if (applyInspector()) grabKeyboardFocus(); };
+    gain.onValueChange=[this] { applyInspector(); }; rowGain.onValueChange=[this] { applyInspector(); };
+    for (auto* combo : {&behaviour,&output,&rowBehaviour}) combo->onChange=[this] { applyInspector(); };
+    for (auto* toggle : {&follow,&loop,&rowMute,&rowLoop}) toggle->onClick=[this] { applyInspector(); };
+    newButton.onClick=[this] { withDiscardConfirmation([this] { stopAll(); show=makeShow(); clips.clear(); projectFile={}; selectedRow=selectedColumn=nextCue=0;
         dirty=false; engine.publish(makeRenderState(show,clips)); refresh(); status="Nuovo show. Importa i file nelle celle Audio."; }); };
     openButton.onClick=[this] { withDiscardConfirmation([this] { openProject(); }); };
     saveButton.onClick=[this] { saveProject(); };
-    addRowButton.onClick=[this] { if (!applyInspector()) return; addRow(show,"Cue "+juce::String((int)show.rows.size()+1)); selectedRow=(int)show.rows.size()-1; changed("Cue aggiunta. Trasporto fermato."); };
+    addRowButton.onClick=[this] { if (!applyInspector()) return; addRow(show,{}); selectedRow=nextCue=(int)show.rows.size()-1; changed("Cue aggiunta. Trasporto fermato.",true); };
     addColumnButton.onClick=[this] {
         if (!applyInspector()) return;
         juce::PopupMenu menu; menu.addItem(1,"Audio"); menu.addItem(2,"MIDI (motore previsto)"); menu.addItem(3,"OSC (motore previsto)");
         auto safe=juce::Component::SafePointer<MainComponent>(this);
         menu.showMenuAsync(juce::PopupMenu::Options().withTargetComponent(&addColumnButton),[safe](int choice) {
             if (!safe || choice==0) return; auto type=(ColumnType)(choice-1);
-            addColumn(safe->show,type,typeName(type)+" "+juce::String((int)safe->show.columns.size()+1));
-            safe->selectedColumn=(int)safe->show.columns.size()-1; safe->changed("Colonna aggiunta. Trasporto fermato.");
+            addColumn(safe->show,type,{});
+            safe->selectedColumn=(int)safe->show.columns.size()-1; safe->changed("Colonna aggiunta. Trasporto fermato.",true);
         });
     };
-    goButton.onClick=[this] { triggerRow(selectedRow); }; panicButton.onClick=[this] { stopAll(); };
+    goButton.onClick=[this] { goNext(); }; panicButton.onClick=[this] { stopAll(); };
     deviceButton.onClick=[this] { showDevices(); }; importButton.onClick=[this] { importDialog(); };
     playCellButton.onClick=[this] { triggerCell(); }; stopCellButton.onClick=[this] { send(show.rows[selectedRow].cells[selectedColumn].id,false,true); };
     clearButton.onClick=[this] {
         auto& c=show.rows[selectedRow].cells[selectedColumn]; clips.erase(c.id); c.file.clear(); c.name.clear(); changed("Audio rimosso dalla cella. File originale conservato.");
     };
     applyButton.onClick=[this] { applyInspector(); }; tempoButton.onClick=[this] { editTempo(); };
-    importButton.setTooltip("WAV mono/stereo. Importare ferma tutte le riproduzioni.");
-    applyButton.setTooltip("Applica i parametri e ferma il trasporto. Anche Salva e il cambio selezione applicano i parametri modificati.");
-    addColumnButton.setTooltip("Aggiungi colonne. Click sul titolo di una colonna per rinominarla o riordinarla.");
+    importButton.setTooltip("WAV e MP3 mono/stereo. Importare ferma tutte le riproduzioni.");
+    applyButton.setTooltip("Applica i parametri senza interrompere il trasporto. Invio conferma i nomi.");
+    addColumnButton.setTooltip("Aggiungi colonne. Doppio click sul titolo per rinominare; frecce per riordinare.");
     output.setTooltip("Coppia numerata tra le uscite attive nel pannello Dispositivi audio.");
     if (startAudio) { auto error=engine.initialise(); if (error.isNotEmpty()) status="Audio non disponibile: "+error; }
     else status="Modalita offline: dispositivo audio non aperto.";
@@ -85,7 +98,7 @@ void MainComponent::paint(juce::Graphics& g) {
     label(g,"SHOW CONTROL",{61,45,130,15},10,palette::muted,true);
     label(g,"SESSION",{232,25,100,22},12,palette::teal,true);
     g.setColour(palette::teal); g.fillRect(232,69,65,3);
-    label(g,"0.1  /  ANTEPRIMA",{334,25,160,22},11,palette::muted);
+    label(g,"0.2  /  PORTABLE",{334,25,160,22},11,palette::muted);
     g.setColour(engine.connected.load() ? palette::teal : palette::red); g.fillEllipse((float)w-367,32,6,6);
     label(g,engine.connected.load() ? "Audio disponibile" : "Audio non disponibile",{w-352,22,160,25},12,palette::muted);
     label(g,"WORKSPACE",{20,99,140,18},10,palette::muted,true);
@@ -98,14 +111,15 @@ void MainComponent::paint(juce::Graphics& g) {
     label(g,hasUnsavedChanges() ? "Modifiche non salvate" : "Nessuna modifica",{20,330,153,22},11,hasUnsavedChanges() ? palette::amber : palette::muted);
     g.setColour(palette::line); g.drawHorizontalLine(383,20,160);
     label(g,"MOTORI",{20,408,140,18},10,palette::muted,true);
-    label(g,"Audio WAV",{20,440,140,24},13,palette::teal);
-    label(g,"MIDI / previsto",{20,475,150,24},12,palette::muted);
-    label(g,"OSC / previsto",{20,510,150,24},12,palette::muted);
+    label(g,"Audio WAV / MP3",{20,430,140,24},13,palette::teal);
+    label(g,"MIDI / previsto",{20,455,150,24},12,palette::muted);
+    label(g,"OSC / previsto",{20,480,150,24},12,palette::muted);
+    label(g,nextCue<(int)show.rows.size() ? "Prossima cue: "+juce::String(nextCue+1) : "Fine sequenza",{20,h-315,150,22},12,palette::teal);
     label(g,"OUTPUT",{20,h-198,130,18},10,palette::muted,true);
     g.setColour(palette::raised); g.fillRoundedRectangle(20.0f,(float)h-164,138,7,3);
     g.setColour(displayPeak>.97f ? palette::red : palette::teal); g.fillRoundedRectangle(20.0f,(float)h-164,138*displayPeak,7,3);
     label(g,juce::String(engine.activeVoices.load())+" celle in riproduzione",{20,h-146,150,22},11,palette::muted);
-    label(g,"SPAZIO   Avvia riga",{20,h-92,150,20},11,palette::muted);
+    label(g,"SPAZIO   Cue successiva",{20,h-92,150,20},11,palette::muted);
     label(g,"ESC          Panic",{20,h-70,150,20},11,palette::muted);
     label(g,"Sessione",{204,90,170,30},25,palette::text,true);
     label(g,"Audio, MIDI e OSC. Un'unica lista di cue.",{205,124,400,19},12,palette::muted);
@@ -123,12 +137,19 @@ void MainComponent::paint(juce::Graphics& g) {
     label(g,"Nome della cue",{x,235,220,18},11,palette::muted);
     label(g,"BPM",{x,303,85,18},11,palette::muted); label(g,"Metrica",{x+112,303,100,18},11,palette::muted);
     g.setColour(palette::line); g.drawHorizontalLine(405,(float)x,(float)x+228);
+    if (!rowSettings) {
     label(g,"CELLA  /  "+col.name,{x,420,228,20},11,palette::muted,true);
     label(g,"Attivazione",{x,490,228,18},11,palette::muted);
     label(g,"Uscite attive",{x,553,228,18},11,palette::muted);
     label(g,"Livello",{x,682,70,20},11,palette::muted);
     if (col.type!=ColumnType::audio)
         label(g,"Motore "+typeName(col.type)+" previsto",{x,707,228,14},10,palette::amber);
+    } else {
+        label(g,"IMPOSTAZIONI INTERA CUE",{x,420,228,20},11,palette::teal,true);
+        label(g,"Attivazione al GO della riga",{x,450,228,20},11,palette::muted);
+        label(g,"Livello cue (dB)",{x,580,228,20},11,palette::muted);
+        label(g,"Il livello cue moltiplica quello delle celle.",{x,652,228,40},11,palette::muted);
+    }
     g.restoreState();
     label(g,status,{204,h-35,w-226,25},12,palette::muted);
 }
@@ -141,6 +162,8 @@ void MainComponent::resized() {
     viewport.setBounds(204,154,editorX-220,gridHeight);
     timeline.setBounds(204,168+gridHeight,editorX-220,h-gridHeight-215);
     int x=editorX+16;
+    cellTab.setBounds(x,198,106,27); rowTab.setBounds(x+114,198,114,27);
+    rowBehaviour.setBounds(x,479,228,30); rowMute.setBounds(x,527,228,24); rowLoop.setBounds(x,553,228,24); rowGain.setBounds(x,610,228,27);
     rowName.setBounds(x,258,228,31); bpm.setBounds(x,326,100,31); meter.setBounds(x+112,326,116,31);
     tempoButton.setBounds(x,368,228,27); cellName.setBounds(x,450,228,29);
     behaviour.setBounds(x,512,228,30); output.setBounds(x,575,228,30);
@@ -150,7 +173,7 @@ void MainComponent::resized() {
     // Compact inspector on smaller displays, keeping all actions reachable.
     if (h<890) {
         const float factor=(float)(h-232)/658.0f;
-        for (juce::Component* c : std::initializer_list<juce::Component*>{&rowName,&bpm,&meter,&tempoButton,&cellName,&behaviour,&output,&follow,&loop,&gain,&importButton,&playCellButton,&stopCellButton,&clearButton,&applyButton}) {
+        for (juce::Component* c : std::initializer_list<juce::Component*>{&rowBehaviour,&rowMute,&rowLoop,&rowGain,&rowName,&bpm,&meter,&tempoButton,&cellName,&behaviour,&output,&follow,&loop,&gain,&importButton,&playCellButton,&stopCellButton,&clearButton,&applyButton}) {
             auto b=c->getBounds(); b.setY(226+(int)((b.getY()-226)*factor)); b.setHeight(std::max(22,(int)(b.getHeight()*factor))); c->setBounds(b);
         }
     }
@@ -161,6 +184,8 @@ void MainComponent::resized() {
 void MainComponent::refresh() { selectedRow=juce::jlimit(0,(int)show.rows.size()-1,selectedRow); selectedColumn=juce::jlimit(0,(int)show.columns.size()-1,selectedColumn); refreshInspector(); resized(); repaint(); grid.repaint(); timeline.repaint(); }
 void MainComponent::refreshInspector() {
     const auto& row=show.rows[selectedRow]; const auto& c=row.cells[selectedColumn]; const auto& col=show.columns[selectedColumn];
+    engine.monitoredRowId.store(row.id);
+    rowName.setTextToShowWhenEmpty("Nome della cue",palette::muted);
     rowName.setText(row.name,false); cellName.setText(c.name,false); cellName.setTextToShowWhenEmpty("Nome della cella",palette::muted);
     bpm.setText(juce::String(row.tempo.front().bpm,1),false);
     auto signature=juce::String(row.tempo.front().numerator)+"/"+juce::String(row.tempo.front().denominator);
@@ -168,7 +193,12 @@ void MainComponent::refreshInspector() {
     if (!item) { item=meter.getNumItems()+1; meter.addItem(signature,item); } meter.setSelectedId(item,juce::dontSendNotification);
     behaviour.setSelectedId((int)c.behaviour+1,juce::dontSendNotification);
     follow.setToggleState(c.followsRow,juce::dontSendNotification); loop.setToggleState(c.loop,juce::dontSendNotification);
-    gain.setValue(c.gain*100,juce::dontSendNotification);
+    gain.setValue(juce::Decibels::gainToDecibels(c.gain,-60.0f),juce::dontSendNotification);
+    rowGain.setValue(juce::Decibels::gainToDecibels(row.gain,-60.0f),juce::dontSendNotification);
+    rowMute.setToggleState(row.muted,juce::dontSendNotification); rowLoop.setToggleState(row.loop,juce::dontSendNotification);
+    rowBehaviour.setSelectedId(row.overrideBehaviour ? (int)row.behaviour+2 : 1,juce::dontSendNotification);
+    for (juce::Component* component : std::initializer_list<juce::Component*>{&cellName,&behaviour,&output,&follow,&loop,&gain,&importButton,&playCellButton,&stopCellButton,&clearButton}) component->setVisible(!rowSettings);
+    for (juce::Component* component : std::initializer_list<juce::Component*>{&rowBehaviour,&rowGain,&rowMute,&rowLoop}) component->setVisible(rowSettings);
     output.clear(juce::dontSendNotification); int channels=2;
     if (auto* device=engine.devices.getCurrentAudioDevice()) channels=std::max(2,device->getActiveOutputChannels().countNumberOfSetBits());
     for (int i=0;i<channels;i+=2) output.addItem(juce::String(i+1)+" / "+juce::String(i+2),i+1);
@@ -179,32 +209,44 @@ void MainComponent::refreshInspector() {
     playCellButton.setEnabled(audio && clips.count(c.id)>0); stopCellButton.setEnabled(audio && clips.count(c.id)>0); clearButton.setEnabled(audio && c.file.isNotEmpty());
 }
 bool MainComponent::select(int row,int column) {
-    if (!applyInspector()) return false;
-    selectedRow=row; selectedColumn=column; refreshInspector(); repaint(); grid.repaint(); timeline.repaint(); return true;
+    if (row<0 || row>=(int)show.rows.size() || column<0 || column>=(int)show.columns.size() || !applyInspector()) return false;
+    nextCue=row; selectedRow=row; selectedColumn=column; refreshInspector();
+    const int top=CueGrid::headerHeight+row*CueGrid::rowHeight, bottom=top+CueGrid::rowHeight;
+    int viewY=viewport.getViewPositionY();
+    if (top<viewY) viewY=top; else if (bottom>viewY+viewport.getViewHeight()) viewY=bottom-viewport.getViewHeight();
+    viewport.setViewPosition(viewport.getViewPositionX(),std::max(0,viewY));
+    repaint(); grid.repaint(); timeline.repaint(); return true;
 }
-void MainComponent::changed(const juce::String& text) { engine.panic(); engine.publish(makeRenderState(show,clips)); dirty=true; status=text; refresh(); }
+void MainComponent::changed(const juce::String& text,bool stopPlayback) { if (stopPlayback) engine.panic(); engine.publish(makeRenderState(show,clips),!stopPlayback); dirty=true; status=text; refresh(); }
 bool MainComponent::inspectorDiffers() const {
     const auto& row=show.rows[selectedRow]; const auto& cell=row.cells[selectedColumn];
     auto signature=juce::String(row.tempo.front().numerator)+"/"+juce::String(row.tempo.front().denominator);
     if (rowName.getText().trim()!=row.name || bpm.getText()!=juce::String(row.tempo.front().bpm,1) || meter.getText()!=signature) return true;
+    if (rowMute.getToggleState()!=row.muted || rowLoop.getToggleState()!=row.loop
+        || rowBehaviour.getSelectedId()!=(row.overrideBehaviour ? (int)row.behaviour+2 : 1)
+        || std::abs(rowGain.getValue()-juce::Decibels::gainToDecibels(row.gain,-60.0f))>0.051) return true;
     if (show.columns[selectedColumn].type!=ColumnType::audio) return false;
     return cellName.getText().trim()!=cell.name || behaviour.getSelectedId()!=(int)cell.behaviour+1 || follow.getToggleState()!=cell.followsRow
-        || loop.getToggleState()!=cell.loop || std::abs(gain.getValue()-cell.gain*100)>0.01 || output.getSelectedId()!=show.columns[selectedColumn].output+1;
+        || loop.getToggleState()!=cell.loop || std::abs(gain.getValue()-juce::Decibels::gainToDecibels(cell.gain,-60.0f))>0.051 || output.getSelectedId()!=show.columns[selectedColumn].output+1;
 }
 bool MainComponent::applyInspector() {
     if (!inspectorDiffers()) return true;
     auto candidate=show; auto& row=candidate.rows[selectedRow]; auto& cell=row.cells[selectedColumn];
     row.name=rowName.getText().trim();
+    row.muted=rowMute.getToggleState(); row.loop=rowLoop.getToggleState();
+    row.overrideBehaviour=rowBehaviour.getSelectedId()>1;
+    if (row.overrideBehaviour) row.behaviour=(Behaviour)(rowBehaviour.getSelectedId()-2);
+    row.gain=juce::Decibels::decibelsToGain((float)rowGain.getValue(),-60.0f);
     if (bpm.getText()!=juce::String(row.tempo.front().bpm,1)) row.tempo.front().bpm=bpm.getText().getDoubleValue();
     auto sig=juce::StringArray::fromTokens(meter.getText(),"/","");
     row.tempo.front().numerator=sig[0].getIntValue(); row.tempo.front().denominator=sig[1].getIntValue();
     if (candidate.columns[selectedColumn].type==ColumnType::audio) {
         cell.name=cellName.getText().trim(); cell.behaviour=(Behaviour)(behaviour.getSelectedId()-1);
-        cell.followsRow=follow.getToggleState(); cell.loop=loop.getToggleState(); cell.gain=(float)gain.getValue()/100;
+        cell.followsRow=follow.getToggleState(); cell.loop=loop.getToggleState(); cell.gain=juce::Decibels::decibelsToGain((float)gain.getValue(),-60.0f);
         candidate.columns[selectedColumn].output=output.getSelectedId()-1;
     }
     auto result=validateShow(candidate); if (result.failed()) { message(result.getErrorMessage()); return false; }
-    show=std::move(candidate); changed("Parametri applicati. Trasporto fermato; il BPM non modifica la velocita audio.");
+    show=std::move(candidate); changed("Parametri applicati. Il BPM non modifica la velocita audio.");
     return true;
 }
 void MainComponent::message(const juce::String& text) { status=text; repaint(); juce::AlertWindow::showMessageBoxAsync(juce::MessageBoxIconType::WarningIcon,"The Cuelist",text,"OK",this); }
@@ -216,7 +258,7 @@ void MainComponent::importDialog() {
     if (show.columns[selectedColumn].type!=ColumnType::audio) return;
     if (!applyInspector()) return;
     const int cellId=show.rows[selectedRow].cells[selectedColumn].id;
-    chooser=std::make_unique<juce::FileChooser>("Importa un WAV mono o stereo",juce::File{},"*.wav");
+    chooser=std::make_unique<juce::FileChooser>("Importa WAV o MP3 mono o stereo",juce::File{},"*.wav;*.mp3");
     chooser->launchAsync(juce::FileBrowserComponent::openMode|juce::FileBrowserComponent::canSelectFiles,
         [safe=juce::Component::SafePointer<MainComponent>(this),cellId](const juce::FileChooser& fc) {
             if (!safe || fc.getResult()==juce::File{}) return;
@@ -225,7 +267,7 @@ void MainComponent::importDialog() {
         });
 }
 void MainComponent::importFile(const juce::File& file) {
-    if (show.columns[selectedColumn].type!=ColumnType::audio) { message("Importa i WAV in una colonna Audio."); return; }
+    if (show.columns[selectedColumn].type!=ColumnType::audio) { message("Importa audio in una colonna Audio."); return; }
     engine.panic(); std::shared_ptr<const AudioClip> clip; auto result=loadClip(file,clip);
     if (result.failed()) { message(result.getErrorMessage()); return; }
     auto updated=clips; auto& c=show.rows[selectedRow].cells[selectedColumn]; updated[c.id]=clip;
@@ -233,12 +275,13 @@ void MainComponent::importFile(const juce::File& file) {
     clips=std::move(updated); c.file=file.getFullPathName(); c.name=file.getFileNameWithoutExtension();
     changed("Importato "+file.getFileName()+". Doppio click sulla cella per avviare.");
 }
-void MainComponent::send(int id,bool row,bool stop) {
-    if (!engine.connected.load()) { message("Nessun dispositivo audio disponibile. Apri Dispositivi audio."); return; }
-    if (!engine.send(id,row,stop)) { engine.panic(); message("Coda comandi piena: riproduzioni fermate. Riprovare."); return; }
-    status=stop ? "Cella fermata." : "Comando inviato al motore audio.";
+bool MainComponent::send(int id,bool row,bool stop) {
+    if (!engine.connected.load()) { message("Nessun dispositivo audio disponibile. Apri Dispositivi audio."); return false; }
+    if (!engine.send(id,row,stop)) { engine.panic(); message("Coda comandi piena: riproduzioni fermate. Riprovare."); return false; }
+    status=stop ? "Cella fermata." : "Comando inviato al motore audio."; return true;
 }
-void MainComponent::triggerRow(int row) { if (!select(row,selectedColumn)) return; send(show.rows[row].id,true); }
+void MainComponent::triggerRow(int row) { if (!select(row,selectedColumn)) return; if (send(show.rows[row].id,true)) nextCue=row+1; repaint(); grid.repaint(); }
+void MainComponent::goNext() { if (nextCue<(int)show.rows.size()) triggerRow(nextCue); else { status="Fine sequenza. Seleziona una cue per ripartire."; repaint(); } }
 void MainComponent::triggerCell() {
     if (!applyInspector()) return;
     auto& c=show.rows[selectedRow].cells[selectedColumn];
@@ -249,11 +292,11 @@ void MainComponent::stopAll() { engine.panic(); status="PANIC / tutte le riprodu
 bool MainComponent::keyPressed(const juce::KeyPress& key) {
     if (key==juce::KeyPress::escapeKey) { stopAll(); return true; }
     if (key.getModifiers().isCommandDown() && key.getKeyCode()=='S') { saveProject(); return true; }
-    if (key==juce::KeyPress::spaceKey && !dynamic_cast<juce::TextEditor*>(juce::Component::getCurrentlyFocusedComponent())) { triggerRow(selectedRow); return true; }
+    if (key==juce::KeyPress::spaceKey && !dynamic_cast<juce::TextEditor*>(juce::Component::getCurrentlyFocusedComponent())) { goNext(); return true; }
     if (key==juce::KeyPress::downKey) { select(std::min(selectedRow+1,(int)show.rows.size()-1),selectedColumn); return true; }
     if (key==juce::KeyPress::upKey) { select(std::max(0,selectedRow-1),selectedColumn); return true; } return false;
 }
-void MainComponent::timerCallback() { engine.collectRetired(); displayPeak=std::max(engine.peak.load(),displayPeak*.88f); repaint(); }
+void MainComponent::timerCallback() { engine.collectRetired(); displayPeak=std::max(engine.peak.load(),displayPeak*.88f); repaint(); timeline.repaint(); }
 void MainComponent::withDiscardConfirmation(std::function<void()> action) {
     if (!hasUnsavedChanges()) { action(); return; }
     juce::AlertWindow::showAsync(juce::MessageBoxOptions().withIconType(juce::MessageBoxIconType::QuestionIcon)
@@ -264,22 +307,23 @@ void MainComponent::withDiscardConfirmation(std::function<void()> action) {
 void MainComponent::requestQuit() { withDiscardConfirmation([this] { stopAll(); juce::JUCEApplication::getInstance()->quit(); }); }
 void MainComponent::saveProject() {
     if (!applyInspector()) return;
-    chooser=std::make_unique<juce::FileChooser>("Salva lo show",projectFile==juce::File{} ? juce::File::getSpecialLocation(juce::File::userDocumentsDirectory).getChildFile("Show_001.cuelist") : projectFile,"*.cuelist");
+    chooser=std::make_unique<juce::FileChooser>("Salva lo show",projectFile==juce::File{} ? juce::File::getSpecialLocation(juce::File::currentExecutableFile).getParentDirectory().getChildFile("Show.cuelist") : projectFile,"*.cuelist");
     chooser->launchAsync(juce::FileBrowserComponent::saveMode|juce::FileBrowserComponent::canSelectFiles|juce::FileBrowserComponent::warnAboutOverwriting,
         [safe=juce::Component::SafePointer<MainComponent>(this)](const juce::FileChooser& fc) {
             if (!safe || fc.getResult()==juce::File{}) return;
             auto file=fc.getResult(); auto result=saveShow(safe->show,file);
             if (result.failed()) { safe->message(result.getErrorMessage()); return; }
+            Show portable; if (loadShow(file,portable).wasOk()) safe->show=std::move(portable);
             safe->projectFile=file; safe->dirty=false; safe->status="Salvato: "+file.getFullPathName(); safe->repaint();
         });
 }
 void MainComponent::openProject() {
-    chooser=std::make_unique<juce::FileChooser>("Apri uno show",projectFile,"*.cuelist;*.json");
+    chooser=std::make_unique<juce::FileChooser>("Apri uno show",projectFile,"*.cuelist;*.json;*.bak");
     chooser->launchAsync(juce::FileBrowserComponent::openMode|juce::FileBrowserComponent::canSelectFiles,
         [safe=juce::Component::SafePointer<MainComponent>(this)](const juce::FileChooser& fc) {
             if (!safe || fc.getResult()==juce::File{}) return;
             const auto file=fc.getResult(); if (file.getSize()>32*1024*1024) { safe->message("File progetto troppo grande (massimo 32 MB)."); return; }
-            Show candidate; auto result=decodeShow(file.loadFileAsString(),candidate);
+            Show candidate; auto result=loadShow(file,candidate);
             if (result.failed()) { safe->message(result.getErrorMessage()); return; }
             safe->engine.panic(); ClipMap loaded; juce::StringArray issues;
             for (const auto& row : candidate.rows) for (const auto& c : row.cells) if (c.file.isNotEmpty()) {
@@ -288,7 +332,7 @@ void MainComponent::openProject() {
                 loaded[c.id]=clip; if (!safe->memoryFits(loaded)) { safe->message("Show oltre 512 MB PCM: apertura annullata. Il progetto corrente resta aperto."); return; }
             }
             safe->show=std::move(candidate); safe->clips=std::move(loaded); safe->projectFile=file; safe->dirty=false;
-            safe->selectedRow=safe->selectedColumn=0; safe->engine.publish(makeRenderState(safe->show,safe->clips)); safe->refresh();
+            safe->selectedRow=safe->selectedColumn=safe->nextCue=0; safe->engine.publish(makeRenderState(safe->show,safe->clips)); safe->refresh();
             safe->status="Progetto aperto: "+file.getFileName();
             if (!issues.isEmpty()) safe->message(juce::String(issues.size())+" file non caricati. Le celle sono evidenziate in rosso: usa Importa WAV per ricollegarle.\n\n"+issues.joinIntoString("\n").substring(0,1500));
         });
@@ -321,144 +365,57 @@ void MainComponent::editTempo() {
             safe->show=std::move(candidate); safe->changed("Mappa tempo salvata per questa cue. Trasporto fermato.");
         });
 }
-void MainComponent::columnMenu(int column) {
-    if (!select(selectedRow,column)) return; juce::PopupMenu menu;
-    menu.addSectionHeader(show.columns[column].name); menu.addItem(1,"Rinomina"); menu.addItem(2,"Sposta a sinistra",column>0);
-    menu.addItem(3,"Sposta a destra",column+1<(int)show.columns.size()); menu.addSeparator(); menu.addItem(4,"Elimina colonna...",show.columns.size()>1);
-    const int id=show.columns[column].id;
-    menu.showMenuAsync(juce::PopupMenu::Options().withTargetComponent(&grid),[safe=juce::Component::SafePointer<MainComponent>(this),id](int choice) {
-        if (!safe || !choice) return;
-        int index=-1; for (int i=0;i<(int)safe->show.columns.size();++i) if (safe->show.columns[i].id==id) index=i; if (index<0) return;
-        if (choice==1) {
-            safe->stopAll();
-            prompt(safe,"Rinomina colonna","Nome della colonna",safe->show.columns[index].name,false,[safe,id](juce::String name) {
-                if (!safe || name.trim().isEmpty()) return; for (auto& c : safe->show.columns) if (c.id==id) c.name=name.trim(); safe->changed("Colonna rinominata.");
-            });
-        } else if (choice==2 || choice==3) {
-            int target=index+(choice==2 ? -1 : 1); if (target<0 || target>=(int)safe->show.columns.size()) return;
-            std::swap(safe->show.columns[index],safe->show.columns[target]); for (auto& row : safe->show.rows) std::swap(row.cells[index],row.cells[target]);
-            safe->selectedColumn=target; safe->changed("Ordine colonne aggiornato. Trasporto fermato.");
-        } else {
-            juce::AlertWindow::showAsync(juce::MessageBoxOptions().withTitle("Elimina colonna").withMessage("Eliminare la colonna e le sue celle? I file originali vengono conservati.").withButton("Elimina").withButton("Annulla").withAssociatedComponent(safe),
-                [safe,id](int answer) { if (!safe || answer!=1 || safe->show.columns.size()<=1) return;
-                    for (size_t i=0;i<safe->show.columns.size();++i) if (safe->show.columns[i].id==id) {
-                        for (auto& row : safe->show.rows) { safe->clips.erase(row.cells[i].id); row.cells.erase(row.cells.begin()+i); }
-                        safe->show.columns.erase(safe->show.columns.begin()+i); safe->changed("Colonna eliminata."); break;
-                    }
-                });
-        }
-    });
+void MainComponent::renameTitle(bool column,int index) {
+    if (!applyInspector()) return;
+    const int id=column ? show.columns[index].id : show.rows[index].id;
+    prompt(this,column ? "Rinomina colonna" : "Rinomina cue","Invio per confermare; il nome puo essere vuoto.",
+        column ? show.columns[index].name : show.rows[index].name,false,
+        [safe=juce::Component::SafePointer<MainComponent>(this),column,id](juce::String name) {
+            if (!safe) return;
+            if (column) { for (auto& c : safe->show.columns) if (c.id==id) c.name=name.trim(); }
+            else { for (auto& r : safe->show.rows) if (r.id==id) r.name=name.trim(); }
+            safe->changed("Titolo aggiornato.");
+        });
 }
-void MainComponent::rowMenu(int row) {
-    if (!select(row,selectedColumn)) return; juce::PopupMenu menu; menu.addItem(1,"Sposta su",row>0); menu.addItem(2,"Sposta giu",row+1<(int)show.rows.size());
-    menu.addItem(3,"Elimina cue...",show.rows.size()>1); const int id=show.rows[row].id;
-    menu.showMenuAsync(juce::PopupMenu::Options().withTargetComponent(&grid),[safe=juce::Component::SafePointer<MainComponent>(this),id](int choice) {
-        if (!safe || !choice) return; int index=-1;
-        for (int i=0;i<(int)safe->show.rows.size();++i) if (safe->show.rows[i].id==id) index=i; if (index<0) return;
-        if (choice==1 || choice==2) {
-            int target=index+(choice==1 ? -1 : 1); if (target<0 || target>=(int)safe->show.rows.size()) return;
-            std::swap(safe->show.rows[index],safe->show.rows[target]); safe->selectedRow=target; safe->changed("Ordine cue aggiornato.");
-        } else {
-            juce::AlertWindow::showAsync(juce::MessageBoxOptions().withTitle("Elimina cue").withMessage("Eliminare questa cue e le sue celle? I file originali vengono conservati.").withButton("Elimina").withButton("Annulla").withAssociatedComponent(safe),
-                [safe,id](int answer) { if (!safe || answer!=1 || safe->show.rows.size()<=1) return;
-                    for (size_t i=0;i<safe->show.rows.size();++i) if (safe->show.rows[i].id==id) {
-                        for (auto& c : safe->show.rows[i].cells) safe->clips.erase(c.id);
-                        safe->show.rows.erase(safe->show.rows.begin()+i); safe->changed("Cue eliminata."); break;
-                    }
-                });
-        }
-    });
+void MainComponent::reorderRow(int index,int delta) {
+    int target=index+delta;
+    if (index<0 || index>=(int)show.rows.size() || target<0 || target>=(int)show.rows.size() || !applyInspector()) return;
+    std::swap(show.rows[index],show.rows[target]); selectedRow=nextCue=target; changed("Ordine cue aggiornato.",true);
 }
-
-void CueGrid::paint(juce::Graphics& g) {
-    g.fillAll(palette::panel); g.setColour(palette::raised); g.fillRect(0,0,getWidth(),headerHeight);
-    label(g,"CUE",{18,10,100,19},10,palette::muted,true); label(g,"Nome / scena",{56,35,145,22},12,palette::text);
-    const auto& show=owner.show;
-    for (int c=0;c<(int)show.columns.size();++c) {
-        int x=nameWidth+c*columnWidth; auto colour=palette::type((int)show.columns[c].type);
-        g.setColour(colour); g.fillRect(x,0,columnWidth-1,3);
-        label(g,typeName(show.columns[c].type),{x+12,12,columnWidth-24,18},10,colour,true);
-        label(g,show.columns[c].name,{x+12,35,columnWidth-24,22},13,palette::text,true);
-        g.setColour(palette::line); g.drawVerticalLine(x,0,(float)getHeight());
-    }
-    int tail=nameWidth+(int)show.columns.size()*columnWidth;
-    label(g,"BPM",{tail+12,31,70,24},11,palette::muted,true); label(g,"METRICA",{tail+88,31,80,24},11,palette::muted,true);
-    auto visible=g.getClipBounds(); int first=std::max(0,(visible.getY()-headerHeight)/rowHeight);
-    int last=std::min((int)show.rows.size(),(visible.getBottom()-headerHeight)/rowHeight+1);
-    for (int r=first;r<last;++r) {
-        int y=headerHeight+r*rowHeight; bool selected=r==owner.selectedRow;
-        g.setColour(selected ? palette::teal.withAlpha(.06f) : r%2 ? palette::background.withAlpha(.4f) : palette::panel);
-        g.fillRect(0,y,getWidth(),rowHeight);
-        if (selected) { g.setColour(palette::teal); g.fillRect(0,y,3,rowHeight); }
-        juce::Path triangle; triangle.addTriangle(15,(float)y+20,15,(float)y+33,25,(float)y+26.5f);
-        g.setColour(selected ? palette::teal : palette::muted); g.fillPath(triangle);
-        label(g,juce::String(r+1).paddedLeft('0',2),{36,y+17,28,22},11,palette::muted);
-        label(g,show.rows[r].name,{70,y+10,nameWidth-78,34},13,selected ? palette::text : palette::muted,selected);
-        for (int c=0;c<(int)show.columns.size();++c) {
-            int x=nameWidth+c*columnWidth; const auto& cell=show.rows[r].cells[c]; const auto type=show.columns[c].type;
-            const bool loaded=owner.clips.count(cell.id)>0, missing=cell.file.isNotEmpty() && !loaded;
-            auto colour=missing ? palette::red : palette::type((int)type);
-            juce::Rectangle<float> box((float)x+5,(float)y+6,(float)columnWidth-10,(float)rowHeight-12);
-            g.setColour(loaded ? colour.withAlpha(.16f) : palette::background.withAlpha(.5f)); g.fillRoundedRectangle(box,5);
-            g.setColour(selected && c==owner.selectedColumn ? colour : palette::line.withAlpha(.65f)); g.drawRoundedRectangle(box,5,selected && c==owner.selectedColumn ? 1.5f : .6f);
-            if (loaded) {
-                for (int n=0;n<6;++n) { float bar=6.0f+(float)((n*7)%15); g.setColour(colour); g.fillRect((float)x+14+n*3,(float)y+27-bar/2,1.5f,bar); }
-                label(g,cell.name.isEmpty() ? "WAV" : cell.name,{x+39,y+11,columnWidth-52,22},12,palette::text);
-                label(g,cell.loop ? "LOOP" : duration(owner.clips.at(cell.id)->samples.getNumSamples()/owner.clips.at(cell.id)->sampleRate),{x+39,y+30,columnWidth-52,13},9,colour);
-                if (!cell.followsRow) label(g,"IND",{x+columnWidth-35,y+29,28,14},8,palette::amber);
-            } else label(g,missing ? "! File non disponibile" : type==ColumnType::audio ? "+  WAV" : "previsto",{x+12,y+15,columnWidth-24,24},11,missing ? palette::red : palette::muted,false,juce::Justification::centred);
-        }
-        auto tempo=show.rows[r].tempo.front();
-        label(g,juce::String(tempo.bpm,1),{tail+12,y+14,70,24},12,palette::muted);
-        label(g,juce::String(tempo.numerator)+"/"+juce::String(tempo.denominator),{tail+88,y+14,70,24},12,palette::muted);
-        g.setColour(palette::line.withAlpha(.6f)); g.drawHorizontalLine(y+rowHeight-1,0,(float)getWidth());
-    }
+void MainComponent::reorderColumn(int index,int delta) {
+    int target=index+delta;
+    if (index<0 || index>=(int)show.columns.size() || target<0 || target>=(int)show.columns.size() || !applyInspector()) return;
+    std::swap(show.columns[index],show.columns[target]);
+    for (auto& row : show.rows) std::swap(row.cells[index],row.cells[target]);
+    selectedColumn=target; changed("Ordine colonne aggiornato.",true);
 }
-void CueGrid::mouseDown(const juce::MouseEvent& e) {
-    owner.grabKeyboardFocus(); int column=(e.x-nameWidth)/columnWidth;
-    if (e.y<headerHeight) { if (e.x>=nameWidth && column<(int)owner.show.columns.size()) owner.columnMenu(column); return; }
-    int row=(e.y-headerHeight)/rowHeight; if (row<0 || row>=(int)owner.show.rows.size()) return;
-    if (e.x<nameWidth) { if (e.mods.isPopupMenu()) owner.rowMenu(row); else if (e.x<32) owner.triggerRow(row); else owner.select(row,owner.selectedColumn); }
-    else if (column>=0 && column<(int)owner.show.columns.size()) owner.select(row,column);
+void MainComponent::deleteRow(int index) {
+    if (index<0 || index>=(int)show.rows.size() || !applyInspector()) return;
+    for (auto& c : show.rows[index].cells) clips.erase(c.id);
+    show.rows.erase(show.rows.begin()+index); if (show.rows.empty()) addRow(show,{});
+    selectedRow=nextCue=std::min(index,(int)show.rows.size()-1); changed("Cue eliminata. File originali conservati.",true);
 }
-void CueGrid::mouseDoubleClick(const juce::MouseEvent& e) { if (e.y>=headerHeight && e.x>=nameWidth && e.x<nameWidth+(int)owner.show.columns.size()*columnWidth && (e.y-headerHeight)/rowHeight<(int)owner.show.rows.size()) owner.triggerCell(); }
-bool CueGrid::isInterestedInFileDrag(const juce::StringArray& files) { return files.size()==1 && files[0].endsWithIgnoreCase(".wav"); }
-void CueGrid::filesDropped(const juce::StringArray& files,int x,int y) {
-    if (x<nameWidth || y<headerHeight) return; int row=(y-headerHeight)/rowHeight,column=(x-nameWidth)/columnWidth;
-    if (row>=(int)owner.show.rows.size() || column>=(int)owner.show.columns.size()) return;
-    if (owner.select(row,column)) owner.importFile(juce::File(files[0]));
+void MainComponent::deleteColumn(int index) {
+    if (index<0 || index>=(int)show.columns.size() || !applyInspector()) return;
+    for (auto& row : show.rows) { clips.erase(row.cells[index].id); row.cells.erase(row.cells.begin()+index); }
+    show.columns.erase(show.columns.begin()+index); if (show.columns.empty()) addColumn(show,ColumnType::audio,{});
+    selectedColumn=std::min(index,(int)show.columns.size()-1); changed("Colonna eliminata. File originali conservati.",true);
 }
-void Timeline::paint(juce::Graphics& g) {
-    g.fillAll(palette::panel); const auto& row=owner.show.rows[owner.selectedRow];
-    label(g,"TIMELINE",{16,11,100,23},11,palette::teal,true);
-    label(g,row.name+"  /  durate audio",{123,11,getWidth()-140,23},12,palette::muted);
-    g.setColour(palette::line); g.drawHorizontalLine(45,0,(float)getWidth());
-    double length=10; int count=0;
-    for (const auto& cell : row.cells) { auto it=owner.clips.find(cell.id); if (it!=owner.clips.end()) { length=std::max(length,it->second->samples.getNumSamples()/it->second->sampleRate); ++count; } }
-    const int start=140,area=getWidth()-start-20;
-    for (int i=0;i<=4;++i) {
-        int x=start+area*i/4; label(g,duration(length*i/4),{x-10,53,55,18},10,palette::muted);
-        g.setColour(palette::line.withAlpha(.6f)); g.drawVerticalLine(x,76,(float)getHeight()-12);
-    }
-    int track=0;
-    for (size_t c=0;c<row.cells.size();++c) {
-        if (owner.show.columns[c].type!=ColumnType::audio) continue;
-        int y=82+track++*42; if (y+32>getHeight()) break;
-        label(g,owner.show.columns[c].name,{16,y,115,30},12,palette::muted);
-        auto it=owner.clips.find(row.cells[c].id); if (it==owner.clips.end()) continue;
-        const auto& audio=it->second->samples; double seconds=audio.getNumSamples()/it->second->sampleRate;
-        const int width=std::max(4,(int)(area*seconds/length));
-        g.setColour(palette::teal.withAlpha(.12f)); g.fillRoundedRectangle((float)start,(float)y,(float)width,31,4);
-        g.setColour(palette::teal.withAlpha(.35f));
-        for (int px=0;px<width;px+=3) {
-            int sample=juce::jlimit(0,audio.getNumSamples()-1,(int)((double)px/width*audio.getNumSamples()));
-            float amp=std::min(1.0f,std::abs(audio.getSample(0,sample)))*24;
-            g.fillRect((float)start+px,(float)y+15-amp/2,1.0f,std::max(1.0f,amp));
-        }
-        label(g,row.cells[c].name,{start+9,y+5,width-16,20},11,palette::text);
-    }
-    if (count==0) label(g,"Importa un WAV per visualizzare la durata della cue.",{140,83,getWidth()-160,35},12,palette::muted);
-    label(g,"TEMPO DELLA CUE   "+juce::String(row.tempo.front().bpm,1)+" BPM     /     "+juce::String((int)row.tempo.size())+" punti tempo     /     Audio a velocita originale",
-          {16,getHeight()-28,getWidth()-30,20},10,palette::muted);
+void MainComponent::moveClip(int sr,int sc,int tr,int tc) {
+    if (!applyInspector()) return;
+    auto result=moveCell(show,sr,sc,tr,tc); if (result.failed()) { status=result.getErrorMessage(); repaint(); return; }
+    selectedRow=tr; selectedColumn=tc; nextCue=tr; changed("Celle scambiate.",true);
+}
+void MainComponent::setClipStart(int column,double seconds) {
+    if (column<0 || column>=(int)show.columns.size() || !std::isfinite(seconds)) return;
+    auto& cell=show.rows[selectedRow].cells[column]; seconds=juce::jlimit(0.0,86400.0,std::round(seconds*100)/100);
+    if (cell.startSeconds==seconds) return;
+    cell.startSeconds=seconds; dirty=true; engine.publish(makeRenderState(show,clips));
+    status="Inizio clip: "+juce::String(seconds,2)+" s"; timeline.repaint(); repaint();
+}
+void MainComponent::seekTimeline(double seconds) {
+    if (!std::isfinite(seconds)) return;
+    if (!engine.seekRow(show.rows[selectedRow].id,juce::jlimit(0.0,86400.0,seconds))) { status="Coda comandi piena."; }
+    timeline.repaint();
 }
 }
