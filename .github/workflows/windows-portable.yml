@@ -33,9 +33,9 @@ jobs:
         shell: powershell
         run: .\scripts\package.ps1 -SkipBuild
 
-      - name: Verify extracted ZIP and offline launch
+      - name: Verify extracted ZIP, launcher and checksums
         shell: powershell
-        run: .\scripts\check-package.ps1 -SmokeLaunch
+        run: .\scripts\check-package.ps1
 
       - name: Upload portable ZIP and checksum
         uses: actions/upload-artifact@v4
