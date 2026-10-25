@@ -40,3 +40,6 @@ if ($SmokeLaunch) {
     if ($application.ExitCode -ne 0) { throw "Chiusura portable con errore: $($application.ExitCode)." }
     Write-Host 'PASS: eseguibile estratto avviato offline e chiuso normalmente.'
 }
+# The source-only launcher intentionally returns 1. Clear that expected native exit
+# status, otherwise GitHub Actions' PowerShell wrapper marks a passing check as failed.
+$global:LASTEXITCODE = 0
