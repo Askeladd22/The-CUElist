@@ -1,6 +1,8 @@
 #pragma once
 #include <juce_core/juce_core.h>
 #include <vector>
+#include <optional>
+#include "MidiClip.h"
 
 namespace cuelist {
 enum class ColumnType { audio, midi, osc };
@@ -10,6 +12,7 @@ struct Column {
     int id = 0; juce::String name; ColumnType type = ColumnType::audio; int output = 0;
     float gain = 1.0f, pan = 0.0f;
     bool muted = false, phaseInverted = false;
+    juce::String midiOutputId;
 };
 struct Cell {
     int id = 0;
@@ -18,6 +21,7 @@ struct Cell {
     float gain = 1.0f;
     double startSeconds = 0;
     Behaviour behaviour = Behaviour::retrigger;
+    std::optional<MidiClip> midi;
 };
 struct Row {
     int id = 0; juce::String name; std::vector<TempoPoint> tempo {{}}; std::vector<Cell> cells;

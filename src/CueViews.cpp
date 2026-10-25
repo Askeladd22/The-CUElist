@@ -57,8 +57,8 @@ void CueGrid::paint(juce::Graphics& g) {
         label(g,juce::String(r+1).paddedLeft('0',2)+(next ? "  PROSSIMA" : row.muted ? "  MUTE" : ""),{137,y+32,nameWidth-181,14},9,next ? palette::amber : palette::muted);
         transportButton(g,{nameWidth-36,y+17,26,22},true,true);
         for (int c=0;c<(int)show.columns.size();++c) {
-            const int x=nameWidth+c*columnWidth; const auto& cell=row.cells[c]; const auto found=owner.clips.find(cell.id);
-            const bool loaded=found!=owner.clips.end(), missing=cell.file.isNotEmpty() && !loaded;
+            const int x=nameWidth+c*columnWidth; const auto& cell=row.cells[c];
+            const bool loaded=owner.hasClip(r,c), missing=cell.file.isNotEmpty() && !loaded;
             const auto colour=missing ? palette::red : palette::type((int)show.columns[c].type);
             const auto box=juce::Rectangle<float>((float)x+5,(float)y+6,(float)columnWidth-10,(float)rowHeight-12);
             g.setColour(loaded ? colour.withAlpha(.15f) : palette::background.withAlpha(.5f)); g.fillRoundedRectangle(box,5);
@@ -68,8 +68,8 @@ void CueGrid::paint(juce::Graphics& g) {
             if (loaded) {
                 auto playback=owner.engine.getCellPlayback(cell.id);
                 if (!owner.engine.connected.load()) playback.playing=playback.waiting=playback.paused=false;
-                label(g,cell.name.isEmpty() ? juce::File(cell.file).getFileNameWithoutExtension() : cell.name,{x+13,y+10,columnWidth-40,22},12,palette::text);
-                const auto seconds=found->second->samples.getNumSamples()/found->second->sampleRate;
+                label(g,cell.name.isEmpty() ? (cell.midi ? "MIDI" : juce::File(cell.file).getFileNameWithoutExtension()) : cell.name,{x+13,y+10,columnWidth-40,22},12,palette::text);
+                const auto seconds=owner.clipDuration(r,c);
                 label(g,playback.waiting ? "ATTESA" : timeText(playback.positionSeconds)+" / "+timeText(seconds),
                       {x+13,y+30,columnWidth-72,14},9,colour);
                 const auto progress=seconds>0 ? juce::jlimit(0.0,1.0,playback.positionSeconds/seconds) : 0;
@@ -77,9 +77,9 @@ void CueGrid::paint(juce::Graphics& g) {
                 g.setColour(playback.paused || playback.waiting ? palette::amber : colour);
                 g.fillRect((float)x+8,(float)y+rowHeight-6,(float)((columnWidth-16)*progress),2.0f);
                 if (playback.playing || playback.paused) g.fillEllipse((float)x+columnWidth-19,(float)y+13,6,6);
-            } else label(g,missing ? "! File non disponibile" : show.columns[c].type==ColumnType::audio ? "+ WAV / MP3" : "previsto",
+            } else label(g,missing ? "! File non disponibile" : show.columns[c].type==ColumnType::audio ? "+ WAV / MP3" : show.columns[c].type==ColumnType::midi ? "+ MIDI / Piano roll" : "previsto",
                          {x+10,y+8,columnWidth-20,18},11,missing ? palette::red : palette::muted,false,juce::Justification::centred);
-            if (show.columns[c].type==ColumnType::audio) {
+            if (show.columns[c].type!=ColumnType::osc) {
                 transportButton(g,{x+columnWidth-54,y+28,21,18},false,loaded);
                 transportButton(g,{x+columnWidth-29,y+28,21,18},true,loaded);
             }
@@ -123,7 +123,7 @@ void CueGrid::mouseDown(const juce::MouseEvent& e) {
     if (e.x>=nameWidth && column<(int)owner.show.columns.size() && localY>=28 && localY<46) {
         const int localX=(e.x-nameWidth)%columnWidth;
         if ((localX>=columnWidth-54 && localX<columnWidth-33) || (localX>=columnWidth-29 && localX<columnWidth-8)) {
-            if (e.getNumberOfClicks()==1 && owner.clips.count(owner.show.rows[row].cells[column].id)) {
+            if (e.getNumberOfClicks()==1 && owner.hasClip(row,column)) {
                 if (localX<columnWidth-33) owner.triggerCellAt(row,column); else owner.stopCellAt(row,column);
             }
             return;
@@ -139,7 +139,7 @@ void CueGrid::mouseDown(const juce::MouseEvent& e) {
         else if (localY>=17 && localY<38 && e.x>=54 && e.x<74) owner.deleteRow(row);
         else if (e.x>=84 && e.x<128 && localY>=12 && localY<42) owner.triggerRow(row);
         else owner.select(row,owner.selectedColumn);
-    } else if (column<(int)owner.show.columns.size() && owner.select(row,column) && owner.clips.count(owner.show.rows[row].cells[column].id)) {
+    } else if (column<(int)owner.show.columns.size() && owner.select(row,column) && owner.hasClip(row,column)) {
         dragRow=row; dragColumn=column;
     }
 }
@@ -171,11 +171,13 @@ void CueGrid::mouseDoubleClick(const juce::MouseEvent& e) {
         const int col=(e.x-nameWidth)/columnWidth;
         const int localX=(e.x-nameWidth)%columnWidth, localY=(e.y-headerHeight)%rowHeight;
         if (localY>=28 && localY<46 && localX>=columnWidth-54) return;
-        if (col<(int)owner.show.columns.size() && owner.select(row,col)) owner.triggerCell();
+        if (col<(int)owner.show.columns.size() && owner.select(row,col)) {
+            if (owner.show.columns[col].type==ColumnType::midi) owner.editMidiClip(); else owner.triggerCell();
+        }
     }
 }
 bool CueGrid::isInterestedInFileDrag(const juce::StringArray& files) {
-    return files.size()==1 && (files[0].endsWithIgnoreCase(".wav") || files[0].endsWithIgnoreCase(".mp3"));
+    return files.size()==1 && (files[0].endsWithIgnoreCase(".wav") || files[0].endsWithIgnoreCase(".mp3") || files[0].endsWithIgnoreCase(".mid") || files[0].endsWithIgnoreCase(".midi"));
 }
 void CueGrid::filesDropped(const juce::StringArray& files,int x,int y) {
     if (!isInterestedInFileDrag(files) || x<nameWidth || y<headerHeight) return;

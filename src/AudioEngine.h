@@ -5,6 +5,7 @@
 #include <atomic>
 #include <map>
 #include <memory>
+#include "MidiOutputRouter.h"
 
 namespace cuelist {
 struct AudioClip { juce::AudioBuffer<float> samples; double sampleRate = 48000; };
@@ -23,6 +24,19 @@ struct CellPlaybackTelemetry {
 struct Voice {
     int cellId = 0, rowId = 0, output = 0;
     std::shared_ptr<const AudioClip> clip;
+    struct NoteEvent { double seconds=0; int status=0, pitch=0, velocity=0; };
+    std::vector<NoteEvent> midiEvents;
+    bool isMidi=false;
+    double midiDuration=0;
+    uint64_t midiHash=0;
+    juce::String midiOutputId;
+    int midiRoute=-1;
+    MidiEventSink* midiSink=nullptr;
+    std::shared_ptr<MidiStream> midiStream;
+    std::array<unsigned char,2048> heldVelocity {};
+    std::array<unsigned short,2048> heldNotes {};
+    size_t midiCursor=0;
+    bool midiNeedsSync=true;
     bool followsRow = true, loop = false, playing = false, paused = false;
     bool stopOnNext = true; // immutable row policy copied into this render snapshot
     std::shared_ptr<CellPlaybackTelemetry> telemetry;
@@ -53,6 +67,7 @@ struct RenderState {
     void seekRow(int rowId, double seconds) noexcept;
     void inheritPlayback(const RenderState&) noexcept;
     void panic() noexcept;
+    void releaseMidi(Voice&, int sampleOffset=0, bool cancelPending=true) noexcept;
     void render(float* const* outputs, int channels, int frames, double sampleRate) noexcept;
     void updateTelemetry() noexcept;
 };
@@ -70,6 +85,8 @@ public:
     bool send(int id, bool row, bool stop = false) noexcept;
     bool seekRow(int rowId, double seconds) noexcept;
     void panic() noexcept;
+    juce::Result setMidiOutput(const juce::String& identifier, bool reconnect=false);
+    void refreshMidiOutputs();
     void processBlock(float* const*, int channels, int frames, double sampleRate) noexcept;
     // UI-thread only. Unknown or removed cells return an empty value.
     CellPlaybackInfo getCellPlayback(int cellId) const noexcept;
@@ -81,9 +98,11 @@ public:
     std::atomic<double> playheadSeconds {0};
     std::atomic<bool> rowPlaying {false};
 private:
+    MidiOutputRouter midiRouter;
     struct PlaybackEntry {
         std::shared_ptr<const AudioClip> clip;
         std::shared_ptr<CellPlaybackTelemetry> telemetry;
+        uint64_t midiHash=0;
     };
     std::map<int, PlaybackEntry> playback; // UI-thread owned; no callback map access
     struct Command { int id = 0; bool row = false, stop = false; uint64_t revision = 0, epoch = 0; bool seek = false; double seconds = 0; };

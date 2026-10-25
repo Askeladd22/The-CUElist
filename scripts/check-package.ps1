@@ -1,15 +1,20 @@
 param([switch]$SmokeLaunch)
 $ErrorActionPreference = 'Stop'
 $repo = Split-Path $PSScriptRoot -Parent
-$name = 'The-Cuelist-0.4.0-Windows-x64'
+$name = 'The-Cuelist-0.5.0-Windows-x64'
 $zip = Join-Path $repo ('dist\' + $name + '.zip')
 $checkRoot = Join-Path $repo ('build\package-check-' + [guid]::NewGuid().ToString('N'))
 New-Item -ItemType Directory -Path $checkRoot | Out-Null
 Expand-Archive -LiteralPath $zip -DestinationPath $checkRoot
 $package = Join-Path $checkRoot $name
-foreach ($file in @('The Cuelist.exe', 'Avvia.cmd', 'LEGGIMI.txt', 'README.md', 'JUCE-LICENSE.md', 'SHA256.txt')) {
+foreach ($file in @('The Cuelist.exe', 'Avvia.cmd', 'LEGGIMI.txt', 'README.md', 'LICENSE', 'NOTICE.md', 'JUCE-LICENSE.md', 'SHA256.txt')) {
     if (!(Test-Path -LiteralPath (Join-Path $package $file))) { throw "File mancante: $file" }
 }
+if (Test-Path -LiteralPath (Join-Path $package 'Sorgenti.zip')) { throw 'Archivio sorgenti inatteso nel pacchetto proprietario.' }
+foreach ($file in @('README.md','LICENSE','NOTICE.md')) {
+    if ((Get-FileHash -LiteralPath (Join-Path $repo $file)).Hash -ne (Get-FileHash -LiteralPath (Join-Path $package $file)).Hash) { throw "Documento non aggiornato: $file" }
+}
+Write-Host 'PASS: licenza e documentazione aggiornate; archivio sorgenti assente.'
 $original = (Get-FileHash -LiteralPath (Join-Path $repo 'build\TheCuelist_artefacts\Release\The Cuelist.exe')).Hash
 $extracted = (Get-FileHash -LiteralPath (Join-Path $package 'The Cuelist.exe')).Hash
 if ($original -ne $extracted) { throw 'Eseguibile estratto diverso dalla build verificata.' }

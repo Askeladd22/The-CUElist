@@ -34,6 +34,10 @@ struct ColumnUtilities::Strip final : juce::Component {
     juce::ComboBox output;
     int routingChannels=-1, routingOutput=-1;
     ColumnType routingType=ColumnType::audio;
+    juce::String midiSignature;
+    juce::StringArray midiIds;
+    double nextMidiScan=0;
+    juce::String lastMidiId;
     Strip(MainComponent& p,int i) : owner(p),id(p.show.columns[i].id),index(i) {
         for (auto* slider : {&gain,&pan}) {
             addAndMakeVisible(slider); slider->setSliderStyle(juce::Slider::LinearHorizontal);
@@ -41,8 +45,13 @@ struct ColumnUtilities::Strip final : juce::Component {
         }
         gain.setName("columnGainDb"); pan.setName("columnPan"); mute.setName("columnMute"); phase.setName("columnPhase");
         addAndMakeVisible(output); output.setName("columnOutput");
-        output.setTooltip("Uscita della colonna. Audio: coppie delle uscite attive del dispositivo. MIDI e OSC: previsti.");
-        output.onChange=[this] { if (output.getSelectedId()>0) owner.setColumnOutput(index,output.getSelectedId()-1); };
+        output.setTooltip("Uscita della colonna. MIDI: dispositivo hardware o porta virtuale. OSC: previsto.");
+        output.onChange=[this] {
+            if (owner.show.columns[index].type==ColumnType::midi) {
+                const int selected=output.getSelectedId()-1;
+                if (selected>=0 && selected<midiIds.size()) owner.setMidiOutput(index,midiIds[selected]);
+            } else if (output.getSelectedId()>0) owner.setColumnOutput(index,output.getSelectedId()-1);
+        };
         gain.setRange(-60,12,0.1); gain.setNumDecimalPlacesToDisplay(1); gain.setTextValueSuffix(" dB");
         pan.setRange(-1,1,0.01);
         pan.textFromValueFunction=[](double value) { return std::abs(value)<0.005 ? juce::String("C") : juce::String(value<0 ? "L " : "R ")+juce::String((int)std::round(std::abs(value)*100)); };
@@ -73,6 +82,24 @@ struct ColumnUtilities::Strip final : juce::Component {
     }
     void syncRouting() {
         const auto& col=owner.show.columns[index]; int channels=2;
+        if (col.type==ColumnType::midi) {
+            const double now=juce::Time::getMillisecondCounterHiRes();
+            if (routingType==ColumnType::midi && lastMidiId==col.midiOutputId && now<nextMidiScan) return;
+            nextMidiScan=now+1000; lastMidiId=col.midiOutputId;
+            const auto available=juce::MidiOutput::getAvailableDevices();
+            juce::String signature=col.midiOutputId+"|";
+            for (const auto& device:available) signature+=device.identifier+"/"+device.name+"|";
+            if (routingType==ColumnType::midi && midiSignature==signature) return;
+            routingType=col.type; midiSignature=signature; midiIds.clear(); midiIds.add({});
+            output.clear(juce::dontSendNotification); output.setEnabled(true); output.addItem("Nessuna uscita MIDI",1);
+            int selected=col.midiOutputId.isEmpty() ? 1 : 0;
+            for (const auto& device:available) {
+                midiIds.add(device.identifier); output.addItem(device.name,midiIds.size());
+                if (device.identifier==col.midiOutputId) selected=midiIds.size();
+            }
+            if (!selected) { midiIds.add(col.midiOutputId); selected=midiIds.size(); output.addItem("Uscita MIDI assente",selected); }
+            output.setSelectedId(selected,juce::dontSendNotification); return;
+        }
         if (auto* device=owner.engine.devices.getCurrentAudioDevice()) channels=std::max(1,device->getActiveOutputChannels().countNumberOfSetBits());
         if (routingChannels==channels && routingOutput==col.output && routingType==col.type) return;
         routingChannels=channels; routingOutput=col.output; routingType=col.type;

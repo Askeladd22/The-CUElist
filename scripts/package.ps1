@@ -5,7 +5,7 @@ Set-Location $repo
 if (!$SkipBuild) { & (Join-Path $PSScriptRoot 'build.ps1') }
 $exe = Join-Path $repo 'build\TheCuelist_artefacts\Release\The Cuelist.exe'
 if (!(Test-Path -LiteralPath $exe)) { throw 'Eseguibile Release assente. Compilare sul computer di sviluppo prima di creare il pacchetto.' }
-$packageName = 'The-Cuelist-0.4.0-Windows-x64'
+$packageName = 'The-Cuelist-0.5.0-Windows-x64'
 $dist = Join-Path $repo 'dist'
 $stagingRoot = Join-Path $repo ('build\package-' + [guid]::NewGuid().ToString('N'))
 $package = Join-Path $stagingRoot $packageName
@@ -14,9 +14,11 @@ New-Item -ItemType Directory -Path $dist -Force | Out-Null
 Copy-Item -LiteralPath $exe -Destination (Join-Path $package 'The Cuelist.exe')
 Copy-Item -LiteralPath (Join-Path $repo 'Avvia.cmd') -Destination $package
 Copy-Item -LiteralPath (Join-Path $repo 'README.md') -Destination $package
+Copy-Item -LiteralPath (Join-Path $repo 'LICENSE') -Destination $package
+Copy-Item -LiteralPath (Join-Path $repo 'NOTICE.md') -Destination $package
 Copy-Item -LiteralPath (Join-Path $repo 'vendor\JUCE\LICENSE.md') -Destination (Join-Path $package 'JUCE-LICENSE.md')
 @'
-THE CUELIST 0.4.0 - WINDOWS x64
+THE CUELIST 0.5.0 - WINDOWS x64
 
 1. Estrai TUTTO questo ZIP in una cartella sul tuo computer.
 2. Apri "The Cuelist.exe" con un doppio click.
@@ -26,11 +28,14 @@ Avvia.cmd e un avvio alternativo; non compila e non installa nulla.
 
 Importa WAV o MP3. SPAZIO avvia la cue successiva. ESC/PANIC ferma l'audio.
 Per trasferire uno show copia il file .cuelist e la cartella _media accanto.
-Per tutte le istruzioni e i limiti della prima versione leggi README.md.
-MIDI, OSC e timecode non sono ancora operativi in questa versione.
+Per tutte le istruzioni e i limiti della versione leggi README.md.
+MIDI: note importate o create nel piano roll, uscita nelle utility.
+OSC e timecode non sono ancora operativi in questa versione.
 
 JUCE 8.0.12: https://github.com/juce-framework/JUCE/tree/8.0.12
-Informazioni di licenza incluse in JUCE-LICENSE.md e README.md.
+The Cuelist: software proprietario, tutti i diritti riservati.
+Condizioni in LICENSE, avvisi sulle dipendenze in NOTICE.md.
+Sorgenti non inclusi. Prima di distribuire a terzi verificare la licenza JUCE.
 '@ | Set-Content -LiteralPath (Join-Path $package 'LEGGIMI.txt') -Encoding UTF8
 $exeHash = (Get-FileHash -LiteralPath (Join-Path $package 'The Cuelist.exe') -Algorithm SHA256).Hash
 "$exeHash  The Cuelist.exe" | Set-Content -LiteralPath (Join-Path $package 'SHA256.txt') -Encoding ASCII

@@ -75,6 +75,10 @@ juce::Result validateShow(const Show& show) {
         }
         for (size_t i=0; i<row.cells.size(); ++i) {
             const auto& c = row.cells[i];
+            if (c.midi) {
+                if (show.columns[i].type!=ColumnType::midi || c.file.isNotEmpty()) return fail("Clip MIDI in colonna non MIDI.");
+                auto result=validateMidiClip(*c.midi); if (result.failed()) return result;
+            }
             if (!unique(c.id) || !std::isfinite(c.gain) || c.gain < 0 || c.gain > 4 || (int)c.behaviour < 0 || (int)c.behaviour > 3
                 || !std::isfinite(c.startSeconds) || c.startSeconds < 0 || c.startSeconds > 86400)
                 return fail("Cella non valida.");
@@ -113,23 +117,31 @@ juce::Array<juce::var> array(const juce::var& o,const char* key) {
 juce::String encodeShow(const Show& show) {
     juce::Array<juce::var> columns, rows;
     for (const auto& c : show.columns) columns.add(object({{"id",c.id},{"name",c.name},{"type",(int)c.type},{"output",c.output},
-        {"gain",c.gain},{"pan",c.pan},{"muted",c.muted},{"phaseInverted",c.phaseInverted}}));
+        {"gain",c.gain},{"pan",c.pan},{"muted",c.muted},{"phaseInverted",c.phaseInverted},{"midiOutputId",c.midiOutputId}}));
     for (const auto& r : show.rows) {
         juce::Array<juce::var> tempo, cells;
         for (const auto& p : r.tempo) tempo.add(object({{"beat",p.beat},{"bpm",p.bpm},{"numerator",p.numerator},{"denominator",p.denominator}}));
-        for (const auto& c : r.cells) cells.add(object({{"id",c.id},{"name",c.name},{"file",c.file},{"followsRow",c.followsRow},
-            {"loop",c.loop},{"gain",c.gain},{"startSeconds",c.startSeconds},{"behaviour",(int)c.behaviour}}));
+        for (const auto& c : r.cells) {
+            juce::var midi;
+            if (c.midi) {
+                juce::Array<juce::var> notes;
+                for (const auto& n:c.midi->notes) notes.add(object({{"beat",n.beat},{"length",n.length},{"pitch",n.pitch},{"velocity",n.velocity},{"channel",n.channel}}));
+                midi=object({{"lengthBeats",c.midi->lengthBeats},{"notes",notes}});
+            }
+            cells.add(object({{"id",c.id},{"name",c.name},{"file",c.file},{"followsRow",c.followsRow},
+                {"loop",c.loop},{"gain",c.gain},{"startSeconds",c.startSeconds},{"behaviour",(int)c.behaviour},{"midi",midi}}));
+        }
         rows.add(object({{"id",r.id},{"name",r.name},{"tempo",tempo},{"cells",cells},{"gain",r.gain},
             {"muted",r.muted},{"loop",r.loop},{"overrideBehaviour",r.overrideBehaviour},{"behaviour",(int)r.behaviour},{"stopOnNext",r.stopOnNext}}));
     }
-    return juce::JSON::toString(object({{"format","TheCuelist"},{"version",4},{"name",show.name},{"nextId",show.nextId},{"columns",columns},{"rows",rows}}));
+    return juce::JSON::toString(object({{"format","TheCuelist"},{"version",5},{"name",show.name},{"nextId",show.nextId},{"columns",columns},{"rows",rows}}));
 }
 juce::Result decodeShow(const juce::String& text, Show& destination) {
     if (text.length() > 32*1024*1024) return juce::Result::fail("Progetto troppo grande (massimo 32 MB). ");
     try {
         auto root = juce::JSON::parse(text);
         const auto version = integer(root,"version");
-        if (string(root,"format") != "TheCuelist" || version < 1 || version > 4) return juce::Result::fail("Formato o versione progetto non supportati.");
+        if (string(root,"format") != "TheCuelist" || version < 1 || version > 5) return juce::Result::fail("Formato o versione progetto non supportati.");
         const auto activation = [version](int value) {
             if (version < 3 && (value == 1 || value == 4)) return Behaviour::retrigger;
             return (Behaviour)value;
@@ -137,6 +149,7 @@ juce::Result decodeShow(const juce::String& text, Show& destination) {
         Show show; show.name = string(root,"name"); show.nextId = integer(root,"nextId");
         for (auto& c : array(root,"columns")) {
             Column column {integer(c,"id"),string(c,"name"),(ColumnType)integer(c,"type"),integer(c,"output")};
+            if (version>=5) column.midiOutputId=string(c,"midiOutputId");
             if (version >= 3) {
                 column.gain=(float)number(c,"gain"); column.pan=(float)number(c,"pan");
                 column.muted=boolean(c,"muted"); column.phaseInverted=boolean(c,"phaseInverted");
@@ -155,6 +168,16 @@ juce::Result decodeShow(const juce::String& text, Show& destination) {
                 Cell cell; cell.id=integer(c,"id"); cell.name=string(c,"name"); cell.file=string(c,"file");
                 cell.followsRow=boolean(c,"followsRow"); cell.loop=boolean(c,"loop"); cell.gain=(float)number(c,"gain"); cell.behaviour=activation(integer(c,"behaviour"));
                 if (version >= 2) cell.startSeconds=number(c,"startSeconds");
+                if (version>=5) {
+                    const auto m=required(c,"midi");
+                    if (!m.isVoid()) {
+                        MidiClip clip; clip.lengthBeats=number(m,"lengthBeats");
+                        const auto notes=array(m,"notes");
+                        if (notes.size()>10000) throw std::runtime_error("Troppe note MIDI.");
+                        for (const auto& n:notes) clip.notes.push_back({number(n,"beat"),number(n,"length"),integer(n,"pitch"),integer(n,"velocity"),integer(n,"channel")});
+                        cell.midi=std::move(clip);
+                    }
+                }
                 if (version == 1 && cell.file.isNotEmpty() && !juce::File::isAbsolutePath(cell.file)) return juce::Result::fail("Percorso v1 non assoluto.");
                 row.cells.push_back(cell);
             }

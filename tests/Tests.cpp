@@ -20,8 +20,21 @@ void test(const char* name, const std::function<void()>& body) {
 #include "ControlsV3Tests.h"
 #include "EngineV4Tests.h"
 #include "ControlsV4Tests.h"
+#include "PianoRollTests.h"
+#include "MidiTests.h"
 int main() {
     juce::ScopedJuceInitialiser_GUI initialiseJuce;
+    pianoRollTests();
+    registerMidiTests();
+    test("MIDI columns accept file drops and enable their importer", [] {
+        MainComponent ui(false); addColumn(ui.show,ColumnType::midi,{}); ui.select(0,1);
+        auto* grid=cueViewFixtures::find<CueGrid>(ui);
+        check(grid->isInterestedInFileDrag({"notes.mid"}),"MIDI file drop rejected");
+        bool importer=false;
+        for (auto* child:ui.getChildren()) if (auto* button=dynamic_cast<juce::TextButton*>(child))
+            if (button->getButtonText()=="Importa MIDI") importer=button->isEnabled();
+        check(importer,"MIDI importer unavailable");
+    });
     test("tempo changes integrate seconds, independent of other rows", [] {
         near(secondsAtBeat({{0,120,4,4},{4,60,3,4}}, 6), 4);
         near(secondsAtBeat({{0,60,4,4}}, 6), 6);

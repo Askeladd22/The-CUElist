@@ -67,6 +67,10 @@ public:
     bool select(int row,int column);
     void importFile(const juce::File&);
     void importDialog();
+    void editMidiClip();
+    void setMidiOutput(int column,const juce::String& identifier);
+    bool hasClip(int row,int column) const;
+    double clipDuration(int row,int column) const;
     void triggerRow(int row);
     void triggerCell();
     void triggerCellAt(int row,int column);
@@ -99,6 +103,7 @@ private:
     juce::TextButton openButton{"Apri"},saveButton{"Salva"},newButton{"Nuovo"},addRowButton{"+ Cue"},addColumnButton{"+ Colonna"};
     juce::TextButton goButton{"GO  /  SPAZIO"},panicButton{"PANIC  /  ESC"},deviceButton{"Dispositivi audio"};
     juce::TextButton importButton{"Importa WAV / MP3"},playCellButton{"Avvia cella"},stopCellButton{"Ferma"},clearButton{"Rimuovi audio"};
+    juce::TextButton midiEditButton{"Crea clip MIDI"};
     juce::TextButton cellTab{"Cella"},rowTab{"Intera cue"};
     juce::TextButton tempoButton{"Mappa tempo"},applyButton{"Applica modifiche"};
     juce::TextEditor rowName,cellName,bpm;
@@ -112,11 +117,13 @@ private:
     int nextCue=0;
     std::unique_ptr<juce::FileChooser> chooser;
     juce::Component::SafePointer<juce::DialogWindow> deviceDialog;
+    juce::Component::SafePointer<juce::DialogWindow> midiDialog;
     juce::File projectFile;
     juce::String status="Pronto. Seleziona una cella Audio e importa un WAV.";
     bool dirty=false;
     int editorX=0;
     float displayPeak=0;
+    int midiRefreshTicks=0;
     void timerCallback() override;
     void refresh();
     void refreshInspector();

@@ -22,9 +22,9 @@ void CellPlaybackTelemetry::write(CellPlaybackInfo value) noexcept {
 }
 void RenderState::updateTelemetry() noexcept {
     for (const auto& v:voices) if (v.telemetry) {
-        const double rate=v.clip ? v.clip->sampleRate : 0;
+        const double rate=v.isMidi ? 1 : (v.clip ? v.clip->sampleRate : 0);
         v.telemetry->write({rate>0 ? v.position/rate : 0,
-            rate>0 ? v.clip->samples.getNumSamples()/rate : 0,
+            v.isMidi ? v.midiDuration : (rate>0 ? v.clip->samples.getNumSamples()/rate : 0),
             v.playing, v.playing && v.rowMode && v.delaySeconds>1.0e-12, v.paused});
     }
 }
@@ -32,6 +32,11 @@ namespace {
 void placeOnTimeline(Voice& v, double seconds) noexcept {
     v.delaySeconds=std::max(0.0,v.startSeconds-seconds);
     v.position=0;
+    if (v.isMidi) {
+        const double elapsed=std::max(0.0,seconds-v.startSeconds);
+        v.position=(v.loop || v.rowLoop) ? std::fmod(elapsed,v.midiDuration) : std::min(elapsed,v.midiDuration);
+        v.midiNeedsSync=true; return;
+    }
     if (!v.clip || v.clip->sampleRate<=0 || v.clip->samples.getNumSamples()==0) return;
     const double elapsed=std::max(0.0,seconds-v.startSeconds);
     const double length=(double)v.clip->samples.getNumSamples();
@@ -44,9 +49,12 @@ void placeOnTimeline(Voice& v, double seconds) noexcept {
 void RenderState::inheritPlayback(const RenderState& previous) noexcept {
     // Copy only scalar runtime state. Shared media ownership stays entirely on the UI thread.
     for (auto& v:voices) for (const auto& old:previous.voices)
-        if (v.cellId==old.cellId && v.clip.get()==old.clip.get()) {
+        if (v.cellId==old.cellId && v.clip.get()==old.clip.get() && v.isMidi==old.isMidi
+            && (!v.isMidi || (v.midiHash==old.midiHash && v.midiOutputId==old.midiOutputId))) {
             v.position=old.position; v.playing=old.playing; v.paused=old.paused; v.delaySeconds=old.delaySeconds;
             v.rowMode=old.rowMode; v.pendingSeek=old.pendingSeek;
+            v.heldNotes=old.heldNotes; v.midiCursor=old.midiCursor; v.midiNeedsSync=old.midiNeedsSync;
+            v.heldVelocity=old.heldVelocity;
             if (v.rowMode && v.startSeconds!=old.startSeconds)
                 for (const auto& row:previous.rows) if (row.id==v.rowId) placeOnTimeline(v,row.seconds);
             break;
@@ -62,6 +70,7 @@ void RenderState::seekRow(int id,double seconds) noexcept {
         running=row.playing; row.seconds=seconds; row.pendingSeek=true; row.ended=false;
     }
     for (auto& v:voices) if (v.rowId==id && v.followsRow) {
+        releaseMidi(v);
         v.rowMode=true; v.pendingSeek=true; placeOnTimeline(v,seconds); v.playing=running;
         if (running) v.paused=false;
     }
@@ -77,6 +86,7 @@ void RenderState::trigger(int id,bool row,bool stop) noexcept {
                 other.seconds=0; other.playing=false; other.pendingSeek=false; other.ended=false;
             }
             for (auto& v:voices) if (v.rowId!=id && v.stopOnNext) {
+                releaseMidi(v);
                 v.playing=false; v.paused=false; v.position=0; v.delaySeconds=0;
                 v.pendingSeek=false; v.rowMode=false;
             }
@@ -100,25 +110,28 @@ void RenderState::trigger(int id,bool row,bool stop) noexcept {
         if (row ? (v.rowId!=id || (!stop && !v.followsRow)) : v.cellId!=id) continue;
         const auto behaviour=row && v.overrideBehaviour ? v.rowBehaviour : v.behaviour;
         if (stop || behaviour==Behaviour::stop) {
+            releaseMidi(v);
             v.playing=false; v.paused=false; v.position=0; v.delaySeconds=0; v.pendingSeek=false; v.rowMode=false;
             stopClock=true; continue;
         }
-        if (!v.clip || v.clip->samples.getNumSamples()==0) continue;
+        if (!v.isMidi && (!v.clip || v.clip->samples.getNumSamples()==0)) continue;
         if (!row) { v.delaySeconds=0; v.pendingSeek=false; }
         const bool wasRowMode=v.rowMode; v.rowMode=row;
         switch (behaviour) {
             case Behaviour::pauseRestart:
-                if (row ? anyPlaying : v.playing) { v.playing=false; break; }
+                if (row ? anyPlaying : v.playing) { releaseMidi(v); v.playing=false; break; }
                 // An explicit seek wins once, otherwise a paused voice restarts
                 // from the row origin (including its offset), or sample zero.
                 [[fallthrough]];
             case Behaviour::retrigger:
+                releaseMidi(v);
                 if (!row || !v.pendingSeek) {
                     if (row) placeOnTimeline(v,0); else v.position=0;
                     restartClock=true;
                 }
                 v.playing=true; break;
             case Behaviour::pauseResume:
+                if (row ? anyPlaying : v.playing) releaseMidi(v);
                 if (row && !wasRowMode && !v.pendingSeek && v.position==0) placeOnTimeline(v,0);
                 v.playing=row ? !anyPlaying : !v.playing; break;
             case Behaviour::continuePlaying:
@@ -138,14 +151,58 @@ void RenderState::trigger(int id,bool row,bool stop) noexcept {
     }
 }
 void RenderState::panic() noexcept {
-    for (auto& v:voices) { v.playing=false; v.paused=false; v.position=0; v.delaySeconds=0; v.pendingSeek=false; v.rowMode=false; }
+    for (auto& v:voices) { releaseMidi(v); v.playing=false; v.paused=false; v.position=0; v.delaySeconds=0; v.pendingSeek=false; v.rowMode=false; }
     for (auto& row:rows) { row.seconds=0; row.playing=false; row.pendingSeek=false; row.ended=false; }
+}
+void RenderState::releaseMidi(Voice& v,int offset,bool cancelPending) noexcept {
+    if (!v.isMidi) return;
+    if (cancelPending && v.midiStream) v.midiStream->epoch.fetch_add(1);
+    if (v.midiSink) v.midiSink->selectStream(v.midiStream.get());
+    for (size_t key=0;key<v.heldNotes.size();++key) if (v.heldNotes[key]) {
+        if (v.midiSink) v.midiSink->emit(v.midiRoute,0x80+(int)(key/128),(int)(key%128),0,offset);
+        v.heldNotes[key]=0;
+    }
+    v.midiNeedsSync=true;
 }
 void RenderState::render(float* const* outputs,int channels,int frames,double sampleRate) noexcept {
     for (int ch=0;ch<channels;++ch) if (outputs[ch]) juce::FloatVectorOperations::clear(outputs[ch],frames);
     if (sampleRate<=0 || !std::isfinite(sampleRate)) return;
     for (auto& row:rows) if (row.playing) row.seconds+=(double)frames/sampleRate;
     for (auto& v:voices) {
+        if (v.isMidi && v.playing) {
+            if (v.midiSink) v.midiSink->selectStream(v.midiStream.get());
+            for (int i=0;i<frames && v.playing;++i) {
+                if (v.rowMode && v.delaySeconds>1.0e-12) { v.delaySeconds=std::max(0.0,v.delaySeconds-1.0/sampleRate); continue; }
+                if (v.position>=v.midiDuration) {
+                    releaseMidi(v,i,false);
+                    if (v.loop || v.rowLoop) v.position=std::fmod(v.position,v.midiDuration);
+                    else { v.position=0; v.playing=false; break; }
+                }
+                if (v.midiNeedsSync) {
+                    v.midiCursor=0; v.heldNotes.fill(0);
+                    while (v.midiCursor<v.midiEvents.size() && v.midiEvents[v.midiCursor].seconds<v.position-1.0e-10) {
+                        const auto& e=v.midiEvents[v.midiCursor++]; auto& count=v.heldNotes[(size_t)((e.status&15)*128+e.pitch)];
+                        if ((e.status&0xf0)==0x90) { ++count; v.heldVelocity[(size_t)((e.status&15)*128+e.pitch)]=(unsigned char)e.velocity; } else if (count) --count;
+                    }
+                    if (!v.rowMuted) for (size_t key=0;key<v.heldNotes.size();++key) if (v.heldNotes[key] && v.midiSink)
+                        v.midiSink->emit(v.midiRoute,0x90+(int)(key/128),(int)(key%128),v.heldVelocity[key],i);
+                    v.midiNeedsSync=false;
+                }
+                while (v.midiCursor<v.midiEvents.size() && v.midiEvents[v.midiCursor].seconds<=v.position+1.0e-10) {
+                    const auto& e=v.midiEvents[v.midiCursor++]; auto& count=v.heldNotes[(size_t)((e.status&15)*128+e.pitch)];
+                    const bool on=(e.status&0xf0)==0x90;
+                    if (on) ++count; else if (count) --count;
+                    if (v.midiSink && !v.rowMuted && (on || count==0)) v.midiSink->emit(v.midiRoute,e.status,e.pitch,e.velocity,i);
+                }
+                v.position+=1.0/sampleRate;
+                if (v.position>=v.midiDuration-1.0e-10) {
+                    releaseMidi(v,i+1,false);
+                    if (v.loop || v.rowLoop) v.position=std::max(0.0,v.position-v.midiDuration);
+                    else { v.position=0; v.playing=false; }
+                }
+            }
+            continue;
+        }
         if (!v.playing || !v.clip) continue;
         const auto& audio=v.clip->samples;
         const int length=audio.getNumSamples();
@@ -212,9 +269,28 @@ std::unique_ptr<RenderState> makeRenderState(const Show& show,const ClipMap& cli
     for (const auto& row : show.rows) {
       state->rows.push_back({row.id}); state->rows.back().stopOnNext=row.stopOnNext;
       for (size_t i=0; i<row.cells.size() && i<show.columns.size(); ++i) {
-        if (show.columns[i].type!=ColumnType::audio) continue;
-        const auto& c=row.cells[i]; const auto it=clips.find(c.id); if (it==clips.end()) continue;
-        Voice v; v.cellId=c.id; v.rowId=row.id; v.clip=it->second; v.output=show.columns[i].output;
+        const auto& c=row.cells[i];
+        Voice v; v.cellId=c.id; v.rowId=row.id; v.output=show.columns[i].output;
+        if (show.columns[i].type==ColumnType::midi && c.midi) {
+            v.isMidi=true; v.midiOutputId=show.columns[i].midiOutputId;
+            v.midiDuration=secondsAtBeat(row.tempo,c.midi->lengthBeats);
+            if (validateMidiClip(*c.midi).failed() || v.midiDuration<=0) continue;
+            for (const auto& n:c.midi->notes) {
+                v.midiEvents.push_back({secondsAtBeat(row.tempo,n.beat),0x90+n.channel-1,n.pitch,n.velocity});
+                v.midiEvents.push_back({secondsAtBeat(row.tempo,n.beat+n.length),0x80+n.channel-1,n.pitch,0});
+            }
+            std::stable_sort(v.midiEvents.begin(),v.midiEvents.end(),[](const auto& a,const auto& b) {
+                return a.seconds!=b.seconds ? a.seconds<b.seconds : a.status<b.status;
+            });
+            // Stable content fingerprint; no pointer identity dependency for embedded clips.
+            uint64_t hash=1469598103934665603ull;
+            const auto mix=[&](const void* ptr,size_t bytes) { const auto* p=static_cast<const unsigned char*>(ptr); for (size_t j=0;j<bytes;++j) { hash^=p[j]; hash*=1099511628211ull; } };
+            mix(&v.midiDuration,sizeof(v.midiDuration));
+            for (const auto& e:v.midiEvents) { mix(&e.seconds,sizeof(e.seconds)); mix(&e.status,sizeof(e.status)); mix(&e.pitch,sizeof(e.pitch)); mix(&e.velocity,sizeof(e.velocity)); }
+            v.midiHash=hash;
+        } else if (show.columns[i].type==ColumnType::audio) {
+            const auto it=clips.find(c.id); if (it==clips.end()) continue; v.clip=it->second;
+        } else continue;
         v.telemetry=std::make_shared<CellPlaybackTelemetry>();
         v.gain=c.gain; v.loop=c.loop; v.followsRow=c.followsRow; v.behaviour=c.behaviour;
         v.startSeconds=c.startSeconds; v.rowGain=row.gain; v.rowMuted=row.muted;
@@ -229,6 +305,8 @@ std::unique_ptr<RenderState> makeRenderState(const Show& show,const ClipMap& cli
     return state;
 }
 AudioEngine::AudioEngine() = default;
+juce::Result AudioEngine::setMidiOutput(const juce::String& identifier,bool reconnect) { return midiRouter.open(identifier,reconnect); }
+void AudioEngine::refreshMidiOutputs() { midiRouter.refresh(); }
 AudioEngine::~AudioEngine() {
     devices.removeAudioCallback(this); devices.closeAudioDevice();
     delete current; delete pending.exchange(nullptr); delete retired.exchange(nullptr);
@@ -241,14 +319,16 @@ void AudioEngine::publish(std::unique_ptr<RenderState> state,bool preservePlayba
     if (!state) return;
     std::map<int, PlaybackEntry> nextPlayback;
     for (auto& v:state->voices) {
+        if (v.isMidi) { v.midiRoute=midiRouter.route(v.midiOutputId); v.midiSink=&midiRouter; v.midiStream=midiRouter.stream(v.cellId,v.midiRoute); }
         if (!v.telemetry) v.telemetry=std::make_shared<CellPlaybackTelemetry>();
         CellPlaybackInfo display;
         if (v.clip && v.clip->sampleRate>0) display.durationSeconds=v.clip->samples.getNumSamples()/v.clip->sampleRate;
+        if (v.isMidi) display.durationSeconds=v.midiDuration;
         const auto old=playback.find(v.cellId);
-        if (preservePlayback && old!=playback.end() && old->second.clip.get()==v.clip.get())
+        if (preservePlayback && old!=playback.end() && old->second.clip.get()==v.clip.get() && old->second.midiHash==v.midiHash)
             display=old->second.telemetry->read();
         v.telemetry->write(display);
-        nextPlayback.emplace(v.cellId,PlaybackEntry{v.clip,v.telemetry});
+        nextPlayback.emplace(v.cellId,PlaybackEntry{v.clip,v.telemetry,v.midiHash});
     }
     playback=std::move(nextPlayback);
     state->revision=++revision;
@@ -277,7 +357,7 @@ bool AudioEngine::seekRow(int id,double seconds) noexcept {
     commands[w]={id,true,false,revision,panicEpoch.load(),true,std::max(0.0,seconds)};
     writeIndex.store(next,std::memory_order_release); return true;
 }
-void AudioEngine::panic() noexcept { panicEpoch.fetch_add(1); }
+void AudioEngine::panic() noexcept { panicEpoch.fetch_add(1); midiRouter.emergencyStop(); }
 void AudioEngine::audioDeviceAboutToStart(juce::AudioIODevice* device) {
     deviceSampleRate=device->getCurrentSampleRate(); connected.store(true); panic();
 }
@@ -287,10 +367,25 @@ void AudioEngine::audioDeviceIOCallbackWithContext(const float* const*,int,float
     processBlock(outputs,channels,frames,deviceSampleRate);
 }
 void AudioEngine::processBlock(float* const* outputs,int channels,int frames,double sampleRate) noexcept {
+    midiRouter.beginBlock(sampleRate);
     if (retired.load()==nullptr) {
         if (auto* next=pending.exchange(nullptr)) {
             if (current && next->preservePlayback && next->minimumCommandRevision==current->minimumCommandRevision)
                 next->inheritPlayback(*current);
+            if (current) {
+                for (auto& old:current->voices) if (old.isMidi) {
+                    bool transferred=false;
+                    if (next->preservePlayback && next->minimumCommandRevision==current->minimumCommandRevision)
+                        for (auto& v:next->voices) if (v.cellId==old.cellId && v.isMidi && v.midiHash==old.midiHash && v.midiOutputId==old.midiOutputId) {
+                            transferred=true;
+                            if (v.startSeconds!=old.startSeconds || v.rowMuted!=old.rowMuted) {
+                                current->releaseMidi(old); v.heldNotes.fill(0); v.midiNeedsSync=true;
+                            }
+                            break;
+                        }
+                    if (!transferred) current->releaseMidi(old);
+                }
+            }
             retired.store(current); current=next;
         }
     }
