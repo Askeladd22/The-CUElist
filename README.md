@@ -16,7 +16,7 @@ Il runtime C/C++ è collegato staticamente; l'eseguibile verificato dipende solo
 
 ## Scaricare l'eseguibile portable da GitHub Actions
 
-Il workflow **Build Windows portable** compila automaticamente su Windows x64, esegue i test, crea lo ZIP e verifica che il programma estratto si avvii anche senza audio (`--offline`). Non e necessario possedere Visual Studio per **utilizzare** il pacchetto.
+Il workflow **Build Windows portable** compila automaticamente su Windows x64, esegue i test, crea lo ZIP e ne verifica l'estrazione, il contenuto e gli hash. Un test grafico opzionale di avvio offline (`--offline`) e disponibile in locale con `scripts/check-package.ps1 -SmokeLaunch`. Non e necessario possedere Visual Studio per **utilizzare** il pacchetto.
 
 1. Apri la scheda **Actions** del repository e scegli **Build Windows portable**.
 2. Apri un'esecuzione riuscita (segno di spunta verde) e, nella sezione **Artifacts**, scarica **The-Cuelist-0.5.0-Windows-x64-portable**.
