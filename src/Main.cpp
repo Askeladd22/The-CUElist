@@ -3,7 +3,7 @@ namespace cuelist {
 class Application final : public juce::JUCEApplication {
 public:
     const juce::String getApplicationName() override { return "The Cuelist"; }
-    const juce::String getApplicationVersion() override { return "0.4.0"; }
+    const juce::String getApplicationVersion() override { return "0.5.0"; }
     void initialise(const juce::String& arguments) override { window=std::make_unique<Window>(!arguments.contains("--offline")); }
     void shutdown() override { window.reset(); }
     void systemRequestedQuit() override { if (window) window->content->requestQuit(); }
