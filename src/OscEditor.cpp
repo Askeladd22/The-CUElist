@@ -193,89 +193,96 @@ void OscClipEditor::createTrack() {
 }
 void OscClipEditor::paint(juce::Graphics& g) {
     g.fillAll(palette::panel);
-    label(g,"OSC  /  timeline",{13,38,225,24},13,palette::teal,true);
-    label(g,"Double-click: create/edit ramp  ·  Drag: move/resize  ·  Shift+click: point",
-          {230,38,getWidth()-245,24},10,palette::muted);
+    label(g,"OSC  /  TIMELINE",{13,38,225,24},13,palette::teal,true);
+    label(g,"Double-click: ramp/edit   •   Shift-click: point   •   Right-click: actions",
+          {215,38,std::max(1,getWidth()-225),24},10,palette::muted);
     const int left=axisLeft(),right=left+axisWidth();
     const auto ruler=juce::Rectangle<float>((float)left,rulerTop,(float)axisWidth(),rulerBottom-rulerTop);
     g.setColour(palette::background); g.fillRect(ruler);
     const double step=1.0/(1<<juce::jlimit(0,3,resolution.getSelectedId()-1));
+    const double visible=clip.length/zoom;
+    const double stride=std::max(1.0,std::ceil(visible/(70*step)));
     if (grid.getToggleState()) {
-        // Render a bounded number of lines even for clips with very fine snap.
-        const int stride=std::max(1,(int)std::ceil(clip.length/(260.0*step)));
-        const double visualStep=step*stride; // every painted line is a true snap-grid multiple
-        for (int i=0;i<=260 && i*visualStep<=clip.length+.00001;++i) {
-            const float x=xForTime(i*visualStep);
-            g.setColour(palette::line.withAlpha(.75f));
-            g.drawVerticalLine((int)x,rulerTop,(float)getHeight());
-        }
+        g.setColour(palette::line.withAlpha(.7f));
+        const double first=std::ceil(viewStart/(step*stride))*(step*stride);
+        for (double t=first;t<=std::min(clip.length,viewStart+visible)+1e-7;t+=step*stride)
+            g.drawVerticalLine((int)xForTime(t),rulerTop,(float)getHeight());
     }
     for (int i=0;i<=8;++i) {
-        const auto time=clip.length*i/8.0;
-        const auto x=xForTime(time);
-        label(g,juce::String(time,clip.useBeats?2:1),{(int)x-8,rulerTop+4,58,18},9,palette::muted);
+        const double t=viewStart+visible*i/8.0;
+        label(g,juce::String(t,clip.useBeats?2:2),
+              {(int)xForTime(t)-8,rulerTop+4,62,18},9,palette::muted);
     }
+    // Ruler and toolbar remain fixed. Events, their labels and every track
+    // share one clip region and one vertical offset.
+    g.saveState();
+    g.reduceClipRegion(0,rulerBottom,getWidth(),std::max(0,getHeight()-rulerBottom));
+    const int eventsY=eventLaneTop();
     g.setColour(palette::raised);
-    g.fillRoundedRectangle((float)left,eventTop,(float)axisWidth(),eventHeight,3);
-    label(g,"EVENTS",{8,eventTop+8,66,19},10,palette::teal,true);
+    g.fillRoundedRectangle((float)left,(float)eventsY,(float)axisWidth(),(float)eventHeight,3);
+    label(g,"EVENTS",{8,eventsY+6,68,19},10,palette::teal,true);
     for (int i=0;i<(int)clip.events.size();++i) {
-        const auto& e=clip.events[(size_t)i];
-        const float x=xForTime(e.time);
-        const float y=eventTop+10+(i%2)*17;
+        const auto& event=clip.events[(size_t)i];
+        const float x=xForTime(event.time);
+        const int y=eventsY+9+(i%2)*17;
+        if (x<left-12 || x>right+12) continue;
         g.setColour(i==selectedEvent ? palette::amber : palette::teal);
-        g.fillRoundedRectangle(x-5,y,10,14,2);
-        if (i==selectedEvent || axisWidth()/std::max(1,(int)clip.events.size())>74) {
-            const auto arguments=describeArguments(e.arguments);
-            const auto summary=e.address+(arguments.isNotEmpty() ? "   "+arguments : juce::String());
-            label(g,summary,{(int)x+7,(int)y-1,
-                std::max(0,std::min(245,right-(int)x-11)),17},10,palette::text);
-        }
+        g.fillRoundedRectangle(x-5,(float)y,10,14,2);
+        const auto arguments=describeArguments(event.arguments);
+        const auto summary=event.address+(arguments.isNotEmpty() ? "   "+arguments : juce::String());
+        if (i==selectedEvent || clip.events.size()<12)
+            label(g,summary,{(int)x+7,y-2,
+                std::max(1,std::min(300,right-(int)x-9)),18},10,palette::text);
     }
-    g.setColour(palette::muted);
-    g.drawHorizontalLine(eventTop+eventHeight+4,(float)left,(float)right);
-    for (int i=0;i<(int)clip.automations.size();++i) {
-        const auto& a=clip.automations[(size_t)i];
-        const int y=laneTop(i);
+    for (int track=0;track<=(int)clip.tracks.size();++track) {
+        const bool placeholder=track==(int)clip.tracks.size();
+        if (placeholder && clip.tracks.size()>=16) break;
+        const int y=laneTop(track);
         if (y>=getHeight() || y+laneHeight<rulerBottom) continue;
-        g.setColour(i%2 ? palette::raised : palette::background);
+        g.setColour(track%2 ? palette::raised : palette::background);
         g.fillRect(left,y,axisWidth(),laneHeight-4);
-        label(g,"AUTO "+juce::String(i+1),{6,y+4,68,16},9,
-              i==selectedAutomation ? palette::amber : palette::teal,true);
-        label(g,a.message.address+"  (double-click: address)",
-              {left+9,y+2,std::max(25,axisWidth()-16),16},10,palette::muted);
-        const float x0=xForTime(a.time),x1=xForTime(a.time+a.duration);
-        g.setColour(palette::teal.withAlpha(i==selectedAutomation ? .23f : .12f));
-        g.fillRoundedRectangle(x0,(float)y+20,std::max(1.0f,x1-x0),
-                               (float)laneHeight-25,3.0f);
-        g.setColour(i==selectedAutomation ? palette::amber : palette::teal);
-        g.fillRoundedRectangle(x1-4,(float)y+23,8,(float)laneHeight-31,2.0f);
-        juce::Path curve;
-        bool first=true;
-        for (int p=0;p<(int)a.points.size();++p) {
-            const auto& point=a.points[(size_t)p];
-            const auto x=xForTime(a.time+point.time),py=yForValue(i,point.value);
-            if (first) { curve.startNewSubPath(x,py); first=false; } else curve.lineTo(x,py);
-            g.setColour(i==selectedAutomation && p==selectedPoint ? palette::amber : palette::text);
-            g.fillEllipse(x-4,py-4,8,8);
+        const bool selected=track==selectedTrack;
+        label(g,placeholder ? "+ TRACK" : "OSC "+juce::String(track+1),
+              {6,y+5,70,18},9,selected?palette::amber:palette::teal,true);
+        const auto& address=placeholder ? juce::String("Double-click to add a ramp")
+            : clip.tracks[(size_t)track].message.address;
+        label(g,address,{left+9,y+2,std::max(1,axisWidth()-16),17},10,palette::muted);
+        if (placeholder) continue;
+        const auto& lane=clip.tracks[(size_t)track];
+        label(g,juce::String(lane.rangeMax,2),{4,y+25,68,15},9,palette::muted);
+        label(g,juce::String(lane.rangeMin,2),{4,y+laneHeight-26,68,15},9,palette::muted);
+        for (int i=0;i<(int)clip.automations.size();++i) {
+            if (trackForAutomation(i)!=track) continue;
+            const auto& a=clip.automations[(size_t)i];
+            const float x0=xForTime(a.time),x1=xForTime(a.time+a.duration);
+            if (x1<left || x0>right) continue;
+            const bool active=i==selectedAutomation;
+            g.setColour(palette::teal.withAlpha(active ? .22f : .12f));
+            g.fillRoundedRectangle(x0,(float)y+20,std::max(1.0f,x1-x0),
+                                   (float)laneHeight-24,3.0f);
+            g.setColour(active ? palette::amber : palette::teal);
+            g.fillRoundedRectangle(x1-4,(float)y+22,8,(float)laneHeight-28,2.0f);
+            juce::Path curve;
+            for (int p=0;p<(int)a.points.size();++p) {
+                const auto& point=a.points[(size_t)p];
+                const float px=xForTime(a.time+point.time),py=yForValue(i,point.value);
+                if (p==0) curve.startNewSubPath(px,py);
+                else curve.lineTo(px,py);
+                g.setColour(active && p==selectedPoint ? palette::amber : palette::text);
+                g.fillEllipse(px-4,py-4,8,8);
+            }
+            g.setColour(active ? palette::amber : palette::teal);
+            g.strokePath(curve,juce::PathStrokeType(2.0f));
         }
-        g.setColour(palette::teal); g.strokePath(curve,juce::PathStrokeType(2.0f));
     }
-    // Ready-to-use empty track; no change to the serialized automation model.
-    if (clip.automations.size()<16) {
-        const int y=laneTop((int)clip.automations.size());
-        if (y<getHeight() && y+laneHeight>rulerBottom) {
-            g.setColour(palette::raised.withAlpha(.65f));
-            g.fillRect(left,y,axisWidth(),laneHeight-4);
-            label(g,"+ AUTO",{6,y+4,68,17},9,palette::teal,true);
-            label(g,newTrackAddress+"  (next track address)",
-                  {left+9,y+3,std::max(25,axisWidth()-16),17},10,palette::muted);
-            label(g,"Double-click here: ramp 0 → 1 / 1 second",
-                  {left+12,y+32,std::max(25,axisWidth()-20),22},11,palette::muted);
-        }
-    }
+    g.restoreState();
     g.setColour(palette::amber.withAlpha(.7f));
     g.drawVerticalLine((int)xForTime(cursor),(float)rulerTop,(float)getHeight());
-    label(g,"GAIN: i / f  •  BOOLEAN: T / F",{13,getHeight()-17,getWidth()-20,16},9,palette::muted);
+    if (editHint.isNotEmpty())
+        label(g,editHint,{13,getHeight()-17,std::max(1,getWidth()-20),16},9,palette::amber);
+    else
+        label(g,"OSC i / f · Right-click a point to delete · Ctrl+wheel to zoom",
+            {13,getHeight()-17,std::max(1,getWidth()-20),16},9,palette::muted);
 }
 void OscClipEditor::chooseEvent(int index) {
     selectedEvent=index; selectedAutomation=selectedPoint=-1; repaint();
