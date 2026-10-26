@@ -19,6 +19,7 @@ void MainComponent::editMidiClip() {
     const int cellId=show.rows[selectedRow].cells[selectedColumn].id;
     if (clipEditor && clipEditorCellId==cellId) {
         if (midiDialog) { midiDialog->toFront(true); return; }
+        if (clipEditor->getParentComponent()!=this) addAndMakeVisible(*clipEditor);
         clipEditor->setVisible(true); layoutClipEditor(); return;
     }
     closeMidiEditor();
