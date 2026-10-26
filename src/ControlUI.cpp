@@ -137,6 +137,53 @@ bool MainComponent::updateControlBinding(int row,int column,int id,ControlBindin
     show=std::move(candidate); refreshControlSettings();
     dirty=true;status="Mapping updated.";refresh();return true;
 }
+int MainComponent::saveControlSetTemplate(int row,int column,const juce::String& name) {
+    if (row<0 || row>=(int)show.rows.size() || column<0 ||
+        column>=(int)show.columns.size() ||
+        show.columns[(size_t)column].type!=ColumnType::control) return 0;
+    const auto label=name.trim();
+    if (label.isEmpty() || label.length()>120) return 0;
+    auto candidate=show;
+    auto& col=candidate.columns[(size_t)column];
+    const ControlSet* source=col.controlLocked ? &col.controlDefaultSet :
+        (candidate.rows[(size_t)row].cells[(size_t)column].controlSet ?
+         &*candidate.rows[(size_t)row].cells[(size_t)column].controlSet : nullptr);
+    if (!source || source->bindings.empty()) return 0;
+    ControlSetTemplate item;
+    item.id=candidate.controls.nextId++;
+    item.name=label;
+    item.set=*source;
+    for (auto& binding:item.set.bindings)
+        binding.id=candidate.controls.nextId++;
+    candidate.controls.templates.push_back(std::move(item));
+    if (auto check=validateShow(candidate);check.failed()) {
+        status=check.getErrorMessage();return 0;
+    }
+    const int result=candidate.controls.templates.back().id;
+    show=std::move(candidate);refreshControlSettings();
+    dirty=true;status="Reusable Control Set saved.";refresh();return result;
+}
+bool MainComponent::applyControlSetTemplate(int row,int column,int templateId) {
+    if (row<0 || row>=(int)show.rows.size() || column<0 ||
+        column>=(int)show.columns.size() ||
+        show.columns[(size_t)column].type!=ColumnType::control) return false;
+    auto candidate=show;
+    const auto it=std::find_if(candidate.controls.templates.begin(),
+        candidate.controls.templates.end(),
+        [templateId](const ControlSetTemplate& item){return item.id==templateId;});
+    if (it==candidate.controls.templates.end()) return false;
+    ControlSet copy=it->set;
+    for (auto& binding:copy.bindings)
+        binding.id=candidate.controls.nextId++;
+    auto& col=candidate.columns[(size_t)column];
+    if (col.controlLocked) col.controlDefaultSet=std::move(copy);
+    else candidate.rows[(size_t)row].cells[(size_t)column].controlSet=std::move(copy);
+    if (auto valid=validateShow(candidate);valid.failed()) {
+        status=valid.getErrorMessage();return false;
+    }
+    show=std::move(candidate);refreshControlSettings();
+    dirty=true;status="Control Set template applied to selected cell.";refresh();return true;
+}
 bool MainComponent::setControlColumnLocked(int column,bool locked,int sourceRow) {
     if (column<0 || column>=(int)show.columns.size() ||
         show.columns[(size_t)column].type!=ColumnType::control ||
