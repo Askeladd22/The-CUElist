@@ -12,6 +12,7 @@ public:
     void paint(juce::Graphics&) override;
     void resized() override;
     void loadClip(const OscClip&);
+    void setTempo(const std::vector<TempoPoint>& currentTempo) { tempo=currentTempo; }
     void setFloating(bool);
     const OscClip& getClip() const { return clip; }
     std::function<void()> onDetach;
