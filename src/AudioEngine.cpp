@@ -89,13 +89,23 @@ void RenderState::trigger(int id,bool row,bool stop) noexcept {
         bool exists=false;
         for (const auto& target:rows) if (target.id==id) { exists=true; break; }
         if (exists) {
-            for (auto& other:rows) if (other.id!=id && other.stopOnNext) {
-                other.seconds=0; other.playing=false; other.pendingSeek=false; other.ended=false;
-            }
+            // Stop participating voices first. Protected voices keep their
+            // audio/MIDI/OSC transport and continue through subsequent GO events.
             for (auto& v:voices) if (v.rowId!=id && v.stopOnNext) {
                 releaseMidi(v);
                 v.playing=false; v.paused=false; v.position=0; v.delaySeconds=0;
                 v.pendingSeek=false; v.rowMode=false;
+            }
+            for (auto& other:rows) if (other.id!=id && other.stopOnNext) {
+                bool survivor=false;
+                for (const auto& v:voices)
+                    if (v.rowId==other.id && v.rowMode && v.playing) { survivor=true; break; }
+                // Keep the timeline running when a protected row-mode clip
+                // survives; otherwise reset the old cue transport as before.
+                if (!survivor) {
+                    other.seconds=0; other.playing=false;
+                    other.pendingSeek=false; other.ended=false;
+                }
             }
         }
     }
@@ -350,7 +360,7 @@ std::unique_ptr<RenderState> makeRenderState(const Show& show,const ClipMap& cli
         v.telemetry=std::make_shared<CellPlaybackTelemetry>();
         v.gain=c.gain; v.loop=c.loop; v.followsRow=c.followsRow; v.behaviour=c.behaviour;
         v.startSeconds=c.startSeconds; v.rowGain=row.gain; v.rowMuted=row.muted;
-        v.stopOnNext=row.stopOnNext;
+        v.stopOnNext=row.stopOnNext && c.stopOnNext;
         v.columnGain=show.columns[i].gain; v.columnPan=show.columns[i].pan;
         v.columnMuted=show.columns[i].muted; v.columnPhaseInverted=show.columns[i].phaseInverted;
         v.rowLoop=row.loop; v.overrideBehaviour=row.overrideBehaviour; v.rowBehaviour=row.behaviour;
