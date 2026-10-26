@@ -67,6 +67,13 @@ bool MainComponent::assignMappingPreset(int rowId,int presetId) {
     status="Preset Control Mapping assegnato."; repaint(); return true;
 }
 void MainComponent::dispatchControl(const ControlEvent& input) {
+    // Track physical button edges even when a cue has no matching binding.
+    // Otherwise an off/release arriving during a different preset is lost.
+    const auto physical=input.deviceId+"|"+juce::String((int)input.kind)+"|"+
+        juce::String(input.channel)+"|"+juce::String(input.number);
+    const bool wasDown=pressedInputs[physical];
+    const bool isDown=!input.isNoteOff && input.normalized()>=0.5f;
+    pressedInputs[physical]=isDown;
     // Hardware MIDI events have already been copied to the UI thread.
     // Pickup compares against the physical value expected for the current
     // actual target. No mutation of show happens in a MIDI callback.
@@ -94,11 +101,7 @@ void MainComponent::dispatchControl(const ControlEvent& input) {
     if (binding.target==ControlTarget::go || binding.target==ControlTarget::panic) {
         // Debounce by physical event identity, not mapping ID. GO changes the
         // active cue, so per-binding debounce would re-trigger a held button.
-        const auto key=input.deviceId+"|"+juce::String((int)input.kind)+"|"+
-            juce::String(input.channel)+"|"+juce::String(input.number);
-        const bool previous=pressedInputs[key];
-        pressedInputs[key]=action->pressed;
-        if (!action->pressed || previous) return;
+        if (!action->pressed || wasDown) return;
         if (binding.target==ControlTarget::go) goNext();
         else stopAll();
         return;
