@@ -56,6 +56,12 @@ Nell'area sinistra delle Utility Colonne, prima dei canali, trovi **MASTER AUDIO
 
 La regolazione Master è salvata nello show (formato v8). Gli show v1–v7 si aprono con Master **0 dB**.
 
+### Copia/incolla e BPM direttamente nella griglia
+
+Seleziona una cella e usa **Ctrl+C** per copiarne contenuto e impostazioni; seleziona una cella della **stessa tipologia di colonna** (Audio, MIDI oppure OSC) e usa **Ctrl+V** per incollare. Puoi utilizzare anche il **clic destro sulla cella** e il menu Copia/Incolla. L'ID della cella di destinazione rimane invariato, e per l'audio viene riutilizzato il media gia caricato nella sessione. Le colonne di tipo differente non possono ricevere l'incolla.
+
+La **scritta BPM sulla riga** e cliccabile: permette di cambiare direttamente il tempo iniziale della cue, lasciando intatti gli eventuali cambi BPM successivi. Il cambiamento ricostruisce la temporizzazione MIDI/OSC e arresta il trasporto durante l'operazione. La metrica non e piu mostrata nell'interfaccia della griglia.
+
 ### Auto Stop 2.0
 
 **Auto Stop della riga** resta l'interruttore generale, a destra delle cue, ed e attivo per impostazione predefinita. Il comando **AS ON / AS OFF** delle singole celle Audio, MIDI e OSC rimane nascosto per non affollare la griglia: premi **+** accanto all'Auto Stop generale della riga per mostrarlo o nasconderlo; poi clicca il comando della cella che vuoi includere/escludere. La stessa opzione e disponibile nell'inspector, scheda **Cella**, come **Arresta al GO della prossima cue**.
@@ -80,7 +86,7 @@ I nuovi show hanno tutte le celle AS ON. All'apertura degli show precedenti (v1-
 ## Clip OSC / UDP
 
 1. Aggiungi una colonna **OSC**. Nelle **utility colonna** premi il pulsante con `host:porta` e imposta il ricevitore (esempio `127.0.0.1:9000`). La destinazione appartiene alla colonna e viene riutilizzata dalle clip di tutte le sue cue.
-2. Seleziona una cella OSC e premi **Crea clip OSC** oppure clicca la clip OSC nella timeline. L'editor compare nel pannello integrato e puo essere staccato o riagganciato alla finestra principale.
+2. Seleziona una cella OSC e premi **Crea clip OSC** oppure clicca la clip OSC nella timeline. L'editor compare nel pannello integrato e puo essere staccato o riagganciato alla finestra principale. Quando e integrato, **trascina la maniglia sul bordo superiore del pannello** per modificarne l'altezza e dare piu spazio agli eventi.
 3. Premi il pulsante **+** per inserire un nuovo messaggio. Il doppio clic sulla riga del messaggio apre una finestra di modifica con **Tempo** (dall'inizio della clip), **Indirizzo OSC** (es. `/luci/intensita`) e **Argomenti** nel formato `i:7; f:0.5; s:scena`. Il prefisso `i` indica int32, `f` float32, `s` stringa. Gli argomenti sono separati da punto e virgola.
 4. In **Unita** scegli **Secondi** o **Beat**: quando cambi unita, l'editor converte durata ed eventi preservando la posizione temporale usando la mappa BPM della cue. La durata della clip si modifica trascinandone il bordo destro nella timeline, senza un campo fisso nell'editor. I messaggi sono inviati con GO/cella, rispettano la timeline, seek, loop e Stop. Modifiche valide sono applicate subito; premi **Salva** per conservarle nello show.
 
