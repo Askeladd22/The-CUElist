@@ -203,6 +203,16 @@ void Timeline::paint(juce::Graphics& g) {
                 const float dx=x+(float)(area*moment/length);
                 g.fillRect(dx,(float)y+6,2.0f,19.0f);
             }
+            for (const auto& automation:cell.osc->automations) {
+                const double start=cell.osc->useBeats ? secondsAtBeat(row.tempo,automation.time) : automation.time;
+                const double end=cell.osc->useBeats
+                    ? secondsAtBeat(row.tempo,automation.time+automation.duration)
+                    : automation.time+automation.duration;
+                const auto from=x+(float)(area*start/length),to=x+(float)(area*end/length);
+                g.setColour(palette::teal.withAlpha(.60f));
+                g.fillRoundedRectangle(from,(float)y+25,std::max(2.0f,to-from),4,1.5f);
+                g.setColour(colour.withAlpha(.4f));
+            }
         } else if (cell.midi) {
             for (const auto& note:cell.midi->notes) {
                 const double begin=secondsAtBeat(row.tempo,note.beat), end=secondsAtBeat(row.tempo,note.beat+note.length);
