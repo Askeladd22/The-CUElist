@@ -134,7 +134,7 @@ std::vector<OscScheduledMessage> prepareOscClip(const OscClip& clip,
     const std::function<double(double)>& unitAtSeconds) {
     std::vector<OscScheduledMessage> result;
     if (validateOscClip(clip).failed()) return result;
-    result.reserve(clip.events.size()+std::min<size_t>(32768,clip.automations.size()*1000));
+    result.reserve(clip.events.size()+std::min<size_t>(8192,clip.automations.size()*1000));
     for (const auto& e:clip.events)
         result.push_back({secondsAt(e.time),encodeOscMessage(e)});
     struct Tick { double seconds=0; size_t source=0; bool initial=false; };
@@ -144,7 +144,7 @@ std::vector<OscScheduledMessage> prepareOscClip(const OscClip& clip,
         summedDuration+=std::max(0.0,secondsAt(automation.time+automation.duration)-secondsAt(automation.time));
     // 30 updates/s for ordinary clips. For extremely long/many overlapping
     // curves, reduce rate to bound precompiled packet count to ~32k per clip.
-    const auto updateHz=std::min(30.0,32768.0/std::max(1.0,summedDuration));
+    const auto updateHz=std::min(30.0,8192.0/std::max(1.0,summedDuration));
     for (size_t index=0;index<clip.automations.size();++index) {
         const auto& au=clip.automations[index];
         const double start=secondsAt(au.time);
