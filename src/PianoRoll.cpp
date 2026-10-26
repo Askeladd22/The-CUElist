@@ -173,12 +173,63 @@ PianoRollEditor::PianoRollEditor(MidiClip value,std::function<void(const MidiCli
     undoButton.onClick=[this] { undo(); }; redoButton.onClick=[this] { redo(); };
     cancel.onClick=[this] { close(); };
     for (auto* b:{&remove,&zoomOut,&zoomIn,&undoButton,&redoButton,&cancel}) b->setWantsKeyboardFocus(false);
-    setSize(940,620); updateCanvas(); selectionChanged();
+    setSize(940,620); updateCanvas(); selectionChanged(); undoButton.setEnabled(false); redoButton.setEnabled(false);
     const int pitch=clip.notes.empty() ? 64 : clip.notes.front().pitch;
     viewport.setViewPosition(0,std::max(0,rulerHeight+(127-pitch)*noteHeight-viewport.getHeight()/2));
 }
 PianoRollEditor::~PianoRollEditor() { viewport.setViewedComponent(nullptr,false); setLookAndFeel(nullptr); }
 juce::Component& PianoRollEditor::getCanvas() { return *canvas; }
+namespace {
+bool sameMidiClip(const MidiClip& a,const MidiClip& b) {
+    if (a.lengthBeats!=b.lengthBeats || a.notes.size()!=b.notes.size()) return false;
+    for (size_t i=0;i<a.notes.size();++i) {
+        const auto& x=a.notes[i]; const auto& y=b.notes[i];
+        if (x.beat!=y.beat || x.length!=y.length || x.pitch!=y.pitch || x.velocity!=y.velocity || x.channel!=y.channel) return false;
+    }
+    return true;
+}
+}
+void PianoRollEditor::beginEdit() {
+    if (gestureActive) return;
+    previousGesture=clip; gestureActive=true;
+}
+void PianoRollEditor::endEdit() {
+    if (!gestureActive) return;
+    gestureActive=false;
+    if (sameMidiClip(previousGesture,clip)) return;
+    const auto valid=validateMidiClip(clip);
+    if (valid.failed()) { clip=previousGesture; hint=valid.getErrorMessage(); updateCanvas(); return; }
+    undoStack.push_back(previousGesture);
+    if (undoStack.size()>100) undoStack.erase(undoStack.begin());
+    redoStack.clear();
+    applyChange();
+}
+void PianoRollEditor::applyChange() {
+    if (commit) commit(clip);
+    undoButton.setEnabled(!undoStack.empty()); redoButton.setEnabled(!redoStack.empty());
+    repaint();
+}
+void PianoRollEditor::loadClip(const MidiClip& value) {
+    clip=value; selected=-1; selectedNotes.clear(); gestureActive=false;
+    undoStack.clear(); redoStack.clear();
+    length.setValue(clip.lengthBeats,juce::dontSendNotification);
+    selectionChanged(); updateCanvas();
+    undoButton.setEnabled(false); redoButton.setEnabled(false);
+}
+void PianoRollEditor::undo() {
+    if (undoStack.empty()) return;
+    redoStack.push_back(clip); clip=undoStack.back(); undoStack.pop_back();
+    selected=-1; selectedNotes.clear(); length.setValue(clip.lengthBeats,juce::dontSendNotification);
+    selectionChanged(); updateCanvas(); applyChange();
+}
+void PianoRollEditor::redo() {
+    if (redoStack.empty()) return;
+    undoStack.push_back(clip); clip=redoStack.back(); redoStack.pop_back();
+    selected=-1; selectedNotes.clear(); length.setValue(clip.lengthBeats,juce::dontSendNotification);
+    selectionChanged(); updateCanvas(); applyChange();
+}
+void PianoRollEditor::setDetached(bool) {}
+
 double PianoRollEditor::gridStep() const { return snapEnabled() ? std::pow(.5,std::max(0,snap.getSelectedId()-1)) : .25; }
 bool PianoRollEditor::snapEnabled() const { return snap.getSelectedId()!=5; }
 void PianoRollEditor::updateCanvas() { canvas->setSize(std::max(viewport.getWidth()-14,keysWidth+(int)std::ceil(clip.lengthBeats*pixelsPerBeat)+24),rulerHeight+128*noteHeight); canvas->repaint(); }
