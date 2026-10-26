@@ -52,7 +52,7 @@ void timelineV3Tests() {
         timeline->mouseDown(event(*timeline,from,from));
         timeline->mouseDrag(event(*timeline,to,from,1,true));
         timeline->mouseUp(event(*timeline,to,from,1,true));
-        near(ui.show.rows[0].cells[0].startSeconds,35.0*10/640);
+        near(ui.show.rows[0].cells[0].startSeconds,.55); // model rounds offsets to 0.01 s
     });
     test("timeline MIDI single click opens shared docked clip editor",[] {
         MainComponent ui(false); addColumn(ui.show,ColumnType::midi,{});
