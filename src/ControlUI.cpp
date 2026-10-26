@@ -125,6 +125,12 @@ bool MainComponent::setControlColumnLocked(int column,bool locked,int sourceRow)
         if (cell.controlSet) col.controlDefaultSet=*cell.controlSet;
         col.controlLocked=true; col.controlPriority=1;
     } else if (!locked && col.controlLocked) {
+        // Retain edits made to the locked default when returning to cue scope.
+        // Other cue-specific sets, held dormant during lock, reappear untouched.
+        auto& source=candidate.rows[(size_t)sourceRow].cells[(size_t)column];
+        if (!col.controlDefaultSet.bindings.empty())
+            source.controlSet=col.controlDefaultSet;
+        col.controlDefaultSet.bindings.clear();
         col.controlLocked=false; col.controlPriority=2;
     } else return true;
     if (auto valid=validateShow(candidate);valid.failed()) {
@@ -494,7 +500,9 @@ private:
 };
 void MainComponent::openControlPanel(bool editSet) {
     if (controlDialog) {
-        controlDialog->setVisible(false); controlDialog=nullptr;
+        auto* previous=controlDialog.getComponent();
+        controlDialog=nullptr;
+        delete previous;
     }
     juce::DialogWindow::LaunchOptions options;
     options.content.setOwned(new ControlPanel(*this,editSet));
