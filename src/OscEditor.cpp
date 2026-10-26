@@ -293,7 +293,13 @@ void OscClipEditor::mouseDrag(const juce::MouseEvent& e) {
             a.time=juce::jlimit(0.0,std::max(0.0,clip.length-original.duration),
                                 quantize(original.time+offset));
         } else if (rampDrag==RampDrag::resize) {
-            const double end=quantize(timeForX(e.position.x));
+            // Unlike instant events, a ramp's right edge may reach clip.length.
+            // Preserve exact endpoint snapping instead of clipping to length-epsilon.
+            const double raw=juce::jlimit(0.0,clip.length,
+                (double)(e.position.x-axisLeft())/axisWidth()*clip.length);
+            const double step=1.0/(1<<juce::jlimit(0,3,resolution.getSelectedId()-1));
+            const double end=snap.getToggleState()
+                ? juce::jlimit(0.0,clip.length,std::round(raw/step)*step) : raw;
             const double next=end-original.time;
             if (next<.01 || original.time+next>clip.length) return;
             a.duration=next;

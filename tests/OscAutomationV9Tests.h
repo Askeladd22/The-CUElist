@@ -277,6 +277,25 @@ void oscAutomationV9Tests() {
               "Double click unexpectedly opened a ramp modal");
         check(validateOscClip(editor.getClip()).wasOk(),"Created ramp invalid");
     });
+    test("OSC ramp can be moved and resized with timeline snapping",[] {
+        OscClipEditor editor(OscClip{},{{0,120,4,4}},
+            [](const OscClip&,const OscClip&,bool){});
+        editor.setSize(940,360);
+        const juce::Point<float> create{190,204};
+        editor.mouseDoubleClick(cueViewFixtures::event(editor,create,create));
+        const juce::Point<float> moveFrom{290,205},moveTo{500,205};
+        editor.mouseDown(cueViewFixtures::event(editor,moveFrom,moveFrom));
+        editor.mouseDrag(cueViewFixtures::event(editor,moveTo,moveFrom,1,true));
+        editor.mouseUp(cueViewFixtures::event(editor,moveTo,moveFrom,1,true));
+        near(editor.getClip().automations[0].time,1.5);
+        const juce::Point<float> edgeFrom{603,205},edgeTo{813,205};
+        editor.mouseDown(cueViewFixtures::event(editor,edgeFrom,edgeFrom));
+        editor.mouseDrag(cueViewFixtures::event(editor,edgeTo,edgeFrom,1,true));
+        editor.mouseUp(cueViewFixtures::event(editor,edgeTo,edgeFrom,1,true));
+        near(editor.getClip().automations[0].duration,2);
+        near(editor.getClip().automations[0].points.back().time,2);
+        check(validateOscClip(editor.getClip()).wasOk(),"Dragged automation invalid");
+    });
     test("OSC editor creates timeline events and automation ramps with separate grid and snap",[] {
         OscClipEditor editor(OscClip{},{{0,120,4,4}},
             [](const OscClip&,const OscClip&,bool){});
