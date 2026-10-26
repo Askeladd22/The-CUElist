@@ -1,4 +1,5 @@
 #pragma once
+#include "GainMeterFader.h"
 #include "OscEditor.h"
 void uiRefinementTests() {
     using namespace cueViewFixtures;
