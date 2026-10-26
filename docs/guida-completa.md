@@ -68,9 +68,9 @@ Disattivalo sulle righe che devono continuare in sovrapposizione. Anche il GO di
 - Doppio click sul titolo di cue o colonna per rinominarlo: il campo riceve subito il focus. **Invio** conferma anche i nomi nell'inspector.
 - Le frecce riordinano righe e colonne; **X** elimina. Eliminando l'ultima rimane una riga/colonna vuota. I file originali non vengono cancellati.
 - Trascina una clip nella griglia per spostarla; una destinazione occupata viene scambiata. Le colonne devono essere dello stesso tipo.
-- Trascina una clip nella timeline per modificarne l'inizio in secondi. Il **magnete** consente di agganciarla alla griglia musicale (1/4, 1/8, 1/16 o 1/32); disattivalo con **Magnete OFF** per spostamenti liberi. La griglia segue la mappa BPM della cue, anche quando il tempo cambia. Il lancio diretto della cella parte subito, senza questo ritardo.
+- Trascina una clip nella timeline per modificarne l'inizio in secondi. La sezione **GRIGLIA** mostra/nasconde la griglia BPM e ne seleziona la risoluzione (1/4, 1/8, 1/16, 1/32). La sezione **SNAP** ha un pulsante con **icona a magnete** per attivare/disattivare l'aggancio e una suddivisione separata. **La griglia può essere nascosta lasciando attivo lo snap, oppure mostrata con snap disattivato.** Le linee seguono la mappa BPM della cue, anche quando il tempo cambia. L'avvio diretto della cella parte subito, senza il ritardo di posizionamento.
 - Trascina il cursore sul righello per cambiare la posizione della cue. Ogni cella mostra tempo trascorso/durata, barra di avanzamento e stato di riproduzione, pausa o attesa.
-- **− / +** regolano lo zoom, **Fit** mostra tutta la cue e **Ctrl+rotella** ingrandisce attorno al puntatore. La barra orizzontale sposta la vista; la rotella scorre le tracce. **Doppio clic su una clip MIDI nella timeline** apre il piano roll senza avviare la clip.
+- **− / +** regolano lo zoom, **Fit** mostra tutta la cue e **Ctrl+rotella** ingrandisce attorno al puntatore. La barra orizzontale sposta la vista; la rotella scorre le tracce. **Clic su una clip MIDI nella timeline** apre il Clip Editor integrato sopra la timeline; **Stacca/Riaggancia** lo trasferisce fra pannello e finestra flottante.
 
 I parametri audio si aggiornano senza azzerare il trasporto. Invio, **Applica modifiche**, Salva o il cambio selezione confermano i campi testo. Importazione, apertura e modifiche strutturali possono fermare l'audio.
 
@@ -90,12 +90,12 @@ I simboli si evidenziano quando attivi. I livelli di cella, cue e colonna si mol
 
 1. Aggiungi una colonna **MIDI** con **+ Colonna**.
 2. Seleziona la cella e usa **Importa MIDI** per un `.mid`/`.midi`, oppure **Crea clip MIDI** per partire da una clip vuota di 4 beat. Puoi anche trascinare un file sulla cella.
-3. Un doppio clic sulla cella apre il **piano roll**; il pulsante Play della cella avvia la riproduzione.
+3. Seleziona una cella MIDI e scegli **Crea clip MIDI / Modifica piano roll** oppure clicca sulla clip nella timeline per aprire il **Clip Editor**; il pulsante Play della cella avvia la riproduzione.
 4. Nelle utility seleziona l'**uscita MIDI**. Serve un sintetizzatore esterno, un'applicazione o uno strumento collegato a quella porta: The Cuelist non contiene un sintetizzatore.
 
-Nel piano roll: doppio clic nella griglia per inserire una nota; trascina la nota per spostare tempo e altezza, oppure il bordo destro per cambiare durata. **Tasto destro + trascinamento** seleziona più note in un rettangolo; **Shift+clic** aggiunge o rimuove note dalla selezione. Le note selezionate possono essere spostate o eliminate insieme, e ricevono collettivamente le modifiche a **Velocity** (1–127) e **Canale** (1–16). **Canc** o **Elimina nota** le rimuovono. **Snap** sceglie la griglia da 1/4 a 1/32 oppure **Off** per spostamenti liberi; **+ / −** cambiano lo zoom e le barre scorrono la vista. **Beat clip** regola la durata senza tagliare note esistenti. I beat sono quarti; C4 corrisponde alla nota MIDI 60.
+Nel piano roll: clic sinistro nella griglia vuota per inserire una nota; trascina la nota per spostare tempo e altezza, oppure il bordo destro per cambiare durata. **Tasto destro + trascinamento** seleziona più note in un rettangolo; **Shift+clic** aggiunge o rimuove note dalla selezione. Le note selezionate possono essere spostate o eliminate insieme, e ricevono collettivamente le modifiche a **Velocity** (1–127) e **Canale** (1–16). **Canc** o **Elimina nota** le rimuovono. **Snap** sceglie la griglia da 1/4 a 1/32 oppure **Off** per spostamenti liberi; **+ / −** cambiano lo zoom e le barre scorrono la vista. **Beat clip** regola la durata senza tagliare note esistenti. I beat sono quarti; C4 corrisponde alla nota MIDI 60.
 
-**Applica** trasferisce le modifiche alla cella; **Annulla** o la chiusura della finestra le scartano. Salva poi lo show per conservarle su disco. Aprire l'editor ferma il trasporto.
+Le modifiche MIDI vengono **applicate subito al modello della clip**, senza un pulsante Applica. **Undo/Redo** annullano o ripetono le modifiche alle note. Il pannello può essere ridotto, chiuso oppure staccato e riagganciato; chiuderlo non annulla i cambiamenti. Premi **Salva** per conservarli nel file dello show.
 
 Le clip MIDI partecipano a GO, Auto Stop, loop, pausa e seek della timeline; si possono spostare tra celle MIDI e trascinare nella timeline. I livelli in dB e il pan agiscono sull'audio; per le note si usa la velocity. Il trasporto MIDI usa il clock del dispositivo audio, che deve quindi essere aperto anche per uno show solo MIDI.
 
