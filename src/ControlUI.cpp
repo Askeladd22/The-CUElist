@@ -3,7 +3,7 @@
 
 namespace cuelist {
 void MainComponent::resetActiveMapping() {
-    activeCueId=0; pressedControls.clear();
+    activeCueId=0;
     controlMapping.setActiveCue(0,0);
 }
 void MainComponent::refreshControlSettings() {
@@ -12,7 +12,6 @@ void MainComponent::refreshControlSettings() {
     for (const auto& row:show.rows)
         if (row.id==activeCueId) { preset=row.mappingPresetId; break; }
     controlMapping.setActiveCue(activeCueId,preset);
-    pressedControls.clear();
     if (midiInput.identifier()!=show.controls.midiInputId) {
         const auto result=midiInput.connect(show.controls.midiInputId);
         if (result.failed()) status=result.getErrorMessage();
@@ -20,6 +19,7 @@ void MainComponent::refreshControlSettings() {
 }
 juce::Result MainComponent::selectControlInput(const juce::String& id) {
     auto result=midiInput.connect(id);
+    pressedInputs.clear();
     // Preserve an explicitly selected disconnected identifier, never silently
     // switch to the first available device.
     show.controls.midiInputId=id;
@@ -92,10 +92,13 @@ void MainComponent::dispatchControl(const ControlEvent& input) {
     if (!action) return;
     const auto& binding=action->binding;
     if (binding.target==ControlTarget::go || binding.target==ControlTarget::panic) {
-        // Momentary controls fire only on the first press, not repeated CCs.
-        const bool old=pressedControls[binding.id];
-        pressedControls[binding.id]=action->pressed;
-        if (!action->pressed || old) return;
+        // Debounce by physical event identity, not mapping ID. GO changes the
+        // active cue, so per-binding debounce would re-trigger a held button.
+        const auto key=input.deviceId+"|"+juce::String((int)input.kind)+"|"+
+            juce::String(input.channel)+"|"+juce::String(input.number);
+        const bool previous=pressedInputs[key];
+        pressedInputs[key]=action->pressed;
+        if (!action->pressed || previous) return;
         if (binding.target==ControlTarget::go) goNext();
         else stopAll();
         return;
