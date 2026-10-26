@@ -65,6 +65,11 @@ struct ControlSettings {
     std::vector<ControlPreset> presets;
     std::vector<ControlBinding> bindings;
 };
+struct EffectiveControl {
+    ControlBinding binding;
+    int columnId=0,priority=1;
+    bool inherited=false;
+};
 struct MappedControl {
     ControlBinding binding;
     float normalized=0,scaled=0;
@@ -93,6 +98,27 @@ public:
         activeCueId=id; activePresetId=preset; pickup.clear();
     }
     int activeCue() const noexcept { return activeCueId; }
+    // Compose the visible effective mapping for a selected cue. No live state
+    // is altered: selecting a row must never activate hardware mappings.
+    std::vector<EffectiveControl> effectiveForCue(int cueId) const {
+        std::vector<EffectiveControl> result;
+        for (const auto& layer:layers) {
+            if (!layer.locked && (cueId==0 || layer.cueId!=cueId)) continue;
+            for (const auto& b:layer.set.bindings) {
+                if (!b.enabled) continue;
+                auto it=std::find_if(result.begin(),result.end(),
+                    [&](const EffectiveControl& v) {
+                        const auto& a=v.binding;
+                        return a.deviceId==b.deviceId && a.kind==b.kind &&
+                            a.channel==b.channel && a.number==b.number;
+                    });
+                if (it==result.end()) result.push_back({b,layer.columnId,layer.priority,layer.locked});
+                else if (layer.priority>=it->priority)
+                    *it={b,layer.columnId,layer.priority,layer.locked};
+            }
+        }
+        return result;
+    }
     const ControlBinding* matched(const ControlEvent& e) const {
         const ControlBinding* best=nullptr;
         for (const auto& b:settings.bindings) if (samePhysicalInput(b,e)

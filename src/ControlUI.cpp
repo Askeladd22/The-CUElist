@@ -113,6 +113,30 @@ bool MainComponent::deleteControlSetBinding(int row,int column,int id) {
     if (set->bindings.size()==size) return false;
     refreshControlSettings();dirty=true;status="Control Set mapping removed.";refresh();return true;
 }
+bool MainComponent::updateControlBinding(int row,int column,int id,ControlBinding b,bool inControlSet) {
+    auto candidate=show;
+    std::vector<ControlBinding>* bindings=&candidate.controls.bindings;
+    if (inControlSet) {
+        if (row<0 || row>=(int)candidate.rows.size() ||
+            column<0 || column>=(int)candidate.columns.size() ||
+            candidate.columns[(size_t)column].type!=ColumnType::control) return false;
+        auto& col=candidate.columns[(size_t)column];
+        auto& cell=candidate.rows[(size_t)row].cells[(size_t)column];
+        if (!col.controlLocked && !cell.controlSet) return false;
+        bindings=col.controlLocked ? &col.controlDefaultSet.bindings :
+            &cell.controlSet->bindings;
+        b.scope=ControlScope::global; b.scopeId=0;
+    }
+    const auto it=std::find_if(bindings->begin(),bindings->end(),
+        [id](const ControlBinding& old){return old.id==id;});
+    if (it==bindings->end()) return false;
+    b.id=id; *it=std::move(b);
+    if (auto valid=validateShow(candidate);valid.failed()) {
+        status=valid.getErrorMessage();repaint();return false;
+    }
+    show=std::move(candidate); refreshControlSettings();
+    dirty=true;status="Mapping updated.";refresh();return true;
+}
 bool MainComponent::setControlColumnLocked(int column,bool locked,int sourceRow) {
     if (column<0 || column>=(int)show.columns.size() ||
         show.columns[(size_t)column].type!=ColumnType::control ||

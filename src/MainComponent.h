@@ -124,6 +124,10 @@ public:
     void editControlSet(int row,int column);
     bool addControlSetBinding(int row,int column,ControlBinding);
     bool deleteControlSetBinding(int row,int column,int id);
+    bool updateControlBinding(int row,int column,int id,ControlBinding updated,bool inControlSet);
+    std::vector<EffectiveControl> effectiveControlSet(int cueId) const {
+        return controlMapping.effectiveForCue(cueId);
+    }
     bool setControlColumnLocked(int column,bool locked,int sourceRow);
     bool setControlColumnPriority(int column,int priority);
     juce::Result selectControlInput(const juce::String&);
