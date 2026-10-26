@@ -116,7 +116,8 @@ void autoStopV7Tests() {
               "OSC badge incorrectly changed other cells");
         ui.select(0,2);
         check(!control->getToggleState(),"Inspector did not mirror selected cell");
-        control->onClick();
+        control->setToggleState(true,juce::dontSendNotification);
+        control->onClick(); // mirrors Button's checked state before dispatching callback
         check(ui.show.rows[0].cells[2].stopOnNext,"Inspector toggle did not update OSC cell");
         ui.setAutoStop(0,false);
         ui.setCellAutoStop(0,2,false);
