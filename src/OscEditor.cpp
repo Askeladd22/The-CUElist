@@ -20,7 +20,8 @@ OscClipEditor::OscClipEditor(OscClip value,std::vector<TempoPoint> points,
     : clip(std::move(value)),tempo(std::move(points)),onEdit(std::move(commit)) {
     setLookAndFeel(&theme); setName("sharedOscEditor"); setWantsKeyboardFocus(true);
     for (juce::Component* component:std::initializer_list<juce::Component*>{
-        &unit,&resolution,&grid,&snap,&add,&ramp,&remove,&duplicate,&detach})
+        &unit,&resolution,&grid,&snap,&add,&remove,&duplicate,&detach,
+        &zoomOut,&zoomIn,&zoomFit})
         addAndMakeVisible(component);
     unit.setName("oscTimeUnit");
     unit.addItem("Seconds",1); unit.addItem("Beat",2);
@@ -53,27 +54,27 @@ OscClipEditor::OscClipEditor(OscClip value,std::vector<TempoPoint> points,
     grid.onClick=[this] { repaint(); };
     snap.setName("oscSnapEnabled"); snap.setToggleState(true,juce::dontSendNotification);
     snap.onClick=[this] { repaint(); };
-    add.setName("oscAddMessage"); add.setTooltip("Add an instantaneous OSC event.");
-    ramp.setName("oscAddAutomation"); ramp.setTooltip("Create a two-point OSC automation ramp.");
+    add.setName("oscAddAutomation"); add.setTooltip("Add a new OSC automation track.");
+    zoomOut.setName("oscZoomOut"); zoomIn.setName("oscZoomIn"); zoomFit.setName("oscZoomFit");
     remove.setName("oscRemoveMessage"); duplicate.setName("oscDuplicate");
-    add.onClick=[this] { addEvent(); };
-    ramp.onClick=[this] { addAutomation(); };
+    add.onClick=[this] { createTrack(); };
+    zoomOut.onClick=[this] { zoomAround(zoom/1.5f,axisLeft()+axisWidth()*.5f); };
+    zoomIn.onClick=[this] { zoomAround(zoom*1.5f,axisLeft()+axisWidth()*.5f); };
+    zoomFit.onClick=[this] { zoom=1; viewStart=0; repaint(); };
     remove.onClick=[this] { deleteSelection(); };
     duplicate.onClick=[this] { duplicateSelection(); };
     detach.setName("oscDetach");
     detach.onClick=[this] { if (onDetach) onDetach(); };
-    for (auto* button:{&add,&ramp,&remove,&duplicate,&detach}) button->setWantsKeyboardFocus(false);
-    newTrackAddress=clip.automations.empty() ? "/parameter"
-        : "/parameter/"+juce::String((int)clip.automations.size()+1);
+    for (auto* button:{&add,&remove,&duplicate,&detach,&zoomOut,&zoomIn,&zoomFit}) button->setWantsKeyboardFocus(false);
+    ensureTracks();
     setSize(940,320);
 }
 OscClipEditor::~OscClipEditor() { setLookAndFeel(nullptr); }
 void OscClipEditor::setFloating(bool floating) { detach.setButtonText(floating?"Reattach":"Detach"); }
 void OscClipEditor::loadClip(const OscClip& next) {
-    ++revision; clip=next; selectedEvent=selectedAutomation=selectedPoint=-1;
-    newTrackAddress=clip.automations.empty() ? "/parameter"
-        : "/parameter/"+juce::String((int)clip.automations.size()+1);
-    dragging=false; rampDrag=RampDrag::none; laneScroll=0;
+    ++revision; clip=next; selectedEvent=selectedTrack=selectedAutomation=selectedPoint=-1;
+    ensureTracks();
+    dragging=false; rampDrag=RampDrag::none; laneScroll=0; zoom=1; viewStart=0;
     unit.setSelectedId(clip.useBeats ? 2 : 1,juce::dontSendNotification);
     repaint();
 }
@@ -81,47 +82,114 @@ void OscClipEditor::resized() {
     const int w=getWidth();
     detach.setBounds(w-105,7,95,27);
     unit.setBounds(w-228,7,110,26);
-    add.setBounds(13,7,35,26); ramp.setBounds(53,7,83,26);
-    remove.setBounds(141,7,70,26); duplicate.setBounds(216,7,75,26);
-    grid.setBounds(300,7,82,26); snap.setBounds(380,7,72,26);
-    resolution.setBounds(452,8,85,24);
+    add.setBounds(13,7,35,26);
+    remove.setBounds(53,7,70,26); duplicate.setBounds(128,7,83,26);
+    grid.setBounds(219,7,69,26); snap.setBounds(291,7,60,26);
+    resolution.setBounds(353,8,78,24);
+    zoomOut.setBounds(441,7,31,26); zoomIn.setBounds(474,7,31,26);
+    zoomFit.setBounds(508,7,42,26);
     repaint();
 }
 float OscClipEditor::xForTime(double time) const {
-    return (float)axisLeft()+(float)(juce::jlimit(0.0,clip.length,time)/clip.length)*axisWidth();
+    return (float)axisLeft()+(float)((time-viewStart)/(clip.length/zoom))*axisWidth();
 }
 double OscClipEditor::timeForX(float x) const {
     return juce::jlimit(0.0,std::max(0.0,clip.length-.00001),
-        (double)(x-axisLeft())/axisWidth()*clip.length);
+        viewStart+(double)(x-axisLeft())/axisWidth()*(clip.length/zoom));
 }
 double OscClipEditor::quantize(double t) const {
     if (!snap.getToggleState()) return t;
-    // Beat mode uses musical quarter-note subdivisions; seconds mode uses
-    // exact fractions of one second independently of BPM.
     const double step=1.0/(1<<juce::jlimit(0,3,resolution.getSelectedId()-1));
     return juce::jlimit(0.0,std::max(0.0,clip.length-.00001),std::round(t/step)*step);
 }
-int OscClipEditor::automationAt(float y) const {
-    for (int i=0;i<(int)clip.automations.size();++i)
+void OscClipEditor::zoomAround(double factor,float anchorX) {
+    const double anchor=timeForX(anchorX);
+    const double proportion=juce::jlimit(0.0,1.0,(double)(anchorX-axisLeft())/axisWidth());
+    zoom=juce::jlimit(1.0,64.0,factor);
+    viewStart=juce::jlimit(0.0,std::max(0.0,clip.length-clip.length/zoom),
+        anchor-proportion*clip.length/zoom);
+    repaint();
+}
+OscTrack OscClipEditor::defaultTrack() const {
+    OscTrack track;
+    track.message.address="/parameter/"+juce::String((int)clip.tracks.size()+1);
+    if (clip.tracks.empty()) track.message.address="/parameter";
+    track.message.arguments={{OscValueType::decimal,0,0,juce::String()}};
+    return track;
+}
+void OscClipEditor::ensureTracks() {
+    for (const auto& au:clip.automations) {
+        const auto found=std::find_if(clip.tracks.begin(),clip.tracks.end(),
+            [&](const OscTrack& t) {
+                return t.message.address==au.message.address &&
+                    t.argumentIndex==au.argumentIndex &&
+                    t.message.arguments.size()==au.message.arguments.size() &&
+                    std::equal(t.message.arguments.begin(),t.message.arguments.end(),
+                        au.message.arguments.begin(),[](const OscValue& x,const OscValue& y){
+                            return x.type==y.type;
+                        });
+            });
+        if (found!=clip.tracks.end() || clip.tracks.size()>=16) continue;
+        OscTrack t; t.message=au.message; t.argumentIndex=au.argumentIndex;
+        for (const auto& p:au.points) {
+            t.rangeMin=std::min(t.rangeMin,p.value);
+            t.rangeMax=std::max(t.rangeMax,p.value);
+        }
+        clip.tracks.push_back(std::move(t));
+    }
+}
+int OscClipEditor::trackForAutomation(int index) const {
+    if (index<0 || index>=(int)clip.automations.size()) return -1;
+    const auto& au=clip.automations[(size_t)index];
+    for (int i=0;i<(int)clip.tracks.size();++i) {
+        const auto& t=clip.tracks[(size_t)i];
+        if (t.message.address==au.message.address && t.argumentIndex==au.argumentIndex
+            && t.message.arguments.size()==au.message.arguments.size()
+            && std::equal(t.message.arguments.begin(),t.message.arguments.end(),
+                au.message.arguments.begin(),[](const OscValue& x,const OscValue& y){
+                    return x.type==y.type;
+                })) return i;
+    }
+    return -1;
+}
+int OscClipEditor::trackAt(float y) const {
+    for (int i=0;i<=(int)clip.tracks.size();++i)
         if (y>=laneTop(i) && y<laneTop(i)+laneHeight-4) return i;
     return -1;
 }
+int OscClipEditor::automationAt(float x,float y) const {
+    const int track=trackAt(y);
+    if (track<0 || track>=(int)clip.tracks.size()) return -1;
+    for (int i=(int)clip.automations.size()-1;i>=0;--i) {
+        const auto& a=clip.automations[(size_t)i];
+        if (trackForAutomation(i)==track && x>=xForTime(a.time)-6
+            && x<=xForTime(a.time+a.duration)+6 && y>=laneTop(track)+19) return i;
+    }
+    return -1;
+}
 float OscClipEditor::yForValue(int index,double value) const {
-    const auto& a=clip.automations[(size_t)index];
-    double lo=0,hi=1;
-    for (auto& p:a.points) { lo=std::min(lo,p.value); hi=std::max(hi,p.value); }
-    if (hi-lo<.01) hi=lo+1;
-    const auto t=juce::jlimit(0.0,1.0,(value-lo)/(hi-lo));
-    return laneTop(index)+laneHeight-13-(float)t*(laneHeight-28);
+    const int track=trackForAutomation(index);
+    if (track<0) return (float)eventLaneTop();
+    const auto& t=clip.tracks[(size_t)track];
+    const double frac=juce::jlimit(0.0,1.0,(value-t.rangeMin)/(t.rangeMax-t.rangeMin));
+    return laneTop(track)+laneHeight-13-(float)frac*(laneHeight-39);
 }
 double OscClipEditor::valueForY(int index,float y) const {
-    const auto& a=clip.automations[(size_t)index];
-    double lo=0,hi=1;
-    for (const auto& p:a.points) { lo=std::min(lo,p.value); hi=std::max(hi,p.value); }
-    if (hi-lo<.01) hi=lo+1;
-    const auto frac=juce::jlimit(0.0,1.0,
-        (double)(laneTop(index)+laneHeight-13-y)/(laneHeight-28));
-    return lo+(hi-lo)*frac;
+    const int track=trackForAutomation(index);
+    if (track<0) return 0;
+    const auto& t=clip.tracks[(size_t)track];
+    const double frac=juce::jlimit(0.0,1.0,
+        (double)(laneTop(track)+laneHeight-13-y)/(laneHeight-39));
+    return t.rangeMin+(t.rangeMax-t.rangeMin)*frac;
+}
+void OscClipEditor::createTrack() {
+    ensureTracks();
+    if (clip.tracks.size()>=16) return;
+    const auto before=clip;
+    clip.tracks.push_back(defaultTrack());
+    selectedTrack=(int)clip.tracks.size()-1;
+    selectedAutomation=selectedPoint=selectedEvent=-1;
+    notify(before);
 }
 void OscClipEditor::paint(juce::Graphics& g) {
     g.fillAll(palette::panel);
