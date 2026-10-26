@@ -245,7 +245,7 @@ void PianoRollEditor::deleteSelected() {
     beginEdit(); for (auto it=selectedNotes.rbegin();it!=selectedNotes.rend();++it) clip.notes.erase(clip.notes.begin()+*it);
     selectedNotes.clear(); selected=-1; selectionChanged(); endEdit(); canvas->repaint();
 }
-void PianoRollEditor::close() { if (closeHandler) closeHandler(); else if (auto* dialog=findParentComponentOfClass<juce::DialogWindow>()) dialog->exitModalState(0); }
+void PianoRollEditor::close() { if (closeHandler) { auto callback=closeHandler; juce::MessageManager::callAsync([callback] { callback(); }); } else if (auto* dialog=findParentComponentOfClass<juce::DialogWindow>()) dialog->exitModalState(0); }
 void PianoRollEditor::paint(juce::Graphics& g) {
     g.fillAll(palette::panel);
     label(g,"PIANO ROLL  /  note MIDI",{16,8,310,25},17,palette::amber,true);
