@@ -37,8 +37,7 @@ void GainMeterFader::paint(juce::Graphics& g) {
         g.drawHorizontalLine((int)std::round(y),41.0f,major ? 47.0f : 44.0f);
         // Retain all tick marks but skip conflicting labels in short strips.
         if (y-previousLabel>=10.0f || previousLabel<0) {
-            juce::Graphics::ScopedSaveState scoped(g);
-            g.setFont(juce::FontOptions(8.5f));
+            g.setFont(font(8.5f));
             g.drawText(tick>0 ? "+"+juce::String(tick) : juce::String(tick),
                        50,(int)std::round(y-6),33,12,juce::Justification::centredLeft,false);
             previousLabel=y;
