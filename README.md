@@ -7,10 +7,10 @@
 ## Funzionalità principali
 
 - **Scaletta di cue:** griglia di righe e colonne con GO, Stop e Panic; Auto Stop 2.0 per cue e per singola cella audio/MIDI/OSC.
-- **Audio:** importazione e riproduzione di WAV e MP3, loop, livelli, pan e routing per colonna.
+- **Audio:** WAV/MP3, loop, channel strip compatti con fader verticale, meter di picco, pan rotativo e routing; Master audio globale indipendente da MIDI e OSC.
 - **MIDI:** importazione e creazione di clip di note, con Piano Roll e selezione dell'uscita MIDI esterna.
 - **OSC:** clip di messaggi UDP con parametri interi, float o stringa, tempi in secondi o beat e destinazione IP/porta per colonna.
 - **Timeline:** posizionamento delle clip, zoom, griglia BPM visibile/nascosta, risoluzione musicale configurabile e magnete indipendente per lo snap.
 - **Progetti portabili:** salvataggio degli show in formato `.cuelist`, con cartella dei media e backup.
 
-**Stato attuale:** sviluppo **0.6 (OSC)**, eseguibile ancora identificato come **0.5.0** nel pacchetto Windows x64. OSC su UDP include editor di messaggi tipizzati e tempo in secondi o beat; video e timecode non sono ancora disponibili. Prima dell'uso in uno spettacolo reale sono necessarie prove sui dispositivi hardware interessati.
+**Stato attuale:** sviluppo **0.6 (Mixer e Master)**, eseguibile ancora identificato come **0.5.0** nel pacchetto Windows x64. OSC su UDP include editor di messaggi tipizzati e tempo in secondi o beat; video e timecode non sono ancora disponibili. Prima dell'uso in uno spettacolo reale sono necessarie prove sui dispositivi hardware interessati.
