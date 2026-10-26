@@ -3,6 +3,27 @@
 
 namespace cuelist {
 namespace {
+class OscUndoAction final : public juce::UndoableAction {
+public:
+    OscUndoAction(MainComponent& parent,int cell,OscClip original,OscClip replacement)
+        : owner(&parent),id(cell),before(std::move(original)),after(std::move(replacement)) {}
+    bool perform() override {
+        if (first) { first=false; return true; }
+        if (!owner) return false;
+        owner->restoreOscClip(id,after); return true;
+    }
+    bool undo() override {
+        if (!owner) return false;
+        owner->restoreOscClip(id,before); return true;
+    }
+    int getSizeInUnits() override { return 1+(int)(before.events.size()+after.events.size()
+        +before.automations.size()*4+after.automations.size()*4)/32; }
+private:
+    juce::Component::SafePointer<MainComponent> owner;
+    int id=0;
+    OscClip before,after;
+    bool first=true;
+};
 class FloatingOscWindow final : public juce::DocumentWindow {
 public:
     explicit FloatingOscWindow(std::function<void()> callback)
@@ -31,17 +52,12 @@ void MainComponent::editOscClip() {
     }
     oscEditorCellId=id;
     auto safe=juce::Component::SafePointer<MainComponent>(this);
-    oscEditor=std::make_unique<OscClipEditor>(*cell.osc,show.rows[selectedRow].tempo,[safe](const OscClip& updated) {
-        if (!safe || validateOscClip(updated).failed()) return;
-        for (auto& row:safe->show.rows)
-            for (size_t c=0;c<row.cells.size();++c) if (row.cells[c].id==safe->oscEditorCellId && safe->show.columns[c].type==ColumnType::osc) {
-                row.cells[c].osc=updated; row.cells[c].file.clear();
-                safe->dirty=true; safe->engine.publish(makeRenderState(safe->show,safe->clips));
-                safe->status="Messaggi OSC aggiornati: salva lo show.";
-                safe->grid.repaint(); safe->timeline.repaint(); safe->repaint();
-                return;
-            }
-    });
+    oscEditor=std::make_unique<OscClipEditor>(*cell.osc,show.rows[selectedRow].tempo,
+        [safe](const OscClip& before,const OscClip& updated,bool complete) {
+            if (safe) safe->oscClipEdited(safe->oscEditorCellId,before,updated,complete);
+        });
+    oscEditor->onUndo=[safe] { if (safe) safe->undoEdit(); };
+    oscEditor->onRedo=[safe] { if (safe) safe->redoEdit(); };
     oscEditor->onDetach=[safe] {
         if (!safe) return;
         if (safe->oscWindow) safe->dockOscClip(); else safe->detachOscClip();
@@ -50,6 +66,33 @@ void MainComponent::editOscClip() {
     addAndMakeVisible(*oscEditor);
     clipCollapsed=false; clipCollapseButton.setButtonText("Riduci");
     resized(); repaint();
+}
+void MainComponent::oscClipEdited(int cellId,const OscClip& before,const OscClip& updated,bool complete) {
+    if (validateOscClip(updated).failed()) return;
+    for (auto& row:show.rows) for (size_t c=0;c<row.cells.size();++c) {
+        auto& cell=row.cells[c];
+        if (cell.id!=cellId || show.columns[c].type!=ColumnType::osc) continue;
+        cell.osc=updated; cell.file.clear();
+        dirty=true; engine.publish(makeRenderState(show,clips));
+        status="OSC aggiornato. Salva lo show per conservarlo.";
+        grid.repaint(); timeline.repaint(); repaint();
+        if (complete) {
+            editHistory.beginNewTransaction("Modifica clip OSC");
+            editHistory.perform(new OscUndoAction(*this,cellId,before,updated));
+        }
+        return;
+    }
+}
+void MainComponent::restoreOscClip(int cellId,const OscClip& snapshot) {
+    for (auto& row:show.rows) for (size_t c=0;c<row.cells.size();++c) {
+        if (row.cells[c].id!=cellId || show.columns[c].type!=ColumnType::osc) continue;
+        row.cells[c].osc=snapshot; dirty=true;
+        engine.publish(makeRenderState(show,clips));
+        if (oscEditor && oscEditorCellId==cellId) oscEditor->loadClip(snapshot);
+        status="Modifica OSC ripristinata.";
+        grid.repaint(); timeline.repaint(); repaint();
+        return;
+    }
 }
 void MainComponent::syncOscEditor() {
     if (!oscEditor) return;
