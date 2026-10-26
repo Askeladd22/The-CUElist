@@ -25,6 +25,7 @@ void test(const char* name, const std::function<void()>& body) {
 #include "OscTests.h"
 #include "AutoStopV7Tests.h"
 #include "MixerV8Tests.h"
+#include "GainMeterFaderTests.h"
 #include "UiRefinementTests.h"
 #include "RowActionsUiTests.h"
 int main() {
@@ -34,6 +35,7 @@ int main() {
     oscTests();
     autoStopV7Tests();
     mixerV8Tests();
+    gainMeterFaderTests();
     uiRefinementTests();
     rowActionsUiTests();
     test("MIDI columns accept file drops and enable their importer", [] {
