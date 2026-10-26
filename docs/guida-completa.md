@@ -63,6 +63,15 @@ Disattivalo sulle righe che devono continuare in sovrapposizione. Anche il GO di
 
 **Loop** è indipendente dall'attivazione. **Partecipa al GO della riga** include o esclude la cella dal lancio collettivo. Nella scheda **Intera cue** puoi impostare livello, mute, loop e un comportamento comune per il GO; il lancio diretto mantiene il comportamento della cella.
 
+## Clip OSC / UDP
+
+1. Aggiungi una colonna **OSC**. Nelle **utility colonna** premi il pulsante con `host:porta` e imposta il ricevitore (esempio `127.0.0.1:9000`). La destinazione appartiene alla colonna e viene riutilizzata dalle clip di tutte le sue cue.
+2. Seleziona una cella OSC e premi **Crea clip OSC** oppure clicca la clip OSC nella timeline. L'editor compare nel pannello integrato e puo essere staccato o riagganciato alla finestra principale.
+3. Premi **Aggiungi** per inserire un messaggio. Compila **Tempo** (dall'inizio della clip), **Indirizzo OSC** (es. `/luci/intensita`) e gli **Argomenti** con formato `i:7; f:0.5; s:scena`. Il prefisso `i` indica int32, `f` float32, `s` stringa. Gli argomenti sono separati da punto e virgola.
+4. In **Unita** scegli **Secondi** o **Beat**: quando cambi unita, l'editor converte durata ed eventi preservando la posizione temporale usando la mappa BPM della cue. La durata della clip si modifica separatamente. I messaggi sono inviati con GO/cella, rispettano la timeline, seek, loop e Stop. Modifiche valide sono applicate subito; premi **Salva** per conservarle nello show.
+
+L'invio utilizza **OSC 1.0 su UDP**. Non viene confermato dal ricevitore e non esistono comandi OSC generici universali di «note off»: Stop/Panic annullano i messaggi non ancora inviati, non revocano azioni gia ricevute dal dispositivo. Il dispatcher usa il clock audio e richiede un dispositivo audio inizializzato anche per show solo OSC. Testa indirizzo, porta e comportamento sul ricevitore prima di uno spettacolo.
+
 ## Modifica e timeline
 
 - Doppio click sul titolo di cue o colonna per rinominarlo: il campo riceve subito il focus. **Invio** conferma anche i nomi nell'inspector.
