@@ -89,14 +89,22 @@ I nuovi show hanno tutte le celle AS ON. All'apertura degli show precedenti (v1-
 
 **Loop** è indipendente dall'attivazione. **Partecipa al GO della riga** include o esclude la cella dal lancio collettivo. Nella scheda **Intera cue** puoi impostare livello, mute, loop e un comportamento comune per il GO; il lancio diretto mantiene il comportamento della cella.
 
-## Clip OSC / UDP
+## Clip OSC / UDP e automazioni
 
-1. Aggiungi una colonna **OSC**. Nelle **utility colonna** premi il pulsante con `host:porta` e imposta il ricevitore (esempio `127.0.0.1:9000`). La destinazione appartiene alla colonna e viene riutilizzata dalle clip di tutte le sue cue.
-2. Seleziona una cella OSC e premi **Crea clip OSC** oppure clicca la clip OSC nella timeline. L'editor compare nel pannello integrato e puo essere staccato o riagganciato alla finestra principale. Quando e integrato, **trascina la maniglia sul bordo superiore del pannello** per modificarne l'altezza e dare piu spazio agli eventi.
-3. Premi il pulsante **+** per inserire un nuovo messaggio. Il doppio clic sulla riga del messaggio apre una finestra di modifica con **Tempo** (dall'inizio della clip), **Indirizzo OSC** (es. `/luci/intensita`) e **Argomenti** nel formato `i:7; f:0.5; s:scena`. Il prefisso `i` indica int32, `f` float32, `s` stringa. Gli argomenti sono separati da punto e virgola.
-4. In **Unita** scegli **Secondi** o **Beat**: quando cambi unita, l'editor converte durata ed eventi preservando la posizione temporale usando la mappa BPM della cue. La durata della clip si modifica trascinandone il bordo destro nella timeline, senza un campo fisso nell'editor. I messaggi sono inviati con GO/cella, rispettano la timeline, seek, loop e Stop. Modifiche valide sono applicate subito; premi **Salva** per conservarle nello show.
+1. Aggiungi una colonna **OSC** e configura **host/IP e porta UDP** dalle Utility Colonne: la destinazione appartiene alla colonna, non ai singoli messaggi.
+2. Seleziona una cella e premi **Crea clip OSC**. L'editor usa la **stessa timeline orizzontale** per eventi istantanei e corsie di automazione. Puoi staccarlo e riagganciarlo: è lo stesso editor e conserva gli stessi dati. Quando è integrato, allargane l'altezza trascinando la maniglia.
+3. **Clic singolo nella corsia EVENTI**: crea un messaggio all'istante indicato. **Doppio clic sul marcatore**: modifica tempo, address e argomenti. Il pulsante **+** crea un messaggio e apre la modifica. Trascina il marcatore per spostarlo; usa **Duplica**, **Elimina**, il menu contestuale o Canc da tastiera.
+4. **+ Rampa** crea una semplice automazione con due punti iniziale/finale; trascina i punti sulla curva o fai doppio clic sulla corsia per aprire l'editor avanzato. Nell'editor avanzato inserisci più punti, in formato `0:0; 0.5:0.75; 1:1`, riferiti all'inizio dell'automazione. Ogni curva indica un *indice argomento* numerico (1-based nell'interfaccia); gli altri argomenti restano al valore configurato. È possibile automatizzare **int32** e **float32**, non stringhe e booleani.
+5. Gli argomenti OSC sono ordinati e si scrivono come `i:7; f:0.5; s:scena; b:true`. `i` = int32, `f` = float32, `s` = stringa, `b:true/false` = booleano OSC (type tag `T`/`F`, senza payload). La clip può essere in **Secondi** o in **Beat**: cambiando modalità la mappa BPM della cue converte gli istanti e i punti delle curve.
+6. **Griglia** e **Snap** nell'editor sono interruttori **indipendenti**. Il menu delle suddivisioni regola lo snap. Tutte le modifiche valide sono applicate immediatamente e possono essere annullate/ripetute tramite Undo/Redo condivisi. Non esistono pulsanti Apply/Cancel. La durata complessiva della clip rimane separata e si può allungare dalla timeline principale.
 
-L'invio utilizza **OSC 1.0 su UDP**. Non viene confermato dal ricevitore e non esistono comandi OSC generici universali di «note off»: Stop/Panic annullano i messaggi non ancora inviati, non revocano azioni gia ricevute dal dispositivo. Il dispatcher usa il clock audio e richiede un dispositivo audio inizializzato anche per show solo OSC. Testa indirizzo, porta e comportamento sul ricevitore prima di uno spettacolo.
+**Riproduzione:** gli eventi istantanei partono una sola volta al rispettivo tempo. Le curve producono messaggi periodici, fino a 30 aggiornamenti/s (un budget massimo di circa 32.768 tick compilati per clip riduce la frequenza in automazioni molto lunghe o numerose). I messaggi, comprese le modifiche ai soli argomenti desiderati, sono **preparati sul thread non realtime**; il clock audio invia i pacchetti a un thread UDP dedicato.
+
+**Stop:** interrompe l'automazione e annulla i pacchetti ancora in coda, **senza inviare reset**. Il ricevitore mantiene l'ultimo valore ricevuto, se non applica politiche proprie. **Retrigger:** riparte dall'inizio e invia di nuovo **il valore iniziale esatto** di ogni automazione al suo tempo di avvio, anche se uguale al precedente. **Loop:** ripete gli stessi messaggi. **Seek:** salta le posizioni già passate e prosegue dai prossimi aggiornamenti coerenti; non provoca reset.
+
+**Più automazioni:** se più curve sullo stesso address controllano argomenti differenti, il compilatore compone insieme i loro valori numerici nei pacchetti successivi, per evitare che un aggiornamento riporti gli altri argomenti ai valori base. Due curve sovrapposte sullo stesso argomento vengono rifiutate.
+
+L'invio utilizza **OSC 1.0 su UDP**, che non garantisce la ricezione. Il clock del trasporto richiede un dispositivo audio inizializzato anche per una scaletta di soli messaggi OSC. Prima di uno spettacolo testa host, porta, latenza e comportamento reale del ricevitore.
 
 ## Modifica e timeline
 
@@ -144,7 +152,7 @@ Le uscite sono memorizzate per identificativo: un dispositivo assente non viene 
 
 Sovrascrivendo uno show, la versione precedente resta in `.cuelist.bak`. Le generazioni precedenti dei media vengono conservate per rendere utilizzabile il backup: salvataggi ripetuti possono aumentare lo spazio occupato.
 
-Il formato corrente è **v8**. **Apri** legge anche v1/v2/v3/v4/v5/v6/v7 e backup. Il flag Auto Stop per cella viene letto dagli show v7 e inizializzato su ON negli show precedenti. Le clip MIDI sono salvate direttamente nello show, senza dipendere dal file MIDI importato:
+Il formato corrente è **v9**. **Apri** legge anche v1/v2/v3/v4/v5/v6/v7/v8 e backup. La v9 aggiunge automazioni OSC, punti di controllo e argomenti booleani. Il flag Auto Stop per cella viene letto dagli show v7 e inizializzato su ON negli show precedenti. Le clip MIDI sono salvate direttamente nello show, senza dipendere dal file MIDI importato:
 
 - Auto Stop viene abilitato per default nei progetti precedenti alla v4.
 - Nei progetti v1/v2, i vecchi Restart e Stop diventano Retrigger e le utility di colonna partono neutre.
@@ -167,7 +175,7 @@ I BPM e la mappa tempo regolano le note MIDI; non cambiano la velocità dei file
 
 - Una clip WAV/MP3 mono/stereo per cella; PCM precaricato fino a **128 MB per file e 512 MB per show**. Streaming e multitraccia interno non implementati.
 - Decodifica sul thread dell'interfaccia: file grandi possono provocare attese. Il callback del renderer non esegue I/O, allocazioni o mutex.
-- OSC UDP con invio di messaggi int32/float/string implementato; LTC/MTC, mapping ingressi, autosave e recupero dopo crash non implementati. ASIO disabilitato in questa build; WASAPI disponibile tramite JUCE.
+- OSC UDP con messaggi int32/float/string/boolean e automazioni lineari implementato; LTC/MTC, mapping ingressi, autosave e recupero dopo crash non implementati. ASIO disabilitato in questa build; WASAPI disponibile tramite JUCE.
 - Ricampionamento lineare e saturazione di sicurezza a ±1. Prove prolungate di ascolto, jitter e disconnessione su hardware esterno restano da eseguire.
 
 ## Sviluppo e verifiche
