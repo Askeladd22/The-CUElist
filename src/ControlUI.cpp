@@ -282,13 +282,29 @@ public:
         for (juce::Component* c : std::initializer_list<juce::Component*>{
             &device,&connect,&learn,&add,&remove,&newPreset,&assignPreset,
             &presetName,&presets,&scope,&target,&takeover,&columns,&bindingList,&state,
-            &outputCc,&oscAddress,&invert})
+            &outputCc,&oscAddress,&invert,&updateSelected,&curve,&minimum,&maximum,&effectivePreview})
             addAndMakeVisible(c);
         device.setName("controlInputDevice");
         device.setTooltip("Select a device explicitly. No automatic fallback on disconnect.");
         connect.setButtonText("Refresh ports");
         learn.setButtonText("MIDI Learn");
         add.setButtonText("Add mapping");
+        updateSelected.setButtonText("Update selected");
+        updateSelected.setName("mappingUpdateSelected");
+        updateSelected.setEnabled(false);
+        updateSelected.onClick=[this] { createBinding(true); };
+        curve.setName("mappingResponseCurve");
+        curve.addItemList({"Linear","Ease in","Ease out"},1);
+        curve.setSelectedId(1);
+        minimum.setName("mappingMinimum");
+        maximum.setName("mappingMaximum");
+        minimum.setText("0"); maximum.setText("1");
+        effectivePreview.setName("effectiveControlPreview");
+        effectivePreview.setMultiLine(true);
+        effectivePreview.setReadOnly(true);
+        effectivePreview.setScrollbarsShown(true);
+        effectivePreview.setVisible(editSet);
+        effectivePreview.setColour(juce::TextEditor::outlineColourId,palette::line);
         remove.setButtonText("Remove selected");
         newPreset.setButtonText("New preset");
         assignPreset.setButtonText("Assign to cue");
@@ -303,7 +319,12 @@ public:
         target.addItemList({"Master Audio","Audio column gain","GO next cue","PANIC",
                             "MIDI CC","OSC Float","Audio column pan","Master pan"},1);
         target.setSelectedId(1);
-        target.onChange=[this]{ refreshColumns(); };
+        target.onChange=[this] {
+            refreshColumns();
+            const int t=target.getSelectedId();
+            minimum.setText(t==7 || t==8 ? "-1" : "0",false);
+            maximum.setText(t==5 ? "127" : "1",false);
+        };
         outputCc.setName("mappingOutputCc");
         outputCc.setText("20"); outputCc.setInputRestrictions(3,"0123456789");
         oscAddress.setName("mappingOscAddress");
@@ -332,9 +353,12 @@ public:
                 state.setText("Connect a MIDI input.",juce::dontSendNotification); return;
             }
             captured.reset(); owner->armControlLearn();
-            state.setText("Move a fader or press a button on the controller...",juce::dontSendNotification);
+            state.setText(selected>=0 && currentBindings() && selected<(int)currentBindings()->size() ?
+                "MIDI Learn for mapping #"+juce::String((*currentBindings())[(size_t)selected].id)+
+                    " — move its hardware control, then click Update selected." :
+                "MIDI Learn for NEW mapping — move a controller control.",juce::dontSendNotification);
         };
-        add.onClick=[this]{ createBinding(); };
+        add.onClick=[this]{ createBinding(false); };
         remove.onClick=[this]{
             const auto* bindings=currentBindings();
             if (!owner || !bindings || selected<0 || selected>=(int)bindings->size()) return;
@@ -361,6 +385,7 @@ public:
                 state.setText("Preset assigned to selected cue.",juce::dontSendNotification);
         };
         refreshDevices(); refreshPresets(); refreshColumns();
+        updateEffectivePreview();
         setSize(780,610); startTimerHz(10);
     }
     ~ControlPanel() override {stopTimer();bindingList.setModel(nullptr);}
@@ -379,7 +404,11 @@ public:
         const auto currentTitle=editSet ? juce::String("Control Column / ") +
               juce::String(sourceColumnId) : juce::String("Cue preset");
         label(g,currentTitle,{17,324,300,17},11,palette::muted,true);
-        label(g,"Saved mappings",{17,402,250,20},12,palette::teal,true);
+        label(g,editSet ? "Mappings in this Control Set" : "Saved mappings",
+              {17,402,300,20},12,palette::teal,true);
+        label(g,"Curve",{440,263,100,16},10,palette::muted,true);
+        label(g,"Min",{572,263,75,16},10,palette::muted,true);
+        label(g,"Max",{671,263,75,16},10,palette::muted,true);
         label(g,editSet ? "Control Set takes effect on GO; locked sets apply to every cue." :
               "Mapping chooses its active destination after GO, not when selecting a row.",
               {17,579,getWidth()-32,19},10,palette::muted);
@@ -396,14 +425,19 @@ public:
         columns.setBounds(555,227,w-571,29);
         outputCc.setBounds(17,281,83,29);
         oscAddress.setBounds(112,281,210,29);
-        invert.setBounds(345,281,90,29);
+        invert.setBounds(345,281,88,29);
+        curve.setBounds(440,281,116,29);
+        minimum.setBounds(572,281,86,29);
+        maximum.setBounds(671,281,86,29);
+        effectivePreview.setBounds(17,344,w-34,65);
         presets.setBounds(17,344,200,30);
         assignPreset.setBounds(226,344,150,30);
         presetName.setBounds(388,344,w-536,30);
         newPreset.setBounds(w-140,344,123,30);
         bindingList.setBounds(17,425,w-230,139);
         add.setBounds(w-202,426,184,37);
-        remove.setBounds(w-202,473,184,37);
+        updateSelected.setBounds(w-202,472,184,37);
+        remove.setBounds(w-202,518,184,37);
     }
 private:
     juce::Component::SafePointer<MainComponent> owner;
@@ -432,9 +466,9 @@ private:
         const auto& cell=owner->show.rows[(size_t)row].cells[(size_t)columnIndex];
         return cell.controlSet ? &cell.controlSet->bindings : nullptr;
     }
-    juce::ComboBox device,presets,scope,target,takeover,columns;
-    juce::TextButton connect,learn,add,remove,newPreset,assignPreset;
-    juce::TextEditor presetName,outputCc,oscAddress;
+    juce::ComboBox device,presets,scope,target,takeover,columns,curve;
+    juce::TextButton connect,learn,add,remove,updateSelected,newPreset,assignPreset;
+    juce::TextEditor presetName,outputCc,oscAddress,minimum,maximum,effectivePreview;
     juce::ToggleButton invert{"Invert"};
     juce::Label state;
     juce::ListBox bindingList;
@@ -446,10 +480,11 @@ private:
         if (!owner) return;
         if (auto event=owner->consumeLearnedInput()) {
             captured=event;
-            state.setText("Ricevuto "+event->deviceId+"  ch"+juce::String(event->channel)+
-                " / "+juce::String(event->number)+" val "+juce::String(event->value),
+            state.setText("Learned "+event->deviceId+" ch"+juce::String(event->channel)+
+                " / "+juce::String(event->number)+" value "+juce::String(event->value),
                 juce::dontSendNotification);
         }
+        if (editSet) updateEffectivePreview();
     }
     void refreshDevices() {
         if (!owner) return;
@@ -489,13 +524,18 @@ private:
         }
         if (!columnIds.empty()) columns.setSelectedId(1);
     }
-    void createBinding() {
-        if (!owner || !captured) {
-            state.setText("Use MIDI Learn first.",juce::dontSendNotification); return;
+    void createBinding(bool update) {
+        const auto* existing=currentBindings();
+        if (!owner || (update && (!existing || selected<0 || selected>=(int)existing->size())) ||
+            (!update && !captured)) {
+            state.setText("Use MIDI Learn first or select a mapping to edit.",
+                juce::dontSendNotification); return;
         }
-        ControlBinding b;
-        b.deviceId=captured->deviceId;
-        b.kind=captured->kind; b.channel=captured->channel; b.number=captured->number;
+        ControlBinding b=update ? (*existing)[(size_t)selected] : ControlBinding{};
+        if (captured) {
+            b.deviceId=captured->deviceId;
+            b.kind=captured->kind; b.channel=captured->channel; b.number=captured->number;
+        }
         b.scope=(ControlScope)(scope.getSelectedId()-1);
         switch (target.getSelectedId()) {
             case 1: b.target=ControlTarget::masterGain; break;
@@ -509,6 +549,8 @@ private:
             default: return;
         }
         b.takeover=(ControlTakeover)(takeover.getSelectedId()-1);
+        b.curve=(ControlCurve)(curve.getSelectedId()-1);
+        b.scopeId=0; b.targetColumnId=0;
         if (b.scope==ControlScope::cue)
             b.scopeId=owner->show.rows[(size_t)owner->selectedRow].id;
         else if (b.scope==ControlScope::preset)
@@ -527,39 +569,107 @@ private:
             b.target==ControlTarget::panic) b.takeover=ControlTakeover::jump;
         b.invert=invert.getToggleState();
         if (b.target==ControlTarget::midiCc) {
-            b.outputChannel=captured->channel;
+            b.outputChannel=b.channel;
             b.outputNumber=outputCc.getText().getIntValue();
-            b.minimum=0; b.maximum=127;
-        } else if (b.target==ControlTarget::oscFloat) {
-            b.oscAddress=oscAddress.getText().trim();
-            b.minimum=0; b.maximum=1;
-        } else if (b.target==ControlTarget::masterPan ||
-                   b.target==ControlTarget::columnPan) {
-            b.minimum=-1; b.maximum=1;
-        } else if (b.target==ControlTarget::masterGain ||
-                   b.target==ControlTarget::columnGain) {
-            b.minimum=0; b.maximum=1;
         }
+        if (b.target==ControlTarget::oscFloat)
+            b.oscAddress=oscAddress.getText().trim();
+        const auto low=minimum.getText().trim(),high=maximum.getText().trim();
+        const auto numeric=[](const juce::String& value) {
+            return value.isNotEmpty() && value.containsAnyOf("0123456789") &&
+                value.retainCharacters("0123456789.-+")==value;
+        };
+        if (!numeric(low) || !numeric(high)) {
+            state.setText("Enter valid minimum and maximum values.",juce::dontSendNotification); return;
+        }
+        b.minimum=low.getFloatValue(); b.maximum=high.getFloatValue();
         int row=-1,column=-1;
-        if ((editSet ? (resolveSource(row,column) &&
-                         owner->addControlSetBinding(row,column,b)) :
-                       owner->addMappingBinding(b))) {
+        const bool resolved=!editSet || resolveSource(row,column);
+        const bool saved=resolved && (update ?
+            owner->updateControlBinding(row,column,b.id,b,editSet) :
+            editSet ? owner->addControlSetBinding(row,column,b) :
+                      owner->addMappingBinding(b));
+        if (saved) {
             bindingList.updateContent(); bindingList.repaint();
-            state.setText("Mapping saved to the show.",juce::dontSendNotification);
+            selected=-1;updateSelected.setEnabled(false);bindingList.deselectAllRows();
+            captured.reset();updateEffectivePreview();
+            state.setText(update ? "Mapping updated." : "Mapping saved to the show.",
+                juce::dontSendNotification);
         } else state.setText(owner->status,juce::dontSendNotification);
+    }
+    void updateEffectivePreview() {
+        if (!owner || !editSet) return;
+        int row=-1,column=-1;
+        if (!resolveSource(row,column)) {
+            effectivePreview.setText("Control Column no longer exists.",false);return;
+        }
+        const int cue=owner->show.rows[(size_t)row].id;
+        const bool live=owner->activeCueMappingId()==cue;
+        const auto resolved=owner->effectiveControlSet(cue);
+        juce::String summary=live ? "LIVE Q"+juce::String(row+1) :
+            "PREVIEW Q"+juce::String(row+1)+" — changes take effect after GO";
+        if (resolved.empty()) summary+="\nNo active Control Column mappings.";
+        for (const auto& item:resolved) {
+            juce::String source="unknown";
+            for (const auto& col:owner->show.columns)
+                if (col.id==item.columnId) {source=col.name;break;}
+            const auto& b=item.binding;
+            const bool local=item.columnId==sourceColumnId;
+            summary+="\n"+juce::String(local ? "LOCAL / " : "INHERITED / ")+
+                source+" (P"+juce::String(item.priority)+")  "+
+                (b.kind==ControlKind::cc ? "CC " :
+                 b.kind==ControlKind::note ? "NOTE " : "BEND ")+
+                juce::String(b.channel)+":"+juce::String(b.number)+
+                " -> "+(b.target==ControlTarget::masterGain ? "MASTER GAIN" :
+                  b.target==ControlTarget::masterPan ? "MASTER PAN" :
+                  b.target==ControlTarget::columnGain ? "CHANNEL GAIN" :
+                  b.target==ControlTarget::columnPan ? "CHANNEL PAN" :
+                  b.target==ControlTarget::midiCc ? "MIDI CC" :
+                  b.target==ControlTarget::oscFloat ? "OSC" :
+                  b.target==ControlTarget::go ? "GO" : "PANIC");
+        }
+        if (effectivePreview.getText()!=summary)
+            effectivePreview.setText(summary,false);
     }
     int getNumRows() override {
         const auto* entries=currentBindings();
         return entries ? (int)entries->size():0;
     }
-    void selectedRowsChanged(int row) override {selected=row;}
+    void selectedRowsChanged(int row) override {
+        selected=row;
+        const auto* entries=currentBindings();
+        updateSelected.setEnabled(entries && row>=0 && row<(int)entries->size());
+        if (!entries || row<0 || row>=(int)entries->size()) return;
+        const auto& b=(*entries)[(size_t)row];
+        captured.reset();
+        scope.setSelectedId((int)b.scope+1,juce::dontSendNotification);
+        target.setSelectedId((int)b.target+1,juce::dontSendNotification);
+        refreshColumns();
+        for (size_t i=0;i<columnIds.size();++i)
+            if (columnIds[i]==b.targetColumnId)
+                columns.setSelectedId((int)i+1,juce::dontSendNotification);
+        takeover.setSelectedId((int)b.takeover+1,juce::dontSendNotification);
+        curve.setSelectedId((int)b.curve+1,juce::dontSendNotification);
+        minimum.setText(juce::String(b.minimum,3),false);
+        maximum.setText(juce::String(b.maximum,3),false);
+        outputCc.setText(juce::String(b.outputNumber),false);
+        oscAddress.setText(b.oscAddress,false);
+        invert.setToggleState(b.invert,juce::dontSendNotification);
+        state.setText("Editing #"+juce::String(b.id)+" — input "+b.deviceId+
+            " ch"+juce::String(b.channel)+" / "+juce::String(b.number),
+            juce::dontSendNotification);
+    }
     void paintListBoxItem(int row,juce::Graphics& g,int width,int height,bool active) override {
         if (!owner || row<0 || row>=getNumRows()) return;
         const auto& b=(*currentBindings())[(size_t)row];
         if (active) g.fillAll(palette::teal.withAlpha(.20f));
         juce::String targetName=b.target==ControlTarget::go ? "GO" :
             b.target==ControlTarget::panic ? "PANIC" :
-            b.target==ControlTarget::masterGain ? "MASTER" : "GAIN";
+            b.target==ControlTarget::masterGain ? "MASTER GAIN" :
+            b.target==ControlTarget::masterPan ? "MASTER PAN" :
+            b.target==ControlTarget::columnPan ? "PAN" :
+            b.target==ControlTarget::oscFloat ? "OSC" :
+            b.target==ControlTarget::midiCc ? "MIDI CC" : "GAIN";
         label(g,"#"+juce::String(b.id)+"   ch"+juce::String(b.channel)+
             " "+(b.kind==ControlKind::cc?"CC ":b.kind==ControlKind::note?"NOTE ":"BEND ")+
             juce::String(b.number)+" → "+targetName+
