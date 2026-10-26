@@ -230,7 +230,9 @@ class ControlPanel final : public juce::Component, private juce::Timer,
                            private juce::ListBoxModel {
 public:
     explicit ControlPanel(MainComponent& main,bool useSet):owner(&main),
-        editSet(useSet),sourceRow(main.selectedRow),sourceColumn(main.selectedColumn) {
+        editSet(useSet),sourceRow(main.selectedRow),sourceColumn(main.selectedColumn),
+        sourceRowId(main.show.rows[(size_t)main.selectedRow].id),
+        sourceColumnId(main.show.columns[(size_t)main.selectedColumn].id) {
         setName("controlMappingPanel");
         for (juce::Component* c : std::initializer_list<juce::Component*>{
             &device,&connect,&learn,&add,&remove,&newPreset,&assignPreset,
@@ -292,8 +294,9 @@ public:
             const auto* bindings=currentBindings();
             if (!owner || !bindings || selected<0 || selected>=(int)bindings->size()) return;
             const int id=(*bindings)[(size_t)selected].id;
+            int row=-1,column=-1;
             const bool removed=editSet ?
-                owner->deleteControlSetBinding(sourceRow,sourceColumn,id) :
+                (resolveSource(row,column) && owner->deleteControlSetBinding(row,column,id)) :
                 owner->deleteMappingBinding(id);
             if (removed) {
                 selected=-1; bindingList.updateContent(); bindingList.repaint();
@@ -328,8 +331,9 @@ public:
         label(g,"Takeover",{410,205,120,17},11,palette::muted,true);
         label(g,"Output CC",{17,263,95,16},10,palette::muted,true);
         label(g,"OSC address",{112,263,140,16},10,palette::muted,true);
-        label(g,editSet ? "Control Column: "+owner->show.columns[(size_t)sourceColumn].name :
-              "Cue preset",{17,324,300,17},11,palette::muted,true);
+        const auto currentTitle=editSet ? juce::String("Control Column / ") +
+              juce::String(sourceColumnId) : juce::String("Cue preset");
+        label(g,currentTitle,{17,324,300,17},11,palette::muted,true);
         label(g,"Saved mappings",{17,402,250,20},12,palette::teal,true);
         label(g,editSet ? "Control Set takes effect on GO; locked sets apply to every cue." :
               "Mapping chooses its active destination after GO, not when selecting a row.",
@@ -360,15 +364,27 @@ private:
     juce::Component::SafePointer<MainComponent> owner;
     bool editSet=false;
     int sourceRow=0,sourceColumn=0;
+    int sourceRowId=0,sourceColumnId=0;
+    bool resolveSource(int& row,int& column) const {
+        if (!owner) return false;
+        for (int i=0;i<(int)owner->show.rows.size();++i)
+            if (owner->show.rows[(size_t)i].id==sourceRowId) {row=i;break;}
+        for (int i=0;i<(int)owner->show.columns.size();++i)
+            if (owner->show.columns[(size_t)i].id==sourceColumnId) {column=i;break;}
+        return row>=0 && row<(int)owner->show.rows.size() &&
+            column>=0 && column<(int)owner->show.columns.size() &&
+            owner->show.rows[(size_t)row].id==sourceRowId &&
+            owner->show.columns[(size_t)column].id==sourceColumnId;
+    }
     const std::vector<ControlBinding>* currentBindings() const {
         if (!owner) return nullptr;
         if (!editSet) return &owner->show.controls.bindings;
-        if (sourceColumn<0 || sourceColumn>=(int)owner->show.columns.size() ||
-            sourceRow<0 || sourceRow>=(int)owner->show.rows.size()) return nullptr;
-        const auto& column=owner->show.columns[(size_t)sourceColumn];
+        int row=-1,columnIndex=-1;
+        if (!resolveSource(row,columnIndex)) return nullptr;
+        const auto& column=owner->show.columns[(size_t)columnIndex];
         if (column.type!=ColumnType::control) return nullptr;
         if (column.controlLocked) return &column.controlDefaultSet.bindings;
-        const auto& cell=owner->show.rows[(size_t)sourceRow].cells[(size_t)sourceColumn];
+        const auto& cell=owner->show.rows[(size_t)row].cells[(size_t)columnIndex];
         return cell.controlSet ? &cell.controlSet->bindings : nullptr;
     }
     juce::ComboBox device,presets,scope,target,takeover,columns;
@@ -473,7 +489,9 @@ private:
                    b.target==ControlTarget::columnGain) {
             b.minimum=0; b.maximum=1;
         }
-        if ((editSet ? owner->addControlSetBinding(sourceRow,sourceColumn,b) :
+        int row=-1,column=-1;
+        if ((editSet ? (resolveSource(row,column) &&
+                         owner->addControlSetBinding(row,column,b)) :
                        owner->addMappingBinding(b))) {
             bindingList.updateContent(); bindingList.repaint();
             state.setText("Mapping saved to the show.",juce::dontSendNotification);
