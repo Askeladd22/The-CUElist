@@ -680,7 +680,11 @@ void MainComponent::reorderColumn(int index,int delta) {
     if (index<0 || index>=(int)show.columns.size() || target<0 || target>=(int)show.columns.size() || !applyInspector()) return;
     std::swap(show.columns[index],show.columns[target]);
     for (auto& row : show.rows) std::swap(row.cells[index],row.cells[target]);
-    selectedColumn=target; changed("Column order updated.",true);
+    selectedColumn=target;
+    // Equal-priority Control Column conflicts are resolved by visible order.
+    // Rebuild the layered mapping immediately when the columns are reordered.
+    refreshControlSettings();
+    changed("Column order updated.",true);
 }
 bool MainComponent::copyRow(int index) {
     if (index<0 || index>=(int)show.rows.size() || !applyInspector()) return false;
