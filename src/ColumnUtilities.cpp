@@ -1,4 +1,5 @@
 #include "MainComponent.h"
+#include "GainMeterFader.h"
 
 namespace cuelist {
 namespace {
@@ -30,7 +31,8 @@ private: bool phase;
 struct ColumnUtilities::Strip final : juce::Component {
     MainComponent& owner;
     int id, index;
-    juce::Slider gain,pan;
+    GainMeterFader gain;
+    juce::Slider pan;
     UtilityIcon mute{false},phase{true};
     juce::ComboBox output;
     juce::TextButton oscDestination{"OSC / destinazione"};
@@ -39,15 +41,11 @@ struct ColumnUtilities::Strip final : juce::Component {
     juce::String midiSignature;
     juce::StringArray midiIds;
     double nextMidiScan=0;
-    float meterLevel=0;
     juce::String lastMidiId;
     Strip(MainComponent& p,int i) : owner(p),id(p.show.columns[i].id),index(i) {
-        for (auto* slider : {&gain,&pan}) {
-            addAndMakeVisible(slider);
-            slider->setDoubleClickReturnValue(true,0);
-        }
-        gain.setSliderStyle(juce::Slider::LinearVertical);
-        gain.setTextBoxStyle(juce::Slider::TextBoxBelow,false,59,19);
+        addAndMakeVisible(gain);
+        addAndMakeVisible(pan);
+        pan.setDoubleClickReturnValue(true,0);
         pan.setSliderStyle(juce::Slider::RotaryVerticalDrag);
         pan.setTextBoxStyle(juce::Slider::NoTextBox,false,0,0);
         gain.setName("columnGainDb"); pan.setName("columnPan"); mute.setName("columnMute"); phase.setName("columnPhase");
@@ -78,7 +76,6 @@ struct ColumnUtilities::Strip final : juce::Component {
                 if (selected>=0 && selected<midiIds.size()) owner.setMidiOutput(index,midiIds[selected]);
             } else if (output.getSelectedId()>0) owner.setColumnOutput(index,output.getSelectedId()-1);
         };
-        gain.setRange(-60,12,0.1); gain.setNumDecimalPlacesToDisplay(1); gain.setTextValueSuffix(" dB");
         pan.setRange(-1,1,0.01);
         pan.textFromValueFunction=[](double value) { return std::abs(value)<0.005 ? juce::String("C") : juce::String(value<0 ? "L " : "R ")+juce::String((int)std::round(std::abs(value)*100)); };
         pan.valueFromTextFunction=[](const juce::String& text) { return text.containsIgnoreCase("L") ? -std::abs(text.retainCharacters("0123456789.").getDoubleValue())/100 : text.containsIgnoreCase("R") ? std::abs(text.retainCharacters("0123456789.").getDoubleValue())/100 : text.getDoubleValue(); };
@@ -90,17 +87,17 @@ struct ColumnUtilities::Strip final : juce::Component {
         auto update=[this](int control) {
             const auto col=owner.show.columns[index];
             owner.setColumnUtilities(index,
-                control==0 ? juce::Decibels::decibelsToGain((float)gain.getValue(),-60.0f) : col.gain,
+                control==0 ? juce::Decibels::decibelsToGain(gain.getGainDb(),-60.0f) : col.gain,
                 control==1 ? (float)pan.getValue() : col.pan,
                 control==2 ? mute.getToggleState() : col.muted,
                 control==3 ? phase.getToggleState() : col.phaseInverted);
         };
-        gain.onValueChange=[update] { update(0); }; pan.onValueChange=[update] { update(1); };
+        gain.onGainChanged=[update](float) { update(0); }; pan.onValueChange=[update] { update(1); };
         mute.onClick=[update] { update(2); }; phase.onClick=[update] { update(3); };
     }
     void sync() {
         const auto& col=owner.show.columns[index];
-        gain.setValue(juce::Decibels::gainToDecibels(col.gain,-60.0f),juce::dontSendNotification);
+        gain.setGainDb(juce::Decibels::gainToDecibels(col.gain,-60.0f));
         pan.setValue(col.pan,juce::dontSendNotification); mute.setToggleState(col.muted,juce::dontSendNotification);
         phase.setToggleState(col.phaseInverted,juce::dontSendNotification);
         for (juce::Component* control : std::initializer_list<juce::Component*>{&gain,&pan,&mute,&phase}) control->setVisible(col.type==ColumnType::audio);
@@ -147,14 +144,14 @@ struct ColumnUtilities::Strip final : juce::Component {
     }
     void updateMeter() {
         if (owner.show.columns[(size_t)index].type!=ColumnType::audio) return;
-        meterLevel=std::max(owner.engine.getColumnPeak(id),meterLevel*.84f);
-        repaint();
+        const auto stereo=owner.engine.getColumnStereoPeak(id);
+        gain.setStereoPeaks(stereo[0],stereo[1]);
     }
     void resized() override {
         const int w=getWidth(),h=getHeight();
         output.setBounds(6,4,w-12,25);
         oscDestination.setBounds(6,4,w-12,28);
-        gain.setBounds(10,35,73,std::max(95,h-37));
+        gain.setBounds(7,33,92,std::max(98,h-36));
         pan.setBounds(w-56,34,46,46);
         mute.setBounds(w-77,h-36,32,29);
         phase.setBounds(w-42,h-36,32,29);
@@ -167,26 +164,6 @@ struct ColumnUtilities::Strip final : juce::Component {
         const double v=owner.show.columns[(size_t)index].pan;
         const juce::String panText=std::abs(v)<.005 ? "C" : juce::String(v<0?"L ":"R ")+juce::String((int)std::round(std::abs(v)*100));
         label(g,panText,{w-62,98,58,15},9,palette::text,false,juce::Justification::centred);
-        // Meter backdrop shares the fader's vertical axis; the slider is
-        // rendered above it by JUCE's child-component paint order.
-        const float x=23.0f,top=44.0f,meterWidth=39.0f,meterHeight=(float)std::max(36,h-89);
-        g.setColour(palette::raised);
-        g.fillRoundedRectangle(x,top,meterWidth,meterHeight,3);
-        const float db=20.0f*std::log10(std::max(0.000001f,meterLevel));
-        const float fill=juce::jlimit(0.0f,1.0f,(db+60.0f)/66.0f);
-        const float fillH=meterHeight*fill;
-        if (fillH>0.0f) {
-            g.setColour(db>=0 ? palette::red.withAlpha(.50f) : db>=-9 ? palette::amber.withAlpha(.5f) : palette::teal.withAlpha(.5f));
-            g.fillRect(x+1,top+meterHeight-fillH,meterWidth-2,fillH);
-        }
-        for (int tick:{0,-12,-24,-36,-48,-60}) {
-            const float y=top+meterHeight*(1.0f-(tick+60.0f)/66.0f);
-            g.setColour(palette::line.withAlpha(.9f));
-            g.drawHorizontalLine((int)std::round(y),x+3,x+meterWidth-3);
-            label(g,tick>0 ? "+6" : juce::String(tick),{(int)x+2,(int)y-7,26,13},8,palette::text);
-        }
-        g.setColour(palette::line); g.drawRoundedRectangle(x,top,meterWidth,meterHeight,3,1);
-        label(g,"dB",{65,40,25,13},8,palette::muted,true);
     }
 };
 ColumnUtilities::ColumnUtilities(MainComponent& p) : owner(p) {}
