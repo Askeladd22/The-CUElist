@@ -155,7 +155,7 @@ struct ColumnUtilities::Strip final : juce::Component {
         output.setBounds(6,4,w-12,25);
         oscDestination.setBounds(6,4,w-12,28);
         gain.setBounds(10,35,73,std::max(95,h-37));
-        pan.setBounds(w-49,37,35,35);
+        pan.setBounds(w-56,34,46,46);
         mute.setBounds(w-77,h-36,32,29);
         phase.setBounds(w-42,h-36,32,29);
     }
@@ -163,10 +163,10 @@ struct ColumnUtilities::Strip final : juce::Component {
         g.setColour(palette::line); g.drawVerticalLine(0,0,(float)getHeight());
         if (owner.show.columns[(size_t)index].type!=ColumnType::audio) return;
         const int h=getHeight(),w=getWidth();
-        label(g,"PAN",{w-54,73,45,13},9,palette::muted,true,juce::Justification::centred);
+        label(g,"PAN",{w-60,82,54,13},9,palette::muted,true,juce::Justification::centred);
         const double v=owner.show.columns[(size_t)index].pan;
         const juce::String panText=std::abs(v)<.005 ? "C" : juce::String(v<0?"L ":"R ")+juce::String((int)std::round(std::abs(v)*100));
-        label(g,panText,{w-61,88,60,15},9,palette::text,false,juce::Justification::centred);
+        label(g,panText,{w-62,98,58,15},9,palette::text,false,juce::Justification::centred);
         // Meter backdrop shares the fader's vertical axis; the slider is
         // rendered above it by JUCE's child-component paint order.
         const float x=23.0f,top=44.0f,meterWidth=39.0f,meterHeight=(float)std::max(36,h-89);
