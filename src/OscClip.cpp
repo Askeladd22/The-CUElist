@@ -60,7 +60,9 @@ juce::Result validateOscClip(const OscClip& clip) {
         for (const auto& point:automation.points) {
             if (!std::isfinite(point.time) || !std::isfinite(point.value)
                 || point.time<=previous || point.time<0 || point.time>automation.duration+1.0e-7
-                || (target.type==OscValueType::integer && (point.value<-2147483648.0 || point.value>2147483647.0)))
+                || (target.type==OscValueType::integer && (point.value<-2147483648.0 || point.value>2147483647.0))
+                || (target.type==OscValueType::decimal
+                    && std::abs(point.value)>(double)std::numeric_limits<float>::max()))
                 return juce::Result::fail("Punto automazione OSC non valido.");
             previous=point.time;
         }
