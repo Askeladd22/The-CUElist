@@ -71,14 +71,10 @@ void MainComponent::dispatchControl(const ControlEvent& input) {
     // Pickup compares against the physical value expected for the current
     // actual target. No mutation of show happens in a MIDI callback.
     std::optional<float> current;
-    const auto& bindings=show.controls.bindings;
-    // Resolve a key once first, then determine the selected target's value.
-    // The pure mapper applies cue/preset/column/global precedence.
-    for (const auto& b:bindings) if (samePhysicalInput(b,input) &&
-        scopeApplies(b,activeCueId, [&]{
-            for (const auto& row:show.rows) if (row.id==activeCueId) return row.mappingPresetId;
-            return 0;
-        }())) {
+    // Determine pickup from the same winner the pure mapping engine selected,
+    // rather than an arbitrary earlier global binding.
+    if (const auto* winner=controlMapping.matched(input)) {
+        const auto& b=*winner;
         if (b.target==ControlTarget::masterGain) {
             const float d=b.maximum-b.minimum;
             if (d>0) current=juce::jlimit(0.0f,1.0f,(show.masterGain-b.minimum)/d);
@@ -133,7 +129,7 @@ public:
             addAndMakeVisible(c);
         device.setName("controlInputDevice");
         device.setTooltip("Selezione esplicita. Nessuna sostituzione automatica in caso di disconnessione.");
-        connect.setButtonText("Connetti");
+        connect.setButtonText("Aggiorna porte");
         learn.setButtonText("MIDI Learn");
         add.setButtonText("Aggiungi mapping");
         remove.setButtonText("Elimina selezionato");
@@ -284,7 +280,13 @@ private:
         b.deviceId=captured->deviceId;
         b.kind=captured->kind; b.channel=captured->channel; b.number=captured->number;
         b.scope=(ControlScope)(scope.getSelectedId()-1);
-        b.target=(ControlTarget)(target.getSelectedId()-1);
+        switch (target.getSelectedId()) {
+            case 1: b.target=ControlTarget::masterGain; break;
+            case 2: b.target=ControlTarget::columnGain; break;
+            case 3: b.target=ControlTarget::go; break;
+            case 4: b.target=ControlTarget::panic; break;
+            default: return;
+        }
         b.takeover=(ControlTakeover)(takeover.getSelectedId()-1);
         if (b.scope==ControlScope::cue)
             b.scopeId=owner->show.rows[(size_t)owner->selectedRow].id;
