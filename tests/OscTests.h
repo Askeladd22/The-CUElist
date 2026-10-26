@@ -51,6 +51,26 @@ void oscTests() {
         check(decodeShow(juce::JSON::toString(json),previous).wasOk(),"v5 project rejected");
         check(previous.columns[0].oscPort==9000 && previous.columns[0].oscHost=="127.0.0.1","Legacy defaults broken");
     });
+    test("OSC UDP sender transmits a real packet to loopback receiver",[] {
+        juce::DatagramSocket receiver(false);
+        check(receiver.bindToPort(0),"Failed to bind local OSC receiver");
+        const int port=receiver.getBoundPort();
+        check(port>0,"OSC receiver has no port");
+        auto show=makeShow(); addColumn(show,ColumnType::osc,"Test");
+        show.columns[1].oscHost="127.0.0.1";
+        show.columns[1].oscPort=port;
+        OscClip clip; clip.length=0.25; clip.events={{0.01,"/loopback",{{OscValueType::integer,9,0,{}}}}};
+        show.rows[0].cells[1].osc=clip;
+        AudioEngine engine;
+        engine.publish(makeRenderState(show,{}));
+        check(engine.send(show.rows[0].cells[1].id,false),"OSC transport command queue full");
+        float buffer[100]{}; float* audio[]{buffer};
+        engine.processBlock(audio,1,100,1000);
+        check(receiver.waitUntilReady(true,1500)==1,"OSC UDP packet not received on loopback");
+        char bytes[1024]{};
+        const int received=receiver.read(bytes,sizeof(bytes),false);
+        check(received>=20 && std::strncmp(bytes,"/loopback",9)==0,"Invalid OSC UDP packet");
+    });
     test("OSC events share audio-clock GO seek loop and Stop policies",[] {
         struct Sink : OscEventSink {
             std::vector<unsigned> lengths;
