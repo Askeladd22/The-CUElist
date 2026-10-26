@@ -84,7 +84,8 @@ struct RowTransport {
     bool stopOnNext = true;
 };
 struct RenderState {
-    float masterGain=1.0f;
+    float masterGain=1.0f, masterPan=0.0f;
+    bool masterMuted=false;
     std::vector<std::pair<int,std::shared_ptr<ColumnPeakTelemetry>>> columnMeters;
     std::vector<Voice> voices;
     std::vector<RowTransport> rows;
@@ -124,6 +125,7 @@ public:
     std::array<float,2> getColumnStereoPeak(int columnId) const noexcept;
     juce::AudioDeviceManager devices;
     std::atomic<float> peak {0};
+    std::atomic<float> masterPeakLeft {0}, masterPeakRight {0};
     std::atomic<int> activeVoices {0};
     std::atomic<bool> connected {false};
     std::atomic<int> monitoredRowId {0};

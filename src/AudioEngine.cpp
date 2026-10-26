@@ -332,10 +332,13 @@ void RenderState::render(float* const* outputs,int channels,int frames,double sa
         for (const auto& v:voices) if (v.rowId==row.id && v.rowMode && v.playing) { row.playing=true; break; }
         if (wasPlaying && !row.playing) row.ended=true;
     }
-    // Master is applied after summing PCM, never to MIDI or OSC messages.
-    // Gain precedes emergency saturation to retain headroom when attenuating.
+    // Post-sum master PCM gain, mute and stereo balance. MIDI/OSC bypass.
+    // Apply each stereo pair's balance before final saturation.
     for (int ch=0;ch<channels;++ch) if (outputs[ch]) {
-        juce::FloatVectorOperations::multiply(outputs[ch],masterGain,frames);
+        const float balance=ch%2==0 ? 1.0f-std::max(0.0f,masterPan)
+                                     : 1.0f+std::min(0.0f,masterPan);
+        juce::FloatVectorOperations::multiply(outputs[ch],
+            masterMuted ? 0.0f : masterGain*balance,frames);
         juce::FloatVectorOperations::clip(outputs[ch],outputs[ch],-1.0f,1.0f,frames);
     }
 }
@@ -361,6 +364,8 @@ juce::Result loadClip(const juce::File& file,std::shared_ptr<const AudioClip>& d
 std::unique_ptr<RenderState> makeRenderState(const Show& show,const ClipMap& clips) {
     auto state=std::make_unique<RenderState>();
     state->masterGain=show.masterGain;
+    state->masterPan=show.masterPan;
+    state->masterMuted=show.masterMuted;
     for (const auto& column:show.columns)
         state->columnMeters.push_back({column.id,
             column.type==ColumnType::audio ? std::make_shared<ColumnPeakTelemetry>() : nullptr});
@@ -521,7 +526,10 @@ void AudioEngine::panic() noexcept { panicEpoch.fetch_add(1); midiRouter.emergen
 void AudioEngine::audioDeviceAboutToStart(juce::AudioIODevice* device) {
     deviceSampleRate=device->getCurrentSampleRate(); connected.store(true); panic();
 }
-void AudioEngine::audioDeviceStopped() { connected.store(false); activeVoices.store(0); peak.store(0); panic(); }
+void AudioEngine::audioDeviceStopped() {
+    connected.store(false); activeVoices.store(0); peak.store(0);
+    masterPeakLeft.store(0); masterPeakRight.store(0); panic();
+}
 void AudioEngine::audioDeviceIOCallbackWithContext(const float* const*,int,float* const* outputs,int channels,int frames,
                                                   const juce::AudioIODeviceCallbackContext&) {
     processBlock(outputs,channels,frames,deviceSampleRate);
@@ -583,11 +591,17 @@ void AudioEngine::processBlock(float* const* outputs,int channels,int frames,dou
         for (int ch=0; ch<channels; ++ch) if (outputs[ch]) juce::FloatVectorOperations::clear(outputs[ch],frames);
     }
     if (current) current->updateTelemetry();
-    float level=0; int active=0;
+    float level=0, stereo[2]{0,0}; int active=0;
     for (int ch=0; ch<channels; ++ch) if (outputs[ch])
-        for (int i=0; i<frames; ++i) level=std::max(level,std::abs(outputs[ch][i]));
+        for (int i=0; i<frames; ++i) {
+            const float sample=std::abs(outputs[ch][i]);
+            level=std::max(level,sample);
+            stereo[ch%2]=std::max(stereo[ch%2],sample);
+        }
     if (current) for (const auto& v : current->voices) if (v.playing) ++active;
     peak.store(level); activeVoices.store(active);
+    masterPeakLeft.store(stereo[0],std::memory_order_relaxed);
+    masterPeakRight.store(channels==1 ? stereo[0] : stereo[1],std::memory_order_relaxed);
     const int monitored=monitoredRowId.load();
     double seconds=0; bool playing=false;
     if (current) for (const auto& row:current->rows) if (row.id==monitored) {

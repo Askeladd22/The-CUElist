@@ -10,12 +10,16 @@ void mixerV8Tests() {
         Show saved;
         check(decodeShow(encoded,saved).wasOk(),"v8 master show refused");
         near(saved.masterGain,.37);
+        near(saved.masterPan,0);
+        check(!saved.masterMuted,"Master mute default changed");
         auto legacy=juce::JSON::parse(encoded);
         legacy.getDynamicObject()->setProperty("version",7);
         legacy.getDynamicObject()->removeProperty("masterGain");
         Show old;
         check(decodeShow(juce::JSON::toString(legacy),old).wasOk(),"v7 master migration failed");
         near(old.masterGain,1.0);
+        near(old.masterPan,0.0);
+        check(!old.masterMuted,"Legacy show must load unmuted");
         for (float invalid : {-1.0f,4.1f,std::numeric_limits<float>::infinity()}) {
             auto broken=makeShow(); broken.masterGain=invalid;
             check(validateShow(broken).failed(),"Invalid master accepted");
@@ -25,6 +29,36 @@ void mixerV8Tests() {
         Show safe; safe.name="Keep";
         check(decodeShow(juce::JSON::toString(malformed),safe).failed(),"Malformed v8 master accepted");
         check(safe.name=="Keep","Failed v8 parse mutated caller's show");
+    });
+    test("master pan/mute persist without changing existing v10 shows", [] {
+        auto s=makeShow(); s.masterPan=-.35f; s.masterMuted=true;
+        Show decoded;
+        check(decodeShow(encodeShow(s),decoded).wasOk(),"New master controls failed to decode");
+        near(decoded.masterPan,-.35); check(decoded.masterMuted,"Master mute was not persisted");
+        auto json=juce::JSON::parse(encodeShow(s));
+        json.getDynamicObject()->removeProperty("masterPan");
+        json.getDynamicObject()->removeProperty("masterMuted");
+        check(decodeShow(juce::JSON::toString(json),decoded).wasOk(),
+            "Previously saved v10 document failed after adding optional master controls");
+        near(decoded.masterPan,0); check(!decoded.masterMuted,"Optional master defaults are incorrect");
+    });
+    test("master pan/mute affect PCM after channel meters and keep voices playing", [] {
+        auto show=makeShow();
+        auto clip=std::make_shared<AudioClip>(); clip->sampleRate=4;
+        clip->samples.setSize(2,8);
+        for(int n=0;n<8;++n) { clip->samples.setSample(0,n,.4f); clip->samples.setSample(1,n,.2f); }
+        ClipMap clips; clips[show.rows[0].cells[0].id]=clip;
+        show.masterPan=.5f;
+        auto state=makeRenderState(show,clips); state->trigger(show.rows[0].cells[0].id,false);
+        juce::AudioBuffer<float> out(2,1); state->render(out.getArrayOfWritePointers(),2,1,4);
+        near(out.getSample(0,0),.2); near(out.getSample(1,0),.2);
+        near(state->columnMeters[0].second->left.load(),.4);
+        show.masterMuted=true;
+        auto muted=makeRenderState(show,clips); muted->trigger(show.rows[0].cells[0].id,false);
+        muted->render(out.getArrayOfWritePointers(),2,1,4);
+        near(out.getSample(0,0),0); near(out.getSample(1,0),0);
+        check(muted->voices[0].playing,"Master mute must not stop playback");
+        near(muted->columnMeters[0].second->left.load(),.4);
     });
     test("master audio scales summed PCM before saturation and does not change strip settings", [] {
         auto show=makeShow(); addColumn(show,ColumnType::audio,"Extra");
@@ -89,8 +123,11 @@ void mixerV8Tests() {
         addColumn(ui.show,ColumnType::osc,"O");
         auto* utilities=cueViewFixtures::find<ColumnUtilities>(ui);
         utilities->refresh(); ui.resized();
-        auto* master=dynamic_cast<juce::Slider*>(controlsV3::named(ui,"masterAudioDb"));
-        check(master && master->getValue()==0,"Master slider missing or not at 0 dB");
+        auto* master=dynamic_cast<GainMeterFader*>(controlsV3::named(ui,"masterAudioDb"));
+        check(master && master->getGainDb()==0,"Integrated master fader missing or not at 0 dB");
+        auto* masterPan=dynamic_cast<juce::Slider*>(controlsV3::named(ui,"masterPan"));
+        auto* masterMute=dynamic_cast<juce::ToggleButton*>(controlsV3::named(ui,"masterMute"));
+        check(masterPan && masterMute,"Master pan and mute controls missing");
         auto* audio=utilities->getChildComponent(0);
         auto* midiStrip=utilities->getChildComponent(1);
         auto* oscStrip=utilities->getChildComponent(2);
@@ -101,8 +138,12 @@ void mixerV8Tests() {
         check(fader->getHeight()>90 && utilities->getHeight()>=180,"Compact mixer strip has insufficient height");
         check(!controlsV3::named(*midiStrip,"columnGainDb")->isVisible(),"MIDI strip displays PCM controls");
         check(!controlsV3::named(*oscStrip,"columnGainDb")->isVisible(),"OSC strip displays PCM controls");
-        master->setValue(-6.0,juce::sendNotificationSync);
+        master->setGainDb(-6.0f,true);
         near(ui.show.masterGain,std::pow(10.,-6./20.));
         check(ui.hasUnsavedChanges(),"Master UI failed to mark show dirty");
+        masterPan->setValue(-.4,juce::sendNotificationSync);
+        near(ui.show.masterPan,-.4);
+        masterMute->triggerClick();
+        check(ui.show.masterMuted,"Master mute UI did not reach the model");
     });
 }

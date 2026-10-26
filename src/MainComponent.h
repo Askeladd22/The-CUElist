@@ -1,5 +1,7 @@
 #pragma once
 #include "AudioEngine.h"
+#include "GainMeterFader.h"
+#include "MixerControls.h"
 #include "MidiInputManager.h"
 #include "ControlOutputRouter.h"
 #include <set>
@@ -116,6 +118,8 @@ public:
     void stopRow(int row);
     void setColumnUtilities(int column,float gain,float pan,bool muted,bool inverted);
     void setMasterAudio(float gain);
+    void setMasterPan(float pan);
+    void setMasterMute(bool muted);
     void openControlPanel();
     juce::Result selectControlInput(const juce::String&);
     bool addMappingBinding(ControlBinding);
@@ -170,7 +174,9 @@ private:
     juce::ToggleButton cellAutoStop{"Arresta al GO della prossima cue"};
     juce::Slider gain;
     juce::Slider rowGain;
-    juce::Slider masterSlider;
+    GainMeterFader masterSlider;
+    juce::Slider masterPan;
+    UtilityIcon masterMute{false};
     struct DockResizeHandle : juce::Component, juce::SettableTooltipClient {
         explicit DockResizeHandle(MainComponent& p) : owner(p) { setMouseCursor(juce::MouseCursor::UpDownResizeCursor); }
         void paint(juce::Graphics& g) override { g.setColour(palette::muted); g.fillRoundedRectangle(getLocalBounds().toFloat().withSizeKeepingCentre(76,3),1.5f); }

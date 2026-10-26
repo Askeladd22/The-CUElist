@@ -15,6 +15,10 @@ void gainMeterFaderTests() {
             > GainMeterFader::yForDb(-6,top,bottom),"Floor drawn above strong signal");
         near(GainMeterFader::dbForY(-100,top,bottom),12);
         near(GainMeterFader::dbForY(500,top,bottom),-60);
+        const float unityPosition=(bottom-GainMeterFader::yForDb(0,top,bottom))/(bottom-top);
+        check(unityPosition>.70f && unityPosition<.80f,"Unity should be near 75% of travel");
+        check(std::abs(GainMeterFader::dbForY((top+bottom)*.5f,top,bottom)+24.0f)>3.0f,
+            "Fader is still linearly mapped to dB");
     });
     test("GainMeterFader owns one mouse/keyboard control and preserves saved dB range", [] {
         GainMeterFader component;

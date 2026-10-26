@@ -38,7 +38,7 @@ struct Row {
     bool muted = false, loop = false, overrideBehaviour = false, stopOnNext = true;
     Behaviour behaviour = Behaviour::retrigger;
 };
-struct Show { juce::String name = "Show 001"; float masterGain=1.0f; int nextId = 1; std::vector<Column> columns; std::vector<Row> rows; ControlSettings controls; };
+struct Show { juce::String name = "Show 001"; float masterGain=1.0f, masterPan=0.0f; bool masterMuted=false; int nextId = 1; std::vector<Column> columns; std::vector<Row> rows; ControlSettings controls; };
 Show makeShow();
 void addRow(Show&, const juce::String&);
 void addColumn(Show&, ColumnType, const juce::String&);

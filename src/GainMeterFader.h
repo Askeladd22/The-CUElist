@@ -21,12 +21,19 @@ public:
         setTooltip("Fader: gain in dB. Barre L/R: picco in dBFS prima del Master. Doppio clic: 0 dB.");
     }
 
+    // Calibrated logarithmic taper: unity sits around 75% of the travel.
+    // Both meter marks and the thumb use the same invertible transformation.
+    // Saved values remain unchanged dB, converted to linear gain only for PCM.
     static float yForDb(float db,float top,float bottom) noexcept {
-        return top+(maxDb-juce::jlimit(minDb,maxDb,db))*(bottom-top)/(maxDb-minDb);
+        if (bottom<=top) return top;
+        const double fraction=(juce::jlimit(minDb,maxDb,db)-minDb)/(maxDb-minDb);
+        const double position=std::expm1(fraction*std::log(3.0))/2.0;
+        return bottom-(float)position*(bottom-top);
     }
     static float dbForY(float y,float top,float bottom) noexcept {
         if (bottom<=top) return minDb;
-        return juce::jlimit(minDb,maxDb,maxDb-(y-top)*(maxDb-minDb)/(bottom-top));
+        const double position=juce::jlimit(0.0,1.0,(double)(bottom-y)/(bottom-top));
+        return (float)(minDb+(maxDb-minDb)*std::log1p(2.0*position)/std::log(3.0));
     }
     float getGainDb() const noexcept { return gainDb; }
     void setGainDb(float value,bool notify=false) {

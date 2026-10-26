@@ -49,15 +49,21 @@ MainComponent::MainComponent(bool startAudio) {
     }
     gain.setName("cellGainDb"); rowGain.setName("rowGainDb");
     masterSlider.setName("masterAudioDb");
-    masterSlider.setSliderStyle(juce::Slider::LinearVertical);
-    masterSlider.setTextBoxStyle(juce::Slider::TextBoxBelow,false,67,19);
+    masterSlider.setTooltip("MASTER AUDIO: fader e meter L/R dell'uscita PCM. Doppio clic: 0 dB.");
     utilities.addAndMakeVisible(masterSlider);
-    masterSlider.setRange(-60,12,0.1);
-    masterSlider.setNumDecimalPlacesToDisplay(1);
-    masterSlider.setTextValueSuffix(" dB");
-    masterSlider.setDoubleClickReturnValue(true,0);
-    masterSlider.setTooltip("MASTER AUDIO: attenua o amplifica l'uscita PCM complessiva, senza influire sui messaggi MIDI e OSC.");
-    masterSlider.onValueChange=[this] { setMasterAudio(juce::Decibels::decibelsToGain((float)masterSlider.getValue(),-60.0f)); };
+    masterSlider.onGainChanged=[this](float db) {
+        setMasterAudio(juce::Decibels::decibelsToGain(db,-60.0f));
+    };
+    configureMixerPan(masterPan);
+    masterPan.setName("masterPan");
+    masterPan.setTooltip("Bilanciamento stereo generale dell'uscita PCM. Doppio clic: centro.");
+    utilities.addAndMakeVisible(masterPan);
+    masterPan.onValueChange=[this] { setMasterPan((float)masterPan.getValue()); };
+    masterMute.setName("masterMute");
+    masterMute.setTooltip("Silenzia il master PCM senza fermare le clip o i messaggi MIDI/OSC.");
+    masterMute.setWantsKeyboardFocus(false);
+    utilities.addAndMakeVisible(masterMute);
+    masterMute.onClick=[this] { setMasterMute(masterMute.getToggleState()); };
     rowBehaviour.addItemList({"Usa impostazioni celle","Retrigger","Pausa / Restart","Pausa / Resume","Continue"},1);
     cellTab.setWantsKeyboardFocus(false); rowTab.setWantsKeyboardFocus(false);
     cellTab.onClick=[this] { if (applyInspector()) { rowSettings=false; refresh(); } };
@@ -269,7 +275,9 @@ void MainComponent::refresh() {
 }
 void MainComponent::refreshInspector() {
     const auto& row=show.rows[selectedRow]; const auto& c=row.cells[selectedColumn]; const auto& col=show.columns[selectedColumn];
-    masterSlider.setValue(juce::Decibels::gainToDecibels(show.masterGain,-60.0f),juce::dontSendNotification);
+    masterSlider.setGainDb(juce::Decibels::gainToDecibels(show.masterGain,-60.0f));
+    masterPan.setValue(show.masterPan,juce::dontSendNotification);
+    masterMute.setToggleState(show.masterMuted,juce::dontSendNotification);
     engine.monitoredRowId.store(row.id);
     rowName.setTextToShowWhenEmpty("Nome della cue",palette::muted);
     rowName.setText(row.name,false); cellName.setText(c.name,false); cellName.setTextToShowWhenEmpty("Nome della cella",palette::muted);
@@ -459,6 +467,21 @@ void MainComponent::setMasterAudio(float level) {
     dirty=true;
     engine.publish(makeRenderState(show,clips));
     status="Livello MASTER audio aggiornato."; repaint();
+}
+void MainComponent::setMasterPan(float pan) {
+    if (!std::isfinite(pan)) return;
+    const float value=juce::jlimit(-1.0f,1.0f,pan);
+    if (std::abs(show.masterPan-value)<1.0e-6f) return;
+    show.masterPan=value; dirty=true;
+    engine.publish(makeRenderState(show,clips));
+    status="Pan MASTER aggiornato."; utilities.repaint(); repaint();
+}
+void MainComponent::setMasterMute(bool muted) {
+    if (show.masterMuted==muted) return;
+    show.masterMuted=muted; dirty=true;
+    engine.publish(makeRenderState(show,clips));
+    status=muted ? "MASTER PCM silenziato." : "MASTER PCM riattivato.";
+    utilities.repaint(); repaint();
 }
 void MainComponent::setColumnUtilities(int column,float level,float pan,bool muted,bool inverted) {
     if (column<0 || column>=(int)show.columns.size() || !std::isfinite(level) || !std::isfinite(pan)) return;
