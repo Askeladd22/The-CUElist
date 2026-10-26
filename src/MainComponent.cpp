@@ -784,6 +784,15 @@ void MainComponent::deleteColumn(int index) {
     selectedColumn=std::min(index,(int)show.columns.size()-1); changed("Column deleted. Original files retained.",true);
 }
 void MainComponent::moveClip(int sr,int sc,int tr,int tc) {
+    if (sc>=0 && sc<(int)show.columns.size() && tr>=0 && tr<(int)show.rows.size() &&
+        tc>=0 && tc<(int)show.columns.size() &&
+        ((show.columns[(size_t)sc].type==ColumnType::control &&
+          show.columns[(size_t)sc].controlLocked) ||
+         (show.columns[(size_t)tc].type==ColumnType::control &&
+          show.columns[(size_t)tc].controlLocked))) {
+        status="Unlock the Control Column before moving its cue-specific sets.";
+        repaint(); return;
+    }
     if (!applyInspector()) return;
     auto result=moveCell(show,sr,sc,tr,tc); if (result.failed()) { status=result.getErrorMessage(); repaint(); return; }
     selectedRow=tr; selectedColumn=tc; nextCue=tr;
@@ -792,6 +801,11 @@ void MainComponent::moveClip(int sr,int sc,int tr,int tc) {
 bool MainComponent::copySelectedCell() {
     if (selectedRow<0 || selectedRow>=(int)show.rows.size() ||
         selectedColumn<0 || selectedColumn>=(int)show.columns.size()) return false;
+    if (show.columns[(size_t)selectedColumn].type==ColumnType::control &&
+        show.columns[(size_t)selectedColumn].controlLocked) {
+        status="Locked Control Column cells cannot be copied individually.";
+        repaint();return false;
+    }
     const auto& source=show.rows[(size_t)selectedRow].cells[(size_t)selectedColumn];
     copiedCell=source;
     copiedType=show.columns[(size_t)selectedColumn].type;
@@ -803,6 +817,11 @@ bool MainComponent::copySelectedCell() {
 bool MainComponent::pasteSelectedCell() {
     if (!copiedCell || selectedRow<0 || selectedRow>=(int)show.rows.size() ||
         selectedColumn<0 || selectedColumn>=(int)show.columns.size()) return false;
+    if (show.columns[(size_t)selectedColumn].type==ColumnType::control &&
+        show.columns[(size_t)selectedColumn].controlLocked) {
+        status="Unlock this Control Column before pasting cue-specific sets.";
+        repaint();return false;
+    }
     if (show.columns[(size_t)selectedColumn].type!=copiedType) {
         message("Copy and paste require columns of the same type."); return false;
     }
