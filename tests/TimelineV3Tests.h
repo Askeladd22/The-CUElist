@@ -52,7 +52,8 @@ void timelineV3Tests() {
         timeline->mouseDown(event(*timeline,from,from));
         timeline->mouseDrag(event(*timeline,to,from,1,true));
         timeline->mouseUp(event(*timeline,to,from,1,true));
-        near(ui.show.rows[0].cells[0].startSeconds,35.0*10/640);
+        // setClipStart stores clip offsets rounded to the nearest centisecond.
+        near(ui.show.rows[0].cells[0].startSeconds,.55);
     });
     test("timeline MIDI double-click opens existing clip editor",[] {
         MainComponent ui(false); addColumn(ui.show,ColumnType::midi,{});
