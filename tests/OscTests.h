@@ -59,7 +59,10 @@ void oscTests() {
         auto show=makeShow(); addColumn(show,ColumnType::osc,"Test");
         show.columns[1].oscHost="127.0.0.1";
         show.columns[1].oscPort=port;
-        OscClip clip; clip.length=0.25; clip.events={{0.01,"/loopback",{{OscValueType::integer,9,0,{}}}}};
+        OscClip clip; clip.length=0.25;
+        clip.events={{0.01,"/loopback",{{OscValueType::decimal,0,0.75f,{}},
+                                        {OscValueType::integer,9,0,{}},
+                                        {OscValueType::text,0,0,"Chataigne"}}}};
         show.rows[0].cells[1].osc=clip;
         AudioEngine engine;
         engine.publish(makeRenderState(show,{}));
@@ -69,7 +72,12 @@ void oscTests() {
         check(receiver.waitUntilReady(true,1500)==1,"OSC UDP packet not received on loopback");
         char bytes[1024]{};
         const int received=receiver.read(bytes,sizeof(bytes),false);
-        check(received>=20 && std::strncmp(bytes,"/loopback",9)==0,"Invalid OSC UDP packet");
+        const auto expected=encodeOscMessage(clip.events[0]);
+        check(received==(int)expected.size() &&
+              std::memcmp(bytes,expected.data(),expected.size())==0,
+              "OSC UDP receiver did not get the float/int/string arguments and OSC types");
+        check(received>=36 && std::strncmp(bytes,"/loopback",9)==0,
+              "OSC UDP receiver did not get the correct destination address");
     });
     test("OSC events share audio-clock GO seek loop and Stop policies",[] {
         struct Sink : OscEventSink {
