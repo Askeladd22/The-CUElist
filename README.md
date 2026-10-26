@@ -65,9 +65,9 @@ Disattivalo sulle righe che devono continuare in sovrapposizione. Anche il GO di
 - Doppio click sul titolo di cue o colonna per rinominarlo: il campo riceve subito il focus. **Invio** conferma anche i nomi nell'inspector.
 - Le frecce riordinano righe e colonne; **X** elimina. Eliminando l'ultima rimane una riga/colonna vuota. I file originali non vengono cancellati.
 - Trascina una clip nella griglia per spostarla; una destinazione occupata viene scambiata. Le colonne devono essere dello stesso tipo.
-- Trascina una clip nella timeline per modificarne l'inizio in secondi. Il lancio diretto della cella parte subito, senza questo ritardo.
+- Trascina una clip nella timeline per modificarne l'inizio in secondi. Il **magnete** consente di agganciarla alla griglia musicale (1/4, 1/8, 1/16 o 1/32); disattivalo con **Magnete OFF** per spostamenti liberi. La griglia segue la mappa BPM della cue, anche quando il tempo cambia. Il lancio diretto della cella parte subito, senza questo ritardo.
 - Trascina il cursore sul righello per cambiare la posizione della cue. Ogni cella mostra tempo trascorso/durata, barra di avanzamento e stato di riproduzione, pausa o attesa.
-- **− / +** regolano lo zoom, **Fit** mostra tutta la cue e **Ctrl+rotella** ingrandisce attorno al puntatore. La barra orizzontale sposta la vista; la rotella scorre le tracce.
+- **− / +** regolano lo zoom, **Fit** mostra tutta la cue e **Ctrl+rotella** ingrandisce attorno al puntatore. La barra orizzontale sposta la vista; la rotella scorre le tracce. **Doppio clic su una clip MIDI nella timeline** apre il piano roll senza avviare la clip.
 
 I parametri audio si aggiornano senza azzerare il trasporto. Invio, **Applica modifiche**, Salva o il cambio selezione confermano i campi testo. Importazione, apertura e modifiche strutturali possono fermare l'audio.
 
@@ -90,7 +90,7 @@ I simboli si evidenziano quando attivi. I livelli di cella, cue e colonna si mol
 3. Un doppio clic sulla cella apre il **piano roll**; il pulsante Play della cella avvia la riproduzione.
 4. Nelle utility seleziona l'**uscita MIDI**. Serve un sintetizzatore esterno, un'applicazione o uno strumento collegato a quella porta: The Cuelist non contiene un sintetizzatore.
 
-Nel piano roll: doppio clic nella griglia per inserire una nota; trascina la nota per spostare tempo e altezza, oppure il bordo destro per cambiare durata. Seleziona una nota per regolare **Velocity** (1–127) e **Canale** (1–16). **Canc** o **Elimina nota** la rimuovono. **Snap** sceglie la griglia da 1/4 a 1/32; **+ / −** cambiano lo zoom e le barre scorrono la vista. **Beat clip** regola la durata senza tagliare note esistenti. I beat sono quarti; C4 corrisponde alla nota MIDI 60.
+Nel piano roll: doppio clic nella griglia per inserire una nota; trascina la nota per spostare tempo e altezza, oppure il bordo destro per cambiare durata. **Tasto destro + trascinamento** seleziona più note in un rettangolo; **Shift+clic** aggiunge o rimuove note dalla selezione. Le note selezionate possono essere spostate o eliminate insieme, e ricevono collettivamente le modifiche a **Velocity** (1–127) e **Canale** (1–16). **Canc** o **Elimina nota** le rimuovono. **Snap** sceglie la griglia da 1/4 a 1/32 oppure **Off** per spostamenti liberi; **+ / −** cambiano lo zoom e le barre scorrono la vista. **Beat clip** regola la durata senza tagliare note esistenti. I beat sono quarti; C4 corrisponde alla nota MIDI 60.
 
 **Applica** trasferisce le modifiche alla cella; **Annulla** o la chiusura della finestra le scartano. Salva poi lo show per conservarle su disco. Aprire l'editor ferma il trasporto.
 
@@ -116,11 +116,11 @@ Salva nuovamente un progetto legacy per raccogliere i media. I file mancanti ven
 
 ## Tempo musicale
 
-Ogni cue ha una **Mappa tempo** separata: una riga per punto, nel formato `beat BPM numeratore/denominatore`. Il primo beat è `0`, espresso in quarti.
+Ogni cue ha una **Mappa tempo** separata: una riga per punto, nel formato `beat BPM`. Il primo beat è `0`, espresso in quarti. La metrica è **4/4** per le nuove mappe e non è più modificabile nell'inspector. Le firme metriche precedenti vengono conservate nei vecchi show finché non si modifica la mappa tempo.
 
 ```text
-0 120 4/4
-8 90 3/4
+0 120
+8 90
 ```
 
 I BPM e la mappa tempo regolano le note MIDI; non cambiano la velocità dei file audio. Il renderer adatta il sample rate mediante interpolazione lineare. Il loop globale ripete ciascuna clip indipendentemente, senza riavvolgere il clock della riga.
