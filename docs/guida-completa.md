@@ -70,7 +70,7 @@ Disattivalo sulle righe che devono continuare in sovrapposizione. Anche il GO di
 - Trascina una clip nella griglia per spostarla; una destinazione occupata viene scambiata. Le colonne devono essere dello stesso tipo.
 - Trascina una clip nella timeline per modificarne l'inizio in secondi. La sezione **GRIGLIA** mostra/nasconde la griglia BPM e ne seleziona la risoluzione (1/4, 1/8, 1/16, 1/32). La sezione **SNAP** ha un pulsante con **icona a magnete** per attivare/disattivare l'aggancio e una suddivisione separata. **La griglia può essere nascosta lasciando attivo lo snap, oppure mostrata con snap disattivato.** Le linee seguono la mappa BPM della cue, anche quando il tempo cambia. L'avvio diretto della cella parte subito, senza il ritardo di posizionamento.
 - Trascina il cursore sul righello per cambiare la posizione della cue. Ogni cella mostra tempo trascorso/durata, barra di avanzamento e stato di riproduzione, pausa o attesa.
-- **− / +** regolano lo zoom, **Fit** mostra tutta la cue e **Ctrl+rotella** ingrandisce attorno al puntatore. La barra orizzontale sposta la vista; la rotella scorre le tracce. **Doppio clic su una clip MIDI nella timeline** apre il piano roll senza avviare la clip.
+- **− / +** regolano lo zoom, **Fit** mostra tutta la cue e **Ctrl+rotella** ingrandisce attorno al puntatore. La barra orizzontale sposta la vista; la rotella scorre le tracce. **Clic su una clip MIDI nella timeline** apre il Clip Editor integrato sopra la timeline; **Stacca/Riaggancia** lo trasferisce fra pannello e finestra flottante.
 
 I parametri audio si aggiornano senza azzerare il trasporto. Invio, **Applica modifiche**, Salva o il cambio selezione confermano i campi testo. Importazione, apertura e modifiche strutturali possono fermare l'audio.
 
