@@ -281,7 +281,8 @@ void oscAutomationV9Tests() {
         OscClip clip; clip.useBeats=true; clip.length=8;
         OscClipEditor editor(clip,{{0,120,4,4}},
             [](const OscClip&,const OscClip&,bool){});
-        editor.setSize(940,360); editor.addAutomation();
+        editor.setSize(940,360);
+        editor.mouseDoubleClick(cueViewFixtures::event(editor,{300,204},{300,204}));
         check(editor.getClip().automations.size()==1,"Beat timeline ramp not created");
         near(editor.getClip().automations[0].duration,2); // two beats at 120 BPM = 1 s
         check(validateOscClip(editor.getClip()).wasOk(),"Beat-mode ramp invalid");
@@ -313,11 +314,92 @@ void oscAutomationV9Tests() {
               controlsV3::named(editor,"oscSnapEnabled") &&
               controlsV3::named(editor,"oscAddAutomation"),"OSC piano-roll controls absent");
         editor.addAutomation();
+        check(editor.getClip().tracks.size()==1 && editor.getClip().automations.empty(),
+              "Plus should add an empty automation track, not a ramp");
+        editor.mouseDoubleClick(cueViewFixtures::event(editor,{190,204},{190,204}));
         check(editor.getClip().automations.size()==1 &&
               editor.getClip().automations[0].points.size()==2,
-              "Ramp button did not create a linear automation");
+              "Double-click failed to create the ramp within the track");
         check(juce::ModalComponentManager::getInstance()->getNumModalComponents()==0,
               "Creating a ramp must not open any configuration dialog");
         check(validateOscClip(editor.getClip()).wasOk(),"Editor created invalid OSC automation");
     });
+    test("OSC editor persists empty tracks and groups separate segments by address",[] {
+        OscClipEditor editor(OscClip{},{{0,120,4,4}},
+            [](const OscClip&,const OscClip&,bool){});
+        editor.setSize(940,500);
+        editor.addAutomation();
+        check(editor.getClip().tracks.size()==1 && editor.getClip().automations.empty(),
+              "Plus failed to add an empty OSC track");
+        editor.mouseDoubleClick(cueViewFixtures::event(editor,{150,204},{150,204}));
+        editor.mouseDoubleClick(cueViewFixtures::event(editor,{590,204},{590,204}));
+        check(editor.getClip().tracks.size()==1 && editor.getClip().automations.size()==2,
+              "Two separate OSC segments must share one track");
+        check(editor.getClip().automations[0].message.address==
+              editor.getClip().automations[1].message.address,
+              "Segments lost their shared address");
+        auto show=makeShow(); addColumn(show,ColumnType::osc,"OSC");
+        show.rows[0].cells[1].osc=editor.getClip();
+        Show loaded;
+        check(decodeShow(encodeShow(show),loaded).wasOk(),"OSC track project roundtrip failed");
+        check(loaded.rows[0].cells[1].osc->tracks.size()==1 &&
+              loaded.rows[0].cells[1].osc->automations.size()==2,
+              "OSC track metadata or segments lost after save");
+    });
+    test("OSC endpoint remains independent and resize preserves intermediate point timing",[] {
+        OscClip clip;
+        OscAutomation a;
+        a.message.address="/curve";
+        a.message.arguments={{OscValueType::decimal,0,0,{}}};
+        a.duration=2; a.points={{0,0},{1,1},{2,0}};
+        clip.automations.push_back(a);
+        OscClipEditor editor(clip,{{0,120,4,4}},
+            [](const OscClip&,const OscClip&,bool){});
+        editor.setSize(940,420);
+        check(editor.getClip().tracks.size()==1,"Legacy ramp has no track");
+        // At 940px the initial axis is 840px for a four-second clip;
+        // the ramp extends from x=78 to x=498.
+        const juce::Point<float> edge{498,211}, extended{708,211};
+        editor.mouseDown(cueViewFixtures::event(editor,edge,edge));
+        editor.mouseDrag(cueViewFixtures::event(editor,extended,edge,1,true));
+        editor.mouseUp(cueViewFixtures::event(editor,extended,edge,1,true));
+        const auto& result=editor.getClip().automations.front();
+        near(result.duration,3);
+        near(result.points[1].time,1);
+        near(result.points.back().time,3);
+        near(result.points.front().value,0);
+        near(result.points[1].value,1);
+        near(result.points.back().value,0);
+        check(validateOscClip(editor.getClip()).wasOk(),"0 to 1 to 0 curve invalid");
+    });
+    test("OSC shrinking cannot silently remove intermediate points",[] {
+        OscClip clip;
+        OscAutomation a; a.message.address="/param";
+        a.message.arguments={{OscValueType::decimal,0,0,{}}};
+        a.duration=3; a.points={{0,0},{2.5,1},{3,0}};
+        clip.automations.push_back(a);
+        OscClipEditor editor(clip,{{0,120,4,4}},[](const OscClip&,const OscClip&,bool){});
+        editor.setSize(940,420);
+        const juce::Point<float> edge{708,210},shorter{498,210};
+        editor.mouseDown(cueViewFixtures::event(editor,edge,edge));
+        editor.mouseDrag(cueViewFixtures::event(editor,shorter,edge,1,true));
+        editor.mouseUp(cueViewFixtures::event(editor,shorter,edge,1,true));
+        check(editor.getClip().automations.front().points.size()==3,
+              "Shrinking removed a control point");
+        near(editor.getClip().automations.front().duration,3);
+        near(editor.getClip().automations.front().points[1].time,2.5);
+    });
+    test("OSC zoom and vertical scrolling keep segment coordinates consistent",[] {
+        OscClipEditor editor(OscClip{},{{0,120,4,4}},
+            [](const OscClip&,const OscClip&,bool){});
+        editor.setSize(940,350);
+        auto* in=dynamic_cast<juce::TextButton*>(controlsV3::named(editor,"oscZoomIn"));
+        auto* fit=dynamic_cast<juce::TextButton*>(controlsV3::named(editor,"oscZoomFit"));
+        check(in && fit,"OSC timeline zoom controls missing");
+        in->triggerClick(); fit->triggerClick();
+        check(validateOscClip(editor.getClip()).wasOk(),"Zoom modified OSC data");
+        for (int i=0;i<5;++i) editor.addAutomation();
+        check(editor.getClip().tracks.size()==5,"OSC plus lost tracks");
+    });
+
 }
