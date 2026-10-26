@@ -10,7 +10,7 @@ void oscAutomationV9Tests() {
         OscClip clip; clip.events={e};
         check(validateOscClip(clip).wasOk(),"OSC booleans rejected");
         const auto encoded=encodeOscMessage(e);
-        check(encoded.size()==12,"OSC T/F carried an illegal binary payload");
+        check(encoded.size()==8,"OSC T/F carried an illegal binary payload");
         check(std::memcmp(encoded.data()+4,",TF",3)==0,"OSC boolean type tags are wrong");
     });
     test("v9 persists detailed curves, booleans and leaves v8 projects unchanged",[] {
