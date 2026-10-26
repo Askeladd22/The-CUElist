@@ -1,4 +1,5 @@
 #pragma once
+#include "GainMeterFader.h"
 namespace controlsV3 {
 juce::Component* named(juce::Component& root,const juce::String& name) {
     if (root.getName()==name) return &root;
