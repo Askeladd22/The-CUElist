@@ -105,7 +105,7 @@ void uiRefinementTests() {
     test("Master audio is within left column utilities and audio strips are compact", [] {
         MainComponent ui(false); ui.setSize(1500,900);
         auto* utilities=find<ColumnUtilities>(ui);
-        auto* master=controlsV3::named(*utilities,"masterAudioDb");
+        auto* master=dynamic_cast<juce::Slider*>(controlsV3::named(*utilities,"masterAudioDb"));
         check(master && master->getParentComponent()==utilities,"Master not placed in utility panel");
         auto* audio=utilities->getChildComponent(0);
         auto* fader=dynamic_cast<juce::Slider*>(controlsV3::named(*audio,"columnGainDb"));
