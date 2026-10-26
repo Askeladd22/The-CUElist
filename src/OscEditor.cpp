@@ -23,7 +23,7 @@ OscClipEditor::OscClipEditor(OscClip value,std::vector<TempoPoint> points,
         &unit,&resolution,&grid,&snap,&add,&ramp,&remove,&duplicate,&detach})
         addAndMakeVisible(component);
     unit.setName("oscTimeUnit");
-    unit.addItem("Secondi",1); unit.addItem("Beat",2);
+    unit.addItem("Seconds",1); unit.addItem("Beat",2);
     unit.setSelectedId(clip.useBeats ? 2 : 1,juce::dontSendNotification);
     unit.onChange=[this] {
         const bool beats=unit.getSelectedId()==2;
@@ -48,13 +48,13 @@ OscClipEditor::OscClipEditor(OscClip value,std::vector<TempoPoint> points,
     resolution.setName("oscGridResolution");
     for (int i=0;i<4;++i) resolution.addItem("1/"+juce::String(4<<i),i+1);
     resolution.setSelectedId(2,juce::dontSendNotification);
-    resolution.setTooltip("Risoluzione musicale o frazione di secondo dello snap.");
+    resolution.setTooltip("Musical snap resolution or fraction of a second.");
     grid.setName("oscGridVisible"); grid.setToggleState(true,juce::dontSendNotification);
     grid.onClick=[this] { repaint(); };
     snap.setName("oscSnapEnabled"); snap.setToggleState(true,juce::dontSendNotification);
     snap.onClick=[this] { repaint(); };
-    add.setName("oscAddMessage"); add.setTooltip("Aggiungi un evento OSC istantaneo.");
-    ramp.setName("oscAddAutomation"); ramp.setTooltip("Crea una rampa automatica OSC con due punti.");
+    add.setName("oscAddMessage"); add.setTooltip("Add an instantaneous OSC event.");
+    ramp.setName("oscAddAutomation"); ramp.setTooltip("Create a two-point OSC automation ramp.");
     remove.setName("oscRemoveMessage"); duplicate.setName("oscDuplicate");
     add.onClick=[this] { addEvent(); };
     ramp.onClick=[this] { addAutomation(); };
@@ -68,7 +68,7 @@ OscClipEditor::OscClipEditor(OscClip value,std::vector<TempoPoint> points,
     setSize(940,320);
 }
 OscClipEditor::~OscClipEditor() { setLookAndFeel(nullptr); }
-void OscClipEditor::setFloating(bool floating) { detach.setButtonText(floating?"Riaggancia":"Stacca"); }
+void OscClipEditor::setFloating(bool floating) { detach.setButtonText(floating?"Reattach":"Detach"); }
 void OscClipEditor::loadClip(const OscClip& next) {
     ++revision; clip=next; selectedEvent=selectedAutomation=selectedPoint=-1;
     newTrackAddress=clip.automations.empty() ? "/parameter"
@@ -126,7 +126,7 @@ double OscClipEditor::valueForY(int index,float y) const {
 void OscClipEditor::paint(juce::Graphics& g) {
     g.fillAll(palette::panel);
     label(g,"OSC  /  timeline",{13,38,225,24},13,palette::teal,true);
-    label(g,"Doppio clic: nuova rampa / modifica  ·  Trascina: sposta o ridimensiona  ·  Shift+clic: punto",
+    label(g,"Double-click: create/edit ramp  ·  Drag: move/resize  ·  Shift+click: point",
           {230,38,getWidth()-245,24},10,palette::muted);
     const int left=axisLeft(),right=left+axisWidth();
     const auto ruler=juce::Rectangle<float>((float)left,rulerTop,(float)axisWidth(),rulerBottom-rulerTop);
@@ -149,7 +149,7 @@ void OscClipEditor::paint(juce::Graphics& g) {
     }
     g.setColour(palette::raised);
     g.fillRoundedRectangle((float)left,eventTop,(float)axisWidth(),eventHeight,3);
-    label(g,"EVENTI",{8,eventTop+8,66,19},10,palette::teal,true);
+    label(g,"EVENTS",{8,eventTop+8,66,19},10,palette::teal,true);
     for (int i=0;i<(int)clip.events.size();++i) {
         const auto& e=clip.events[(size_t)i];
         const float x=xForTime(e.time);
@@ -173,7 +173,7 @@ void OscClipEditor::paint(juce::Graphics& g) {
         g.fillRect(left,y,axisWidth(),laneHeight-4);
         label(g,"AUTO "+juce::String(i+1),{6,y+4,68,16},9,
               i==selectedAutomation ? palette::amber : palette::teal,true);
-        label(g,a.message.address+"  (doppio clic: address)",
+        label(g,a.message.address+"  (double-click: address)",
               {left+9,y+2,std::max(25,axisWidth()-16),16},10,palette::muted);
         const float x0=xForTime(a.time),x1=xForTime(a.time+a.duration);
         g.setColour(palette::teal.withAlpha(i==selectedAutomation ? .23f : .12f));
@@ -199,9 +199,9 @@ void OscClipEditor::paint(juce::Graphics& g) {
             g.setColour(palette::raised.withAlpha(.65f));
             g.fillRect(left,y,axisWidth(),laneHeight-4);
             label(g,"+ AUTO",{6,y+4,68,17},9,palette::teal,true);
-            label(g,newTrackAddress+"  (address prossima traccia)",
+            label(g,newTrackAddress+"  (next track address)",
                   {left+9,y+3,std::max(25,axisWidth()-16),17},10,palette::muted);
-            label(g,"Doppio clic qui: rampa 0 → 1 / 1 secondo",
+            label(g,"Double-click here: ramp 0 → 1 / 1 second",
                   {left+12,y+32,std::max(25,axisWidth()-20),22},11,palette::muted);
         }
     }
@@ -389,10 +389,10 @@ void OscClipEditor::showContext(const juce::MouseEvent& e) {
             }
     } else if (const auto i=automationAt(e.position.y);i>=0) chooseAutomation(i);
     juce::PopupMenu menu;
-    menu.addItem(1,"Modifica",selectedEvent>=0 || selectedAutomation>=0);
-    menu.addItem(2,"Duplica",selectedEvent>=0 || selectedAutomation>=0);
-    menu.addItem(3,"Elimina",selectedEvent>=0 || selectedAutomation>=0);
-    menu.addItem(4,"Address traccia OSC",selectedAutomation>=0);
+    menu.addItem(1,"Edit",selectedEvent>=0 || selectedAutomation>=0);
+    menu.addItem(2,"Duplicate",selectedEvent>=0 || selectedAutomation>=0);
+    menu.addItem(3,"Delete",selectedEvent>=0 || selectedAutomation>=0);
+    menu.addItem(4,"OSC track address",selectedAutomation>=0);
     auto safe=juce::Component::SafePointer<OscClipEditor>(this);
     menu.showMenuAsync(juce::PopupMenu::Options().withTargetComponent(this),[safe](int item) {
         if (!safe) return;
@@ -439,11 +439,11 @@ void OscClipEditor::editTrackAddress(int index) {
     if (index>=(int)clip.automations.size()) return;
     const juce::String address=index<0 ? newTrackAddress :
         clip.automations[(size_t)index].message.address;
-    auto* dialog=new juce::AlertWindow("Address traccia OSC",
-        "Indirizzo condiviso dai messaggi della rampa.",
+    auto* dialog=new juce::AlertWindow("OSC track address",
+        "Address shared by the ramp's OSC messages.",
         juce::MessageBoxIconType::NoIcon,this);
     dialog->addTextEditor("address",address,"OSC address");
-    dialog->addButton("Salva",1); dialog->addButton("Annulla",0);
+    dialog->addButton("Save",1); dialog->addButton("Cancel",0);
     auto safe=juce::Component::SafePointer<OscClipEditor>(this);
     const auto generation=revision;
     dialog->enterModalState(true,juce::ModalCallbackFunction::create(
@@ -489,13 +489,13 @@ void OscClipEditor::editEvent(int index) {
     if (index<0 || index>=(int)clip.events.size()) return;
     chooseEvent(index);
     const auto event=clip.events[(size_t)index];
-    auto* dialog=new juce::AlertWindow("Messaggio OSC",
-        "Tempo, address e argomenti in ordine: i:7; f:0.5; s:scena; b:true",
+    auto* dialog=new juce::AlertWindow("OSC message",
+        "Time, address and ordered arguments: i:7; f:0.5; s:scene; b:true",
         juce::MessageBoxIconType::NoIcon,this);
-    dialog->addTextEditor("time",juce::String(event.time,3),clip.useBeats?"Beat":"Secondi");
+    dialog->addTextEditor("time",juce::String(event.time,3),clip.useBeats?"Beat":"Seconds");
     dialog->addTextEditor("address",event.address,"OSC address");
-    dialog->addTextEditor("args",describeArguments(event.arguments),"Argomenti");
-    dialog->addButton("Salva",1); dialog->addButton("Annulla",0);
+    dialog->addTextEditor("args",describeArguments(event.arguments),"Arguments");
+    dialog->addButton("Save",1); dialog->addButton("Cancel",0);
     auto safe=juce::Component::SafePointer<OscClipEditor>(this); const auto generation=revision;
     dialog->enterModalState(true,juce::ModalCallbackFunction::create(
         [safe,dialog,index,generation](int answer) {
@@ -518,14 +518,14 @@ void OscClipEditor::editAutomation(int index) {
     chooseAutomation(index);
     const auto old=clip.automations[(size_t)index];
     const auto type=old.message.arguments[(size_t)old.argumentIndex].type;
-    auto* dialog=new juce::AlertWindow("Rampa OSC",
-        "Modifica i valori e il tipo. Sposta la rampa trascinandola; per la durata usa la maniglia destra.\n"
-        "Per l'address fai doppio clic sull'intestazione della traccia.",
+    auto* dialog=new juce::AlertWindow("OSC ramp",
+        "Edit values and type. Drag the ramp to move it; use the right handle to resize.\n"
+        "Double-click the track header to edit its address.",
         juce::MessageBoxIconType::NoIcon,this);
-    dialog->addTextEditor("minimum",juce::String(old.points.front().value,3),"Inizio / Min");
-    dialog->addTextEditor("maximum",juce::String(old.points.back().value,3),"Fine / Max");
-    dialog->addTextEditor("type",type==OscValueType::integer?"i":"f","Tipo: f (float) o i (integer)");
-    dialog->addButton("Salva",1); dialog->addButton("Annulla",0);
+    dialog->addTextEditor("minimum",juce::String(old.points.front().value,3),"Start / Min");
+    dialog->addTextEditor("maximum",juce::String(old.points.back().value,3),"End / Max");
+    dialog->addTextEditor("type",type==OscValueType::integer?"i":"f","Type: f (float) or i (integer)");
+    dialog->addButton("Save",1); dialog->addButton("Cancel",0);
     auto safe=juce::Component::SafePointer<OscClipEditor>(this);
     const auto generation=revision;
     dialog->enterModalState(true,juce::ModalCallbackFunction::create(
@@ -563,25 +563,25 @@ juce::Result OscClipEditor::parseArguments(const juce::String& text,std::vector<
     if (text.trim().isEmpty()) return juce::Result::ok();
     for (auto item:juce::StringArray::fromTokens(text,";","")) {
         const auto part=item.trim();
-        if (part.length()<2 || part[1]!=':') return juce::Result::fail("Argomento senza tipo.");
+        if (part.length()<2 || part[1]!=':') return juce::Result::fail("Argument has no type.");
         const auto v=part.substring(2).trim();
         OscValue a;
         if (part[0]=='i') {
-            if (v.isEmpty() || v.retainCharacters("-0123456789")!=v) return juce::Result::fail("Intero OSC non valido.");
+            if (v.isEmpty() || v.retainCharacters("-0123456789")!=v) return juce::Result::fail("Invalid OSC integer.");
             const auto n=v.getLargeIntValue();
-            if (n < -2147483648LL || n>2147483647LL) return juce::Result::fail("Intero OSC fuori range.");
+            if (n < -2147483648LL || n>2147483647LL) return juce::Result::fail("OSC integer out of range.");
             a.type=OscValueType::integer; a.integer=(int)n;
         } else if (part[0]=='f') {
-            if (v.isEmpty() || v.retainCharacters("-0123456789.eE+")!=v) return juce::Result::fail("Float OSC non valido.");
+            if (v.isEmpty() || v.retainCharacters("-0123456789.eE+")!=v) return juce::Result::fail("Invalid OSC float.");
             a.type=OscValueType::decimal; a.decimal=(float)v.getDoubleValue();
-            if (!std::isfinite(a.decimal)) return juce::Result::fail("Float OSC non valido.");
+            if (!std::isfinite(a.decimal)) return juce::Result::fail("Invalid OSC float.");
         } else if (part[0]=='s') { a.type=OscValueType::text; a.text=v; }
         else if (part[0]=='b') {
-            if (v!="true" && v!="false") return juce::Result::fail("Boolean OSC: true o false.");
+            if (v!="true" && v!="false") return juce::Result::fail("OSC boolean must be true or false.");
             a.type=OscValueType::boolean; a.boolean=v=="true";
-        } else return juce::Result::fail("Tipo OSC sconosciuto.");
+        } else return juce::Result::fail("Unknown OSC argument type.");
         output.push_back(std::move(a));
-        if (output.size()>16) return juce::Result::fail("Massimo 16 argomenti.");
+        if (output.size()>16) return juce::Result::fail("Maximum 16 arguments.");
     }
     return juce::Result::ok();
 }
@@ -604,13 +604,13 @@ juce::Result OscClipEditor::parsePoints(const juce::String& text,std::vector<Osc
     for (auto token:juce::StringArray::fromTokens(text,";","")) {
         const auto v=token.trim();
         const int colon=v.indexOfChar(':');
-        if (colon<=0) return juce::Result::fail("Usa tempo:valore; tempo:valore.");
+        if (colon<=0) return juce::Result::fail("Use time:value; time:value.");
         const auto t=v.substring(0,colon).trim(),x=v.substring(colon+1).trim();
         if (t.isEmpty() || x.isEmpty() ||
             t.retainCharacters("0123456789.")!=t ||
-            x.retainCharacters("-0123456789.eE+")!=x) return juce::Result::fail("Punto non valido.");
+            x.retainCharacters("-0123456789.eE+")!=x) return juce::Result::fail("Invalid point.");
         output.push_back({t.getDoubleValue(),x.getDoubleValue()});
-        if (output.size()>128) return juce::Result::fail("Troppi punti.");
+        if (output.size()>128) return juce::Result::fail("Too many points.");
     }
     return juce::Result::ok();
 }

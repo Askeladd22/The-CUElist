@@ -343,22 +343,22 @@ void RenderState::render(float* const* outputs,int channels,int frames,double sa
     }
 }
 juce::Result loadClip(const juce::File& file,std::shared_ptr<const AudioClip>& destination) {
-    if (!file.existsAsFile()) return juce::Result::fail("File mancante: "+file.getFullPathName());
-    if (!file.hasFileExtension("wav;mp3")) return juce::Result::fail("Importare un file WAV o MP3 mono o stereo.");
+    if (!file.existsAsFile()) return juce::Result::fail("File missing: "+file.getFullPathName());
+    if (!file.hasFileExtension("wav;mp3")) return juce::Result::fail("Import a mono or stereo WAV or MP3 file.");
     juce::AudioFormatManager formats;
     formats.registerFormat(new juce::WavAudioFormat(),true);
     formats.registerFormat(new juce::MP3AudioFormat(),false);
     std::unique_ptr<juce::AudioFormatReader> reader(formats.createReaderFor(file));
     if (!reader || reader->sampleRate <= 0 || reader->lengthInSamples <= 0 || reader->numChannels<1 || reader->numChannels>2)
-        return juce::Result::fail("Audio non valido: richiesto un file mono o stereo non vuoto.");
+        return juce::Result::fail("Invalid audio: a non-empty mono or stereo file is required.");
     if (reader->lengthInSamples > (128*1024*1024)/(4*reader->numChannels))
-        return juce::Result::fail("Audio troppo grande per il precaricamento: massimo 128 MB di PCM per file.");
+        return juce::Result::fail("Audio too large to preload: maximum 128 MB PCM per file.");
     auto clip=std::make_shared<AudioClip>(); clip->sampleRate=reader->sampleRate;
     clip->samples.setSize((int)reader->numChannels,(int)reader->lengthInSamples);
-    if (!reader->read(&clip->samples,0,clip->samples.getNumSamples(),0,true,true)) return juce::Result::fail("Lettura audio non riuscita.");
+    if (!reader->read(&clip->samples,0,clip->samples.getNumSamples(),0,true,true)) return juce::Result::fail("Could not read audio.");
     for (int ch=0; ch<clip->samples.getNumChannels(); ++ch)
         for (int i=0; i<clip->samples.getNumSamples(); ++i)
-            if (!std::isfinite(clip->samples.getSample(ch,i))) return juce::Result::fail("Audio con campioni non finiti.");
+            if (!std::isfinite(clip->samples.getSample(ch,i))) return juce::Result::fail("Audio contains non-finite samples.");
     destination=std::move(clip); return juce::Result::ok();
 }
 std::unique_ptr<RenderState> makeRenderState(const Show& show,const ClipMap& clips) {

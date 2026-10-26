@@ -29,7 +29,7 @@ juce::Result MidiOutputRouter::open(const juce::String& id,bool reconnect) {
     const auto found=routes.find(id);
     if (!available) {
         if (found!=routes.end() && devices[(size_t)found->second]) closeRoute(found->second);
-        return juce::Result::fail("Uscita MIDI scollegata o non disponibile.");
+        return juce::Result::fail("MIDI output disconnected or unavailable.");
     }
     if (found!=routes.end()) {
         const auto slot=(size_t)found->second;
@@ -37,10 +37,10 @@ juce::Result MidiOutputRouter::open(const juce::String& id,bool reconnect) {
         closeRoute((int)slot);
         devices[slot]=juce::MidiOutput::openDevice(id);
         resetTimes[slot]=juce::Time::getMillisecondCounterHiRes();
-        return devices[slot] ? juce::Result::ok() : juce::Result::fail("Riapertura uscita MIDI non riuscita; uscita silenziata.");
+        return devices[slot] ? juce::Result::ok() : juce::Result::fail("Could not reopen MIDI output; output muted.");
     }
     auto output=juce::MidiOutput::openDevice(id);
-    if (!output) return juce::Result::fail("Uscita MIDI non disponibile.");
+    if (!output) return juce::Result::fail("MIDI output unavailable.");
     routes.emplace(id,(int)devices.size()); devices.push_back(std::move(output)); sounding.emplace_back();
     resetTimes.push_back(juce::Time::getMillisecondCounterHiRes());
     return juce::Result::ok();

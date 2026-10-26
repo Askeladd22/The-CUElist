@@ -65,12 +65,12 @@ double secondsAtBeat(const std::vector<TempoPoint>& points, double beat) {
 }
 juce::Result validateShow(const Show& show) {
     const auto fail = [](const char* s) { return juce::Result::fail(s); };
-    if (show.name.trim().isEmpty() || show.columns.empty() || show.rows.empty()) return fail("Nome, righe o colonne mancanti.");
-    if (!std::isfinite(show.masterGain) || show.masterGain<0 || show.masterGain>4) return fail("Master audio non valido.");
+    if (show.name.trim().isEmpty() || show.columns.empty() || show.rows.empty()) return fail("Missing name, rows or columns.");
+    if (!std::isfinite(show.masterGain) || show.masterGain<0 || show.masterGain>4) return fail("Invalid master audio gain.");
     if (!std::isfinite(show.masterPan) || show.masterPan < -1 || show.masterPan > 1)
-        return fail("Master pan non valido.");
+        return fail("Invalid master pan.");
     if (show.columns.size() > 10000 || show.rows.size() > 10000 || show.rows.size()*show.columns.size() > 1000000)
-        return fail("Progetto oltre il limite di sicurezza di un milione di celle.");
+        return fail("Project exceeds the safety limit of one million cells.");
     std::set<int> ids;
     auto unique = [&](int id) { return id > 0 && id < 1000000000 && ids.insert(id).second; };
     for (const auto& column : show.columns) {
@@ -79,44 +79,44 @@ juce::Result validateShow(const Show& show) {
             || column.oscPort<1 || column.oscPort>65535 || column.oscHost.isEmpty()
             || column.oscHost.length()>255 || column.oscHost.containsChar(' ')
             || !std::isfinite(column.gain) || column.gain < 0 || column.gain > 4
-            || !std::isfinite(column.pan) || column.pan < -1 || column.pan > 1) return fail("Colonna non valida.");
+            || !std::isfinite(column.pan) || column.pan < -1 || column.pan > 1) return fail("Invalid column.");
     }
     for (const auto& row : show.rows) {
         if (!unique(row.id) || row.cells.size()!=show.columns.size() || row.tempo.empty()
-            || !std::isfinite(row.gain) || row.gain < 0 || row.gain > 4 || (int)row.behaviour < 0 || (int)row.behaviour > 3) return fail("Riga non valida.");
+            || !std::isfinite(row.gain) || row.gain < 0 || row.gain > 4 || (int)row.behaviour < 0 || (int)row.behaviour > 3) return fail("Invalid row.");
         double previous = -1;
         for (const auto& p : row.tempo) {
             if (!std::isfinite(p.beat) || p.beat < 0 || p.beat <= previous || (previous < 0 && p.beat != 0)
                 || !std::isfinite(p.bpm) || p.bpm < 1 || p.bpm > 999 || p.numerator < 1 || p.numerator > 32
                 || (p.denominator != 1 && p.denominator != 2 && p.denominator != 4 && p.denominator != 8 && p.denominator != 16 && p.denominator != 32))
-                return fail("Mappa tempo non valida: primo punto a beat 0, BPM 1-999, posizioni crescenti.");
+                return fail("Invalid tempo map: first point must be at beat 0, BPM 1–999, increasing positions.");
             previous = p.beat;
         }
         for (size_t i=0; i<row.cells.size(); ++i) {
             const auto& c = row.cells[i];
             if (c.midi) {
-                if (show.columns[i].type!=ColumnType::midi || c.file.isNotEmpty() || c.osc) return fail("Clip MIDI in colonna non MIDI.");
+                if (show.columns[i].type!=ColumnType::midi || c.file.isNotEmpty() || c.osc) return fail("MIDI clip in a non-MIDI column.");
                 auto result=validateMidiClip(*c.midi); if (result.failed()) return result;
             }
             if (c.osc) {
-                if (show.columns[i].type!=ColumnType::osc || c.file.isNotEmpty() || c.midi) return fail("Clip OSC in colonna non OSC.");
+                if (show.columns[i].type!=ColumnType::osc || c.file.isNotEmpty() || c.midi) return fail("OSC clip in a non-OSC column.");
                 const auto result=validateOscClip(*c.osc); if (result.failed()) return result;
             }
             if (!unique(c.id) || !std::isfinite(c.gain) || c.gain < 0 || c.gain > 4 || (int)c.behaviour < 0 || (int)c.behaviour > 3
                 || !std::isfinite(c.startSeconds) || c.startSeconds < 0 || c.startSeconds > 86400)
-                return fail("Cella non valida.");
+                return fail("Invalid cell.");
             if (c.file.isNotEmpty() && (show.columns[i].type != ColumnType::audio || (!juce::File::isAbsolutePath(c.file) && !safeRelative(c.file))))
-                return fail("Percorso audio non valido o colonna non Audio.");
+                return fail("Invalid audio path or non-Audio column.");
         }
     }
-    if (show.nextId <= *ids.rbegin() || show.nextId >= 1000000000) return fail("Contatore identificativi non valido.");
+    if (show.nextId <= *ids.rbegin() || show.nextId >= 1000000000) return fail("Invalid identifier counter.");
     std::vector<int> rowIds,columnIds;
     for (const auto& row:show.rows) {
         rowIds.push_back(row.id);
         if (row.mappingPresetId!=0 &&
             std::none_of(show.controls.presets.begin(),show.controls.presets.end(),
                 [&](const auto& p){ return p.id==row.mappingPresetId; }))
-            return fail("Cue con preset mapping inesistente.");
+            return fail("Cue references a missing mapping preset.");
     }
     for (const auto& column:show.columns) columnIds.push_back(column.id);
     if (auto controlResult=validateControls(show.controls,rowIds,columnIds); controlResult.failed())
@@ -127,13 +127,13 @@ juce::Result validateShow(const Show& show) {
             binding.target==ControlTarget::columnGain) {
             const auto it=std::find_if(show.columns.begin(),show.columns.end(),
                 [&](const Column& col){return col.id==binding.targetColumnId;});
-            if (it==show.columns.end()) return fail("Destinazione Control Mapping inesistente.");
+            if (it==show.columns.end()) return fail("Control Mapping destination does not exist.");
             if (binding.target==ControlTarget::midiCc && it->type!=ColumnType::midi)
-                return fail("MIDI CC richiede una colonna MIDI.");
+                return fail("MIDI CC requires a MIDI column.");
             if (binding.target==ControlTarget::oscFloat && it->type!=ColumnType::osc)
-                return fail("OSC richiede una colonna OSC.");
+                return fail("OSC requires an OSC column.");
             if (binding.target==ControlTarget::columnGain && it->type!=ColumnType::audio)
-                return fail("Gain mapping richiede una colonna Audio.");
+                return fail("Gain mapping requires an Audio column.");
         }
     }
     return juce::Result::ok();
@@ -143,24 +143,24 @@ juce::var object(std::initializer_list<std::pair<const char*,juce::var>> propert
     auto* o = new juce::DynamicObject(); for (const auto& p : properties) o->setProperty(p.first,p.second); return o;
 }
 juce::var required(const juce::var& o, const char* key) {
-    if (!o.isObject() || !o.hasProperty(key)) throw std::runtime_error("Campo mancante nel progetto.");
+    if (!o.isObject() || !o.hasProperty(key)) throw std::runtime_error("Missing field in project.");
     return o[key];
 }
 double number(const juce::var& o, const char* key) {
-    auto v = required(o,key); if (!v.isDouble() && !v.isInt() && !v.isInt64()) throw std::runtime_error("Numero non valido.");
-    double n = v; if (!std::isfinite(n)) throw std::runtime_error("Numero non finito."); return n;
+    auto v = required(o,key); if (!v.isDouble() && !v.isInt() && !v.isInt64()) throw std::runtime_error("Invalid number.");
+    double n = v; if (!std::isfinite(n)) throw std::runtime_error("Non-finite number."); return n;
 }
 int integer(const juce::var& o, const char* key) {
-    const auto n = number(o,key); if (std::floor(n)!=n || n < -2147483647.0 || n > 2147483647.0) throw std::runtime_error("Intero non valido."); return (int)n;
+    const auto n = number(o,key); if (std::floor(n)!=n || n < -2147483647.0 || n > 2147483647.0) throw std::runtime_error("Invalid integer."); return (int)n;
 }
 juce::String string(const juce::var& o,const char* key) {
-    auto v = required(o,key); if (!v.isString()) throw std::runtime_error("Testo non valido."); return v.toString();
+    auto v = required(o,key); if (!v.isString()) throw std::runtime_error("Invalid text."); return v.toString();
 }
 bool boolean(const juce::var& o,const char* key) {
-    auto v = required(o,key); if (!v.isBool()) throw std::runtime_error("Flag non valido."); return (bool)v;
+    auto v = required(o,key); if (!v.isBool()) throw std::runtime_error("Invalid flag."); return (bool)v;
 }
 juce::Array<juce::var> array(const juce::var& o,const char* key) {
-    auto v = required(o,key); if (!v.isArray()) throw std::runtime_error("Lista non valida."); return *v.getArray();
+    auto v = required(o,key); if (!v.isArray()) throw std::runtime_error("Invalid list."); return *v.getArray();
 }
 }
 juce::String encodeShow(const Show& show) {
@@ -228,11 +228,11 @@ juce::String encodeShow(const Show& show) {
         {"columns",columns},{"rows",rows},{"controls",controls}}));
 }
 juce::Result decodeShow(const juce::String& text, Show& destination) {
-    if (text.length() > 32*1024*1024) return juce::Result::fail("Progetto troppo grande (massimo 32 MB). ");
+    if (text.length() > 32*1024*1024) return juce::Result::fail("Project too large (maximum 32 MB). ");
     try {
         auto root = juce::JSON::parse(text);
         const auto version = integer(root,"version");
-        if (string(root,"format") != "TheCuelist" || version < 1 || version > 10) return juce::Result::fail("Formato o versione progetto non supportati.");
+        if (string(root,"format") != "TheCuelist" || version < 1 || version > 10) return juce::Result::fail("Unsupported project format or version.");
         const auto activation = [version](int value) {
             if (version < 3 && (value == 1 || value == 4)) return Behaviour::retrigger;
             return (Behaviour)value;
@@ -298,7 +298,7 @@ juce::Result decodeShow(const juce::String& text, Show& destination) {
                     if (!m.isVoid()) {
                         MidiClip clip; clip.lengthBeats=number(m,"lengthBeats");
                         const auto notes=array(m,"notes");
-                        if (notes.size()>10000) throw std::runtime_error("Troppe note MIDI.");
+                        if (notes.size()>10000) throw std::runtime_error("Too many MIDI notes.");
                         for (const auto& n:notes) clip.notes.push_back({number(n,"beat"),number(n,"length"),integer(n,"pitch"),integer(n,"velocity"),integer(n,"channel")});
                         cell.midi=std::move(clip);
                     }
@@ -308,11 +308,11 @@ juce::Result decodeShow(const juce::String& text, Show& destination) {
                     if (!o.isVoid()) {
                         OscClip clip; clip.useBeats=boolean(o,"useBeats"); clip.length=number(o,"length");
                         const auto events=array(o,"events");
-                        if (events.size()>256) throw std::runtime_error("Troppi eventi OSC.");
+                        if (events.size()>256) throw std::runtime_error("Too many OSC events.");
                         for (const auto& e:events) {
                             OscEvent ev; ev.time=number(e,"time"); ev.address=string(e,"address");
                             const auto args=array(e,"args");
-                            if (args.size()>16) throw std::runtime_error("Troppi argomenti OSC.");
+                            if (args.size()>16) throw std::runtime_error("Too many OSC arguments.");
                             for (const auto& a:args) {
                                 OscValue value; value.type=(OscValueType)integer(a,"type");
                                 value.integer=integer(a,"integer"); value.decimal=(float)number(a,"decimal");
@@ -324,13 +324,13 @@ juce::Result decodeShow(const juce::String& text, Show& destination) {
                         }
                         if (version>=9) {
                             const auto automations=array(o,"automations");
-                            if (automations.size()>16) throw std::runtime_error("Troppe automazioni OSC.");
+                            if (automations.size()>16) throw std::runtime_error("Too many OSC automations.");
                             for (const auto& a:automations) {
                                 OscAutomation au; au.message.address=string(a,"address");
                                 au.argumentIndex=integer(a,"argumentIndex");
                                 au.time=number(a,"time"); au.duration=number(a,"duration");
                                 const auto args=array(a,"args");
-                                if (args.size()>16) throw std::runtime_error("Troppi argomenti OSC.");
+                                if (args.size()>16) throw std::runtime_error("Too many OSC arguments.");
                                 for (const auto& v:args) {
                                     OscValue arg; arg.type=(OscValueType)integer(v,"type");
                                     arg.integer=integer(v,"integer"); arg.decimal=(float)number(v,"decimal");
@@ -338,7 +338,7 @@ juce::Result decodeShow(const juce::String& text, Show& destination) {
                                     au.message.arguments.push_back(arg);
                                 }
                                 const auto points=array(a,"points");
-                                if (points.size()>128) throw std::runtime_error("Troppi punti OSC.");
+                                if (points.size()>128) throw std::runtime_error("Too many OSC points.");
                                 for (const auto& point:points)
                                     au.points.push_back({number(point,"time"),number(point,"value")});
                                 clip.automations.push_back(std::move(au));
@@ -347,23 +347,23 @@ juce::Result decodeShow(const juce::String& text, Show& destination) {
                         cell.osc=std::move(clip);
                     }
                 }
-                if (version == 1 && cell.file.isNotEmpty() && !juce::File::isAbsolutePath(cell.file)) return juce::Result::fail("Percorso v1 non assoluto.");
+                if (version == 1 && cell.file.isNotEmpty() && !juce::File::isAbsolutePath(cell.file)) return juce::Result::fail("v1 path is not absolute.");
                 row.cells.push_back(cell);
             }
             show.rows.push_back(std::move(row));
         }
         auto valid = validateShow(show); if (valid.failed()) return valid;
         destination=std::move(show); return juce::Result::ok();
-    } catch (const std::exception& e) { return juce::Result::fail(juce::String("Progetto non valido: ")+e.what()); }
+    } catch (const std::exception& e) { return juce::Result::fail(juce::String("Invalid project: ")+e.what()); }
 }
 juce::Result saveShow(const Show& show,const juce::File& file) {
     auto valid = validateShow(show); if (valid.failed()) return valid;
     const auto parent = file.getParentDirectory();
-    if (!parent.isDirectory() || file.isDirectory()) return juce::Result::fail("Cartella destinazione non valida.");
+    if (!parent.isDirectory() || file.isDirectory()) return juce::Result::fail("Invalid destination folder.");
     // Each save owns a new media generation. Older generations remain available to backups.
     const auto media = parent.getChildFile(file.getFileNameWithoutExtension()+"_media");
     const auto generation = media.getChildFile(juce::Uuid().toString());
-    if (!contained(media, parent) || generation.exists()) return juce::Result::fail("Cartella media non sicura.");
+    if (!contained(media, parent) || generation.exists()) return juce::Result::fail("Unsafe media folder.");
     Show portable = show;
     std::map<juce::String, juce::String> copied;
     bool createdGeneration = false;
@@ -373,46 +373,46 @@ juce::Result saveShow(const Show& show,const juce::File& file) {
     } cleanup { generation, createdGeneration };
     for (auto& row : portable.rows) for (auto& cell : row.cells) {
         if (cell.file.isEmpty()) continue;
-        if (!juce::File::isAbsolutePath(cell.file)) return juce::Result::fail("Caricare il progetto prima di salvarlo: percorso media relativo.");
+        if (!juce::File::isAbsolutePath(cell.file)) return juce::Result::fail("Load the project before saving it: relative media path.");
         auto found = copied.find(cell.file);
         if (found != copied.end()) { cell.file = found->second; continue; }
         const juce::File source(cell.file);
-        if (!source.existsAsFile()) return juce::Result::fail("Media mancante: " + cell.file);
+        if (!source.existsAsFile()) return juce::Result::fail("Missing media: " + cell.file);
         if (!createdGeneration) {
-            if (generation.createDirectory().failed()) return juce::Result::fail("Impossibile creare la cartella media.");
+            if (generation.createDirectory().failed()) return juce::Result::fail("Could not create media folder.");
             createdGeneration = true;
         }
         const auto target = generation.getChildFile(juce::String((int)copied.size()) + source.getFileExtension());
-        if (target.exists() || !source.copyFileTo(target)) return juce::Result::fail("Copia media non riuscita.");
+        if (target.exists() || !source.copyFileTo(target)) return juce::Result::fail("Could not copy media.");
         const auto relative = target.getRelativePathFrom(parent).replaceCharacter('\\','/');
         copied.emplace(cell.file, relative); cell.file = relative;
     }
     juce::TemporaryFile temp(file);
-    if (!temp.getFile().replaceWithText(encodeShow(portable))) return juce::Result::fail("Impossibile scrivere il file temporaneo.");
+    if (!temp.getFile().replaceWithText(encodeShow(portable))) return juce::Result::fail("Could not write temporary file.");
     const auto backup = file.getSiblingFile(file.getFileName()+".bak");
     juce::TemporaryFile stagedBackup(backup), oldBackup(backup);
     const bool existing = file.existsAsFile(), hadBackup = backup.existsAsFile();
     if (existing) {
         if (backup.isDirectory() || (hadBackup && !backup.copyFileTo(oldBackup.getFile()))
             || !file.copyFileTo(stagedBackup.getFile()) || !stagedBackup.overwriteTargetFileWithTemporary())
-            return juce::Result::fail("Backup non riuscito: il progetto originale non e stato modificato.");
+            return juce::Result::fail("Backup failed: the original project was not changed.");
     }
     if (!temp.overwriteTargetFileWithTemporary()) {
         if (existing) { if (hadBackup) oldBackup.overwriteTargetFileWithTemporary(); else backup.deleteFile(); }
-        return juce::Result::fail("Impossibile sostituire il progetto. Controllare permessi e spazio libero.");
+        return juce::Result::fail("Could not replace project. Check permissions and free disk space.");
     }
     cleanup.committed = true;
     return juce::Result::ok();
 }
 juce::Result loadShow(const juce::File& file, Show& destination) {
-    if (!file.existsAsFile() || file.getSize() > 32*1024*1024) return juce::Result::fail("Progetto assente o troppo grande.");
+    if (!file.existsAsFile() || file.getSize() > 32*1024*1024) return juce::Result::fail("Project missing or too large.");
     Show loaded;
     auto result = decodeShow(file.loadFileAsString(), loaded); if (result.failed()) return result;
     for (auto& row : loaded.rows) for (auto& cell : row.cells) {
         if (cell.file.isEmpty() || juce::File::isAbsolutePath(cell.file)) continue;
-        if (!safeRelative(cell.file)) return juce::Result::fail("Percorso relativo non sicuro.");
+        if (!safeRelative(cell.file)) return juce::Result::fail("Unsafe relative path.");
         const auto resolved = file.getParentDirectory().getChildFile(cell.file);
-        if (!contained(resolved, file.getParentDirectory())) return juce::Result::fail("Il media esce dalla cartella progetto.");
+        if (!contained(resolved, file.getParentDirectory())) return juce::Result::fail("Media path escapes the project folder.");
         cell.file = resolved.getFullPathName();
     }
     destination = std::move(loaded);
@@ -421,8 +421,8 @@ juce::Result loadShow(const juce::File& file, Show& destination) {
 juce::Result moveCell(Show& show, int sr, int sc, int tr, int tc) {
     const auto valid = [&](int r, int c) { return r >= 0 && c >= 0 && (size_t)r < show.rows.size()
         && (size_t)c < show.columns.size() && (size_t)c < show.rows[(size_t)r].cells.size(); };
-    if (!valid(sr,sc) || !valid(tr,tc)) return juce::Result::fail("Posizione cella non valida.");
-    if (show.columns[(size_t)sc].type != show.columns[(size_t)tc].type) return juce::Result::fail("Colonne di tipo diverso.");
+    if (!valid(sr,sc) || !valid(tr,tc)) return juce::Result::fail("Invalid cell position.");
+    if (show.columns[(size_t)sc].type != show.columns[(size_t)tc].type) return juce::Result::fail("Columns have different types.");
     std::swap(show.rows[(size_t)sr].cells[(size_t)sc], show.rows[(size_t)tr].cells[(size_t)tc]);
     return juce::Result::ok();
 }

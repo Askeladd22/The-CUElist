@@ -22,7 +22,7 @@ bool validText(const juce::String& value) {
 }
 juce::Result validateOscClip(const OscClip& clip) {
     if (!std::isfinite(clip.length) || clip.length<=0 || clip.length>86400
-        || clip.events.size()>256) return juce::Result::fail("Durata OSC o numero di eventi non valido.");
+        || clip.events.size()>256) return juce::Result::fail("Invalid OSC length or event count.");
     for (const auto& event:clip.events) {
         if (!std::isfinite(event.time) || event.time<0 || event.time>=clip.length
             || !event.address.startsWithChar('/') || event.address.length()>256
@@ -31,16 +31,16 @@ juce::Result validateOscClip(const OscClip& clip) {
             || event.address.containsChar('?') || event.address.containsChar('[')
             || event.address.containsChar(']') || event.address.containsChar('{')
             || event.address.containsChar('}') || event.arguments.size()>16)
-            return juce::Result::fail("Indirizzo o tempo OSC non valido.");
+            return juce::Result::fail("Invalid OSC address or time.");
         for (const auto& a:event.arguments)
             if ((int)a.type<0 || (int)a.type>3
                 || (a.type==OscValueType::decimal && !std::isfinite(a.decimal))
                 || (a.type==OscValueType::text && !validText(a.text)))
-                return juce::Result::fail("Argomento OSC non valido.");
+                return juce::Result::fail("Invalid OSC argument.");
         if (encodeOscMessage(event).size()>1024)
-            return juce::Result::fail("Messaggio OSC oltre il limite di 1024 byte.");
+            return juce::Result::fail("OSC message exceeds the 1024-byte limit.");
     }
-    if (clip.automations.size()>16) return juce::Result::fail("Massimo 16 automazioni OSC.");
+    if (clip.automations.size()>16) return juce::Result::fail("Maximum 16 OSC automations.");
     for (const auto& automation:clip.automations) {
         if (!std::isfinite(automation.time) || !std::isfinite(automation.duration)
             || automation.time<0 || automation.duration<=0
@@ -49,13 +49,13 @@ juce::Result validateOscClip(const OscClip& clip) {
             || automation.argumentIndex<0
             || (size_t)automation.argumentIndex>=automation.message.arguments.size()
             || automation.points.size()<2 || automation.points.size()>128)
-            return juce::Result::fail("Automazione OSC con posizione, durata o argomento non valido.");
+            return juce::Result::fail("OSC automation has an invalid position, duration or argument.");
         const auto& target=automation.message.arguments[(size_t)automation.argumentIndex];
         if (target.type!=OscValueType::integer && target.type!=OscValueType::decimal)
-            return juce::Result::fail("Si possono automatizzare solo argomenti integer e float.");
+            return juce::Result::fail("Only integer and float arguments can be automated.");
         OscClip singleton; singleton.length=1;
         singleton.events={{0,automation.message.address,automation.message.arguments}};
-        if (validateOscClip(singleton).failed()) return juce::Result::fail("Template OSC automazione non valido.");
+        if (validateOscClip(singleton).failed()) return juce::Result::fail("Invalid OSC automation template.");
         double previous=-1;
         for (const auto& point:automation.points) {
             if (!std::isfinite(point.time) || !std::isfinite(point.value)
@@ -63,12 +63,12 @@ juce::Result validateOscClip(const OscClip& clip) {
                 || (target.type==OscValueType::integer && (point.value<-2147483648.0 || point.value>2147483647.0))
                 || (target.type==OscValueType::decimal
                     && std::abs(point.value)>(double)std::numeric_limits<float>::max()))
-                return juce::Result::fail("Punto automazione OSC non valido.");
+                return juce::Result::fail("Invalid OSC automation point.");
             previous=point.time;
         }
         if (std::abs(automation.points.front().time)>1.0e-8
             || std::abs(automation.points.back().time-automation.duration)>1.0e-6)
-            return juce::Result::fail("Le curve OSC devono iniziare a zero e finire alla durata.");
+            return juce::Result::fail("OSC curves must start at zero and end at their duration.");
     }
     // Concurrent automations of the same OSC address may target distinct
     // arguments, but not write the same argument during overlapping spans.
@@ -78,12 +78,12 @@ juce::Result validateOscClip(const OscClip& clip) {
             if (a.message.address!=b.message.address ||
                 a.time>=b.time+b.duration || b.time>=a.time+a.duration) continue;
             if (a.message.arguments.size()!=b.message.arguments.size())
-                return juce::Result::fail("Curve sullo stesso address OSC devono avere lo stesso formato.");
+                return juce::Result::fail("Curves with the same OSC address must use the same format.");
             for (size_t arg=0;arg<a.message.arguments.size();++arg)
                 if (a.message.arguments[arg].type!=b.message.arguments[arg].type)
-                    return juce::Result::fail("Tipi OSC incompatibili fra automazioni dello stesso address.");
+                    return juce::Result::fail("Incompatible OSC types between automations sharing an address.");
             if (a.argumentIndex==b.argumentIndex)
-                return juce::Result::fail("Automazioni OSC sovrapposte sullo stesso argomento.");
+                return juce::Result::fail("OSC automations overlap on the same argument.");
         }
     return juce::Result::ok();
 }

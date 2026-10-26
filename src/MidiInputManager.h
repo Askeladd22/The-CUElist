@@ -17,9 +17,9 @@ public:
         bool found=false;
         for (const auto& d:juce::MidiInput::getAvailableDevices())
             if (d.identifier==identifier) { found=true; break; }
-        if (!found) return juce::Result::fail("Controller MIDI non collegato.");
+        if (!found) return juce::Result::fail("MIDI controller not connected.");
         auto port=juce::MidiInput::openDevice(identifier,this);
-        if (!port) return juce::Result::fail("Impossibile aprire ingresso MIDI.");
+        if (!port) return juce::Result::fail("Could not open MIDI input.");
         deviceId=identifier;
         input=std::move(port);
         input->start();

@@ -113,12 +113,12 @@ inline juce::Result validateControls(const ControlSettings& s,
         const std::vector<int>& rowIds,const std::vector<int>& columnIds) {
     if (s.midiInputId.length()>255 || s.nextId<1 || s.nextId>=1000000000 ||
         s.bindings.size()>2048 || s.presets.size()>256)
-        return juce::Result::fail("Limiti mapping MIDI superati.");
+        return juce::Result::fail("MIDI mapping limits exceeded.");
     std::set<int> ids;
     for (const auto& p:s.presets)
         if (p.id<1 || p.id>=s.nextId || !ids.insert(p.id).second ||
             p.name.trim().isEmpty() || p.name.length()>120)
-            return juce::Result::fail("Preset mapping non valido.");
+            return juce::Result::fail("Invalid mapping preset.");
     for (size_t i=0;i<s.bindings.size();++i)
         for (size_t j=i+1;j<s.bindings.size();++j) {
             const auto& a=s.bindings[i],&b=s.bindings[j];
@@ -126,7 +126,7 @@ inline juce::Result validateControls(const ControlSettings& s,
                 a.kind!=b.kind || a.channel!=b.channel || a.number!=b.number ||
                 a.scope!=b.scope) continue;
             if (a.scope==ControlScope::column || a.scopeId==b.scopeId)
-                return juce::Result::fail("Due mapping con lo stesso controllo e la stessa priorita.");
+                return juce::Result::fail("Two mappings share the same control and priority.");
         }
     for (const auto& b:s.bindings) {
         if (b.id<1 || b.id>=s.nextId || !ids.insert(b.id).second || b.deviceId.length()>255
@@ -137,20 +137,20 @@ inline juce::Result validateControls(const ControlSettings& s,
             || b.oscPort<1 || b.oscPort>65535 || b.oscHost.isEmpty() || b.oscHost.length()>255
             || b.oscAddress.isEmpty() || !b.oscAddress.startsWithChar('/')
             || !std::isfinite(b.minimum) || !std::isfinite(b.maximum) || b.minimum>b.maximum)
-            return juce::Result::fail("Binding MIDI non valido.");
+            return juce::Result::fail("Invalid MIDI binding.");
         if (b.scope==ControlScope::cue &&
             std::find(rowIds.begin(),rowIds.end(),b.scopeId)==rowIds.end())
-            return juce::Result::fail("Mapping associato a cue inesistente.");
+            return juce::Result::fail("Mapping refers to a missing cue.");
         if (b.scope==ControlScope::preset &&
             std::none_of(s.presets.begin(),s.presets.end(),[&](const auto& p){return p.id==b.scopeId;}))
-            return juce::Result::fail("Mapping associato a preset inesistente.");
+            return juce::Result::fail("Mapping refers to a missing preset.");
         if ((b.scope==ControlScope::column || b.target==ControlTarget::columnGain ||
              b.target==ControlTarget::midiCc || b.target==ControlTarget::oscFloat) &&
             std::find(columnIds.begin(),columnIds.end(),b.targetColumnId)==columnIds.end())
-            return juce::Result::fail("Mapping associato a colonna inesistente.");
+            return juce::Result::fail("Mapping refers to a missing column.");
         if ((b.target==ControlTarget::masterGain || b.target==ControlTarget::columnGain)
             && (b.minimum<0 || b.maximum>4))
-            return juce::Result::fail("Gain mapping fuori range.");
+            return juce::Result::fail("Gain mapping out of range.");
     }
     return juce::Result::ok();
 }
