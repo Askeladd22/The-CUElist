@@ -684,14 +684,29 @@ bool MainComponent::duplicateRow(int index) {
 }
 void MainComponent::deleteRow(int index) {
     if (index<0 || index>=(int)show.rows.size() || !applyInspector()) return;
+    const int removedId=show.rows[(size_t)index].id;
     for (auto& c : show.rows[index].cells) clips.erase(c.id);
     show.rows.erase(show.rows.begin()+index); if (show.rows.empty()) addRow(show,{});
+    auto& bindings=show.controls.bindings;
+    bindings.erase(std::remove_if(bindings.begin(),bindings.end(),
+        [removedId](const ControlBinding& b) {
+            return b.scope==ControlScope::cue && b.scopeId==removedId;
+        }),bindings.end());
+    refreshControlSettings();
     selectedRow=nextCue=std::min(index,(int)show.rows.size()-1); changed("Cue eliminata. File originali conservati.",true);
 }
 void MainComponent::deleteColumn(int index) {
     if (index<0 || index>=(int)show.columns.size() || !applyInspector()) return;
+    const int removedId=show.columns[(size_t)index].id;
     for (auto& row : show.rows) { clips.erase(row.cells[index].id); row.cells.erase(row.cells.begin()+index); }
     show.columns.erase(show.columns.begin()+index); if (show.columns.empty()) addColumn(show,ColumnType::audio,{});
+    auto& bindings=show.controls.bindings;
+    bindings.erase(std::remove_if(bindings.begin(),bindings.end(),
+        [removedId](const ControlBinding& b) {
+            return (b.scope==ControlScope::column || b.target==ControlTarget::columnGain)
+                    && b.targetColumnId==removedId;
+        }),bindings.end());
+    refreshControlSettings();
     selectedColumn=std::min(index,(int)show.columns.size()-1); changed("Colonna eliminata. File originali conservati.",true);
 }
 void MainComponent::moveClip(int sr,int sc,int tr,int tc) {
