@@ -517,7 +517,11 @@ bool AudioEngine::seekRow(int id,double seconds) noexcept {
 bool AudioEngine::sendMappedMidiCc(const juce::String& id,int channel,int cc,int value) {
     return midiRouter.queueMappedCc(id,channel,cc,value);
 }
-void AudioEngine::panic() noexcept { panicEpoch.fetch_add(1); midiRouter.emergencyStop(); oscRouter.emergencyStop(); }
+void AudioEngine::panic() noexcept {
+    panicEpoch.fetch_add(1);
+    acknowledgedCueId.store(0,std::memory_order_release);
+    midiRouter.emergencyStop(); oscRouter.emergencyStop();
+}
 void AudioEngine::audioDeviceAboutToStart(juce::AudioIODevice* device) {
     deviceSampleRate=device->getCurrentSampleRate(); connected.store(true); panic();
 }
@@ -572,13 +576,22 @@ void AudioEngine::processBlock(float* const* outputs,int channels,int frames,dou
         if (command.epoch==epoch && (!current || command.revision>current->revision)) break;
         if (current && command.revision>=current->minimumCommandRevision && command.epoch==epoch) {
             if (command.seek) current->seekRow(command.id,command.seconds);
-            else current->trigger(command.id,command.row,command.stop);
+            else {
+                current->trigger(command.id,command.row,command.stop);
+                if (command.row && !command.stop) {
+                    for (const auto& row:current->rows) if (row.id==command.id) {
+                        acknowledgedCueId.store(command.id,std::memory_order_release);
+                        break;
+                    }
+                }
+            }
         }
     }
     readIndex.store(r,std::memory_order_release);
     if (current) current->render(outputs,channels,frames,sampleRate);
     else for (int ch=0; ch<channels; ++ch) if (outputs[ch]) juce::FloatVectorOperations::clear(outputs[ch],frames);
     if (panicEpoch.load()!=epoch) {
+        acknowledgedCueId.store(0,std::memory_order_release);
         if (current) current->panic();
         for (int ch=0; ch<channels; ++ch) if (outputs[ch]) juce::FloatVectorOperations::clear(outputs[ch],frames);
     }

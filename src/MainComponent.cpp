@@ -136,7 +136,8 @@ void MainComponent::paint(juce::Graphics& g) {
     g.setColour(palette::line); g.drawHorizontalLine(72,0,(float)w); g.drawVerticalLine(180,73,(float)h);
     static const auto appIcon=juce::ImageFileFormat::loadFrom(
         BinaryData::thecuelist_icon_png,BinaryData::thecuelist_icon_pngSize);
-    if (appIcon.isValid()) g.drawImage(appIcon,23,18,30,33,0,0,appIcon.getWidth(),appIcon.getHeight());
+    if (appIcon.isValid())
+        g.drawImageWithin(appIcon,19,16,38,39,juce::RectanglePlacement::centred);
     else for (int i=0;i<3;++i) {
         g.setColour(i==1 ? palette::teal : palette::text);
         g.fillRoundedRectangle(23.0f,23.0f+i*9,23.0f-i*4,4,2);
@@ -413,10 +414,9 @@ void MainComponent::triggerRow(int row) {
     engine.publish(makeRenderState(show,clips));
     if (send(show.rows[row].id,true)) {
         nextCue=row+1;
-        activeCueId=show.rows[row].id;
-        controlMapping.setActiveCue(activeCueId,show.rows[row].mappingPresetId);
-        // Preserve held physical button state across GO to prevent repeated CC
-        // values from cascading through multiple cues before release.
+        // The mapping changes when the audio callback acknowledges execution,
+        // not when this command is merely accepted into its lock-free queue.
+        // Physical-button edges remain tracked across the pending transition.
     }
     repaint(); grid.repaint();
 }
@@ -512,6 +512,16 @@ bool MainComponent::keyPressed(const juce::KeyPress& key) {
 }
 void MainComponent::timerCallback() {
     engine.collectRetired();
+    // Consume transport confirmation before hardware events in this UI tick.
+    // Empty cue GO is acknowledged too; merely selecting a row is not.
+    const int confirmed=engine.acknowledgedCueId.load(std::memory_order_acquire);
+    if (confirmed!=activeCueId) {
+        activeCueId=0; int preset=0;
+        if (confirmed>0) for (const auto& row:show.rows) if (row.id==confirmed) {
+            activeCueId=confirmed; preset=row.mappingPresetId; break;
+        }
+        controlMapping.setActiveCue(activeCueId,preset);
+    }
     ControlEvent control; int processed=0;
     while (processed++<256 && midiInput.poll(control)) {
         if (controlLearnArmed) { learnedInput=control; controlLearnArmed=false; }
