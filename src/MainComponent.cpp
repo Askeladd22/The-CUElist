@@ -738,6 +738,8 @@ void MainComponent::setClipDuration(int column,double seconds) {
         cell.midi->lengthBeats=length;
     } else {
         for (const auto& event:cell.osc->events) length=std::max(length,event.time+.001);
+        for (const auto& automation:cell.osc->automations)
+            length=std::max(length,automation.time+automation.duration);
         length=juce::jlimit(.01,86400.0,length);
         if (std::abs(cell.osc->length-length)<.0001) return;
         cell.osc->length=length;
