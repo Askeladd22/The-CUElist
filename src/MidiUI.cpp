@@ -81,8 +81,9 @@ void MainComponent::editMidiClip() {
     clipEditorCellId=id;
     auto safe=juce::Component::SafePointer<MainComponent>(this);
     clipEditor=std::make_unique<PianoRollEditor>(*cell.midi,
-        [safe,id](const MidiClip& before,const MidiClip& after,bool complete) {
-            if (safe) safe->midiClipEdited(id,before,after,complete);
+        [safe](const MidiClip& before,const MidiClip& after,bool complete) {
+            if (safe && safe->clipEditorCellId>0)
+                safe->midiClipEdited(safe->clipEditorCellId,before,after,complete);
         });
     clipEditor->onDetach=[safe] {
         if (!safe) return;
