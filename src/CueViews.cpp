@@ -46,7 +46,7 @@ void CueGrid::paint(juce::Graphics& g) {
     }
     const int tail=nameWidth+(int)show.columns.size()*columnWidth;
     label(g,"BPM (clic)",{tail+12,31,92,24},11,palette::muted,true);
-    label(g,"AUTO STOP",{tail+105,31,110,24},10,palette::muted,true);
+    label(g,"AUTO STOP",{tail+105,31,96,24},10,palette::muted,true);
     const auto clip=g.getClipBounds();
     const int first=std::max(0,(clip.getY()-headerHeight)/rowHeight), last=std::min((int)show.rows.size(),(clip.getBottom()-headerHeight)/rowHeight+1);
     for (int r=first;r<last;++r) {
