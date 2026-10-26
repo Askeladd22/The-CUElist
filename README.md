@@ -6,8 +6,8 @@
 
 ## Funzionalità principali
 
-- **Scaletta di cue:** griglia di righe e colonne con GO, Stop e Panic; copia/incolla celle (Ctrl+C/V), BPM modificabile sulla riga e Auto Stop selettivo delle celle visibile su richiesta.
-- **Audio:** WAV/MP3, loop, channel strip compatti con fader sopra meter di picco graduati in dB, pan rotativo e routing; Master audio nella zona utility a sinistra delle colonne, indipendente da MIDI/OSC.
+- **Scaletta di cue:** griglia di righe e colonne con GO, Stop e Panic; copia/incolla celle (Ctrl+C/V), menu riga per copia/incolla/duplicazione/eliminazione, BPM modificabile sulla riga e Auto Stop selettivo espandibile sotto il toggle.
+- **Audio:** WAV/MP3, loop, channel strip compatti con fader sopra meter di picco graduati in dB, pan rotativo di dimensioni intermedie e routing; Master audio nella zona utility a sinistra delle colonne, indipendente da MIDI/OSC.
 - **MIDI:** importazione e creazione di clip di note, con Piano Roll e selezione dell'uscita MIDI esterna.
 - **OSC:** clip di messaggi UDP con parametri interi, float o stringa, tempi in secondi o beat e destinazione IP/porta per colonna.
 - **Timeline:** posizionamento delle clip, zoom, ridimensionamento delle clip MIDI/OSC dal bordo destro, griglia BPM visibile/nascosta e magnete indipendente.

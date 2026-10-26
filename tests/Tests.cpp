@@ -26,6 +26,7 @@ void test(const char* name, const std::function<void()>& body) {
 #include "AutoStopV7Tests.h"
 #include "MixerV8Tests.h"
 #include "UiRefinementTests.h"
+#include "RowActionsUiTests.h"
 int main() {
     juce::ScopedJuceInitialiser_GUI initialiseJuce;
     pianoRollTests();
@@ -34,6 +35,7 @@ int main() {
     autoStopV7Tests();
     mixerV8Tests();
     uiRefinementTests();
+    rowActionsUiTests();
     test("MIDI columns accept file drops and enable their importer", [] {
         MainComponent ui(false); addColumn(ui.show,ColumnType::midi,{}); ui.select(0,1);
         auto* grid=cueViewFixtures::find<CueGrid>(ui);

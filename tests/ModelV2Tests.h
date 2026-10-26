@@ -5,7 +5,7 @@ void modelV2Tests() {
     test("blank show and v2 cue controls survive serialization", [] {
         auto show = makeShow();
         check(show.rows.size()==1 && show.columns.size()==1, "Initial show is not 1x1");
-        check(show.rows[0].name.isEmpty() && show.columns[0].name.isEmpty() && show.rows[0].cells[0].name.isEmpty(), "Demo names remain");
+        check(show.rows[0].name.isEmpty() && show.columns[0].name=="Audio 1" && show.rows[0].cells[0].name.isEmpty(), "Default audio channel number missing");
         auto& row = show.rows[0]; row.gain=3; row.muted=true; row.loop=true; row.overrideBehaviour=true; row.behaviour=Behaviour::continuePlaying;
         row.cells[0].startSeconds=12.5; row.cells[0].gain=4;
         Show loaded; check(decodeShow(encodeShow(show),loaded).wasOk(), "v2 roundtrip failed");

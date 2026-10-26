@@ -242,7 +242,7 @@ void MainComponent::resized() {
         }
     }
     goButton.setBounds(20,h-282,140,34); panicButton.setBounds(20,h-239,140,34);
-    grid.setSize(std::max(viewport.getWidth()-14,CueGrid::nameWidth+(int)show.columns.size()*CueGrid::columnWidth+280),
+    grid.setSize(std::max(viewport.getWidth()-14,CueGrid::nameWidth+(int)show.columns.size()*CueGrid::columnWidth+205),
                  std::max(viewport.getHeight()-14,CueGrid::headerHeight+(int)show.rows.size()*CueGrid::rowHeight));
 }
 void MainComponent::refresh() {
@@ -582,6 +582,63 @@ void MainComponent::reorderColumn(int index,int delta) {
     std::swap(show.columns[index],show.columns[target]);
     for (auto& row : show.rows) std::swap(row.cells[index],row.cells[target]);
     selectedColumn=target; changed("Ordine colonne aggiornato.",true);
+}
+bool MainComponent::copyRow(int index) {
+    if (index<0 || index>=(int)show.rows.size() || !applyInspector()) return false;
+    const auto& row=show.rows[(size_t)index];
+    copiedRow=row;
+    copiedRowAudio.clear();
+    copiedRowAudio.reserve(row.cells.size());
+    for (const auto& cell:row.cells) {
+        const auto it=clips.find(cell.id);
+        copiedRowAudio.push_back(it==clips.end() ? nullptr : it->second);
+    }
+    status="Cue copiata. Clic destro su una riga per incollarla sotto.";
+    repaint();
+    return true;
+}
+bool MainComponent::insertCopiedRowAfter(int index,const Row& source,
+        const std::vector<std::shared_ptr<const AudioClip>>& sourceAudio) {
+    if (index<0 || index>=(int)show.rows.size() || !applyInspector()
+        || source.cells.size()!=show.columns.size() || sourceAudio.size()!=source.cells.size())
+        return false;
+    if ((int64_t)show.nextId+1+(int64_t)source.cells.size()>=1000000000) {
+        message("Limite identificativi dello show raggiunto."); return false;
+    }
+    auto candidate=show;
+    auto media=clips;
+    Row inserted=source;
+    inserted.id=candidate.nextId++;
+    for (size_t c=0;c<inserted.cells.size();++c) {
+        inserted.cells[c].id=candidate.nextId++;
+        if (sourceAudio[c]) media[inserted.cells[c].id]=sourceAudio[c];
+    }
+    candidate.rows.insert(candidate.rows.begin()+index+1,std::move(inserted));
+    const auto valid=validateShow(candidate);
+    if (valid.failed()) { message(valid.getErrorMessage()); return false; }
+    if (!memoryFits(media)) { message("Limite di memoria PCM dello show raggiunto."); return false; }
+    closeMidiClip(); closeOscClip();
+    show=std::move(candidate);
+    clips=std::move(media);
+    selectedRow=nextCue=index+1;
+    changed("Cue inserita con nuove identita di riga e celle.",true);
+    return true;
+}
+bool MainComponent::pasteRowAfter(int index) {
+    if (!copiedRow) return false;
+    return insertCopiedRowAfter(index,*copiedRow,copiedRowAudio);
+}
+bool MainComponent::duplicateRow(int index) {
+    if (index<0 || index>=(int)show.rows.size() || !applyInspector()) return false;
+    Row snapshot=show.rows[(size_t)index];
+    snapshot.name=snapshot.name.isEmpty() ? "Cue (copia)" : snapshot.name+" (copia)";
+    std::vector<std::shared_ptr<const AudioClip>> media;
+    media.reserve(snapshot.cells.size());
+    for (const auto& cell:snapshot.cells) {
+        const auto it=clips.find(cell.id);
+        media.push_back(it==clips.end() ? nullptr : it->second);
+    }
+    return insertCopiedRowAfter(index,snapshot,media);
 }
 void MainComponent::deleteRow(int index) {
     if (index<0 || index>=(int)show.rows.size() || !applyInspector()) return;

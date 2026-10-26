@@ -34,14 +34,19 @@ void CueGrid::paint(juce::Graphics& g) {
         smallButton(g,"<",{x+88,11,20,20},c>0);
         smallButton(g,">",{x+112,11,20,20},c+1<(int)show.columns.size());
         smallButton(g,"x",{x+136,11,20,20},true,true);
-        label(g,show.columns[c].name.isEmpty() ? "Doppio click: nome" : show.columns[c].name,{x+10,36,columnWidth-20,22},12,
-              show.columns[c].name.isEmpty() ? palette::muted : palette::text,true);
+        // Older projects may still contain unnamed columns: show meaningful
+        // type-specific numbering without rewriting their saved metadata.
+        int ordinal=0;
+        for (int n=0;n<=c;++n) if (show.columns[n].type==show.columns[c].type) ++ordinal;
+        const auto prefix=show.columns[c].type==ColumnType::audio ? "Audio" :
+            show.columns[c].type==ColumnType::midi ? "MIDI" : "OSC";
+        const auto name=show.columns[c].name.isEmpty() ? juce::String(prefix)+" "+juce::String(ordinal) : show.columns[c].name;
+        label(g,name,{x+10,36,columnWidth-20,22},12,palette::text,true);
         g.setColour(palette::line); g.drawVerticalLine(x,0,(float)getHeight());
     }
     const int tail=nameWidth+(int)show.columns.size()*columnWidth;
     label(g,"BPM (clic)",{tail+12,31,92,24},11,palette::muted,true);
-    label(g,"AUTO STOP",{tail+105,31,90,24},10,palette::muted,true);
-    label(g,"CELLE",{tail+206,31,70,24},10,palette::muted,true);
+    label(g,"AUTO STOP",{tail+105,31,96,24},10,palette::muted,true);
     const auto clip=g.getClipBounds();
     const int first=std::max(0,(clip.getY()-headerHeight)/rowHeight), last=std::min((int)show.rows.size(),(clip.getBottom()-headerHeight)/rowHeight+1);
     for (int r=first;r<last;++r) {
@@ -52,9 +57,10 @@ void CueGrid::paint(juce::Graphics& g) {
         if (selected || next) { g.setColour(next ? palette::amber : palette::teal); g.fillRect(0,y,3,rowHeight); }
         smallButton(g,"^",{6,y+17,20,21},r>0); smallButton(g,"v",{30,y+17,20,21},r+1<(int)show.rows.size());
         smallButton(g,"x",{54,y+17,20,21},true,true);
+        smallButton(g,"...",{nameWidth-70,y+17,28,21},true);
         g.setColour((next ? palette::amber : palette::teal).withAlpha(.14f)); g.fillRoundedRectangle(84.0f,(float)y+12,44,30,4);
         label(g,"GO",{84,y+12,44,30},11,next ? palette::amber : palette::teal,true,juce::Justification::centred);
-        label(g,row.name,{137,y+7,nameWidth-181,25},13,palette::text,selected);
+        label(g,row.name,{137,y+7,nameWidth-220,25},13,palette::text,selected);
         label(g,juce::String(r+1).paddedLeft('0',2)+(next ? "  PROSSIMA" : row.muted ? "  MUTE" : ""),{137,y+32,nameWidth-181,14},9,next ? palette::amber : palette::muted);
         transportButton(g,{nameWidth-36,y+17,26,22},true,true);
         for (int c=0;c<(int)show.columns.size();++c) {
@@ -99,13 +105,37 @@ void CueGrid::paint(juce::Graphics& g) {
         const auto tempo=row.tempo.front();
         label(g,juce::String(tempo.bpm,1),{tail+12,y+14,79,24},12,palette::teal);
         g.setColour(row.stopOnNext ? palette::teal.withAlpha(.25f) : palette::raised);
-        g.fillRoundedRectangle((float)tail+115,(float)y+18,34,19,9.5f);
+        g.fillRoundedRectangle((float)tail+115,(float)y+8,34,19,9.5f);
         g.setColour(row.stopOnNext ? palette::teal : palette::muted);
-        g.fillEllipse((float)tail+(row.stopOnNext ? 134 : 118),(float)y+21,13,13);
-        label(g,row.stopOnNext ? "ON" : "OFF",{tail+154,y+17,38,20},10,row.stopOnNext ? palette::teal : palette::muted);
-        smallButton(g,autoStopVisibleRows.count(row.id) ? "−" : "+",{tail+203,y+16,34,23},true);
+        g.fillEllipse((float)tail+(row.stopOnNext ? 134 : 118),(float)y+11,13,13);
+        label(g,row.stopOnNext ? "ON" : "OFF",{tail+154,y+8,38,20},10,row.stopOnNext ? palette::teal : palette::muted);
+        smallButton(g,autoStopVisibleRows.count(row.id) ? "−" : "+",{tail+118,y+32,28,19},true);
         g.setColour(palette::line.withAlpha(.6f)); g.drawHorizontalLine(y+rowHeight-1,0,(float)getWidth());
     }
+}
+
+void CueGrid::showRowMenu(int row) {
+    if (row<0 || row>=(int)owner.show.rows.size()) return;
+    const int rowId=owner.show.rows[(size_t)row].id;
+    juce::PopupMenu menu;
+    menu.addItem(1,"Copia cue");
+    menu.addItem(2,"Incolla cue sotto questa",owner.copiedRow.has_value()
+        && owner.copiedRow->cells.size()==owner.show.columns.size());
+    menu.addItem(3,"Duplica cue");
+    menu.addSeparator();
+    menu.addItem(4,"Elimina cue");
+    auto safe=juce::Component::SafePointer<MainComponent>(&owner);
+    menu.showMenuAsync(juce::PopupMenu::Options().withTargetComponent(this),[safe,rowId](int item) {
+        if (!safe || item==0) return;
+        for (int index=0;index<(int)safe->show.rows.size();++index)
+            if (safe->show.rows[(size_t)index].id==rowId) {
+                if (item==1) safe->copyRow(index);
+                else if (item==2) safe->pasteRowAfter(index);
+                else if (item==3) safe->duplicateRow(index);
+                else if (item==4) safe->deleteRow(index);
+                return;
+            }
+    });
 }
 
 void CueGrid::mouseDown(const juce::MouseEvent& e) {
@@ -120,6 +150,11 @@ void CueGrid::mouseDown(const juce::MouseEvent& e) {
                 if (safe) { if (item==1) safe->copySelectedCell(); else if (item==2) safe->pasteSelectedCell(); }
             });
         }
+        return;
+    }
+    if (e.mods.isPopupMenu() && e.x>=0 && e.x<nameWidth && e.y>=headerHeight) {
+        const int row=(e.y-headerHeight)/rowHeight;
+        if (row>=0 && row<(int)owner.show.rows.size()) showRowMenu(row);
         return;
     }
     if (!e.mods.isLeftButtonDown()) return;
@@ -144,11 +179,11 @@ void CueGrid::mouseDown(const juce::MouseEvent& e) {
         if (e.getNumberOfClicks()==1) owner.editRowBpm(row);
         return;
     }
-    if (e.x>=tail+105 && e.x<tail+195 && localY>=10 && localY<44) {
+    if (e.x>=tail+105 && e.x<tail+195 && localY>=6 && localY<30) {
         if (e.getNumberOfClicks()==1) owner.setAutoStop(row,!owner.show.rows[row].stopOnNext);
         return;
     }
-    if (e.x>=tail+200 && e.x<tail+244 && localY>=10 && localY<44) {
+    if (e.x>=tail+115 && e.x<tail+150 && localY>=31 && localY<53) {
         const int id=owner.show.rows[(size_t)row].id;
         if (autoStopVisibleRows.count(id)) autoStopVisibleRows.erase(id);
         else autoStopVisibleRows.insert(id);
@@ -175,6 +210,10 @@ void CueGrid::mouseDown(const juce::MouseEvent& e) {
     if (e.x<nameWidth) {
         if (e.x>=nameWidth-36 && e.x<nameWidth-10 && localY>=17 && localY<39) {
             if (e.getNumberOfClicks()==1) owner.stopRow(row); return;
+        }
+        if (e.x>=nameWidth-70 && e.x<nameWidth-42 && localY>=17 && localY<38) {
+            if (e.getNumberOfClicks()==1) showRowMenu(row);
+            return;
         }
         if (e.x<137 && e.getNumberOfClicks()>1) return;
         if (localY>=17 && localY<38 && e.x>=6 && e.x<26) owner.reorderRow(row,-1);

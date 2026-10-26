@@ -15,6 +15,7 @@ public:
     void mouseDoubleClick(const juce::MouseEvent&) override;
     void mouseDrag(const juce::MouseEvent&) override;
     void mouseUp(const juce::MouseEvent&) override;
+    void showRowMenu(int row);
     bool isInterestedInFileDrag(const juce::StringArray&) override;
     void filesDropped(const juce::StringArray&,int,int) override;
     static constexpr int rowHeight=54, headerHeight=68, nameWidth=310, columnWidth=160;
@@ -117,6 +118,9 @@ public:
     void renameTitle(bool column,int index);
     void reorderRow(int index,int delta);
     void reorderColumn(int index,int delta);
+    bool copyRow(int index);
+    bool pasteRowAfter(int index);
+    bool duplicateRow(int index);
     void deleteRow(int index);
     void deleteColumn(int index);
     void moveClip(int,int,int,int);
@@ -175,6 +179,9 @@ private:
     int clipEditorCellId=-1;
     bool clipCollapsed=false;
     int dockHeight=208;
+    std::optional<Row> copiedRow;
+    std::vector<std::shared_ptr<const AudioClip>> copiedRowAudio;
+    bool insertCopiedRowAfter(int index, const Row&, const std::vector<std::shared_ptr<const AudioClip>>&);
     std::optional<Cell> copiedCell;
     std::shared_ptr<const AudioClip> copiedAudio;
     ColumnType copiedType=ColumnType::audio;
