@@ -192,4 +192,128 @@ void controlMappingV10Tests() {
         check(!ui.assignMappingPreset(id,50000),"Nonexistent preset accepted");
         check(validateShow(ui.show).wasOk(),"Assigned mapping preset invalidated show");
     });
+
+    test("Control Column priority produces partial physical-input overrides",[] {
+        auto show=makeShow();
+        addColumn(show,ColumnType::audio,"Audio 2");
+        addColumn(show,ColumnType::control,"Default");
+        addColumn(show,ColumnType::control,"Scene overrides");
+        const int low=2,high=3;
+        auto make=[&](int number,ControlTarget target,int destination=0) {
+            ControlBinding b; b.id=show.controls.nextId++;
+            b.deviceId="physical-faders";b.kind=ControlKind::cc;
+            b.number=number;b.channel=1;b.target=target;
+            b.targetColumnId=destination;b.takeover=ControlTakeover::jump;
+            return b;
+        };
+        auto first=make(1,ControlTarget::columnGain,show.columns[0].id);
+        auto second=make(2,ControlTarget::columnGain,show.columns[1].id);
+        auto fourth=make(4,ControlTarget::masterGain);
+        auto override=make(2,ControlTarget::masterGain);
+        show.columns[low].controlLocked=true;
+        show.columns[low].controlPriority=1;
+        show.columns[low].controlDefaultSet.bindings={first,second,fourth};
+        show.columns[high].controlPriority=3;
+        show.rows[0].cells[high].controlSet=ControlSet{{override}};
+        check(validateShow(show).wasOk(),"Valid locked/override Control Columns rejected");
+        std::vector<ControlLayer> layers={
+            {show.columns[low].id,0,1,true,show.columns[low].controlDefaultSet},
+            {show.columns[high].id,show.rows[0].id,3,false,
+                *show.rows[0].cells[high].controlSet}};
+        ControlMappingEngine mapping;mapping.setLayers(layers);
+        auto event=[&](int number) {
+            return ControlEvent{"physical-faders",ControlKind::cc,1,number,70,false};
+        };
+        check(mapping.matched(event(2))->id==second.id,
+              "Cue-specific mapping was applied before GO");
+        mapping.setActiveCue(show.rows[0].id,0);
+        check(mapping.matched(event(1))->id==first.id &&
+              mapping.matched(event(2))->id==override.id &&
+              mapping.matched(event(4))->id==fourth.id,
+              "Higher priority must override only its own physical input");
+        mapping.setActiveCue(0,0);
+        check(mapping.matched(event(2))->id==second.id,
+              "Cue override leaked after active cue was reset");
+        auto json=encodeShow(show);Show loaded;
+        check(decodeShow(json,loaded).wasOk(),"Control Column save/load rejected");
+        check(loaded.columns[low].controlLocked &&
+              loaded.columns[low].controlPriority==1 &&
+              loaded.columns[low].controlDefaultSet.bindings.size()==3 &&
+              loaded.rows[0].cells[high].controlSet->bindings.size()==1,
+              "Control default/override set lost after save");
+    
+    });
+    test("Control Column lock, priority and MIDI Learn bindings update live mapping",[] {
+        MainComponent ui(false);
+        addColumn(ui.show,ColumnType::control,"Control 1");
+        addColumn(ui.show,ColumnType::control,"Control 2");
+        ui.select(0,1);
+        ControlBinding b;b.deviceId="desk";b.number=7;
+        b.target=ControlTarget::masterGain;b.takeover=ControlTakeover::jump;
+        check(ui.addControlSetBinding(0,1,b),"Could not add cue Control Set mapping");
+        check(ui.show.rows[0].cells[1].controlSet->bindings.size()==1,
+              "Control Set did not store mapping");
+        check(ui.setControlColumnLocked(1,true,0),"Could not lock Control Column");
+        check(ui.show.columns[1].controlPriority==1 &&
+              ui.show.columns[1].controlDefaultSet.bindings.size()==1,
+              "Lock did not promote cue set to low-priority column default");
+        check(!ui.setControlColumnPriority(1,4),
+              "Locked Control Column must reject higher priority");
+        ui.dispatchControlForTest({"desk",ControlKind::cc,1,7,64,false});
+        near(ui.show.masterGain,64.0/127);
+        check(ui.setControlColumnLocked(1,false,0),"Unable to unlock Control Column");
+        check(ui.show.columns[1].controlPriority==2 &&
+              ui.show.rows[0].cells[1].controlSet->bindings.size()==1,
+              "Unlock did not restore the edited default as cue set");
+        check(ui.setControlColumnPriority(1,4),"Maximum priority rejected");
+        check(ui.show.columns[1].controlPriority==4,
+              "Control Column priority update missing");
+        check(validateShow(ui.show).wasOk(),"Control UI created invalid show");
+    });
+    test("Control Set binding output validation and backward-compatible old show",[] {
+        auto show=makeShow();
+        addColumn(show,ColumnType::control,"Control 1");
+        ControlBinding b;b.id=show.controls.nextId++;
+        b.deviceId="dev";b.number=12;b.target=ControlTarget::midiCc;
+        b.targetColumnId=show.columns[0].id;
+        show.rows[0].cells[1].controlSet=ControlSet{{b}};
+        check(validateShow(show).failed(),
+              "Control Set routed MIDI to an Audio column");
+        b.target=ControlTarget::masterGain; b.targetColumnId=0;
+        show.rows[0].cells[1].controlSet=ControlSet{{b}};
+        check(validateShow(show).wasOk(),"Valid Control Set mapping rejected");
+        auto legacy=juce::JSON::parse(encodeShow(show));
+        for (auto& col:*legacy.getProperty("columns",{}).getArray()) {
+            col.getDynamicObject()->removeProperty("controlLocked");
+            col.getDynamicObject()->removeProperty("controlPriority");
+            col.getDynamicObject()->removeProperty("controlDefaultSet");
+        }
+        for (auto& row:*legacy.getProperty("rows",{}).getArray())
+            for (auto& cell:*row.getProperty("cells",{}).getArray())
+                cell.getDynamicObject()->removeProperty("controlSet");
+        Show old;
+        check(decodeShow(juce::JSON::toString(legacy),old).wasOk(),
+              "Original v10 show rejected when optional Control Sets are absent");
+        check(!old.rows[0].cells[1].controlSet.has_value() &&
+              old.columns[1].controlPriority==2 && !old.columns[1].controlLocked,
+              "Optional Control Column defaults incorrect");
+    });
+    test("Control Column copy/paste and row duplication preserve independent sets",[] {
+        MainComponent ui(false);
+        addColumn(ui.show,ColumnType::control,"Control 1");
+        ControlBinding b; b.deviceId="desk";b.number=22;
+        b.target=ControlTarget::masterGain;b.takeover=ControlTakeover::jump;
+        check(ui.addControlSetBinding(0,1,b),"Control Set creation failed");
+        check(ui.copyRow(0) && ui.duplicateRow(0),"Cannot duplicate control cue");
+        check(ui.show.rows[1].cells[1].controlSet.has_value(),
+              "Duplicated cue lost Control Set");
+        check(ui.show.rows[1].cells[1].controlSet->bindings[0].id!=
+              ui.show.rows[0].cells[1].controlSet->bindings[0].id,
+              "Duplicated binding IDs not regenerated");
+        check(validateShow(ui.show).wasOk(),"Duplicate Control cue invalid");
+        check(ui.select(0,1) && ui.copySelectedCell() &&
+              ui.select(1,1) && ui.pasteSelectedCell(),"Control cell copy failed");
+        check(validateShow(ui.show).wasOk(),"Pasted Control cell invalid");
+    });
+
 }
