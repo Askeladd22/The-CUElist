@@ -492,7 +492,7 @@ void MainComponent::setCellAutoStop(int row,int column,bool enabled) {
     grid.repaint(); repaint();
 }
 void MainComponent::stopAll() {
-    engine.panic(); resetActiveMapping();
+    engine.panic(); controlOutput.clear(); resetActiveMapping();
     status="PANIC / riproduzioni audio, MIDI e OSC fermate."; repaint();
 }
 bool MainComponent::keyPressed(const juce::KeyPress& key) {
