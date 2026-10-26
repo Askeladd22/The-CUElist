@@ -93,9 +93,9 @@ void mixerV8Tests() {
         auto* audio=utilities->getChildComponent(0);
         auto* midiStrip=utilities->getChildComponent(1);
         auto* oscStrip=utilities->getChildComponent(2);
-        auto* fader=dynamic_cast<juce::Slider*>(controlsV3::named(*audio,"columnGainDb"));
+        auto* fader=dynamic_cast<GainMeterFader*>(controlsV3::named(*audio,"columnGainDb"));
         auto* pan=dynamic_cast<juce::Slider*>(controlsV3::named(*audio,"columnPan"));
-        check(fader && fader->getSliderStyle()==juce::Slider::LinearVertical,"Fader not vertical");
+        check(fader && fader->getNumChildComponents()==0,"Stereo fader/meter must be one component, not layered widgets");
         check(pan && pan->getSliderStyle()==juce::Slider::RotaryVerticalDrag,"Pan not rotary");
         check(fader->getHeight()>90 && utilities->getHeight()>=180,"Compact mixer strip has insufficient height");
         check(!controlsV3::named(*midiStrip,"columnGainDb")->isVisible(),"MIDI strip displays PCM controls");
