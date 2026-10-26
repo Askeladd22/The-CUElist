@@ -131,9 +131,11 @@ void timelineV3Tests() {
         check(grid!=nullptr,"Grid division control missing");
         grid->setSelectedId(1,juce::sendNotificationSync);
         const auto pixel=[&](int x) { return timeline->createComponentSnapshot(timeline->getLocalBounds()).getPixelAt(x,190).getARGB(); };
-        const auto before=pixel(332);
+        // At 120 BPM, 3.5 s is beat 7 (a visible musical line).
+        // After beat 4 switches to 60 BPM, 3.5 s lies between beats 5 and 6.
+        const auto before=pixel(364);
         ui.show.rows[0].tempo={{0,120,4,4},{4,60,4,4}};
-        check(pixel(332)!=before,"BPM change did not relocate beat 5 line to 3 seconds");
+        check(pixel(364)!=before,"BPM change did not move musical lines away from 3.5 seconds");
     });
     test("timeline MIDI single click opens shared docked clip editor",[] {
         MainComponent ui(false); addColumn(ui.show,ColumnType::midi,{});
