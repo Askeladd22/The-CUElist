@@ -57,7 +57,7 @@ void rowActionsUiTests() {
         check(ui.duplicateRow(0),"Duplicate cue failed");
         check(ui.show.rows.size()==2 && ui.selectedRow==1,"Duplicate cue not inserted after source");
         const auto& duplicate=ui.show.rows[1];
-        check(duplicate.name=="Scena 1 (copia)" && duplicate.tempo.size()==2,
+        check(duplicate.name=="Scena 1 (copy)" && duplicate.tempo.size()==2,
               "Duplicate cue name or BPM tempo map lost");
         near(duplicate.gain,.4);
         check(!duplicate.stopOnNext && duplicate.cells[0].loop && !duplicate.cells[0].stopOnNext,
