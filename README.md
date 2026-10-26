@@ -1,18 +1,20 @@
 # The Cuelist
 
-**The Cuelist** è un'applicazione desktop per Windows dedicata al **controllo delle cue audio e MIDI durante spettacoli teatrali, concerti ed eventi dal vivo**. Permette di organizzare una scaletta di interventi sonori e avviarli, interromperli o sovrapporli da un'unica interfaccia.
+**The Cuelist** is a Windows desktop application for **controlling audio and MIDI cues in theatre productions, concerts, and live events**. It lets operators arrange, start, stop, and overlap sound cues from a single interface.
 
-È pensata per chi deve gestire la riproduzione durante uno show senza utilizzare un'intera DAW.
+It is designed for show playback control without requiring a full digital audio workstation (DAW).
 
-## Funzionalità principali
+## Main features
 
-- **Scaletta di cue:** griglia di righe e colonne con GO, Stop e Panic; copia/incolla celle (Ctrl+C/V), menu riga per copia/incolla/duplicazione/eliminazione, BPM modificabile sulla riga e Auto Stop selettivo espandibile sotto il toggle.
-- **Audio:** WAV/MP3, loop, channel strip compatti con un unico GainMeterFader stereo (barre L/R in dBFS, cursore in dB e scala verticale condivisa), pan rotativo di dimensioni intermedie e routing; Master audio nella zona utility a sinistra delle colonne, indipendente da MIDI/OSC.
-- **MIDI:** importazione e creazione di clip di note, con Piano Roll e selezione dell'uscita MIDI esterna.
-- **OSC:** Clip Editor visivo con eventi OSC e automazioni di argomenti int/float (rampe e curve multipunto), parametri int/float/string/bool, timeline in secondi o beat, Undo/Redo e routing UDP per colonna.
-- **Timeline:** posizionamento delle clip, zoom, ridimensionamento delle clip MIDI/OSC dal bordo destro, griglia BPM visibile/nascosta e magnete indipendente.
-- **Control Mapping (prima integrazione):** ingresso MIDI fisico selezionato manualmente, MIDI Learn per CC, note e Pitch Bend, preset di scena, priorita cue/preset/colonna/globale, Pickup/Jump e destinazioni Master, gain Audio, GO, Panic, MIDI CC e OSC Float.
-- **Branding:** icona trasparente approvata inclusa in `assets/thecuelist_icon.png` e incorporata nella GUI/eseguibile.
-- **Progetti portabili:** salvataggio degli show in formato `.cuelist`, con cartella dei media e backup.
+- **Cue list:** row-and-column cue grid with GO, Stop, and Panic; cell copy/paste (Ctrl+C/V); row menus for copying, pasting, duplicating, and deleting cues; directly editable cue BPM; and selective Auto Stop options beneath each row's toggle.
+- **Audio:** WAV/MP3 playback, loops, compact channel strips with an integrated stereo GainMeterFader (L/R dBFS meters, dB gain slider, shared vertical scale), rotary pan and output routing. The Master in the utilities area has the same integrated fader, plus Master Pan and Mute, and does not affect MIDI/OSC.
+- **MIDI:** import and create note clips using the built-in Piano Roll, with external MIDI output selection.
+- **OSC:** visual Clip Editor with instant OSC events and integer/float argument automation (ramps and multipoint curves), int/float/string/bool arguments, a seconds-or-beats timeline, Undo/Redo, and per-column UDP destinations.
+- **Timeline:** clip placement and zoom, right-edge resizing of MIDI/OSC clips, independent BPM grid visibility and beat snapping.
+- **Control Mapping (initial implementation):** manually selected physical MIDI input, MIDI Learn for CC, notes and Pitch Bend, cue presets, cue/preset/column/global mapping priorities, Pickup/Jump takeover, and targets for Master, Audio column gain, GO, Panic, MIDI CC, and OSC Float.
+- **Branding:** approved transparent icon included as `assets/thecuelist_icon.png` and embedded in the GUI/executable.
+- **Portable projects:** save shows as `.cuelist` files, alongside their media folder and backups.
 
-**Stato attuale:** sviluppo **0.6 (Control & Mapping v10 iniziale)**, eseguibile ancora identificato come **0.5.0**. Il formato degli show e `v10`, compatibile con v1-v9. Le modifiche sono una PR non ancora compilata o verificata su hardware Windows. Video, timecode e feedback MIDI verso controller non sono ancora disponibili. Il sistema Control Mapping resta sperimentale: non utilizzarlo durante uno spettacolo senza prove complete.
+**Development status:** **0.6 (initial Control & Mapping v10)**; the executable is still identified as **0.5.0**. Show format **v10** can load projects from v1–v9. Windows CI builds and automated tests have succeeded, but a complete test on live production hardware has not been carried out. Video, timecode, and MIDI controller feedback are not yet implemented. Control Mapping remains experimental: do not use it in a live show without thorough rehearsal and validation.
+
+See [the complete user guide](docs/guida-completa.md) for operating instructions, build details, and limits.

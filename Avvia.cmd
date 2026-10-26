@@ -14,12 +14,12 @@ if exist "build\TheCuelist_artefacts\Release\The Cuelist.exe" (
     exit /b 0
 )
 echo.
-echo Questa cartella contiene i sorgenti, ma non il programma compilato.
-echo Per usare The Cuelist NON serve installare Visual Studio.
+echo This folder contains the source code, but not the compiled application.
+echo You do NOT need to install Visual Studio to run The Cuelist.
 echo.
-echo Estrai il pacchetto The-Cuelist-0.5.0-Windows-x64.zip
-echo e apri "The Cuelist.exe" nella cartella estratta.
-echo In alternativa, copia l'eseguibile nella cartella di questo launcher.
+echo Extract The-Cuelist-0.5.0-Windows-x64.zip
+echo and open "The Cuelist.exe" from the extracted folder.
+echo Alternatively, copy the executable into the same folder as this launcher.
 echo.
 pause
 exit /b 1

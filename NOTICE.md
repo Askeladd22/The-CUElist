@@ -1,17 +1,17 @@
-# The Cuelist — avvisi di licenza
+# The Cuelist — License Notices
 
-Il codice originale dell'applicazione, gli script e i test sono proprietari: tutti i diritti riservati. Vedere [LICENSE](LICENSE). Non si applica una licenza open source al codice originale del progetto.
+The original application code, scripts, and tests are proprietary: all rights reserved. See [LICENSE](LICENSE). No open-source license applies to the project's original code.
 
-## JUCE e componenti di terze parti
+## JUCE and Third-Party Components
 
-- JUCE: versione 8.0.12, commit `29396c22c93392d6738e021b83196283d6e4d850`.
-- Origine: https://github.com/juce-framework/JUCE/tree/8.0.12
-- JUCE offre licenze distinte dal codice dell'applicazione. Per distribuire The Cuelist come software proprietario occorre una licenza JUCE appropriata alle condizioni applicabili. La sua disponibilità non è stata verificata: questo documento non dichiara l'acquisto, l'attivazione o l'accettazione di una licenza JUCE per conto del titolare.
-- Prima della distribuzione a terzi verificare la copertura JUCE: https://juce.com/get-juce/
-- `vendor/JUCE/LICENSE.md` elenca i termini del framework e delle dipendenze. Questi avvisi restano invariati; la licenza proprietaria dell'applicazione non li sostituisce.
+- JUCE: version 8.0.12, commit `29396c22c93392d6738e021b83196283d6e4d850`.
+- Source: https://github.com/juce-framework/JUCE/tree/8.0.12
+- JUCE licensing is separate from the application's licensing. Distributing The Cuelist as proprietary software requires an appropriate JUCE license under the applicable terms. License availability has not been verified: this notice does not claim that any JUCE license has been purchased, activated, or accepted on behalf of the copyright holder.
+- Check JUCE licensing before distributing to third parties: https://juce.com/get-juce/
+- `vendor/JUCE/LICENSE.md` describes the framework's and dependencies' terms. Those notices remain applicable and are not superseded by the application's proprietary license.
 
-## Pacchetto portable
+## Portable Package
 
-Il pacchetto locale include `LICENSE`, questo documento e `JUCE-LICENSE.md`. Non include i sorgenti dell'applicazione o del framework. La preparazione del pacchetto non certifica la copertura di licenza per distribuirlo.
+The local package includes `LICENSE`, this notice, and `JUCE-LICENSE.md`. It does not include the application's or framework's source code. Packaging does not certify that distribution is covered by the necessary licenses.
 
-WAV, MP3 e progetti creati o importati dagli utenti conservano i rispettivi diritti. La fixture `tests/fixtures/tone.mp3` è un segnale sintetico generato per i test del progetto.
+User-created or imported WAV/MP3 files and projects retain their respective rights. The fixture `tests/fixtures/tone.mp3` is a synthetic tone generated for project tests.
