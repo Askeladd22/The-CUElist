@@ -132,7 +132,7 @@ I BPM e la mappa tempo regolano le note MIDI; non cambiano la velocità dei file
 
 - Una clip WAV/MP3 mono/stereo per cella; PCM precaricato fino a **128 MB per file e 512 MB per show**. Streaming e multitraccia interno non implementati.
 - Decodifica sul thread dell'interfaccia: file grandi possono provocare attese. Il callback del renderer non esegue I/O, allocazioni o mutex.
-- Motore OSC, LTC/MTC, mapping ingressi, autosave e recupero dopo crash non implementati. ASIO disabilitato in questa build; WASAPI disponibile tramite JUCE.
+- OSC UDP con invio di messaggi int32/float/string implementato; LTC/MTC, mapping ingressi, autosave e recupero dopo crash non implementati. ASIO disabilitato in questa build; WASAPI disponibile tramite JUCE.
 - Ricampionamento lineare e saturazione di sicurezza a ±1. Prove prolungate di ascolto, jitter e disconnessione su hardware esterno restano da eseguire.
 
 ## Sviluppo e verifiche
