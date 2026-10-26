@@ -39,8 +39,9 @@ void CueGrid::paint(juce::Graphics& g) {
         g.setColour(palette::line); g.drawVerticalLine(x,0,(float)getHeight());
     }
     const int tail=nameWidth+(int)show.columns.size()*columnWidth;
-    label(g,"BPM",{tail+12,31,70,24},11,palette::muted,true); label(g,"METRICA",{tail+88,31,80,24},11,palette::muted,true);
-    label(g,"AUTO STOP",{tail+178,31,96,24},10,palette::muted,true);
+    label(g,"BPM (clic)",{tail+12,31,92,24},11,palette::muted,true);
+    label(g,"AUTO STOP",{tail+105,31,90,24},10,palette::muted,true);
+    label(g,"CELLE",{tail+206,31,70,24},10,palette::muted,true);
     const auto clip=g.getClipBounds();
     const int first=std::max(0,(clip.getY()-headerHeight)/rowHeight), last=std::min((int)show.rows.size(),(clip.getBottom()-headerHeight)/rowHeight+1);
     for (int r=first;r<last;++r) {
@@ -81,32 +82,46 @@ void CueGrid::paint(juce::Graphics& g) {
                          {x+10,y+8,columnWidth-20,18},11,missing ? palette::red : palette::muted,false,juce::Justification::centred);
             // Auto Stop is a per-cell choice. The row's switch remains the
             // master gate; an OFF cell survives future GO commands.
-            const bool effective=row.stopOnNext && cell.stopOnNext;
-            const auto badge=juce::Rectangle<float>((float)x+columnWidth-52,(float)y+7,44,18);
-            g.setColour(effective ? palette::teal.withAlpha(.22f)
-                : (!cell.stopOnNext ? palette::amber.withAlpha(.16f) : palette::raised));
-            g.fillRoundedRectangle(badge,3.0f);
-            label(g,cell.stopOnNext ? "AS ON" : "AS OFF",
-                {x+columnWidth-52,y+7,44,18},9,
-                effective ? palette::teal : !cell.stopOnNext ? palette::amber : palette::muted,
-                true,juce::Justification::centred);
+            if (autoStopVisibleRows.count(row.id)) {
+                const bool effective=row.stopOnNext && cell.stopOnNext;
+                const auto badge=juce::Rectangle<float>((float)x+columnWidth-52,(float)y+7,44,18);
+                g.setColour(effective ? palette::teal.withAlpha(.22f)
+                    : (!cell.stopOnNext ? palette::amber.withAlpha(.16f) : palette::raised));
+                g.fillRoundedRectangle(badge,3.0f);
+                label(g,cell.stopOnNext ? "AS ON" : "AS OFF",
+                    {x+columnWidth-52,y+7,44,18},9,
+                    effective ? palette::teal : !cell.stopOnNext ? palette::amber : palette::muted,
+                    true,juce::Justification::centred);
+            }
             transportButton(g,{x+columnWidth-54,y+28,21,18},false,loaded);
             transportButton(g,{x+columnWidth-29,y+28,21,18},true,loaded);
         }
         const auto tempo=row.tempo.front();
-        label(g,juce::String(tempo.bpm,1),{tail+12,y+14,70,24},12,palette::muted);
-        label(g,juce::String(tempo.numerator)+"/"+juce::String(tempo.denominator),{tail+88,y+14,70,24},12,palette::muted);
+        label(g,juce::String(tempo.bpm,1),{tail+12,y+14,79,24},12,palette::teal);
         g.setColour(row.stopOnNext ? palette::teal.withAlpha(.25f) : palette::raised);
-        g.fillRoundedRectangle((float)tail+188,(float)y+18,34,19,9.5f);
+        g.fillRoundedRectangle((float)tail+115,(float)y+18,34,19,9.5f);
         g.setColour(row.stopOnNext ? palette::teal : palette::muted);
-        g.fillEllipse((float)tail+(row.stopOnNext ? 207 : 191),(float)y+21,13,13);
-        label(g,row.stopOnNext ? "ON" : "OFF",{tail+228,y+17,38,20},10,row.stopOnNext ? palette::teal : palette::muted);
+        g.fillEllipse((float)tail+(row.stopOnNext ? 134 : 118),(float)y+21,13,13);
+        label(g,row.stopOnNext ? "ON" : "OFF",{tail+154,y+17,38,20},10,row.stopOnNext ? palette::teal : palette::muted);
+        smallButton(g,autoStopVisibleRows.count(row.id) ? "−" : "+",{tail+203,y+16,34,23},true);
         g.setColour(palette::line.withAlpha(.6f)); g.drawHorizontalLine(y+rowHeight-1,0,(float)getWidth());
     }
 }
 
 void CueGrid::mouseDown(const juce::MouseEvent& e) {
     dragRow=dragColumn=dropRow=dropColumn=-1; dragging=false;
+    if (e.mods.isPopupMenu() && e.x>=nameWidth && e.y>=headerHeight) {
+        const int row=(e.y-headerHeight)/rowHeight,col=(e.x-nameWidth)/columnWidth;
+        if (row>=0 && row<(int)owner.show.rows.size() && col>=0 && col<(int)owner.show.columns.size() && owner.select(row,col)) {
+            juce::PopupMenu menu; menu.addItem(1,"Copia cella  Ctrl+C",owner.hasClip(row,col));
+            menu.addItem(2,"Incolla cella  Ctrl+V",owner.copiedCell.has_value() && owner.copiedType==owner.show.columns[(size_t)col].type);
+            auto safe=juce::Component::SafePointer<MainComponent>(&owner);
+            menu.showMenuAsync(juce::PopupMenu::Options().withTargetComponent(this),[safe](int item) {
+                if (safe) { if (item==1) safe->copySelectedCell(); else if (item==2) safe->pasteSelectedCell(); }
+            });
+        }
+        return;
+    }
     if (!e.mods.isLeftButtonDown()) return;
     owner.grabKeyboardFocus();
     if (e.y<0 || e.x<0) return;
@@ -125,13 +140,24 @@ void CueGrid::mouseDown(const juce::MouseEvent& e) {
     const int row=(e.y-headerHeight)/rowHeight, localY=(e.y-headerHeight)%rowHeight;
     if (row>=(int)owner.show.rows.size()) return;
     const int tail=nameWidth+(int)owner.show.columns.size()*columnWidth;
-    if (e.x>=tail+178 && e.x<tail+274 && localY>=10 && localY<44) {
+    if (e.x>=tail+12 && e.x<tail+96 && localY>=8 && localY<45) {
+        if (e.getNumberOfClicks()==1) owner.editRowBpm(row);
+        return;
+    }
+    if (e.x>=tail+105 && e.x<tail+195 && localY>=10 && localY<44) {
         if (e.getNumberOfClicks()==1) owner.setAutoStop(row,!owner.show.rows[row].stopOnNext);
         return;
     }
+    if (e.x>=tail+200 && e.x<tail+244 && localY>=10 && localY<44) {
+        const int id=owner.show.rows[(size_t)row].id;
+        if (autoStopVisibleRows.count(id)) autoStopVisibleRows.erase(id);
+        else autoStopVisibleRows.insert(id);
+        repaint(); return;
+    }
     if (e.x>=nameWidth && column>=0 && column<(int)owner.show.columns.size() && localY>=5 && localY<27) {
         const int localX=(e.x-nameWidth)%columnWidth;
-        if (localX>=columnWidth-52 && localX<columnWidth-8) {
+        if (autoStopVisibleRows.count(owner.show.rows[(size_t)row].id)
+            && localX>=columnWidth-52 && localX<columnWidth-8) {
             if (e.getNumberOfClicks()==1)
                 owner.setCellAutoStop(row,column,!owner.show.rows[(size_t)row].cells[(size_t)column].stopOnNext);
             return;

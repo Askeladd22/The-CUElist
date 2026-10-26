@@ -30,7 +30,7 @@ void prompt(juce::Component* parent,const juce::String& title,const juce::String
 MainComponent::MainComponent(bool startAudio) {
     setLookAndFeel(&theme); setWantsKeyboardFocus(true); setSize(1440,900);
     for (juce::Component* c : std::initializer_list<juce::Component*>{&openButton,&saveButton,&newButton,&addRowButton,&addColumnButton,
-         &goButton,&panicButton,&deviceButton,&masterSlider,&importButton,&midiEditButton,&oscEditButton,&playCellButton,&stopCellButton,&clearButton,&tempoButton,&applyButton,
+         &goButton,&panicButton,&deviceButton,&dockResize,&importButton,&midiEditButton,&oscEditButton,&playCellButton,&stopCellButton,&clearButton,&tempoButton,&applyButton,
          &cellTab,&rowTab,&rowGain,&rowBehaviour,&rowMute,&rowLoop,&rowName,&cellName,&bpm,&behaviour,&follow,&loop,&cellAutoStop,&gain,&viewport,&timeline,&utilities,
          &clipCollapseButton,&clipCloseButton}) addAndMakeVisible(c);
     for (auto* b : {&openButton,&saveButton,&newButton,&addRowButton,&addColumnButton,&goButton,&panicButton,&deviceButton,
@@ -48,8 +48,9 @@ MainComponent::MainComponent(bool startAudio) {
     }
     gain.setName("cellGainDb"); rowGain.setName("rowGainDb");
     masterSlider.setName("masterAudioDb");
-    masterSlider.setSliderStyle(juce::Slider::LinearHorizontal);
-    masterSlider.setTextBoxStyle(juce::Slider::TextBoxRight,false,67,25);
+    masterSlider.setSliderStyle(juce::Slider::LinearVertical);
+    masterSlider.setTextBoxStyle(juce::Slider::TextBoxBelow,false,67,19);
+    utilities.addAndMakeVisible(masterSlider);
     masterSlider.setRange(-60,12,0.1);
     masterSlider.setNumDecimalPlacesToDisplay(1);
     masterSlider.setTextValueSuffix(" dB");
@@ -71,6 +72,8 @@ MainComponent::MainComponent(bool startAudio) {
     cellAutoStop.setName("cellAutoStop");
     cellAutoStop.setTooltip("La cella si arresta al GO di un'altra cue solo se Auto Stop della sua riga e attivo.");
     cellAutoStop.onClick=[this] { setCellAutoStop(selectedRow,selectedColumn,cellAutoStop.getToggleState()); };
+    dockResize.setName("clipEditorResizeHandle");
+    dockResize.setTooltip("Trascina in alto o in basso per ridimensionare il Clip Editor integrato.");
     clipCollapseButton.setName("clipEditorCollapse");
     clipCloseButton.setName("clipEditorClose");
     clipCollapseButton.setVisible(false); clipCloseButton.setVisible(false);
@@ -130,7 +133,7 @@ void MainComponent::paint(juce::Graphics& g) {
     label(g,"SESSION",{232,25,100,22},12,palette::teal,true);
     g.setColour(palette::teal); g.fillRect(232,69,65,3);
     label(g,"0.5  /  PORTABLE",{334,25,160,22},11,palette::muted);
-    label(g,"MASTER AUDIO",{std::max(380,w-833),25,115,22},11,palette::teal,true);
+
     g.setColour(engine.connected.load() ? palette::teal : palette::red); g.fillEllipse((float)w-367,32,6,6);
     label(g,engine.connected.load() ? "Audio disponibile" : "Audio non disponibile",{w-352,22,160,25},12,palette::muted);
     label(g,"WORKSPACE",{20,99,140,18},10,palette::muted,true);
@@ -167,7 +170,7 @@ void MainComponent::paint(juce::Graphics& g) {
     g.saveState();
     if (h<890) { const float factor=(float)(h-232)/658.0f; g.addTransform(juce::AffineTransform(1,0,0,0,factor,226*(1-factor))); }
     label(g,"Nome della cue",{x,235,220,18},11,palette::muted);
-    label(g,"BPM  /  quarti in 4/4",{x,303,220,18},11,palette::muted);
+    label(g,"BPM iniziale",{x,303,220,18},11,palette::muted);
     g.setColour(palette::line); g.drawHorizontalLine(405,(float)x,(float)x+228);
     if (!rowSettings) {
     label(g,"CELLA  /  "+col.name,{x,420,228,20},11,palette::muted,true);
@@ -188,10 +191,10 @@ void MainComponent::resized() {
     const int w=getWidth(),h=getHeight(); editorX=w-280;
     newButton.setBounds(w-190,23,68,29); openButton.setBounds(w-116,23,46,29); saveButton.setBounds(w-64,23,52,29);
     deviceButton.setBounds(20,188,140,33);
-    masterSlider.setBounds(std::max(490,w-715),22,224,29);
+
     addRowButton.setBounds(editorX-188,98,76,33); addColumnButton.setBounds(editorX-104,98,92,33);
     const bool docked=(clipEditor && !clipWindow) || (oscEditor && !oscWindow);
-    const int dockHeight=docked ? (clipCollapsed ? 36 : 208) : 0;
+    const int dockHeight=docked ? (clipCollapsed ? 36 : this->dockHeight) : 0;
     const int gridHeight=std::max(235,h-438-dockHeight);
     constexpr int utilityHeight=182;
     viewport.setBounds(204,154,editorX-220,gridHeight-utilityHeight);
@@ -200,6 +203,11 @@ void MainComponent::resized() {
     const int dockY=168+gridHeight;
     clipCollapseButton.setVisible(docked);
     clipCloseButton.setVisible(docked);
+    dockResize.setVisible(docked && !clipCollapsed);
+    if (docked && !clipCollapsed) {
+        dockResize.setBounds(std::max(700,editorX-245),dockY-8,94,11);
+        dockResize.toFront(false);
+    }
     if (docked) {
         clipCollapseButton.setBounds(522,dockY+4,86,26);
         clipCloseButton.setBounds(615,dockY+4,82,26);
@@ -318,7 +326,12 @@ bool MainComponent::applyInspector() {
 }
 void MainComponent::message(const juce::String& text) { status=text; repaint(); juce::AlertWindow::showMessageBoxAsync(juce::MessageBoxIconType::WarningIcon,"The Cuelist",text,"OK",this); }
 bool MainComponent::memoryFits(const ClipMap& collection) const {
-    int64_t bytes=0; for (const auto& item : collection) bytes+=(int64_t)item.second->samples.getNumSamples()*item.second->samples.getNumChannels()*4;
+    // Pasted Audio cells intentionally share one immutable PCM object; counting
+    // the same shared media once per cell would reject valid large shows.
+    int64_t bytes=0;
+    std::set<const AudioClip*> counted;
+    for (const auto& item:collection) if (item.second && counted.insert(item.second.get()).second)
+        bytes+=(int64_t)item.second->samples.getNumSamples()*item.second->samples.getNumChannels()*4;
     return bytes<=512LL*1024*1024;
 }
 void MainComponent::importDialog() {
@@ -454,6 +467,10 @@ void MainComponent::setCellAutoStop(int row,int column,bool enabled) {
 }
 void MainComponent::stopAll() { engine.panic(); status="PANIC / riproduzioni audio, MIDI e OSC fermate."; repaint(); }
 bool MainComponent::keyPressed(const juce::KeyPress& key) {
+    if (key.getModifiers().isCommandDown() && !dynamic_cast<juce::TextEditor*>(juce::Component::getCurrentlyFocusedComponent())) {
+        if (key.getKeyCode()=='C' || key.getKeyCode()=='c') return copySelectedCell();
+        if (key.getKeyCode()=='V' || key.getKeyCode()=='v') return pasteSelectedCell();
+    }
     if (key.getModifiers().isCommandDown() && (key.getKeyCode()=='Z' || key.getKeyCode()=='z'))
         return key.getModifiers().isShiftDown() ? redoEdit() : undoEdit();
     if (key.getModifiers().isCommandDown() && (key.getKeyCode()=='Y' || key.getKeyCode()=='y')) return redoEdit();
@@ -527,7 +544,7 @@ void MainComponent::editTempo() {
     stopAll();
     const int rowId=show.rows[selectedRow].id; juce::String text;
     for (const auto& p : show.rows[selectedRow].tempo) text+=juce::String(p.beat)+" "+juce::String(p.bpm)+"\n";
-    prompt(this,"Mappa tempo della cue","Una riga per cambio: beat BPM. Metrica 4/4; beat in quarti, partenza da 0. Non modifica la velocita dei WAV.",text,true,
+    prompt(this,"Mappa tempo della cue","Una riga per cambio: beat BPM. Beat in quarti, da zero. Non modifica la velocita dei WAV.",text,true,
         [safe=juce::Component::SafePointer<MainComponent>(this),rowId](juce::String input) {
             if (!safe) return;
             std::vector<TempoPoint> points;
@@ -582,6 +599,98 @@ void MainComponent::moveClip(int sr,int sc,int tr,int tc) {
     if (!applyInspector()) return;
     auto result=moveCell(show,sr,sc,tr,tc); if (result.failed()) { status=result.getErrorMessage(); repaint(); return; }
     selectedRow=tr; selectedColumn=tc; nextCue=tr; changed("Celle scambiate.",true);
+}
+bool MainComponent::copySelectedCell() {
+    if (selectedRow<0 || selectedRow>=(int)show.rows.size() ||
+        selectedColumn<0 || selectedColumn>=(int)show.columns.size()) return false;
+    const auto& source=show.rows[(size_t)selectedRow].cells[(size_t)selectedColumn];
+    copiedCell=source;
+    copiedType=show.columns[(size_t)selectedColumn].type;
+    const auto found=clips.find(source.id);
+    copiedAudio=found==clips.end() ? nullptr : found->second;
+    status="Cella copiata: Ctrl+V su un'altra cella dello stesso tipo."; repaint();
+    return true;
+}
+bool MainComponent::pasteSelectedCell() {
+    if (!copiedCell || selectedRow<0 || selectedRow>=(int)show.rows.size() ||
+        selectedColumn<0 || selectedColumn>=(int)show.columns.size()) return false;
+    if (show.columns[(size_t)selectedColumn].type!=copiedType) {
+        message("Copia e incolla richiedono colonne dello stesso tipo (Audio / MIDI / OSC)."); return false;
+    }
+    if (!applyInspector()) return false;
+    auto updatedClips=clips;
+    auto& target=show.rows[(size_t)selectedRow].cells[(size_t)selectedColumn];
+    if (copiedAudio) updatedClips[target.id]=copiedAudio;
+    else updatedClips.erase(target.id);
+    if (!memoryFits(updatedClips)) {
+        message("Impossibile incollare: limite di memoria dei media superato."); return false;
+    }
+    const int id=target.id;
+    closeMidiClip(); closeOscClip();
+    target=*copiedCell;
+    target.id=id; // Stable destination identity; other cues and telemetry are unaffected.
+    clips=std::move(updatedClips);
+    changed("Contenuto e impostazioni della cella incollati.");
+    return true;
+}
+void MainComponent::editRowBpm(int index) {
+    if (index<0 || index>=(int)show.rows.size() || !applyInspector()) return;
+    const int id=show.rows[(size_t)index].id;
+    prompt(this,"BPM della cue","Nuovo BPM iniziale (20-400). Eventuali cambi tempo successivi restano invariati.",
+        juce::String(show.rows[(size_t)index].tempo.front().bpm,1),false,
+        [safe=juce::Component::SafePointer<MainComponent>(this),id](juce::String text) {
+            if (!safe) return;
+            const auto value=text.trim();
+            if (value.isEmpty() || value.retainCharacters("0123456789.")!=value) {
+                safe->message("BPM non valido."); return;
+            }
+            auto candidate=safe->show;
+            bool changed=false;
+            for (auto& row:candidate.rows) if (row.id==id) {
+                row.tempo.front().bpm=value.getDoubleValue(); changed=true; break;
+            }
+            if (!changed) return;
+            if (auto result=validateShow(candidate); result.failed()) {
+                safe->message(result.getErrorMessage()); return;
+            }
+            safe->show=std::move(candidate);
+            safe->changed("BPM iniziale della cue aggiornato.",true);
+        });
+}
+void MainComponent::setClipDuration(int column,double seconds) {
+    if (column<0 || column>=(int)show.columns.size() ||
+        selectedRow<0 || selectedRow>=(int)show.rows.size() || !std::isfinite(seconds)) return;
+    auto& row=show.rows[(size_t)selectedRow];
+    auto& cell=row.cells[(size_t)column];
+    if (!cell.midi && !cell.osc) return;
+    const auto& tempo=row.tempo;
+    const auto beatAt=[&](double duration) {
+        double low=0,high=std::max(1.0,duration*4);
+        while (secondsAtBeat(tempo,high)<duration && high<1000000.0) high*=2;
+        for (int i=0;i<48;++i) {
+            double mid=(low+high)*.5;
+            if (secondsAtBeat(tempo,mid)<duration) low=mid; else high=mid;
+        }
+        return (low+high)*.5;
+    };
+    double length=cell.midi || cell.osc->useBeats ? beatAt(std::max(.01,seconds)) : std::max(.01,seconds);
+    if (cell.midi) {
+        for (const auto& note:cell.midi->notes) length=std::max(length,note.beat+note.length+.0001);
+        length=juce::jlimit(.25,4096.0,length);
+        if (std::abs(cell.midi->lengthBeats-length)<.0001) return;
+        cell.midi->lengthBeats=length;
+    } else {
+        for (const auto& event:cell.osc->events) length=std::max(length,event.time+.001);
+        length=juce::jlimit(.01,86400.0,length);
+        if (std::abs(cell.osc->length-length)<.0001) return;
+        cell.osc->length=length;
+    }
+    dirty=true;
+    engine.publish(makeRenderState(show,clips));
+    if (cell.midi && clipEditor && clipEditorCellId==cell.id) clipEditor->loadClip(*cell.midi);
+    if (cell.osc && oscEditor && oscEditorCellId==cell.id) oscEditor->loadClip(*cell.osc);
+    status="Durata clip aggiornata dalla timeline.";
+    timeline.repaint(); grid.repaint(); repaint();
 }
 void MainComponent::setClipStart(int column,double seconds) {
     if (column<0 || column>=(int)show.columns.size() || !std::isfinite(seconds)) return;

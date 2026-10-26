@@ -1,5 +1,6 @@
 #pragma once
 #include "AudioEngine.h"
+#include <set>
 #include "Theme.h"
 namespace cuelist {
 class MainComponent;
@@ -20,6 +21,7 @@ public:
 private:
     MainComponent& owner;
     int dragRow=-1, dragColumn=-1, dropRow=-1, dropColumn=-1;
+    std::set<int> autoStopVisibleRows;
     bool dragging=false;
 };
 class Timeline final : public juce::Component, private juce::ScrollBar::Listener {
@@ -35,7 +37,8 @@ public:
 private:
     MainComponent& owner;
     int trackScroll=0, dragColumn=-1, dragRowId=-1, viewportRowId=-1;
-    bool seeking=false;
+    bool seeking=false,resizingClip=false;
+    double dragStartDuration=0;
     double dragStartSeconds=0, dragLength=10, dragViewStart=0, dragPixels=1;
     double zoom=1, viewStart=0;
     // Visual grid and clip snapping have independent controls and subdivisions.
@@ -118,6 +121,10 @@ public:
     void deleteColumn(int index);
     void moveClip(int,int,int,int);
     void setClipStart(int column,double seconds);
+    void setClipDuration(int column,double durationSeconds);
+    bool copySelectedCell();
+    bool pasteSelectedCell();
+    void editRowBpm(int row);
     void seekTimeline(double seconds);
     void goNext();
     int nextCueIndex() const { return nextCue; }
@@ -127,7 +134,7 @@ public:
     int selectedRow=0, selectedColumn=0;
     AudioEngine engine;
 private:
-    friend class CueGrid; friend class Timeline; friend class MidiUndoAction;
+    friend class CueGrid; friend class Timeline; friend class MidiUndoAction; friend class ColumnUtilities;
     Theme theme;
     juce::TooltipWindow tooltip{this,600};
     CueGrid grid{*this}; Timeline timeline{*this}; juce::Viewport viewport;
@@ -146,6 +153,14 @@ private:
     juce::Slider gain;
     juce::Slider rowGain;
     juce::Slider masterSlider;
+    struct DockResizeHandle : juce::Component, juce::SettableTooltipClient {
+        explicit DockResizeHandle(MainComponent& p) : owner(p) { setMouseCursor(juce::MouseCursor::UpDownResizeCursor); }
+        void paint(juce::Graphics& g) override { g.setColour(palette::muted); g.fillRoundedRectangle(getLocalBounds().toFloat().withSizeKeepingCentre(76,3),1.5f); }
+        void mouseDown(const juce::MouseEvent&) override { original=owner.dockHeight; }
+        void mouseDrag(const juce::MouseEvent& e) override { owner.dockHeight=juce::jlimit(130,400,original-e.getDistanceFromDragStartY()); owner.resized(); }
+        MainComponent& owner;
+        int original=208;
+    } dockResize{*this};
     juce::ComboBox rowBehaviour;
     juce::ToggleButton rowMute{"Mute intera cue"},rowLoop{"Loop di tutte le clip"};
     bool rowSettings=false;
@@ -159,6 +174,10 @@ private:
     std::unique_ptr<juce::DocumentWindow> clipWindow;
     int clipEditorCellId=-1;
     bool clipCollapsed=false;
+    int dockHeight=208;
+    std::optional<Cell> copiedCell;
+    std::shared_ptr<const AudioClip> copiedAudio;
+    ColumnType copiedType=ColumnType::audio;
     juce::TextButton clipCollapseButton{"Riduci"}, clipCloseButton{"Chiudi"};
     juce::UndoManager editHistory;
     juce::File projectFile;

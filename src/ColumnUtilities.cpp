@@ -7,9 +7,10 @@ public:
     explicit UtilityIcon(bool invert) : phase(invert) { setButtonText(invert ? "Inversione di fase" : "Mute"); }
     void paintButton(juce::Graphics& g,bool hover,bool down) override {
         const auto box=getLocalBounds().toFloat().reduced(2);
-        g.setColour(getToggleState() ? palette::teal.withAlpha(.18f) : palette::raised);
+        const auto active=phase ? palette::teal : palette::red;
+        g.setColour(getToggleState() ? active.withAlpha(.18f) : palette::raised);
         g.fillRoundedRectangle(box,4);
-        g.setColour(getToggleState() ? palette::teal : hover || down ? palette::text : palette::muted);
+        g.setColour(getToggleState() ? active : hover || down ? palette::text : palette::muted);
         g.drawRoundedRectangle(box,4,getToggleState() ? 1.4f : .7f);
         const auto icon=juce::Rectangle<float>(20,20).withCentre(box.getCentre());
         if (phase) {
@@ -153,31 +154,39 @@ struct ColumnUtilities::Strip final : juce::Component {
         const int w=getWidth(),h=getHeight();
         output.setBounds(6,4,w-12,25);
         oscDestination.setBounds(6,4,w-12,28);
-        gain.setBounds(3,34,61,std::max(90,h-39));
-        pan.setBounds(w-66,35,58,58);
-        mute.setBounds(w-75,h-36,32,29);
-        phase.setBounds(w-39,h-36,32,29);
+        gain.setBounds(10,35,73,std::max(95,h-37));
+        pan.setBounds(w-49,37,35,35);
+        mute.setBounds(w-77,h-36,32,29);
+        phase.setBounds(w-42,h-36,32,29);
     }
     void paint(juce::Graphics& g) override {
         g.setColour(palette::line); g.drawVerticalLine(0,0,(float)getHeight());
         if (owner.show.columns[(size_t)index].type!=ColumnType::audio) return;
         const int h=getHeight(),w=getWidth();
-        label(g,"PAN",{w-71,94,64,13},9,palette::muted,true,juce::Justification::centred);
+        label(g,"PAN",{w-54,73,45,13},9,palette::muted,true,juce::Justification::centred);
         const double v=owner.show.columns[(size_t)index].pan;
         const juce::String panText=std::abs(v)<.005 ? "C" : juce::String(v<0?"L ":"R ")+juce::String((int)std::round(std::abs(v)*100));
-        label(g,panText,{w-73,108,68,16},10,palette::text,false,juce::Justification::centred);
-        const float x=68.0f,top=43.0f,meterHeight=(float)std::max(30,h-89);
+        label(g,panText,{w-61,88,60,15},9,palette::text,false,juce::Justification::centred);
+        // Meter backdrop shares the fader's vertical axis; the slider is
+        // rendered above it by JUCE's child-component paint order.
+        const float x=23.0f,top=44.0f,meterWidth=39.0f,meterHeight=(float)std::max(36,h-89);
         g.setColour(palette::raised);
-        g.fillRoundedRectangle(x,top,13,meterHeight,3);
-        g.setColour(palette::line); g.drawRoundedRectangle(x,top,13,meterHeight,3,1);
+        g.fillRoundedRectangle(x,top,meterWidth,meterHeight,3);
         const float db=20.0f*std::log10(std::max(0.000001f,meterLevel));
         const float fill=juce::jlimit(0.0f,1.0f,(db+60.0f)/66.0f);
-        const float height=meterHeight*fill;
-        if (height>0) {
-            g.setColour(db>=0.0f ? palette::red : db>=-9.0f ? palette::amber : palette::teal);
-            g.fillRoundedRectangle(x+2,top+meterHeight-height,9,height,2);
+        const float fillH=meterHeight*fill;
+        if (fillH>0.0f) {
+            g.setColour(db>=0 ? palette::red.withAlpha(.50f) : db>=-9 ? palette::amber.withAlpha(.5f) : palette::teal.withAlpha(.5f));
+            g.fillRect(x+1,top+meterHeight-fillH,meterWidth-2,fillH);
         }
-        label(g,"PEAK",{62,h-38,28,13},8,palette::muted,true);
+        for (int tick:{0,-12,-24,-36,-48,-60}) {
+            const float y=top+meterHeight*(1.0f-(tick+60.0f)/66.0f);
+            g.setColour(palette::line.withAlpha(.9f));
+            g.drawHorizontalLine((int)std::round(y),x+3,x+meterWidth-3);
+            label(g,tick>0 ? "+6" : juce::String(tick),{(int)x+2,(int)y-7,26,13},8,palette::text);
+        }
+        g.setColour(palette::line); g.drawRoundedRectangle(x,top,meterWidth,meterHeight,3,1);
+        label(g,"dB",{65,40,25,13},8,palette::muted,true);
     }
 };
 ColumnUtilities::ColumnUtilities(MainComponent& p) : owner(p) {}
@@ -190,19 +199,24 @@ void ColumnUtilities::refresh() {
         for (int i=0;i<(int)owner.show.columns.size();++i) { auto strip=std::make_unique<Strip>(owner,i); addAndMakeVisible(*strip); strips.push_back(std::move(strip)); }
     }
     for (auto& strip : strips) strip->sync();
+    // Preserve the historical strip-child order used by the UI and tests.
+    // The Master remains an overlay in the left utility area and is last.
+    owner.masterSlider.toFront(false);
     resized(); repaint();
 }
 void ColumnUtilities::syncScroll(int x) { if (scrollX!=x) { scrollX=x; resized(); repaint(); } }
 void ColumnUtilities::refreshRouting() { for (auto& strip : strips) strip->syncRouting(); }
 void ColumnUtilities::refreshMeters() { for (auto& strip : strips) strip->updateMeter(); }
 void ColumnUtilities::resized() {
-    for (size_t i=0;i<strips.size();++i) strips[i]->setBounds(CueGrid::nameWidth+(int)i*CueGrid::columnWidth-scrollX,1,CueGrid::columnWidth,getHeight()-2);
+    owner.masterSlider.setBounds(21-scrollX,34,76,std::max(92,getHeight()-37));
+    for (size_t i=0;i<strips.size();++i)
+        strips[i]->setBounds(CueGrid::nameWidth+(int)i*CueGrid::columnWidth-scrollX,1,CueGrid::columnWidth,getHeight()-2);
 }
 void ColumnUtilities::paint(juce::Graphics& g) {
     g.fillAll(palette::panel); g.setColour(palette::line); g.drawHorizontalLine(0,0,(float)getWidth());
-    label(g,"UTILITY COLONNE",{14-scrollX,10,CueGrid::nameWidth-28,20},11,palette::teal,true);
-    label(g,"Fader verticali / Peak", {14-scrollX,39,CueGrid::nameWidth-28,20},11,palette::muted);
-    label(g,"Pan rotativo / Mute / Fase", {14-scrollX,65,CueGrid::nameWidth-28,20},11,palette::muted);
-    label(g,"Routing Audio / MIDI / OSC", {14-scrollX,93,CueGrid::nameWidth-28,20},11,palette::muted);
+    label(g,"MASTER AUDIO",{14-scrollX,10,CueGrid::nameWidth-28,20},11,palette::teal,true);
+    label(g,"Volume generale",{112-scrollX,58,175,20},12,palette::text);
+    label(g,"Solo audio PCM",{112-scrollX,84,175,18},10,palette::muted);
+    label(g,"MIDI e OSC invariati",{112-scrollX,104,175,18},10,palette::muted);
 }
 }
