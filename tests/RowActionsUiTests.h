@@ -43,6 +43,17 @@ void rowActionsUiTests() {
         pcm->samples.clear();
         const auto original=ui.show.rows[0];
         ui.clips[original.cells[0].id]=pcm;
+        // Match the visible inspector with the programmatically populated
+        // source cue; otherwise an unapplied UI draft would correctly win.
+        auto* name=dynamic_cast<juce::TextEditor*>(controlsV3::named(ui,"cueName"));
+        auto* bpm=dynamic_cast<juce::TextEditor*>(controlsV3::named(ui,"cueBpm"));
+        auto* level=dynamic_cast<juce::Slider*>(controlsV3::named(ui,"rowGainDb"));
+        name->setText("Scena 1",false);
+        bpm->setText("92.0",false);
+        level->setValue(juce::Decibels::gainToDecibels(.4f),juce::dontSendNotification);
+        for (auto* child:ui.getChildren()) if (auto* toggle=dynamic_cast<juce::ToggleButton*>(child))
+            if (toggle->getButtonText()=="Ripeti in loop")
+                toggle->setToggleState(true,juce::dontSendNotification);
         check(ui.duplicateRow(0),"Duplicate cue failed");
         check(ui.show.rows.size()==2 && ui.selectedRow==1,"Duplicate cue not inserted after source");
         const auto& duplicate=ui.show.rows[1];
@@ -74,6 +85,8 @@ void rowActionsUiTests() {
         pcm->samples.setSize(1,64); pcm->samples.clear();
         const int oldId=ui.show.rows[0].cells[0].id;
         ui.clips[oldId]=pcm;
+        dynamic_cast<juce::TextEditor*>(controlsV3::named(ui,"cueName"))->setText("Partenza",false);
+        dynamic_cast<juce::TextEditor*>(controlsV3::named(ui,"cellName"))->setText("Intro",false);
         check(ui.copyRow(0),"Copy entire row failed");
         ui.deleteRow(0);
         check(ui.show.rows.size()==1 && ui.show.rows[0].name=="Altro",
