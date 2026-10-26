@@ -241,7 +241,7 @@ void PianoRollEditor::loadClip(const MidiClip& replacement) {
 void PianoRollEditor::selectionChanged() {
     if (selected>=0) { const auto& n=clip.notes[(size_t)selected]; velocity.setValue(n.velocity,juce::dontSendNotification); channel.setSelectedId(n.channel,juce::dontSendNotification);
         hint=selectedNotes.size()>1 ? juce::String((int)selectedNotes.size())+" notes selected (drag, change velocity/channel or Delete)"
-            : "Note "+juce::String(n.pitch)+"  |  Beat "+juce::String(n.beat+1,2)+"  |  Durata "+juce::String(n.length,2)+" beat";
+            : "Note "+juce::String(n.pitch)+"  |  Beat "+juce::String(n.beat+1,2)+"  |  Length "+juce::String(n.length,2)+" beat";
     } else hint="Click: add note  |  Right-drag: select  |  Shift+click: add  |  Delete: remove";
     remove.setEnabled(!selectedNotes.empty()); repaint();
 }
