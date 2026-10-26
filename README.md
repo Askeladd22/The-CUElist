@@ -10,7 +10,7 @@ Controllo di spettacoli mediante una griglia di cue, clip audio e timeline. Ripr
 2. Apri **The Cuelist.exe** oppure **Avvia.cmd**.
 3. Seleziona il dispositivo in **Dispositivi audio**, importa un WAV/MP3 e scegli l'uscita della colonna nel menu **Out** delle utility.
 
-Per usare il programma **non servono Visual Studio, Build Tools, CMake, Git o Python**. Non è richiesto un installer. L'archivio dei soli sorgenti non contiene automaticamente l'eseguibile: usa il pacchetto portable nella cartella `dist`.
+Per usare il programma **non servono Visual Studio, Build Tools, CMake, Git o Python**. Non è richiesto un installer. **Attenzione: il pulsante GitHub `Code → Download ZIP` scarica soltanto i sorgenti, NON l'eseguibile.** Per avviare l'app scarica un artifact portable da **Actions → Build Windows portable** (oppure, per una build locale, usa il pacchetto nella cartella `dist`).
 
 Il runtime C/C++ è collegato staticamente; l'eseguibile verificato dipende solo da DLL di Windows. `Avvia.cmd` cerca l'eseguibile accanto a sé, in `portable` o nella build locale; non avvia mai una compilazione.
 
@@ -19,9 +19,10 @@ Il runtime C/C++ è collegato staticamente; l'eseguibile verificato dipende solo
 Il workflow **Build Windows portable** compila automaticamente su Windows x64, esegue i test, crea lo ZIP e ne verifica l'estrazione, il contenuto e gli hash. Un test grafico opzionale di avvio offline (`--offline`) e disponibile in locale con `scripts/check-package.ps1 -SmokeLaunch`. Non e necessario possedere Visual Studio per **utilizzare** il pacchetto.
 
 1. Apri la scheda **Actions** del repository e scegli **Build Windows portable**.
-2. Apri un'esecuzione riuscita (segno di spunta verde) e, nella sezione **Artifacts**, scarica **The-Cuelist-0.5.0-Windows-x64-portable**.
-3. Estrai lo ZIP scaricato da Actions; al suo interno trovi **The-Cuelist-0.5.0-Windows-x64.zip** e il checksum `.sha256`.
-4. Estrai anche il secondo ZIP in una cartella a tua scelta (anche su una chiavetta USB) e apri **The Cuelist.exe**. Non e richiesta un'installazione.
+2. Apri un'esecuzione riuscita (segno di spunta verde) e, nella sezione **Artifacts**, scarica **The-Cuelist-Windows-x64-READY** (accesso GitHub richiesto).
+3. Estrai il file scaricato in una cartella a tua scelta (anche su una chiavetta USB). Apri la cartella **The-Cuelist-0.5.0-Windows-x64** e avvia **The Cuelist.exe**. Non serve installare nulla.
+
+In alternativa puoi scaricare **The-Cuelist-0.5.0-Windows-x64-portable**: contiene lo ZIP di distribuzione e il file checksum `.sha256`, quindi richiede una seconda estrazione.
 
 Il workflow viene eseguito sui commit al ramo `feat/desktop-foundation`, nelle pull request dirette a quel ramo oppure manualmente dalla scheda Actions. Gli artifact GitHub scadono dopo 30 giorni; per conservarli scarica lo ZIP.
 
