@@ -14,7 +14,7 @@ void controlsV4Tests() {
                 check(controlsV3::named(*strip,name)->isVisible()==(c==0),"MIDI OSC utility area is not blank");
         }
         int combos=0; for (auto* child : ui.getChildren()) if (dynamic_cast<juce::ComboBox*>(child)) ++combos;
-        check(combos==3,"Output selector still present in inspector");
+        check(combos==2,"Unexpected combo box in inspector after meter selector removal");
     });
     test("column output combo reroutes actual PCM live without changing inspector drafts", [] {
         MainComponent ui(false); ui.show.columns[0].output=2;
