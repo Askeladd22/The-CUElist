@@ -126,6 +126,9 @@ public:
     std::atomic<float> peak {0};
     std::atomic<int> activeVoices {0};
     std::atomic<bool> connected {false};
+    // Last row GO actually processed in the callback. A queued GO does not
+    // change the active control mapping until acknowledged by transport.
+    std::atomic<int> acknowledgedCueId {0};
     std::atomic<int> monitoredRowId {0};
     std::atomic<double> playheadSeconds {0};
     std::atomic<bool> rowPlaying {false};

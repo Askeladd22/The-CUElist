@@ -159,6 +159,29 @@ void controlMappingV10Tests() {
         near(ui.show.columns[0].gain,32.0/127);
         check(ui.hasUnsavedChanges(),"Mapped faders did not mark project dirty");
     });
+    test("cue control mapping changes only after the audio callback confirms GO",[] {
+        MainComponent ui(false);
+        const int id=ui.show.rows[0].id;
+        ui.engine.connected.store(true);
+        check(ui.activeCueMappingId()==0,"New show should have global controls only");
+        ui.triggerRow(0);
+        check(ui.activeCueMappingId()==0,"UI activated mapping before GO was executed");
+        check(ui.engine.acknowledgedCueId.load()==0,"Queued GO was prematurely acknowledged");
+        juce::AudioBuffer<float> output(2,64);
+        ui.engine.processBlock(output.getArrayOfWritePointers(),2,64,48000.0);
+        check(ui.engine.acknowledgedCueId.load()==id,"Transport did not confirm executed GO");
+        ui.engine.panic();
+        check(ui.engine.acknowledgedCueId.load()==0,"Panic did not disarm cue mapping");
+    });
+    test("unknown GO rows cannot become active control mappings",[] {
+        auto show=makeShow();
+        AudioEngine audio;
+        audio.publish(makeRenderState(show,{}));
+        check(audio.send(987654,true),"Unable to queue test command");
+        juce::AudioBuffer<float> out(2,64);
+        audio.processBlock(out.getArrayOfWritePointers(),2,64,48000.0);
+        check(audio.acknowledgedCueId.load()==0,"Invalid cue ID activated mapping");
+    });
     test("preset creation and selection keep IDs stable on cue and show",[] {
         MainComponent ui(false);
         auto first=ui.createMappingPreset("Main");
