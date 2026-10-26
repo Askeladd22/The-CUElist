@@ -316,4 +316,32 @@ void controlMappingV10Tests() {
         check(validateShow(ui.show).wasOk(),"Pasted Control cell invalid");
     });
 
+    test("unlock restores the source cue without overwriting an unrelated Q override",[] {
+        MainComponent ui(false);
+        addColumn(ui.show,ColumnType::control,"Control A");
+        addRow(ui.show,"Q2");
+        ControlBinding first;first.deviceId="desk";first.number=10;
+        first.target=ControlTarget::masterGain;first.takeover=ControlTakeover::jump;
+        ControlBinding second=first;second.number=20;
+        check(ui.addControlSetBinding(0,1,first),"Q1 source mapping was not saved");
+        check(ui.addControlSetBinding(1,1,second),"Q2 override mapping was not saved");
+        check(ui.setControlColumnLocked(1,true,0),"Could not lock Q1 mapping");
+        check(ui.show.columns[1].controlDefaultSourceRowId==ui.show.rows[0].id,
+              "Lock did not remember its source cue");
+        auto third=first;third.number=11;
+        check(ui.addControlSetBinding(1,1,third),"Cannot update the locked default");
+        check(ui.setControlColumnLocked(1,false,1),"Unlocking from another selected cue failed");
+        const auto& original=ui.show.rows[0].cells[1].controlSet;
+        const auto& unrelated=ui.show.rows[1].cells[1].controlSet;
+        check(original && original->bindings.size()==2,
+              "Edited default was not restored to its original Q1");
+        check(unrelated && unrelated->bindings.size()==1 &&
+              unrelated->bindings.front().number==20,
+              "Unlock erased Q2's unrelated override");
+        check(validateShow(ui.show).wasOk(),"Lossless unlock invalidated the show");
+        Show recovered;
+        check(decodeShow(encodeShow(ui.show),recovered).wasOk(),
+              "Lock/unlock edits did not survive a project roundtrip");
+    });
+
 }
