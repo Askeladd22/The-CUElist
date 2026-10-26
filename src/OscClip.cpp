@@ -2,6 +2,7 @@
 #include <cmath>
 #include <cstring>
 #include <algorithm>
+#include <array>
 #include <numeric>
 #include <limits>
 namespace cuelist {
@@ -194,11 +195,25 @@ std::vector<OscScheduledMessage> prepareOscClip(const OscClip& clip,
         if (alreadyPeriodic && !tick.initial) continue;
         OscEvent composed=clip.automations[group].message;
         const auto unit=unitAtSeconds(tick.seconds);
+        // Multiple nonoverlapping segments may share a track/argument.
+        // Resolve by *timeline position*, not by insertion order: a later
+        // stored but earlier timed segment must never override the active one.
+        std::array<int,16> winner{};
+        winner.fill(-1);
         for (size_t k=0;k<clip.automations.size();++k) {
-            const auto& a=clip.automations[k];
-            if (!matchingTemplate(a,source) || unit+1e-9<a.time) continue;
-            const double value=interpolatedValue(a,juce::jlimit(0.0,a.duration,unit-a.time));
-            applyValue(composed.arguments[(size_t)a.argumentIndex],value);
+            const auto& segment=clip.automations[k];
+            if (!matchingTemplate(segment,source) || unit+1e-9<segment.time) continue;
+            const int arg=segment.argumentIndex;
+            const int previous=winner[(size_t)arg];
+            if (previous<0 || segment.time>=clip.automations[(size_t)previous].time)
+                winner[(size_t)arg]=(int)k;
+        }
+        for (int chosen:winner) {
+            if (chosen<0) continue;
+            const auto& segment=clip.automations[(size_t)chosen];
+            const double offset=juce::jlimit(0.0,segment.duration,unit-segment.time);
+            applyValue(composed.arguments[(size_t)segment.argumentIndex],
+                       interpolatedValue(segment,offset));
         }
         auto bytes=encodeOscMessage(composed);
         if (bytes.size()<=1024) result.push_back({tick.seconds,std::move(bytes)});
