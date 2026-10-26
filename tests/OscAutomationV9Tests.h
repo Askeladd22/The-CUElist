@@ -166,6 +166,65 @@ void oscAutomationV9Tests() {
         check(ui.redoEdit(),"OSC event Redo unavailable");
         check(ui.show.rows[0].cells[1].osc->events.size()==1,"OSC Redo did not restore inserted event");
     });
+    test("OSC automation respects a tempo change inside a beat-synced cue",[] {
+        const std::vector<TempoPoint> tempo={{0,120,4,4},{4,60,4,4}};
+        OscClip clip; clip.useBeats=true; clip.length=8;
+        OscAutomation a; a.message.address="/light";
+        a.message.arguments={{OscValueType::decimal,0,0,{}}};
+        a.time=3; a.duration=2; a.points={{0,0},{2,1}};
+        clip.automations.push_back(a);
+        const auto secondsAt=[&](double beat){return secondsAtBeat(tempo,beat);};
+        const auto beatAt=[&](double seconds){
+            double lo=0,hi=10;
+            for(int n=0;n<50;++n) {
+                const auto mid=(lo+hi)*.5;
+                if(secondsAt(mid)<seconds)lo=mid;else hi=mid;
+            }
+            return (lo+hi)*.5;
+        };
+        const auto messages=prepareOscClip(clip,secondsAt,beatAt);
+        check(!messages.empty(),"Beat-synced automation did not compile");
+        near(messages.front().seconds,1.5); // Beat three at 120 BPM
+        near(messages.back().seconds,3.0);  // Beat five after change to 60 BPM
+        bool foundHalf=false;
+        for(const auto& msg:messages) if(std::abs(msg.seconds-2.0)<.000001) {
+            check(msg.bytes.size()==16,"Unexpected OSC float payload");
+            // /light padded to 8; ,f padded to 4; 0.5f = 0x3f000000.
+            check(msg.bytes[12]==0x3f && msg.bytes[13]==0x00,
+                  "Musical interpolation did not reach halfway at BPM change");
+            foundHalf=true;
+        }
+        check(foundHalf,"Tempo change point missing from the prepared automation timeline");
+    });
+    test("seek into an OSC ramp does not repeat its already elapsed initial value",[] {
+        struct Sink : OscEventSink {
+            std::vector<std::vector<uint8_t>> received;
+            void emit(int,const uint8_t* data,unsigned size,int) noexcept override {
+                received.emplace_back(data,data+size);
+            }
+        } sink;
+        auto show=makeShow(); addColumn(show,ColumnType::osc,"OSC");
+        OscClip clip; clip.length=2;
+        OscAutomation au; au.message.address="/seek";
+        au.message.arguments={{OscValueType::integer,0,0,{}}};
+        au.points={{0,10},{1,40}}; au.duration=1;
+        clip.automations={au};
+        show.rows[0].cells[1].osc=clip;
+        auto state=makeRenderState(show,{});
+        auto& voice=state->voices[0]; voice.oscSink=&sink; voice.oscRoute=3;
+        voice.oscStream=std::make_shared<OscStream>();
+        state->trigger(show.rows[0].id,true);
+        state->seekRow(show.rows[0].id,.5);
+        float samples[100]{}; float* channels[]{samples};
+        state->render(channels,1,100,1000);
+        check(!sink.received.empty(),"Seek into ramp did not resume interpolation");
+        const auto& bytes=sink.received.front();
+        check(bytes.size()>=4 && bytes.back()!=10,"Seek unexpectedly replayed the initial value");
+        const auto before=sink.received.size();
+        state->trigger(show.rows[0].id,true,true);
+        state->render(channels,1,100,1000);
+        check(sink.received.size()==before,"Explicit Stop emitted an OSC reset");
+    });
     test("OSC editor creates timeline events and automation ramps with separate grid and snap",[] {
         OscClipEditor editor(OscClip{},{{0,120,4,4}},
             [](const OscClip&,const OscClip&,bool){});
