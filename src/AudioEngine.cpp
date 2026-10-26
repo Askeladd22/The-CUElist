@@ -514,6 +514,9 @@ bool AudioEngine::seekRow(int id,double seconds) noexcept {
     commands[w]={id,true,false,revision,panicEpoch.load(),true,std::max(0.0,seconds)};
     writeIndex.store(next,std::memory_order_release); return true;
 }
+bool AudioEngine::sendMappedMidiCc(const juce::String& id,int channel,int cc,int value) {
+    return midiRouter.queueMappedCc(id,channel,cc,value);
+}
 void AudioEngine::panic() noexcept { panicEpoch.fetch_add(1); midiRouter.emergencyStop(); oscRouter.emergencyStop(); }
 void AudioEngine::audioDeviceAboutToStart(juce::AudioIODevice* device) {
     deviceSampleRate=device->getCurrentSampleRate(); connected.store(true); panic();
