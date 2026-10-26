@@ -242,7 +242,7 @@ void MainComponent::resized() {
         }
     }
     goButton.setBounds(20,h-282,140,34); panicButton.setBounds(20,h-239,140,34);
-    grid.setSize(std::max(viewport.getWidth()-14,CueGrid::nameWidth+(int)show.columns.size()*CueGrid::columnWidth+280),
+    grid.setSize(std::max(viewport.getWidth()-14,CueGrid::nameWidth+(int)show.columns.size()*CueGrid::columnWidth+205),
                  std::max(viewport.getHeight()-14,CueGrid::headerHeight+(int)show.rows.size()*CueGrid::rowHeight));
 }
 void MainComponent::refresh() {
