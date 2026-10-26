@@ -52,7 +52,7 @@ void rowActionsUiTests() {
         bpm->setText("92.0",false);
         level->setValue(juce::Decibels::gainToDecibels(.4f),juce::dontSendNotification);
         for (auto* child:ui.getChildren()) if (auto* toggle=dynamic_cast<juce::ToggleButton*>(child))
-            if (toggle->getButtonText()=="Ripeti in loop")
+            if (toggle->getButtonText()=="Loop playback")
                 toggle->setToggleState(true,juce::dontSendNotification);
         check(ui.duplicateRow(0),"Duplicate cue failed");
         check(ui.show.rows.size()==2 && ui.selectedRow==1,"Duplicate cue not inserted after source");
