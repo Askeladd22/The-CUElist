@@ -242,9 +242,10 @@ void MainComponent::refreshInspector() {
     for (juce::Component* component : std::initializer_list<juce::Component*>{&cellName,&behaviour,&follow,&loop,&gain,&importButton,&midiEditButton,&oscEditButton,&playCellButton,&stopCellButton,&clearButton}) component->setVisible(!rowSettings);
     for (juce::Component* component : std::initializer_list<juce::Component*>{&rowBehaviour,&rowGain,&rowMute,&rowLoop}) component->setVisible(rowSettings);
     bool audio=col.type==ColumnType::audio; const bool midi=col.type==ColumnType::midi;
-    for (juce::Component* component : std::initializer_list<juce::Component*>{&importButton,&midiEditButton,&oscEditButton,&playCellButton,&stopCellButton,&clearButton,&gain,&loop,&behaviour,&follow,&cellName}) component->setEnabled(audio || midi);
+    for (juce::Component* component : std::initializer_list<juce::Component*>{&importButton,&midiEditButton,&oscEditButton,&playCellButton,&stopCellButton,&clearButton,&gain,&loop,&behaviour,&follow,&cellName}) component->setEnabled(true);
     gain.setVisible(!rowSettings && audio);
-    midiEditButton.setVisible(!rowSettings && midi); midiEditButton.setEnabled(midi);
+    midiEditButton.setEnabled(midi); oscEditButton.setEnabled(col.type==ColumnType::osc);
+    midiEditButton.setVisible(!rowSettings && midi);
     oscEditButton.setVisible(!rowSettings && col.type==ColumnType::osc);
     oscEditButton.setButtonText(c.osc ? "Modifica clip OSC" : "Crea clip OSC");
     midiEditButton.setButtonText(c.midi ? "Modifica piano roll" : "Crea clip MIDI");
@@ -253,7 +254,8 @@ void MainComponent::refreshInspector() {
     importButton.setTooltip(midi ? "File .mid/.midi: importa le note al tempo della cue." : "WAV / MP3 mono o stereo.");
     clearButton.setButtonText(col.type==ColumnType::osc ? "Rimuovi OSC" : midi ? "Rimuovi MIDI" : "Rimuovi audio");
     const bool loaded=hasClip(selectedRow,selectedColumn);
-    playCellButton.setEnabled(loaded); stopCellButton.setEnabled(loaded); clearButton.setEnabled(loaded || c.file.isNotEmpty());
+    playCellButton.setEnabled(loaded); stopCellButton.setEnabled(loaded);
+    clearButton.setEnabled(loaded || c.file.isNotEmpty());
 }
 bool MainComponent::select(int row,int column) {
     if (row<0 || row>=(int)show.rows.size() || column<0 || column>=(int)show.columns.size() || !applyInspector()) return false;
