@@ -115,8 +115,23 @@ void MainComponent::dispatchControl(const ControlEvent& input) {
                 break;
             }
     }
-    // MIDI CC and OSC outbound mappings are represented by the model but not
-    // dispatched until independent output paths are introduced.
+    if (binding.target==ControlTarget::midiCc) {
+        for (const auto& col:show.columns) if (col.id==binding.targetColumnId &&
+            col.type==ColumnType::midi) {
+            if (!engine.sendMappedMidiCc(col.midiOutputId,binding.outputChannel,
+                    binding.outputNumber,juce::jlimit(0,127,(int)std::lround(action->scaled))))
+                status="Controllo MIDI: uscita assente o coda piena.";
+            break;
+        }
+    } else if (binding.target==ControlTarget::oscFloat) {
+        for (const auto& col:show.columns) if (col.id==binding.targetColumnId &&
+            col.type==ColumnType::osc) {
+            if (!controlOutput.sendOscFloat(col.oscHost,col.oscPort,
+                binding.oscAddress,action->scaled))
+                status="Controllo OSC: destinazione non valida o coda piena.";
+            break;
+        }
+    }
 }
 class ControlPanel final : public juce::Component, private juce::Timer,
                            private juce::ListBoxModel {
@@ -125,7 +140,8 @@ public:
         setName("controlMappingPanel");
         for (juce::Component* c : std::initializer_list<juce::Component*>{
             &device,&connect,&learn,&add,&remove,&newPreset,&assignPreset,
-            &presetName,&presets,&scope,&target,&takeover,&columns,&bindingList,&state})
+            &presetName,&presets,&scope,&target,&takeover,&columns,&bindingList,&state,
+            &outputCc,&oscAddress,&invert})
             addAndMakeVisible(c);
         device.setName("controlInputDevice");
         device.setTooltip("Selezione esplicita. Nessuna sostituzione automatica in caso di disconnessione.");
@@ -140,8 +156,15 @@ public:
         state.setJustificationType(juce::Justification::centredLeft);
         scope.addItemList({"Globale","Colonna","Preset","Singola cue"},1);
         scope.setSelectedId(1);
-        target.addItemList({"Master Audio","Gain colonna Audio","GO cue successiva","PANIC"},1);
+        target.addItemList({"Master Audio","Gain colonna Audio","GO cue successiva","PANIC",
+                            "MIDI CC","OSC Float"},1);
         target.setSelectedId(1);
+        target.onChange=[this]{ refreshColumns(); };
+        outputCc.setName("mappingOutputCc");
+        outputCc.setText("20"); outputCc.setInputRestrictions(3,"0123456789");
+        oscAddress.setName("mappingOscAddress");
+        oscAddress.setText("/control/value");
+        invert.setName("mappingInvert");
         takeover.addItemList({"Pickup","Jump"},1);
         takeover.setSelectedId(1);
         bindingList.setName("mappingBindings");
@@ -155,7 +178,11 @@ public:
             state.setText(result.wasOk() ? "Dispositivo selezionato." : result.getErrorMessage(),
                 juce::dontSendNotification);
         };
-        connect.onClick=[this]{ refreshDevices(); };
+        connect.onClick=[this]{
+            refreshDevices();
+            if (owner && owner->show.controls.midiInputId.isNotEmpty())
+                owner->selectControlInput(owner->show.controls.midiInputId);
+        };
         learn.onClick=[this]{
             if (!owner || !owner->midiInput.connected()) {
                 state.setText("Connetti un ingresso MIDI.",juce::dontSendNotification); return;
@@ -185,7 +212,7 @@ public:
                 state.setText("Preset assegnato alla cue selezionata.",juce::dontSendNotification);
         };
         refreshDevices(); refreshPresets(); refreshColumns();
-        setSize(760,520); startTimerHz(10);
+        setSize(780,610); startTimerHz(10);
     }
     ~ControlPanel() override {stopTimer();bindingList.setModel(nullptr);}
     void paint(juce::Graphics& g) override {
@@ -196,10 +223,12 @@ public:
         label(g,"Regola",{17,205,120,17},11,palette::muted,true);
         label(g,"Destinazione",{213,205,120,17},11,palette::muted,true);
         label(g,"Takeover",{410,205,120,17},11,palette::muted,true);
-        label(g,"Preset cue",{17,286,200,17},11,palette::muted,true);
-        label(g,"Mapping salvati",{17,364,250,20},12,palette::teal,true);
+        label(g,"CC uscita",{17,263,95,16},10,palette::muted,true);
+        label(g,"Address OSC",{112,263,140,16},10,palette::muted,true);
+        label(g,"Preset cue",{17,324,200,17},11,palette::muted,true);
+        label(g,"Mapping salvati",{17,402,250,20},12,palette::teal,true);
         label(g,"Il mapping seleziona la destinazione attiva dopo GO, non al clic sulla riga.",
-              {17,483,getWidth()-32,19},10,palette::muted);
+              {17,579,getWidth()-32,19},10,palette::muted);
     }
     void resized() override {
         const int w=getWidth();
@@ -211,19 +240,23 @@ public:
         target.setBounds(213,227,180,29);
         takeover.setBounds(410,227,133,29);
         columns.setBounds(555,227,w-571,29);
-        presets.setBounds(17,308,200,30);
-        assignPreset.setBounds(226,308,150,30);
-        presetName.setBounds(388,308,w-536,30);
-        newPreset.setBounds(w-140,308,123,30);
-        bindingList.setBounds(17,388,w-230,89);
-        add.setBounds(w-202,389,184,37);
-        remove.setBounds(w-202,436,184,37);
+        outputCc.setBounds(17,281,83,29);
+        oscAddress.setBounds(112,281,210,29);
+        invert.setBounds(345,281,90,29);
+        presets.setBounds(17,344,200,30);
+        assignPreset.setBounds(226,344,150,30);
+        presetName.setBounds(388,344,w-536,30);
+        newPreset.setBounds(w-140,344,123,30);
+        bindingList.setBounds(17,425,w-230,139);
+        add.setBounds(w-202,426,184,37);
+        remove.setBounds(w-202,473,184,37);
     }
 private:
     juce::Component::SafePointer<MainComponent> owner;
     juce::ComboBox device,presets,scope,target,takeover,columns;
     juce::TextButton connect,learn,add,remove,newPreset,assignPreset;
-    juce::TextEditor presetName;
+    juce::TextEditor presetName,outputCc,oscAddress;
+    juce::ToggleButton invert{"Inverti"};
     juce::Label state;
     juce::ListBox bindingList;
     std::vector<juce::String> deviceIds;
@@ -266,7 +299,12 @@ private:
         if (!owner) return;
         columns.clear(juce::dontSendNotification);
         columnIds.clear();
-        for (const auto& c:owner->show.columns) if (c.type==ColumnType::audio) {
+        const int targetId=target.getSelectedId();
+        for (const auto& c:owner->show.columns) {
+            const bool eligible=targetId==2 ? c.type==ColumnType::audio :
+                targetId==5 ? c.type==ColumnType::midi :
+                targetId==6 ? c.type==ColumnType::osc : true;
+            if (!eligible) continue;
             columnIds.push_back(c.id);
             columns.addItem(c.name,(int)columnIds.size());
         }
@@ -285,6 +323,8 @@ private:
             case 2: b.target=ControlTarget::columnGain; break;
             case 3: b.target=ControlTarget::go; break;
             case 4: b.target=ControlTarget::panic; break;
+            case 5: b.target=ControlTarget::midiCc; break;
+            case 6: b.target=ControlTarget::oscFloat; break;
             default: return;
         }
         b.takeover=(ControlTakeover)(takeover.getSelectedId()-1);
@@ -292,17 +332,27 @@ private:
             b.scopeId=owner->show.rows[(size_t)owner->selectedRow].id;
         else if (b.scope==ControlScope::preset)
             b.scopeId=std::max(0,presets.getSelectedId()-1);
-        if (b.scope==ControlScope::column || b.target==ControlTarget::columnGain) {
+        if (b.scope==ControlScope::column || b.target==ControlTarget::columnGain ||
+            b.target==ControlTarget::midiCc || b.target==ControlTarget::oscFloat) {
             const int i=columns.getSelectedId()-1;
             if (i<0 || i>=(int)columnIds.size()) {
-                state.setText("Seleziona una colonna Audio.",juce::dontSendNotification);return;
+                state.setText("Seleziona una colonna di destinazione.",juce::dontSendNotification);return;
             }
             b.targetColumnId=columnIds[(size_t)i];
             if (b.scope==ControlScope::column) b.scopeId=b.targetColumnId;
         }
         if (b.kind==ControlKind::note || b.target==ControlTarget::go ||
             b.target==ControlTarget::panic) b.takeover=ControlTakeover::jump;
-        if (b.target==ControlTarget::masterGain || b.target==ControlTarget::columnGain) {
+        b.invert=invert.getToggleState();
+        if (b.target==ControlTarget::midiCc) {
+            b.outputChannel=captured->channel;
+            b.outputNumber=outputCc.getText().getIntValue();
+            b.minimum=0; b.maximum=127;
+        } else if (b.target==ControlTarget::oscFloat) {
+            b.oscAddress=oscAddress.getText().trim();
+            b.minimum=0; b.maximum=1;
+        } else if (b.target==ControlTarget::masterGain ||
+                   b.target==ControlTarget::columnGain) {
             b.minimum=0; b.maximum=1;
         }
         if (owner->addMappingBinding(b)) {
