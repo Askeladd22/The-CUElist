@@ -9,7 +9,7 @@ namespace cuelist {
 // An integrated stereo peak-meter and gain fader. No child Slider: the two
 // bars, cursor, ticks and hit target use the same calibrated dB-to-Y mapping.
 // Fader numbers are relative gain (dB); meter bars represent pre-master dBFS.
-class GainMeterFader final : public juce::Component {
+class GainMeterFader final : public juce::Component, public juce::SettableTooltipClient {
 public:
     static constexpr float minDb=-60.0f, maxDb=12.0f;
     std::function<void(float)> onGainChanged;
