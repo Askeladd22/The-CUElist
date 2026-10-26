@@ -1,4 +1,5 @@
 #pragma once
+#include "GainMeterFader.h"
 namespace controlsV3 {
 juce::Component* named(juce::Component& root,const juce::String& name) {
     if (root.getName()==name) return &root;
@@ -45,7 +46,7 @@ void controlsV3Tests() {
         for (int s=0;s<48000;++s) { clip->samples.setSample(0,s,.2f); clip->samples.setSample(1,s,.4f); }
         ui.clips[ui.show.rows[0].cells[0].id]=clip; ui.engine.connected.store(true); ui.engine.publish(makeRenderState(ui.show,ui.clips));
         auto* utilities=find<ColumnUtilities>(ui); check(utilities!=nullptr,"Utility strip absent");
-        auto* gain=dynamic_cast<juce::Slider*>(controlsV3::named(*utilities,"columnGainDb"));
+        auto* gain=dynamic_cast<GainMeterFader*>(controlsV3::named(*utilities,"columnGainDb"));
         auto* pan=dynamic_cast<juce::Slider*>(controlsV3::named(*utilities,"columnPan"));
         auto* mute=dynamic_cast<juce::ToggleButton*>(controlsV3::named(*utilities,"columnMute"));
         auto* phase=dynamic_cast<juce::ToggleButton*>(controlsV3::named(*utilities,"columnPhase"));
@@ -53,7 +54,7 @@ void controlsV3Tests() {
         ui.triggerCell();
         auto render=[&] { juce::AudioBuffer<float> out(2,1); ui.engine.collectRetired(); ui.engine.processBlock(out.getArrayOfWritePointers(),2,1,48000); return out; };
         near(render().getSample(0,0),.2);
-        gain->setValue(-6,juce::sendNotificationSync); const auto level=std::pow(10.0,-6.0/20); near(render().getSample(0,0),.2*level);
+        gain->setGainDb(-6,true); const auto level=std::pow(10.0,-6.0/20); near(render().getSample(0,0),.2*level);
         pan->setValue(1,juce::sendNotificationSync); auto out=render(); near(out.getSample(0,0),0); near(out.getSample(1,0),.4*level);
         phase->setToggleState(true,juce::dontSendNotification); phase->onClick(); near(render().getSample(1,0),-.4*level);
         mute->setToggleState(true,juce::dontSendNotification); mute->onClick(); near(render().getSample(1,0),0);

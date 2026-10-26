@@ -1,4 +1,5 @@
 #pragma once
+#include "GainMeterFader.h"
 #include "OscEditor.h"
 void uiRefinementTests() {
     using namespace cueViewFixtures;
@@ -109,9 +110,9 @@ void uiRefinementTests() {
         auto* master=dynamic_cast<juce::Slider*>(controlsV3::named(*utilities,"masterAudioDb"));
         check(master && master->getParentComponent()==utilities,"Master not placed in utility panel");
         auto* audio=utilities->getChildComponent(0);
-        auto* fader=dynamic_cast<juce::Slider*>(controlsV3::named(*audio,"columnGainDb"));
+        auto* fader=dynamic_cast<GainMeterFader*>(controlsV3::named(*audio,"columnGainDb"));
         auto* pan=dynamic_cast<juce::Slider*>(controlsV3::named(*audio,"columnPan"));
-        check(fader && pan && pan->getWidth()>=43 && pan->getWidth()<=50 && fader->getWidth()<=80,"Strip controls were not reduced");
+        check(fader && pan && pan->getWidth()>=43 && pan->getWidth()<=50 && fader->getWidth()<=96,"Strip controls were not reduced");
         check(master->getWidth()<=80 && master->getSliderStyle()==juce::Slider::LinearVertical,
               "Master fader not compact and vertical");
     });

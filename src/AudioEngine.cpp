@@ -187,7 +187,18 @@ void RenderState::releaseMidi(Voice& v,int offset,bool cancelPending) noexcept {
 }
 void RenderState::render(float* const* outputs,int channels,int frames,double sampleRate) noexcept {
     for (int ch=0;ch<channels;++ch) if (outputs[ch]) juce::FloatVectorOperations::clear(outputs[ch],frames);
-    for (auto& meter:columnMeters) if (meter.second) meter.second->peak.store(0.0f,std::memory_order_relaxed);
+    // Reset preallocated stereo mix buffers. Per-voice contributions are
+    // accumulated into each column separately, even if multiple columns
+    // share a physical output pair. No heap activity on the audio thread.
+    for (auto& meter:columnMeters) if (meter.second) {
+        auto& t=*meter.second;
+        const auto used=std::min((size_t)std::max(0,frames),t.mix[0].size());
+        for (auto& channel:t.mix) std::fill_n(channel.begin(),used,0.0f);
+        t.oversizeVoicePeak={{0.0f,0.0f}};
+        t.peak.store(0.0f,std::memory_order_relaxed);
+        t.left.store(0.0f,std::memory_order_relaxed);
+        t.right.store(0.0f,std::memory_order_relaxed);
+    }
     if (sampleRate<=0 || !std::isfinite(sampleRate)) return;
     for (auto& row:rows) if (row.playing) row.seconds+=(double)frames/sampleRate;
     for (auto& v:voices) {
@@ -263,7 +274,6 @@ void RenderState::render(float* const* outputs,int channels,int frames,double sa
             : v.gain*v.rowGain*v.columnGain*(v.columnPhaseInverted ? -1.0f : 1.0f);
         const float sideGain[2] {gain*(1.0f-std::max(0.0f,v.columnPan)),
                                  gain*(1.0f+std::min(0.0f,v.columnPan))};
-        float voicePeak=0.0f;
         for (int i=0;i<frames && v.playing;++i) {
             if (v.rowMode && v.delaySeconds>1.0e-12) { v.delaySeconds=std::max(0.0,v.delaySeconds-1.0/sampleRate); continue; }
             v.delaySeconds=0;
@@ -279,7 +289,14 @@ void RenderState::render(float* const* outputs,int channels,int frames,double sa
                 const float* data=audio.getReadPointer(std::min(side,audio.getNumChannels()-1));
                 const float contribution=(data[a]+fraction*(data[b]-data[a]))*sideGain[side];
                 outputs[output][i]+=contribution;
-                voicePeak=std::max(voicePeak,std::abs(contribution));
+                if (v.columnMeter) {
+                    auto& telemetry=*v.columnMeter;
+                    if ((size_t)i<telemetry.mix[(size_t)side].size())
+                        telemetry.mix[(size_t)side][(size_t)i]+=contribution;
+                    else
+                        telemetry.oversizeVoicePeak[(size_t)side]=std::max(
+                            telemetry.oversizeVoicePeak[(size_t)side],std::abs(contribution));
+                }
             }
             v.position+=step;
             if (v.position>=length) {
@@ -287,10 +304,17 @@ void RenderState::render(float* const* outputs,int channels,int frames,double sa
                 else { v.position=0; v.playing=false; }
             }
         }
-        if (v.columnMeter) {
-            const float oldPeak=v.columnMeter->peak.load(std::memory_order_relaxed);
-            v.columnMeter->peak.store(std::max(oldPeak,voicePeak),std::memory_order_relaxed);
-        }
+    }
+    for (auto& meter:columnMeters) if (meter.second) {
+        auto& t=*meter.second;
+        const auto used=std::min((size_t)std::max(0,frames),t.mix[0].size());
+        float peaks[2]={t.oversizeVoicePeak[0],t.oversizeVoicePeak[1]};
+        for (int ch=0;ch<2;++ch)
+            for (size_t i=0;i<used;++i)
+                peaks[ch]=std::max(peaks[ch],std::abs(t.mix[(size_t)ch][i]));
+        t.left.store(peaks[0],std::memory_order_relaxed);
+        t.right.store(peaks[1],std::memory_order_relaxed);
+        t.peak.store(std::max(peaks[0],peaks[1]),std::memory_order_relaxed);
     }
     for (auto& row:rows) {
         const bool wasPlaying=row.playing;
@@ -436,8 +460,15 @@ void AudioEngine::publish(std::unique_ptr<RenderState> state,bool preservePlayba
     delete pending.exchange(state.release());
 }
 float AudioEngine::getColumnPeak(int columnId) const noexcept {
+    const auto stereo=getColumnStereoPeak(columnId);
+    return std::max(stereo[0],stereo[1]);
+}
+std::array<float,2> AudioEngine::getColumnStereoPeak(int columnId) const noexcept {
     const auto it=columnPeaks.find(columnId);
-    return it==columnPeaks.end() ? 0.0f : it->second->peak.load(std::memory_order_relaxed);
+    if (it==columnPeaks.end()) return {{0.0f,0.0f}};
+    // UI thread owns columnPeaks; callback publishes atomic samples only.
+    return {{it->second->left.load(std::memory_order_relaxed),
+             it->second->right.load(std::memory_order_relaxed)}};
 }
 CellPlaybackInfo AudioEngine::getCellPlayback(int cellId) const noexcept {
     const auto found=playback.find(cellId);
