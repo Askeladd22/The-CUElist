@@ -12,4 +12,4 @@
 - **Timeline:** posizionamento delle clip, zoom, griglia BPM visibile/nascosta, risoluzione musicale configurabile e magnete indipendente per lo snap.
 - **Progetti portabili:** salvataggio degli show in formato `.cuelist`, con cartella dei media e backup.
 
-**Stato attuale:** versione **0.5.0** in sviluppo, per **Windows x64**. Il controllo OSC, il video e il timecode non sono ancora disponibili. Prima dell'uso in uno spettacolo reale sono necessarie prove sui dispositivi hardware interessati.
+**Stato attuale:** sviluppo **0.6 (OSC)**, eseguibile ancora identificato come **0.5.0** nel pacchetto Windows x64. OSC su UDP include editor di messaggi tipizzati e tempo in secondi o beat; video e timecode non sono ancora disponibili. Prima dell'uso in uno spettacolo reale sono necessarie prove sui dispositivi hardware interessati.
