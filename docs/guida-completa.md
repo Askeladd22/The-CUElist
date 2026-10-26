@@ -46,6 +46,16 @@ La sessione iniziale contiene una cue e una colonna Audio senza nomi precompilat
 
 Selezionare una riga riarma la sequenza da quella cue. I pulsanti Play/Stop delle celle e lo Stop di riga non cambiano la prossima cue. Spazio non lancia cue mentre si scrive in un campo testo.
 
+### Mixer e Master audio
+
+Nelle **Utility Colonne** ogni colonna Audio presenta una striscia compatta: **fader verticale** per il livello in dB, **meter PEAK** accanto al fader, **pan rotativo** con indicatore L/C/R e pulsanti **Mute** e **inversione di fase**. Le uscite Audio, MIDI e OSC mantengono il proprio routing: le colonne MIDI mostrano la porta MIDI e quelle OSC la destinazione UDP, senza controlli del volume audio.
+
+Il meter di colonna misura il picco dei contributi audio **dopo il livello di cella/riga/colonna, il pan e il mute**, **prima del Master**; è un indicatore di picco per le voci della strip, non un misuratore RMS né un limiter. Una colonna senza segnale mostra il livello che decresce verso zero.
+
+In alto trovi **MASTER AUDIO**: 0 dB è neutro, valori negativi attenuano tutto l'audio in uscita e valori positivi amplificano il mix. Il Master agisce soltanto sul PCM finale, **non** su messaggi MIDI o OSC e **non cambia** i livelli salvati nelle colonne. È applicato prima del taglio di sicurezza a ±1; non sostituisce un limiter per eventi dal vivo. Il meter globale OUTPUT sul lato sinistro indica il livello dopo il Master.
+
+La regolazione Master è salvata nello show (formato v8). Gli show v1–v7 si aprono con Master **0 dB**.
+
 ### Auto Stop 2.0
 
 **Auto Stop della riga** resta l'interruttore generale, a destra delle cue, ed e attivo per impostazione predefinita. Ogni cella Audio, MIDI o OSC ha inoltre il comando **AS ON / AS OFF**, nell'angolo superiore destro. Cliccalo per includere o escludere quella singola cella. La stessa opzione e disponibile nell'inspector, scheda **Cella**, come **Arresta al GO della prossima cue**.
@@ -122,7 +132,7 @@ Le uscite sono memorizzate per identificativo: un dispositivo assente non viene 
 
 Sovrascrivendo uno show, la versione precedente resta in `.cuelist.bak`. Le generazioni precedenti dei media vengono conservate per rendere utilizzabile il backup: salvataggi ripetuti possono aumentare lo spazio occupato.
 
-Il formato corrente è **v7**. **Apri** legge anche v1/v2/v3/v4/v5/v6 e backup. Il flag Auto Stop per cella viene letto dagli show v7 e inizializzato su ON negli show precedenti. Le clip MIDI sono salvate direttamente nello show, senza dipendere dal file MIDI importato:
+Il formato corrente è **v8**. **Apri** legge anche v1/v2/v3/v4/v5/v6/v7 e backup. Il flag Auto Stop per cella viene letto dagli show v7 e inizializzato su ON negli show precedenti. Le clip MIDI sono salvate direttamente nello show, senza dipendere dal file MIDI importato:
 
 - Auto Stop viene abilitato per default nei progetti precedenti alla v4.
 - Nei progetti v1/v2, i vecchi Restart e Stop diventano Retrigger e le utility di colonna partono neutre.
