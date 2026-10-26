@@ -40,6 +40,18 @@ juce::Result validateOscClip(const OscClip& clip) {
         if (encodeOscMessage(event).size()>1024)
             return juce::Result::fail("OSC message exceeds the 1024-byte limit.");
     }
+    if (clip.tracks.size()>16) return juce::Result::fail("Maximum 16 OSC tracks.");
+    for (const auto& track:clip.tracks) {
+        if (track.argumentIndex<0 || track.argumentIndex>=(int)track.message.arguments.size()
+            || !std::isfinite(track.rangeMin) || !std::isfinite(track.rangeMax)
+            || track.rangeMin>=track.rangeMax)
+            return juce::Result::fail("Invalid OSC track parameter or range.");
+        const auto type=track.message.arguments[(size_t)track.argumentIndex].type;
+        if (type!=OscValueType::integer && type!=OscValueType::decimal)
+            return juce::Result::fail("An OSC track requires a numeric argument.");
+        OscClip single; single.events={{0,track.message.address,track.message.arguments}};
+        if (validateOscClip(single).failed()) return juce::Result::fail("Invalid OSC track message.");
+    }
     if (clip.automations.size()>16) return juce::Result::fail("Maximum 16 OSC automations.");
     for (const auto& automation:clip.automations) {
         if (!std::isfinite(automation.time) || !std::isfinite(automation.duration)

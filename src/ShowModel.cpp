@@ -198,8 +198,18 @@ juce::String encodeShow(const Show& show) {
                         {"argumentIndex",a.argumentIndex},{"time",a.time},
                         {"duration",a.duration},{"points",points}}));
                 }
+                juce::Array<juce::var> tracks;
+                for (const auto& track:c.osc->tracks) {
+                    juce::Array<juce::var> args;
+                    for (const auto& v:track.message.arguments)
+                        args.add(object({{"type",(int)v.type},{"integer",v.integer},
+                            {"decimal",(double)v.decimal},{"text",v.text},{"boolean",v.boolean}}));
+                    tracks.add(object({{"address",track.message.address},{"args",args},
+                        {"argumentIndex",track.argumentIndex},{"rangeMin",track.rangeMin},
+                        {"rangeMax",track.rangeMax}}));
+                }
                 osc=object({{"useBeats",c.osc->useBeats},{"length",c.osc->length},
-                    {"events",events},{"automations",automations}});
+                    {"events",events},{"automations",automations},{"tracks",tracks}});
             }
             cells.add(object({{"id",c.id},{"name",c.name},{"file",c.file},{"followsRow",c.followsRow},
                 {"loop",c.loop},{"stopOnNext",c.stopOnNext},{"gain",c.gain},{"startSeconds",c.startSeconds},{"behaviour",(int)c.behaviour},{"midi",midi},{"osc",osc}}));
@@ -342,6 +352,27 @@ juce::Result decodeShow(const juce::String& text, Show& destination) {
                                 for (const auto& point:points)
                                     au.points.push_back({number(point,"time"),number(point,"value")});
                                 clip.automations.push_back(std::move(au));
+                            }
+                        }
+                        // v10-compatible optional lane metadata. Older v10 and v1-v9
+                        // files have no tracks property: their ramps are imported unchanged.
+                        if (o.hasProperty("tracks")) {
+                            const auto items=array(o,"tracks");
+                            if (items.size()>16) throw std::runtime_error("Too many OSC tracks.");
+                            for (const auto& item:items) {
+                                OscTrack track; track.message.address=string(item,"address");
+                                track.argumentIndex=integer(item,"argumentIndex");
+                                track.rangeMin=number(item,"rangeMin");
+                                track.rangeMax=number(item,"rangeMax");
+                                const auto args=array(item,"args");
+                                if (args.size()>16) throw std::runtime_error("Too many OSC arguments.");
+                                for (const auto& v:args) {
+                                    OscValue arg; arg.type=(OscValueType)integer(v,"type");
+                                    arg.integer=integer(v,"integer"); arg.decimal=(float)number(v,"decimal");
+                                    arg.text=string(v,"text"); arg.boolean=boolean(v,"boolean");
+                                    track.message.arguments.push_back(arg);
+                                }
+                                clip.tracks.push_back(std::move(track));
                             }
                         }
                         cell.osc=std::move(clip);

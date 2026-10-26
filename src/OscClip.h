@@ -26,11 +26,19 @@ struct OscAutomation {
     double time=0, duration=1;
     std::vector<OscControlPoint> points;
 };
+// Optional v10 metadata for persistent lanes; segments remain in the existing
+// automations array so older projects and the audio-clock scheduler keep working.
+struct OscTrack {
+    OscEvent message;
+    int argumentIndex=0;
+    double rangeMin=0, rangeMax=1;
+};
 struct OscClip {
     bool useBeats=false;
     double length=4;
     std::vector<OscEvent> events;
     std::vector<OscAutomation> automations;
+    std::vector<OscTrack> tracks;
 };
 // Valid OSC 1.0 messages with i, f, s, T and F type tags.
 // Packets have a fixed 1024-byte upper bound for lock-free RT dispatch.
