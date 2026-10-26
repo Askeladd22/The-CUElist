@@ -17,8 +17,8 @@ inline void pianoRollTests() {
         PianoRollEditor editor(MidiClip{},[](const MidiClip&){}); auto& canvas=editor.getCanvas();
         using namespace cueViewFixtures;
         const juce::Point<float> start{70,1240};
-        canvas.mouseDoubleClick(event(canvas,start,start,2));
-        check(editor.getClip().notes.size()==1,"Double click did not create note");
+        canvas.mouseDown(event(canvas,start,start));
+        check(editor.getClip().notes.size()==1,"Single click did not create note");
         near(editor.getClip().notes[0].beat,0); near(editor.getClip().notes[0].length,.25);
         check(editor.getClip().notes[0].pitch==60,"Wrong keyboard pitch");
         const juce::Point<float> moved{150,1222};
@@ -30,7 +30,7 @@ inline void pianoRollTests() {
         check(canvas.keyPressed(juce::KeyPress(juce::KeyPress::deleteKey)),"Delete ignored");
         check(editor.getClip().notes.empty(),"Note not deleted");
     });
-    test("piano roll edits velocity channel and commits only on Apply",[] {
+    test("piano roll edits velocity and channel with immediate commit",[] {
         MidiClip original{4,{{0,1,60,40,2}}}; int commits=0; MidiClip saved;
         PianoRollEditor editor(original,[&](const MidiClip& clip){ ++commits; saved=clip; }); auto& canvas=editor.getCanvas();
         cueViewFixtures::click(canvas,70,1240);
@@ -39,11 +39,11 @@ inline void pianoRollTests() {
             if (child->getName()=="midiVelocity") dynamic_cast<juce::Slider*>(child)->setValue(112,juce::sendNotificationSync);
             if (child->getName()=="midiLength") dynamic_cast<juce::Slider*>(child)->setValue(.25,juce::sendNotificationSync);
         }
-        check(commits==0 && original.notes[0].velocity==40,"Draft changed original");
+        check(commits>=2 && original.notes[0].velocity==40,"Immediate commit missing or original changed");
         near(editor.getClip().lengthBeats,1);
-        for (auto* child:editor.getChildren()) if (auto* button=dynamic_cast<juce::TextButton*>(child))
-            if (button->getButtonText()=="Applica") button->onClick();
-        check(commits==1 && saved.notes[0].channel==8 && saved.notes[0].velocity==112,"Apply lost note edits");
+        check(saved.notes[0].channel==8 && saved.notes[0].velocity==112,"Live commit lost note edits");
+        editor.undo(); check(editor.getClip().lengthBeats==4,"Undo did not restore clip length");
+        editor.redo(); near(editor.getClip().lengthBeats,1);
         const auto folder=juce::File::getSpecialLocation(juce::File::currentExecutableFile).getParentDirectory().getChildFile("test-artifacts");
         folder.createDirectory(); auto out=folder.getChildFile("piano-roll-preview.png").createOutputStream();
         if (out) { out->setPosition(0); out->truncate(); juce::PNGImageFormat{}.writeImageToStream(editor.createComponentSnapshot(editor.getLocalBounds()),*out); }
@@ -74,7 +74,7 @@ inline void pianoRollTests() {
         for (auto* child:editor.getChildren()) if (child->getName()=="midiSnap")
             dynamic_cast<juce::ComboBox*>(child)->setSelectedId(5,juce::sendNotificationSync);
         const juce::Point<float> from{94,1240};
-        canvas.mouseDoubleClick(cueViewFixtures::event(canvas,from,from,2));
+        canvas.mouseDown(cueViewFixtures::event(canvas,from,from));
         near(editor.getClip().notes[0].beat,.375);
         const juce::Point<float> dragFrom{100,1240},dragTo{112,1240};
         canvas.mouseDown(cueViewFixtures::event(canvas,dragFrom,dragFrom));
@@ -93,18 +93,14 @@ inline void pianoRollTests() {
         timeline->mouseDrag(cueViewFixtures::event(*timeline,to,from,1,true)); timeline->mouseUp(cueViewFixtures::event(*timeline,to,from,1,true));
         near(ui.show.rows[1].cells[1].startSeconds,1); near(ui.clipDuration(1,1),2);
     });
-    test("MIDI piano roll dialog applies to its cell and closes with owner",[] {
+    test("MIDI piano roll docks, commits instantly and closes with owner",[] {
         juce::Component::SafePointer<juce::Component> dialog;
         {
             MainComponent ui(false); addColumn(ui.show,ColumnType::midi,{}); ui.select(0,1);
-            ui.editMidiClip(); dialog=juce::ModalComponentManager::getInstance()->getModalComponent(0);
-            check(dialog!=nullptr,"MIDI editor did not open");
-            auto* editor=cueViewFixtures::find<PianoRollEditor>(*dialog); check(editor!=nullptr,"Piano roll absent");
+            ui.editMidiClip();
+            auto* editor=cueViewFixtures::find<PianoRollEditor>(ui); check(editor!=nullptr,"Docked piano roll absent");
             auto& canvas=editor->getCanvas(); const juce::Point<float> p{70,1240};
-            canvas.mouseDoubleClick(cueViewFixtures::event(canvas,p,p,2));
-            check(!ui.show.rows[0].cells[1].midi,"Draft leaked into show");
-            for (auto* child:editor->getChildren()) if (auto* button=dynamic_cast<juce::TextButton*>(child))
-                if (button->getButtonText()=="Applica") button->onClick();
+            canvas.mouseDown(cueViewFixtures::event(canvas,p,p));
             check(ui.show.rows[0].cells[1].midi && ui.show.rows[0].cells[1].midi->notes.size()==1,"Clip not committed to selected cell");
             check(ui.hasUnsavedChanges(),"MIDI edit not marked dirty");
             ui.setSize(1700,900);
