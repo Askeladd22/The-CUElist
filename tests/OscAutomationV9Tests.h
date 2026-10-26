@@ -98,6 +98,44 @@ void oscAutomationV9Tests() {
         check(end[16]==0 && end[17]==0 && end[18]==0 && end[19]==0,
               "Final automation value not emitted");
     });
+    test("automation sends its final value at natural completion and immediately before loop wrap",[] {
+        struct Sink : OscEventSink {
+            std::vector<std::vector<uint8_t>> messages;
+            void emit(int,const uint8_t* bytes,unsigned n,int) noexcept override {
+                messages.emplace_back(bytes,bytes+n);
+            }
+        } sink;
+        auto show=makeShow(); addColumn(show,ColumnType::osc,"OSC");
+        OscClip clip; clip.length=1;
+        OscAutomation a; a.message.address="/fade";
+        a.message.arguments={{OscValueType::integer,0,0,{}}};
+        a.duration=1; a.points={{0,0},{1,127}};
+        clip.automations.push_back(a);
+        show.rows[0].cells[1].osc=clip;
+        auto state=makeRenderState(show,{});
+        auto& voice=state->voices[0]; voice.oscSink=&sink; voice.oscRoute=5;
+        voice.oscStream=std::make_shared<OscStream>();
+        float samples[1000]{}; float* channels[]{samples};
+        state->trigger(voice.cellId,false);
+        state->render(channels,1,1000,1000);
+        check(!sink.messages.empty(),"Fade failed to emit");
+        check(sink.messages.back().back()==127,"Final automation value never emitted");
+        const auto count=sink.messages.size();
+        state->render(channels,1,100,1000);
+        check(sink.messages.size()==count,"Completed clip sent trailing OSC updates");
+        show.rows[0].cells[1].loop=true;
+        auto looping=makeRenderState(show,{});
+        auto& v=looping->voices[0]; v.oscSink=&sink; v.oscRoute=5;
+        v.oscStream=std::make_shared<OscStream>();
+        looping->trigger(v.cellId,false);
+        const auto begin=sink.messages.size();
+        looping->render(channels,1,1000,1000);
+        const auto afterFirst=sink.messages.size();
+        check(afterFirst>begin && sink.messages.back().back()==127,"Loop end missed final value");
+        looping->render(channels,1,1,1000);
+        check(sink.messages.size()==afterFirst+1 && sink.messages.back().back()==0,
+              "Loop should immediately re-send the ramp's initial value");
+    });
     test("two automations on different args share an OSC address without overwriting each other",[] {
         OscClip clip; clip.length=2;
         OscAutomation a; a.message.address="/xy";
