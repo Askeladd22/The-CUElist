@@ -285,10 +285,11 @@ void OscClipEditor::paint(juce::Graphics& g) {
             {13,getHeight()-17,std::max(1,getWidth()-20),16},9,palette::muted);
 }
 void OscClipEditor::chooseEvent(int index) {
-    selectedEvent=index; selectedAutomation=selectedPoint=-1; repaint();
+    selectedEvent=index; selectedTrack=selectedAutomation=selectedPoint=-1; repaint();
 }
 void OscClipEditor::chooseAutomation(int index) {
-    selectedAutomation=index; selectedEvent=selectedPoint=-1; repaint();
+    selectedAutomation=index; selectedTrack=trackForAutomation(index);
+    selectedEvent=selectedPoint=-1; repaint();
 }
 void OscClipEditor::notify(const OscClip& before,bool complete) {
     if (validateOscClip(clip).failed()) { clip=before; repaint(); return; }
@@ -540,39 +541,41 @@ void OscClipEditor::showContext(const juce::MouseEvent& e) {
 void OscClipEditor::addEvent() {
     if (clip.events.size()>=256) return;
     const auto before=clip;
-    clip.events.push_back({cursor,"/cue",{}});
+    // The message must have a typed argument. Historically this button
+    // created an empty typetag list: receivers saw only its OSC address.
+    clip.events.push_back({cursor,"/cue",{{OscValueType::decimal,0,0.0f,juce::String()}}});
     chooseEvent((int)clip.events.size()-1);
     notify(before); editEvent(selectedEvent);
 }
-void OscClipEditor::addAutomation() { createAutomationAt(cursor); }
-
-void OscClipEditor::createAutomationAt(double start) {
-    if (clip.automations.size()>=16 || !std::isfinite(start)) return;
+void OscClipEditor::addAutomation() { createTrack(); }
+void OscClipEditor::createAutomationAt(double start,int trackIndex) {
+    if (clip.automations.size()>=16 || !std::isfinite(start) ||
+        trackIndex<0 || trackIndex>(int)clip.tracks.size()) return;
     const auto before=clip;
+    if (trackIndex==(int)clip.tracks.size()) clip.tracks.push_back(defaultTrack());
+    const auto& track=clip.tracks[(size_t)trackIndex];
     OscAutomation au;
     au.time=juce::jlimit(0.0,clip.length,start);
-    // One true second even when the visible axis is in musical beats.
     au.duration=clip.useBeats
         ? beatFromSeconds(tempo,secondsAtBeat(tempo,au.time)+1.0)-au.time
         : 1.0;
-    if (!(au.duration>0) || au.time+au.duration>86400) return;
-    au.message.address=newTrackAddress;
-    au.message.arguments={{OscValueType::decimal,0,0,juce::String()}};
+    if (!(au.duration>0) || au.time+au.duration>86400) {clip=before;return;}
+    au.message=track.message;
+    au.argumentIndex=track.argumentIndex;
     au.points={{0,0},{au.duration,1}};
     clip.length=std::max(clip.length,au.time+au.duration);
     clip.automations.push_back(au);
-    if (validateOscClip(clip).failed()) { clip=before; return; }
+    if (validateOscClip(clip).failed()) {
+        clip=before; editHint="Cannot add an overlapping OSC segment."; repaint(); return;
+    }
     chooseAutomation((int)clip.automations.size()-1);
-    newTrackAddress="/parameter/"+juce::String((int)clip.automations.size()+1);
     notify(before);
 }
-
 void OscClipEditor::editTrackAddress(int index) {
-    if (index>=(int)clip.automations.size()) return;
-    const juce::String address=index<0 ? newTrackAddress :
-        clip.automations[(size_t)index].message.address;
+    if (index<0 || index>=(int)clip.tracks.size()) return;
+    const auto address=clip.tracks[(size_t)index].message.address;
     auto* dialog=new juce::AlertWindow("OSC track address",
-        "Address shared by the ramp's OSC messages.",
+        "Shared by all segments in this track.",
         juce::MessageBoxIconType::NoIcon,this);
     dialog->addTextEditor("address",address,"OSC address");
     dialog->addButton("Save",1); dialog->addButton("Cancel",0);
@@ -580,26 +583,34 @@ void OscClipEditor::editTrackAddress(int index) {
     const auto generation=revision;
     dialog->enterModalState(true,juce::ModalCallbackFunction::create(
         [safe,dialog,index,generation](int response) {
-            if (!safe || response!=1 || generation!=safe->revision) return;
+            if (!safe || response!=1 || generation!=safe->revision ||
+                index>=(int)safe->clip.tracks.size()) return;
             const auto address=dialog->getTextEditorContents("address").trim();
-            if (index<0) {
-                OscClip test; test.events={{0,address,{}}};
-                if (validateOscClip(test).failed()) return;
-                safe->newTrackAddress=address; safe->repaint(); return;
-            }
-            if (index>=(int)safe->clip.automations.size()) return;
             const auto before=safe->clip;
-            safe->clip.automations[(size_t)index].message.address=address;
+            for (int i=0;i<(int)safe->clip.automations.size();++i)
+                if (safe->trackForAutomation(i)==index)
+                    safe->clip.automations[(size_t)i].message.address=address;
+            safe->clip.tracks[(size_t)index].message.address=address;
             safe->notify(before);
         }),true);
 }
 void OscClipEditor::deleteSelection() {
+    if (selectedPoint>=0 && selectedAutomation>=0) {
+        removeSelectedPoint(); return;
+    }
     const auto before=clip;
     if (selectedEvent>=0 && selectedEvent<(int)clip.events.size()) {
-        clip.events.erase(clip.events.begin()+selectedEvent); selectedEvent=-1;
+        clip.events.erase(clip.events.begin()+selectedEvent);
+        selectedEvent=-1;
     } else if (selectedAutomation>=0 && selectedAutomation<(int)clip.automations.size()) {
         clip.automations.erase(clip.automations.begin()+selectedAutomation);
         selectedAutomation=selectedPoint=-1;
+    } else if (selectedTrack>=0 && selectedTrack<(int)clip.tracks.size()) {
+        for (int i=(int)clip.automations.size()-1;i>=0;--i)
+            if (trackForAutomation(i)==selectedTrack)
+                clip.automations.erase(clip.automations.begin()+i);
+        clip.tracks.erase(clip.tracks.begin()+selectedTrack);
+        selectedTrack=-1;
     } else return;
     notify(before);
 }
@@ -612,7 +623,9 @@ void OscClipEditor::duplicateSelection() {
     } else if (selectedAutomation>=0 && selectedAutomation<(int)clip.automations.size()
                && clip.automations.size()<16) {
         auto copy=clip.automations[(size_t)selectedAutomation];
-        copy.time=juce::jlimit(0.0,clip.length-copy.duration,copy.time+.25);
+        copy.time+=copy.duration+.25; // avoid overlap on the same track
+        clip.length=std::max(clip.length,copy.time+copy.duration);
+        if (clip.length>86400) { clip=before; return; }
         clip.automations.push_back(copy); chooseAutomation((int)clip.automations.size()-1);
     } else return;
     notify(before);
