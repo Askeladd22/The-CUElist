@@ -415,7 +415,8 @@ void MainComponent::triggerRow(int row) {
         nextCue=row+1;
         activeCueId=show.rows[row].id;
         controlMapping.setActiveCue(activeCueId,show.rows[row].mappingPresetId);
-        pressedControls.clear();
+        // Preserve held physical button state across GO to prevent repeated CC
+        // values from cascading through multiple cues before release.
     }
     repaint(); grid.repaint();
 }
