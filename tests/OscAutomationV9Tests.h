@@ -402,4 +402,45 @@ void oscAutomationV9Tests() {
         check(editor.getClip().tracks.size()==5,"OSC plus lost tracks");
     });
 
+    test("OSC segments on one address use temporal priority instead of insertion order",[] {
+        OscClip clip; clip.length=4;
+        OscAutomation later; later.message.address="/same";
+        later.message.arguments={{OscValueType::decimal,0,0,{}}};
+        later.time=2; later.duration=1; later.points={{0,0},{1,1}};
+        auto earlier=later; earlier.time=0;
+        earlier.points={{0,0},{1,0.25}};
+        clip.automations={later,earlier}; // intentionally reversed
+        check(validateOscClip(clip).wasOk(),"Nonoverlapping segments rejected");
+        const auto packets=prepareOscClip(clip,
+            [](double time){return time;},[](double seconds){return seconds;});
+        OscEvent expected; expected.address="/same";
+        expected.arguments={{OscValueType::decimal,0,1.0f,{}}};
+        const auto encoded=encodeOscMessage(expected);
+        bool found=false;
+        for (const auto& packet:packets)
+            if (std::abs(packet.seconds-3.0)<1e-7 && packet.bytes==encoded)
+                found=true;
+        check(found,"Earlier inserted segment reset the value at the end of a later segment");
+    });
+    test("OSC editing removes an interior point without deleting its ramp",[] {
+        OscClip clip; OscAutomation a; a.message.address="/shape";
+        a.message.arguments={{OscValueType::decimal,0,0,{}}};
+        a.duration=2; a.points={{0,0},{1,1},{2,0}};
+        clip.automations.push_back(a);
+        int edits=0;
+        OscClipEditor editor(clip,{{0,120,4,4}},
+            [&](const OscClip&,const OscClip&,bool){++edits;});
+        editor.setSize(940,420);
+        // The middle point is at 1 second: x=288, y=185 in the 0..1 lane.
+        const juce::Point<float> middle{288,185};
+        editor.mouseDown(cueViewFixtures::event(editor,middle,middle));
+        check(editor.keyPressed(juce::KeyPress(juce::KeyPress::deleteKey)),
+              "Delete was not handled");
+        check(editor.getClip().automations.size()==1 &&
+              editor.getClip().automations[0].points.size()==2,
+              "Point deletion removed the entire OSC ramp instead");
+        check(edits>0 && validateOscClip(editor.getClip()).wasOk(),
+              "OSC point deletion did not commit a valid undoable edit");
+    });
+
 }
