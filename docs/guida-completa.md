@@ -109,7 +109,7 @@ Le uscite sono memorizzate per identificativo: un dispositivo assente non viene 
 
 Sovrascrivendo uno show, la versione precedente resta in `.cuelist.bak`. Le generazioni precedenti dei media vengono conservate per rendere utilizzabile il backup: salvataggi ripetuti possono aumentare lo spazio occupato.
 
-Il formato corrente è **v5**. **Apri** legge anche v1/v2/v3/v4 e backup. Le clip MIDI sono salvate direttamente nello show, senza dipendere dal file MIDI importato:
+Il formato corrente è **v6**. **Apri** legge anche v1/v2/v3/v4/v5 e backup. Le clip MIDI sono salvate direttamente nello show, senza dipendere dal file MIDI importato:
 
 - Auto Stop viene abilitato per default nei progetti precedenti alla v4.
 - Nei progetti v1/v2, i vecchi Restart e Stop diventano Retrigger e le utility di colonna partono neutre.
