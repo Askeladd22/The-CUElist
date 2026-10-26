@@ -66,7 +66,7 @@ void timelineV3Tests() {
             if (component->getName()=="timelineSnapDivision") snapResolution=dynamic_cast<juce::ComboBox*>(component);
         }
         check(visibility && magnet && gridResolution && snapResolution,"Grid or snap controls absent");
-        check(visibility->getButtonText()=="Griglia ON" && magnet->getToggleState(),"Initial controls incorrect");
+        check(visibility->getButtonText()=="Grid ON" && magnet->getToggleState(),"Initial controls incorrect");
         gridResolution->setSelectedId(1,juce::sendNotificationSync); // quarter notes
         const auto pixelAt=[&](int x) {
             auto screenshot=timeline->createComponentSnapshot(timeline->getLocalBounds());
@@ -74,7 +74,7 @@ void timelineV3Tests() {
         };
         const auto withGrid=pixelAt(172); // beat 1 at 0.5 s, 120 BPM and 640px/10s
         visibility->onClick();
-        check(visibility->getButtonText()=="Griglia OFF","Grid toggle did not update label");
+        check(visibility->getButtonText()=="Grid OFF","Grid toggle did not update label");
         check(pixelAt(172)!=withGrid,"Grid still drawn when hidden");
         check(magnet->getToggleState(),"Hiding grid disabled magnet");
         visibility->onClick();
@@ -83,7 +83,7 @@ void timelineV3Tests() {
         check(pixelAt(156)!=withoutHalfBeat,"Grid resolution does not affect rendered lines");
         check(snapResolution->getSelectedId()==3,"Changing grid resolution changed snap");
         magnet->onClick();
-        check(!magnet->getToggleState() && visibility->getButtonText()=="Griglia ON",
+        check(!magnet->getToggleState() && visibility->getButtonText()=="Grid ON",
               "Turning magnet off also hid grid");
     });
     test("timeline snap division works with hidden grid and independent tempo map",[] {
