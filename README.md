@@ -17,4 +17,6 @@ It is designed for show playback control without requiring a full digital audio 
 
 **Development status:** **0.6 (initial Control & Mapping v10)**; the executable is still identified as **0.5.0**. Show format **v10** can load projects from v1–v9. Windows CI builds and automated tests have succeeded, but a complete test on live production hardware has not been carried out. Video, timecode, and MIDI controller feedback are not yet implemented. Control Mapping remains experimental: do not use it in a live show without thorough rehearsal and validation.
 
+For license terms, see the [English reference translation](LICENSE.en.md) and the authoritative [Italian original](LICENSE).
+
 See [the complete user guide](docs/guida-completa.md) for operating instructions, build details, and limits.

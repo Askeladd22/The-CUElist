@@ -1,6 +1,6 @@
 # The Cuelist — License Notices
 
-The original application code, scripts, and tests are proprietary: all rights reserved. See [LICENSE](LICENSE). No open-source license applies to the project's original code.
+The original application code, scripts, and tests are proprietary: all rights reserved. See the authoritative [Italian LICENSE](LICENSE) or the [English reference translation](LICENSE.en.md). No open-source license applies to the project's original code.
 
 ## JUCE and Third-Party Components
 
