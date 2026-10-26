@@ -24,7 +24,18 @@ struct CellPlaybackTelemetry {
 };
 // Column meter receives post-strip, pre-master peak samples from the audio callback.
 // No allocations, locks, or UI lookups occur on the real-time thread.
-struct ColumnPeakTelemetry { std::atomic<float> peak {0}; };
+struct ColumnPeakTelemetry {
+    static constexpr int maxMeterFrames=8192;
+    // The scratch arrays are allocated on the UI thread when creating a render
+    // state, never inside audioDeviceIOCallback. They preserve stereo sums
+    // across simultaneous voices on the same column.
+    std::array<std::vector<float>,2> mix;
+    std::array<float,2> oversizeVoicePeak {{0,0}};
+    std::atomic<float> peak {0}, left {0}, right {0};
+    ColumnPeakTelemetry() {
+        for (auto& channel:mix) channel.resize(maxMeterFrames,0.0f);
+    }
+};
 struct Voice {
     int cellId = 0, rowId = 0, output = 0, columnIndex = -1;
     std::shared_ptr<ColumnPeakTelemetry> columnMeter;
@@ -108,6 +119,8 @@ public:
     // UI-thread only. Unknown or removed cells return an empty value.
     CellPlaybackInfo getCellPlayback(int cellId) const noexcept;
     float getColumnPeak(int columnId) const noexcept;
+    // Returns post-cell/row/strip, pre-master L/R peaks (linear amplitude).
+    std::array<float,2> getColumnStereoPeak(int columnId) const noexcept;
     juce::AudioDeviceManager devices;
     std::atomic<float> peak {0};
     std::atomic<int> activeVoices {0};
