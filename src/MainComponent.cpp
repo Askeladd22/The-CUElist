@@ -165,7 +165,7 @@ void MainComponent::resized() {
     newButton.setBounds(w-190,23,68,29); openButton.setBounds(w-116,23,46,29); saveButton.setBounds(w-64,23,52,29);
     deviceButton.setBounds(20,188,140,33);
     addRowButton.setBounds(editorX-188,98,76,33); addColumnButton.setBounds(editorX-104,98,92,33);
-    const int dockHeight=clipEditor && !midiDialog && clipEditor->isVisible() ? (clipEditorExpanded ? 280 : 190) : 0;
+    const int dockHeight=clipEditor && !midiDialog && clipEditor->isVisible() ? (clipEditorExpanded ? 310 : 260) : 0;
     const int gridHeight=std::max(235,h-438-dockHeight);
     viewport.setBounds(204,154,editorX-220,gridHeight-116);
     utilities.setBounds(204,154+gridHeight-116,editorX-220,116);
