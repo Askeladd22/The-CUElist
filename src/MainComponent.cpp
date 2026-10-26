@@ -170,7 +170,7 @@ void MainComponent::paint(juce::Graphics& g) {
     g.saveState();
     if (h<890) { const float factor=(float)(h-232)/658.0f; g.addTransform(juce::AffineTransform(1,0,0,0,factor,226*(1-factor))); }
     label(g,"Nome della cue",{x,235,220,18},11,palette::muted);
-    label(g,"BPM  /  quarti in 4/4",{x,303,220,18},11,palette::muted);
+    label(g,"BPM iniziale",{x,303,220,18},11,palette::muted);
     g.setColour(palette::line); g.drawHorizontalLine(405,(float)x,(float)x+228);
     if (!rowSettings) {
     label(g,"CELLA  /  "+col.name,{x,420,228,20},11,palette::muted,true);
@@ -539,7 +539,7 @@ void MainComponent::editTempo() {
     stopAll();
     const int rowId=show.rows[selectedRow].id; juce::String text;
     for (const auto& p : show.rows[selectedRow].tempo) text+=juce::String(p.beat)+" "+juce::String(p.bpm)+"\n";
-    prompt(this,"Mappa tempo della cue","Una riga per cambio: beat BPM. Metrica 4/4; beat in quarti, partenza da 0. Non modifica la velocita dei WAV.",text,true,
+    prompt(this,"Mappa tempo della cue","Una riga per cambio: beat BPM. Beat in quarti, da zero. Non modifica la velocita dei WAV.",text,true,
         [safe=juce::Component::SafePointer<MainComponent>(this),rowId](juce::String input) {
             if (!safe) return;
             std::vector<TempoPoint> points;
