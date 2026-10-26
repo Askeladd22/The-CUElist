@@ -53,6 +53,18 @@ juce::Result validateOscClip(const OscClip& clip) {
         OscClip single; single.events={{0,track.message.address,track.message.arguments}};
         if (validateOscClip(single).failed()) return juce::Result::fail("Invalid OSC track message.");
     }
+    for (size_t i=0;i<clip.tracks.size();++i)
+        for (size_t j=i+1;j<clip.tracks.size();++j) {
+            const auto& a=clip.tracks[i],&b=clip.tracks[j];
+            if (a.message.address!=b.message.address ||
+                a.argumentIndex!=b.argumentIndex ||
+                a.message.arguments.size()!=b.message.arguments.size()) continue;
+            const bool sameTypes=std::equal(a.message.arguments.begin(),a.message.arguments.end(),
+                b.message.arguments.begin(),[](const OscValue& x,const OscValue& y){
+                    return x.type==y.type;
+                });
+            if (sameTypes) return juce::Result::fail("Duplicate OSC track address and argument.");
+        }
     if (clip.automations.size()>16) return juce::Result::fail("Maximum 16 OSC automations.");
     for (const auto& automation:clip.automations) {
         if (!std::isfinite(automation.time) || !std::isfinite(automation.duration)
