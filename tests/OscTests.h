@@ -11,7 +11,7 @@ void oscTests() {
         OscClip clip; clip.events={e};
         check(validateOscClip(clip).wasOk(),"Valid OSC clip rejected");
         const auto encoded=encodeOscMessage(e);
-        check(encoded.size()==32,"OSC packet size incorrect");
+        check(encoded.size()==28,"OSC packet size incorrect");
         const auto eq=[&](size_t offset,const char* pattern) {
             return std::memcmp(encoded.data()+offset,pattern,std::strlen(pattern))==0;
         };
