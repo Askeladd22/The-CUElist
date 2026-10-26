@@ -5,7 +5,7 @@ namespace cuelist {
 namespace {
 constexpr int timelineStart=140, tracksTop=82, trackHeight=42;
 // Invert the monotonic tempo map to place grid lines in musical time,
- // including cues with multiple BPM changes.
+// including cues with multiple BPM changes.
 double beatAtSeconds(const std::vector<TempoPoint>& tempo,double seconds) {
     if (seconds<=0) return 0;
     double low=0,high=std::max(1.0,seconds*2);
@@ -25,29 +25,75 @@ juce::Rectangle<int> zoomButton(int width,int index) {
     return {width-140+34*index,10,index==2 ? 52 : 28,25};
 }
 }
+void Timeline::MagnetToggle::paintButton(juce::Graphics& g,bool hovered,bool pressed) {
+    const auto active=getToggleState();
+    const auto bounds=getLocalBounds().toFloat().reduced(2.0f);
+    g.setColour(active ? palette::teal.withAlpha(.23f) : palette::raised);
+    g.fillRoundedRectangle(bounds,5.0f);
+    g.setColour(active ? palette::teal : hovered || pressed ? palette::text : palette::line);
+    g.drawRoundedRectangle(bounds,5.0f,active ? 1.6f : 1.0f);
+
+    // U-shaped magnet glyph, with contrasting poles and a visible on/off state.
+    const float x=bounds.getCentreX()-12, y=bounds.getCentreY()-12;
+    juce::Path magnet;
+    magnet.startNewSubPath(x+5,y+4);
+    magnet.lineTo(x+5,y+16);
+    magnet.quadraticTo(x+12,y+26,x+19,y+16);
+    magnet.lineTo(x+19,y+4);
+    g.setColour(active ? palette::teal : palette::muted);
+    g.strokePath(magnet,juce::PathStrokeType(3.5f,juce::PathStrokeType::curved,juce::PathStrokeType::rounded));
+    g.setColour(palette::red);
+    g.fillRect(x+3,y+3,4.0f,5.0f);
+    g.setColour(palette::text);
+    g.fillRect(x+17,y+3,4.0f,5.0f);
+}
 Timeline::Timeline(MainComponent& p) : owner(p) {
     addAndMakeVisible(horizontalScroll);
     horizontalScroll.setAutoHide(false);
     horizontalScroll.addListener(this);
-    addAndMakeVisible(snapDivision);
-    addAndMakeVisible(snapToggle);
-    snapDivision.setName("timelineSnapDivision"); snapToggle.setName("timelineSnapToggle");
-    snapDivision.addItemList({"1/4","1/8","1/16","1/32"},1);
+    for (juce::Component* item : std::initializer_list<juce::Component*>{
+         &gridToggle,&gridDivision,&snapToggle,&snapDivision}) addAndMakeVisible(item);
+    gridToggle.setName("timelineGridVisibility");
+    gridDivision.setName("timelineGridDivision");
+    snapToggle.setName("timelineSnapToggle");
+    snapDivision.setName("timelineSnapDivision");
+    for (auto* combo : {&gridDivision,&snapDivision})
+        combo->addItemList({"1/4","1/8","1/16","1/32"},1);
+    gridDivision.setSelectedId(3,juce::dontSendNotification);
     snapDivision.setSelectedId(3,juce::dontSendNotification);
-    snapDivision.setTooltip("Suddivisione musicale per lo snap delle clip.");
-    snapToggle.setTooltip("Attiva o disattiva l'aggancio delle clip alla griglia BPM.");
-    snapToggle.onClick=[this] {
-        snapEnabled=!snapEnabled;
-        snapToggle.setButtonText(snapEnabled ? "Magnete ON" : "Magnete OFF");
+    gridToggle.setTooltip("Mostra o nasconde soltanto le linee musicali BPM; lo snap non cambia.");
+    gridDivision.setTooltip("Suddivisione della griglia musicale visualizzata, indipendente dallo snap.");
+    snapDivision.setTooltip("Suddivisione usata dall'aggancio dei clip, anche con griglia nascosta.");
+    snapToggle.setButtonText("Magnete ON");
+    snapToggle.setToggleState(true,juce::dontSendNotification);
+    snapToggle.setTooltip("Magnete ON: clip agganciate ai beat. Click per disattivare.");
+    gridToggle.onClick=[this] {
+        gridVisible=!gridVisible;
+        gridToggle.setButtonText(gridVisible ? "Griglia ON" : "Griglia OFF");
         repaint();
     };
+    snapToggle.onClick=[this] {
+        snapEnabled=!snapEnabled;
+        snapToggle.setToggleState(snapEnabled,juce::dontSendNotification);
+        snapToggle.setButtonText(snapEnabled ? "Magnete ON" : "Magnete OFF");
+        snapToggle.setTooltip(snapEnabled
+            ? "Magnete ON: clip agganciate ai beat. Click per disattivare."
+            : "Magnete OFF: spostamento libero. Click per riattivare.");
+        repaint();
+    };
+    gridDivision.onChange=[this] { repaint(); };
     snapDivision.onChange=[this] { repaint(); };
 }
 void Timeline::resized() {
     horizontalScroll.setBounds(timelineStart,std::max(0,getHeight()-43),std::max(0,getWidth()-timelineStart-20),12);
-    snapDivision.setBounds(getWidth()-344,10,96,25);
-    snapToggle.setBounds(getWidth()-240,10,94,25);
+    gridToggle.setBounds(196,10,76,25);
+    gridDivision.setBounds(278,10,80,25);
+    snapToggle.setBounds(408,10,41,25);
+    snapDivision.setBounds(459,10,80,25);
     syncViewport();
+}
+double Timeline::gridStepBeats() const {
+    return std::pow(.5,std::max(0,gridDivision.getSelectedId()-1));
 }
 double Timeline::snapStepBeats() const {
     return std::pow(.5,std::max(0,snapDivision.getSelectedId()-1));
@@ -95,14 +141,14 @@ void Timeline::paint(juce::Graphics& g) {
     syncViewport(); g.fillAll(palette::panel);
     if (owner.selectedRow<0 || owner.selectedRow>=(int)owner.show.rows.size()) return;
     const auto& row=owner.show.rows[owner.selectedRow];
-    label(g,"TIMELINE",{16,11,100,23},11,palette::teal,true);
-    label(g,row.name+"  /  trascina clip o cursore",{123,11,std::max(0,getWidth()-273),23},12,palette::muted);
+    label(g,"TIMELINE",{16,11,110,23},11,palette::teal,true);
+    label(g,"GRIGLIA",{143,11,52,23},10,palette::muted,true);
+    label(g,"SNAP",{370,11,35,23},10,palette::muted,true);
     for (int i=0;i<3;++i) {
         const auto box=zoomButton(getWidth(),i);
         g.setColour(palette::raised); g.fillRoundedRectangle(box.toFloat(),3);
         label(g,i==0 ? "-" : i==1 ? "+" : "Fit",box,12,palette::text,true,juce::Justification::centred);
     }
-    label(g,"SNAP",{getWidth()-391,11,44,23},10,palette::muted);
     g.setColour(palette::line); g.drawHorizontalLine(45,0,(float)getWidth());
     const double length=visibleLength(); const int area=std::max(1,getWidth()-timelineStart-20), bottom=getHeight()-48;
     int audioTracks=0; for (const auto& column : owner.show.columns) if (column.type!=ColumnType::osc) ++audioTracks;
@@ -112,26 +158,29 @@ void Timeline::paint(juce::Graphics& g) {
         label(g,timeText(viewStart+length*i/4),{x-10,53,65,18},10,palette::muted);
         g.setColour(palette::line.withAlpha(.6f)); g.drawVerticalLine(x,76,(float)bottom);
     }
-    // Render the beat grid across the tracks, using secondsAtBeat for tempo changes.
-    const double startBeat=beatAtSeconds(row.tempo,viewStart);
-    const double endBeat=beatAtSeconds(row.tempo,viewStart+length);
-    const double subdivision=snapStepBeats();
-    const int skip=std::max(1,(int)std::ceil((endBeat-startBeat)/subdivision/250.0));
-    const double renderStep=subdivision*skip;
-    const int firstGrid=std::max(0,(int)std::ceil(startBeat/renderStep));
-    const int lastGrid=(int)std::floor(endBeat/renderStep);
-    g.saveState();
-    g.reduceClipRegion(timelineStart,76,area,std::max(0,bottom-76));
-    for (int i=firstGrid;i<=lastGrid && i<firstGrid+260;++i) {
-        const double beat=i*renderStep;
-        const double seconds=secondsAtBeat(row.tempo,beat);
-        const int x=timelineStart+(int)std::round(area*(seconds-viewStart)/length);
-        const bool bar=std::abs(beat/4-std::round(beat/4))<.0001;
-        const bool quarter=std::abs(beat-std::round(beat))<.0001;
-        g.setColour(palette::teal.withAlpha(bar ? .37f : quarter ? .22f : .11f));
-        g.drawVerticalLine(x,76,(float)bottom);
+    // Musical grid follows secondsAtBeat across all tempo changes, but its
+    // visibility/resolution never changes how clip dragging is quantized.
+    if (gridVisible) {
+        const double startBeat=beatAtSeconds(row.tempo,viewStart);
+        const double endBeat=beatAtSeconds(row.tempo,viewStart+length);
+        const double subdivision=gridStepBeats();
+        const int skip=std::max(1,(int)std::ceil((endBeat-startBeat)/subdivision/250.0));
+        const double renderStep=subdivision*skip;
+        const int firstGrid=std::max(0,(int)std::ceil(startBeat/renderStep));
+        const int lastGrid=(int)std::floor(endBeat/renderStep);
+        g.saveState();
+        g.reduceClipRegion(timelineStart,76,area,std::max(0,bottom-76));
+        for (int i=firstGrid;i<=lastGrid && i<firstGrid+260;++i) {
+            const double beat=i*renderStep;
+            const double seconds=secondsAtBeat(row.tempo,beat);
+            const int x=timelineStart+(int)std::round(area*(seconds-viewStart)/length);
+            const bool bar=std::abs(beat/4-std::round(beat/4))<.0001;
+            const bool quarter=std::abs(beat-std::round(beat))<.0001;
+            g.setColour(palette::teal.withAlpha(bar ? .37f : quarter ? .22f : .11f));
+            g.drawVerticalLine(x,76,(float)bottom);
+        }
+        g.restoreState();
     }
-    g.restoreState();
     int track=0, loaded=0;
     g.saveState(); g.reduceClipRegion(0,tracksTop,getWidth(),std::max(0,bottom-tracksTop));
     for (int c=0;c<(int)row.cells.size();++c) {
@@ -175,7 +224,7 @@ void Timeline::paint(juce::Graphics& g) {
             juce::Path marker; marker.addTriangle(x-5,71,x+5,71,x,78); g.fillPath(marker);
         }
     }
-    label(g,juce::String(row.tempo.front().bpm,1)+" BPM  /  4/4  /  doppio clic MIDI: piano roll  /  "+juce::String(zoom,1)+"x",
+    label(g,juce::String(row.tempo.front().bpm,1)+" BPM  /  4/4  /  clic MIDI: Clip Editor  /  "+row.name+"  /  "+juce::String(zoom,1)+"x",
           {16,getHeight()-27,getWidth()-30,20},10,palette::muted);
     const int available=std::max(1,bottom-tracksTop), total=track*trackHeight;
     if (total>available) {
