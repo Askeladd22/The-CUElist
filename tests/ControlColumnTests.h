@@ -130,4 +130,20 @@ void controlColumnTests() {
               "Legacy fallback differed from displayed effective mapping");
     });
 
+    test("Deleting a target column cleans reusable Control Set templates",[] {
+        MainComponent ui(false);
+        addColumn(ui.show,ColumnType::control,"Lighting");
+        ControlBinding mapped; mapped.deviceId="fader";mapped.number=4;
+        mapped.target=ControlTarget::columnGain;
+        mapped.targetColumnId=ui.show.columns[0].id;
+        check(ui.addControlSetBinding(0,1,mapped),"Unable to create Control Set with audio target");
+        check(ui.saveControlSetTemplate(0,1,"Audio controls")>0,
+              "Unable to save Control Set template before deleting the target");
+        ui.deleteColumn(0);
+        check(validateShow(ui.show).wasOk(),"Deleting audio column left dangling Control Set reference");
+        check(ui.show.controls.templates.size()==1 &&
+              ui.show.controls.templates[0].set.bindings.empty(),
+              "Deleted target survived inside a reusable Control Set template");
+    });
+
 }
