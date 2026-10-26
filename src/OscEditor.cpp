@@ -1,5 +1,7 @@
 #include "OscEditor.h"
 #include <cmath>
+#include <cstdint>
+
 namespace cuelist {
 OscClipEditor::OscClipEditor(OscClip value,std::vector<TempoPoint> points,
                            std::function<void(const OscClip&)> commit)
@@ -7,113 +9,117 @@ OscClipEditor::OscClipEditor(OscClip value,std::vector<TempoPoint> points,
     setLookAndFeel(&theme);
     setName("sharedOscEditor");
     for (juce::Component* component:std::initializer_list<juce::Component*>{
-         &eventList,&unit,&time,&address,&args,&length,&add,&remove,&detach,&help})
-        addAndMakeVisible(component);
+        &eventList,&unit,&add,&remove,&detach}) addAndMakeVisible(component);
     eventList.setName("oscEventList");
     unit.setName("oscTimeUnit");
     unit.addItem("Secondi",1); unit.addItem("Beat",2);
     unit.setSelectedId(clip.useBeats ? 2 : 1,juce::dontSendNotification);
-    unit.setTooltip("I tempi sono misurati dall'inizio della clip; cambiando unita le posizioni vengono convertite con la mappa BPM.");
-    time.setName("oscEventTime"); address.setName("oscEventAddress");
-    args.setName("oscEventArguments"); length.setName("oscClipLength");
-    time.setInputRestrictions(0,"0123456789."); length.setInputRestrictions(0,"0123456789.");
-    args.setTooltip("Argomenti separati da punto e virgola: i:12; f:0.5; s:testo. I tipi sono int32, float32 e string.");
-    help.setText("Argomenti: i:7; f:0.5; s:ciao. Un messaggio per riga della lista.",juce::dontSendNotification);
-    help.setColour(juce::Label::textColourId,palette::muted);
-    help.setJustificationType(juce::Justification::centredLeft);
-    length.setText(juce::String(clip.length,3),false);
+    unit.setTooltip("Tempi in secondi oppure beat. Il cambio converte gli eventi con la mappa BPM.");
     unit.onChange=[this] {
-        if (updating) return;
-        const bool nextBeats=unit.getSelectedId()==2;
-        if (clip.useBeats==nextBeats) return;
-        for (auto& event:clip.events)
-            event.time=nextBeats ? beatFromSeconds(tempo,event.time) : secondsAtBeat(tempo,event.time);
-        clip.length=nextBeats ? beatFromSeconds(tempo,clip.length) : secondsAtBeat(tempo,clip.length);
-        clip.useBeats=nextBeats;
-        length.setText(juce::String(clip.length,3),false);
-        showEvent(); notify();
+        const bool beats=unit.getSelectedId()==2;
+        if (clip.useBeats==beats) return;
+        for (auto& e:clip.events)
+            e.time=beats ? beatFromSeconds(tempo,e.time) : secondsAtBeat(tempo,e.time);
+        clip.length=beats ? beatFromSeconds(tempo,clip.length) : secondsAtBeat(tempo,clip.length);
+        clip.useBeats=beats;
+        notify();
     };
-    for (auto* editor:{&time,&address,&args}) editor->onTextChange=[this] { if (!updating) commitEvent(); };
-    length.onTextChange=[this] {
-        if (updating) return;
-        const double n=length.getText().getDoubleValue();
-        if (n<=0 || !std::isfinite(n)) return;
-        const double previous=clip.length; clip.length=n;
-        if (validateOscClip(clip).wasOk()) notify();
-        else clip.length=previous;
-    };
-    add.onClick=[this] {
-        if (clip.events.size()>=256) return;
-        const OscEvent e{0,"/cue",{}};
-        clip.events.push_back(e);
-        selected=(int)clip.events.size()-1;
-        eventList.updateContent(); eventList.selectRow(selected);
-        showEvent(); notify();
-    };
+    add.setName("oscAddMessage");
+    add.setTooltip("Aggiungi un messaggio OSC. Doppio clic su un messaggio per modificarlo.");
+    remove.setName("oscRemoveMessage");
+    remove.setTooltip("Elimina il messaggio selezionato.");
+    add.onClick=[this] { addEvent(); };
     remove.onClick=[this] {
         if (selected<0 || selected>=(int)clip.events.size()) return;
         clip.events.erase(clip.events.begin()+selected);
         selected=clip.events.empty() ? -1 : std::min(selected,(int)clip.events.size()-1);
         eventList.updateContent();
         if (selected>=0) eventList.selectRow(selected);
-        showEvent(); notify();
+        notify();
     };
+    detach.setName("oscDetach");
     detach.onClick=[this] { if (onDetach) onDetach(); };
     for (auto* b:{&add,&remove,&detach}) b->setWantsKeyboardFocus(false);
     setSize(940,250);
     if (!clip.events.empty()) eventList.selectRow(0);
-    showEvent();
 }
 OscClipEditor::~OscClipEditor() { setLookAndFeel(nullptr); }
-void OscClipEditor::setFloating(bool isFloating) { detach.setButtonText(isFloating ? "Riaggancia" : "Stacca"); }
+void OscClipEditor::setFloating(bool floating) { detach.setButtonText(floating ? "Riaggancia" : "Stacca"); }
 void OscClipEditor::loadClip(const OscClip& replacement) {
+    ++revision;
     clip=replacement; selected=-1; eventList.updateContent();
-    updating=true;
     unit.setSelectedId(clip.useBeats ? 2 : 1,juce::dontSendNotification);
-    length.setText(juce::String(clip.length,3),false);
-    updating=false;
     if (!clip.events.empty()) eventList.selectRow(0);
-    showEvent();
+    repaint();
 }
 void OscClipEditor::paint(juce::Graphics& g) {
     g.fillAll(palette::panel);
-    label(g,"OSC  /  messaggi UDP",{12,8,280,23},15,palette::teal,true);
-    label(g,"Unita",{13,42,60,20},11,palette::muted);
-    label(g,"Durata clip",{207,42,90,20},11,palette::muted);
-    label(g,"Tempo",{328,42,65,20},11,palette::muted);
-    label(g,"Indirizzo OSC",{438,42,120,20},11,palette::muted);
-    label(g,"Argomenti tipizzati",{12,getHeight()-72,200,17},11,palette::muted);
+    label(g,"OSC  /  messaggi UDP",{12,7,280,28},15,palette::teal,true);
+    label(g,"Doppio clic su un messaggio per cambiare tempo, indirizzo e argomenti",
+          {14,42,getWidth()-28,24},11,palette::muted);
+    label(g,"Unita",{getWidth()-390,8,48,27},11,palette::muted);
 }
 void OscClipEditor::resized() {
     const int w=getWidth(),h=getHeight();
-    detach.setBounds(w-100,7,90,28);
-    unit.setBounds(69,39,115,25); length.setBounds(280,39,72,25);
-    time.setBounds(382,39,60,25); address.setBounds(555,39,std::max(140,w-567),25);
-    eventList.setBounds(12,76,std::max(20,w-24),std::max(30,h-159));
-    args.setBounds(12,h-52,std::max(80,w-200),27);
-    add.setBounds(w-178,h-52,79,27); remove.setBounds(w-91,h-52,79,27);
+    detach.setBounds(w-103,7,93,28);
+    unit.setBounds(w-336,9,107,25);
+    add.setBounds(w-221,8,39,28);
+    remove.setBounds(w-175,8,67,28);
+    eventList.setBounds(12,72,std::max(20,w-24),std::max(28,h-83));
 }
-void OscClipEditor::paintListBoxItem(int row,juce::Graphics& g,int w,int h,bool active) {
+void OscClipEditor::paintListBoxItem(int row,juce::Graphics& g,int width,int height,bool active) {
     if (row<0 || row>=(int)clip.events.size()) return;
     if (active) g.fillAll(palette::teal.withAlpha(.2f));
     const auto& e=clip.events[(size_t)row];
     label(g,juce::String(e.time,3)+(clip.useBeats ? " beat   " : " s   ")+e.address+
-        "   ["+describeArguments(e.arguments)+"]",{9,0,w-16,h},12,active ? palette::text : palette::muted);
+          (e.arguments.empty() ? juce::String() : "   ["+describeArguments(e.arguments)+"]"),
+          {9,0,width-16,height},12,active ? palette::text : palette::muted);
 }
-void OscClipEditor::selectedRowsChanged(int row) { selected=row; showEvent(); }
-void OscClipEditor::showEvent() {
-    updating=true;
-    if (selected>=0 && selected<(int)clip.events.size()) {
-        const auto& e=clip.events[(size_t)selected];
-        time.setText(juce::String(e.time,3),false);
-        address.setText(e.address,false);
-        args.setText(describeArguments(e.arguments),false);
-    } else {
-        time.clear(); address.clear(); args.clear();
-    }
-    time.setEnabled(selected>=0); address.setEnabled(selected>=0);
-    args.setEnabled(selected>=0); remove.setEnabled(selected>=0);
-    updating=false; repaint();
+void OscClipEditor::addEvent() {
+    if (clip.events.size()>=256) return;
+    OscEvent e;
+    e.time=clip.events.empty() ? 0.0 : std::min(clip.length-.001,clip.events.back().time+.5);
+    e.time=std::max(0.0,e.time);
+    e.address="/cue";
+    clip.events.push_back(e);
+    selected=(int)clip.events.size()-1;
+    eventList.updateContent(); eventList.selectRow(selected);
+    notify(); editEvent(selected);
+}
+void OscClipEditor::editEvent(int index) {
+    if (index<0 || index>=(int)clip.events.size()) return;
+    selected=index;
+    const auto event=clip.events[(size_t)index];
+    auto* dialog=new juce::AlertWindow("Modifica messaggio OSC",
+        "Tempo, indirizzo e argomenti; usa i:7; f:0.5; s:scena per i tipi.",juce::MessageBoxIconType::NoIcon,this);
+    dialog->addTextEditor("time",juce::String(event.time,3),clip.useBeats ? "Tempo (beat)" : "Tempo (secondi)");
+    dialog->addTextEditor("address",event.address,"Indirizzo OSC");
+    dialog->addTextEditor("args",describeArguments(event.arguments),"Argomenti");
+    dialog->addButton("Salva",1);
+    dialog->addButton("Annulla",0);
+    auto safe=juce::Component::SafePointer<OscClipEditor>(this);
+    const auto generation=revision;
+    dialog->enterModalState(true,juce::ModalCallbackFunction::create(
+        [safe,dialog,index,generation](int answer) {
+            if (!safe || answer!=1 || safe->revision!=generation || index>=(int)safe->clip.events.size()) return;
+            const auto timeText=dialog->getTextEditorContents("time").trim();
+            if (timeText.isEmpty() || timeText.retainCharacters("0123456789.")!=timeText) return;
+            auto proposed=safe->clip;
+            auto& e=proposed.events[(size_t)index];
+            e.time=timeText.getDoubleValue();
+            e.address=dialog->getTextEditorContents("address").trim();
+            if (parseArguments(dialog->getTextEditorContents("args"),e.arguments).failed()) return;
+            if (e.time>=proposed.length) proposed.length=std::min(86400.0,e.time+1.0);
+            if (validateOscClip(proposed).failed()) return;
+            safe->clip=std::move(proposed);
+            safe->eventList.updateContent();
+            safe->eventList.selectRow(index);
+            safe->notify();
+        }),true);
+}
+void OscClipEditor::notify() {
+    if (validateOscClip(clip).wasOk() && onEdit) onEdit(clip);
+    eventList.repaint();
 }
 juce::Result OscClipEditor::parseArguments(const juce::String& text,std::vector<OscValue>& output) {
     output.clear();
@@ -155,19 +161,5 @@ double OscClipEditor::beatFromSeconds(const std::vector<TempoPoint>& points,doub
         if (secondsAtBeat(points,mid)<seconds) low=mid; else high=mid;
     }
     return (low+high)*.5;
-}
-void OscClipEditor::commitEvent() {
-    if (selected<0 || selected>=(int)clip.events.size()) return;
-    auto next=clip;
-    auto& e=next.events[(size_t)selected];
-    const auto t=time.getText().trim();
-    if (t.isEmpty() || t.retainCharacters("0123456789.")!=t) return;
-    e.time=t.getDoubleValue(); e.address=address.getText().trim();
-    if (parseArguments(args.getText(),e.arguments).failed() || validateOscClip(next).failed()) return;
-    clip=std::move(next); notify(); eventList.repaint();
-}
-void OscClipEditor::notify() {
-    if (validateOscClip(clip).wasOk() && onEdit) onEdit(clip);
-    eventList.repaint();
 }
 }
