@@ -217,6 +217,11 @@ void Timeline::paint(juce::Graphics& g) {
             g.fillRect(x+px,(float)y+15-amp/2,1.0f,std::max(1.0f,amp));
         }
         }
+        if (cell.midi || cell.osc) {
+            // Explicit resize grip at the right edge of MIDI and OSC clips.
+            g.setColour(palette::teal.withAlpha(.65f));
+            g.fillRoundedRectangle(x+width-7,(float)y+5,4,21,1.5f);
+        }
         label(g,(cell.name.isEmpty() ? (cell.midi ? "MIDI" : cell.osc ? "OSC" : "AUDIO") : cell.name)+"  +"+juce::String(cell.startSeconds,2)+"s",{(int)x+8,y+5,std::max(1,(int)width-16),20},11,palette::text);
         g.restoreState();
     }
@@ -229,7 +234,7 @@ void Timeline::paint(juce::Graphics& g) {
             juce::Path marker; marker.addTriangle(x-5,71,x+5,71,x,78); g.fillPath(marker);
         }
     }
-    label(g,juce::String(row.tempo.front().bpm,1)+" BPM  /  4/4  /  clic MIDI/OSC: Clip Editor  /  "+row.name+"  /  "+juce::String(zoom,1)+"x",
+    label(g,juce::String(row.tempo.front().bpm,1)+" BPM  /  trascina bordo destro MIDI/OSC: durata  /  "+row.name+"  /  "+juce::String(zoom,1)+"x",
           {16,getHeight()-27,getWidth()-30,20},10,palette::muted);
     const int available=std::max(1,bottom-tracksTop), total=track*trackHeight;
     if (total>available) {
@@ -241,7 +246,7 @@ void Timeline::paint(juce::Graphics& g) {
 void Timeline::mouseDown(const juce::MouseEvent& e) {
     if (!e.mods.isLeftButtonDown()) return;
     syncViewport();
-    owner.grabKeyboardFocus(); dragColumn=-1; seeking=false;
+    owner.grabKeyboardFocus(); dragColumn=-1; seeking=false; resizingClip=false;
     for (int i=0;i<3;++i) if (zoomButton(getWidth(),i).contains(e.getPosition())) {
         if (i==2) { zoom=1; viewStart=0; syncViewport(); repaint(); }
         else changeZoom(i==0 ? .5 : 2,.5);
@@ -263,8 +268,13 @@ void Timeline::mouseDown(const juce::MouseEvent& e) {
         const auto rowId=row.id; const auto start=cell.startSeconds;
         if (position<start || position>end || !owner.select(owner.selectedRow,c)) return;
         dragColumn=c; dragRowId=rowId; dragStartSeconds=start;
-        if (owner.show.columns[c].type==ColumnType::midi) owner.editMidiClip();
-        else if (owner.show.columns[c].type==ColumnType::osc) owner.editOscClip();
+        dragStartDuration=owner.clipDuration(owner.selectedRow,c);
+        const int edgeX=timelineStart+(int)std::round((end-dragViewStart)*area/dragLength);
+        resizingClip=(cell.midi || cell.osc) && std::abs(e.x-edgeX)<=10;
+        if (!resizingClip) {
+            if (owner.show.columns[c].type==ColumnType::midi) owner.editMidiClip();
+            else if (owner.show.columns[c].type==ColumnType::osc) owner.editOscClip();
+        }
         setMouseCursor(juce::MouseCursor::DraggingHandCursor); return;
     }
 }
@@ -294,11 +304,17 @@ void Timeline::mouseDrag(const juce::MouseEvent& e) {
     syncViewport();
     if (owner.selectedRow<0 || owner.selectedRow>=(int)owner.show.rows.size() || owner.show.rows[owner.selectedRow].id!=dragRowId) return;
     if (seeking) owner.seekTimeline(juce::jlimit(0.0,86400.0,dragViewStart+juce::jlimit(0.0,dragPixels,(double)e.x-timelineStart)*dragLength/dragPixels));
-    else if (dragColumn>=0 && dragColumn<(int)owner.show.rows[owner.selectedRow].cells.size())
-        owner.setClipStart(dragColumn,juce::jlimit(0.0,86400.0,snapSeconds(juce::jlimit(0.0,86400.0,dragStartSeconds+e.getDistanceFromDragStartX()*dragLength/dragPixels))));
+    else if (dragColumn>=0 && dragColumn<(int)owner.show.rows[owner.selectedRow].cells.size()) {
+        const double delta=e.getDistanceFromDragStartX()*dragLength/dragPixels;
+        if (resizingClip) {
+            const double end=snapSeconds(juce::jlimit(0.0,86400.0,dragStartSeconds+dragStartDuration+delta));
+            owner.setClipDuration(dragColumn,end-dragStartSeconds);
+        } else owner.setClipStart(dragColumn,juce::jlimit(0.0,86400.0,
+                snapSeconds(juce::jlimit(0.0,86400.0,dragStartSeconds+delta))));
+    }
     repaint();
 }
-void Timeline::mouseUp(const juce::MouseEvent&) { dragColumn=-1; seeking=false; syncViewport(); setMouseCursor(juce::MouseCursor::NormalCursor); repaint(); }
+void Timeline::mouseUp(const juce::MouseEvent&) { dragColumn=-1; seeking=false; resizingClip=false; syncViewport(); setMouseCursor(juce::MouseCursor::NormalCursor); repaint(); }
 void Timeline::mouseWheelMove(const juce::MouseEvent& e, const juce::MouseWheelDetails& wheel) {
     syncViewport();
     if (e.mods.isCtrlDown()) {
