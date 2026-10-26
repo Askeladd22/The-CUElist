@@ -107,7 +107,7 @@ struct ColumnUtilities::Strip final : juce::Component {
             output.setSelectedId(1,juce::dontSendNotification); return;
         }
         for (int i=0;i<channels;i+=2) output.addItem("Out "+juce::String(i+1)+(i+1<channels ? " / "+juce::String(i+2) : " (mono)"),i+1);
-        if (col.output>=channels || col.output%2!=0) output.addItem("Out "+juce::String(col.output+1)+" / "+juce::String(col.output+2)+" (assente)",col.output+1);
+        if (col.output>=channels || col.output%2!=0) output.addItem("Out "+juce::String(col.output+1)+" / "+juce::String(col.output+2)+" (missing)",col.output+1);
         output.setSelectedId(col.output+1,juce::dontSendNotification);
     }
     void updateMeter() {
