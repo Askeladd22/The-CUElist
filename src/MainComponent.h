@@ -1,6 +1,7 @@
 #pragma once
 #include "AudioEngine.h"
 #include "MidiInputManager.h"
+#include "ControlOutputRouter.h"
 #include <set>
 #include "Theme.h"
 namespace cuelist {
@@ -184,6 +185,7 @@ private:
     int nextCue=0;
     MidiInputManager midiInput;
     ControlMappingEngine controlMapping;
+    ControlOutputRouter controlOutput;
     int activeCueId=0;
     bool controlLearnArmed=false;
     std::optional<ControlEvent> learnedInput;
