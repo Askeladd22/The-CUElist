@@ -258,6 +258,16 @@ void RenderState::render(float* const* outputs,int channels,int frames,double sa
                 }
                 v.position+=1.0/sampleRate;
                 if (v.position>=v.oscDuration-1.0e-10) {
+                    // Events at the exact end (notably automation's final
+                    // value) must be emitted once before a natural completion
+                    // or loop wraps; otherwise the sample loop would never
+                    // visit the endpoint timestamp.
+                    while (v.oscCursor<v.oscEvents.size()
+                           && v.oscEvents[v.oscCursor].seconds<=v.oscDuration+1.0e-9) {
+                        const auto& e=v.oscEvents[v.oscCursor++];
+                        if (v.oscSink && !v.rowMuted && !v.columnMuted)
+                            v.oscSink->emit(v.oscRoute,e.bytes.data(),(unsigned)e.bytes.size(),i);
+                    }
                     if (v.loop || v.rowLoop) { v.position=std::max(0.0,v.position-v.oscDuration); v.oscNeedsSync=true; }
                     else { v.position=0; v.playing=false; }
                 }
