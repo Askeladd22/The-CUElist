@@ -61,7 +61,7 @@ void timelineV3Tests() {
         const juce::Point<float> p{160,136};
         timeline->mouseDoubleClick(event(*timeline,p,p,2));
         check(cueViewFixtures::find<PianoRollEditor>(ui)==nullptr,"Editor accidentally nested in main view");
-        check(juce::ModalComponentManager::getInstance()->getModalComponent(0)!=nullptr,"MIDI timeline double-click did not open editor");
+        check(cueViewFixtures::find<PianoRollEditor>(ui)!=nullptr,"MIDI timeline double-click did not dock editor");
     });
     test("timeline Ctrl wheel anchors time and changing row cancels a seek", [] {
         MainComponent ui(false); addRow(ui.show,{});
