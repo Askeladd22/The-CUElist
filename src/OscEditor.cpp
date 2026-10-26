@@ -86,8 +86,8 @@ void OscClipEditor::resized() {
     remove.setBounds(53,7,70,26); duplicate.setBounds(128,7,83,26);
     grid.setBounds(219,7,69,26); snap.setBounds(291,7,60,26);
     resolution.setBounds(353,8,78,24);
-    zoomOut.setBounds(441,7,31,26); zoomIn.setBounds(474,7,31,26);
-    zoomFit.setBounds(508,7,42,26);
+    zoomOut.setBounds(435,7,29,26); zoomIn.setBounds(468,7,29,26);
+    zoomFit.setBounds(501,7,30,26);
     repaint();
 }
 float OscClipEditor::xForTime(double time) const {
