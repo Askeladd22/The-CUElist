@@ -326,7 +326,12 @@ bool MainComponent::applyInspector() {
 }
 void MainComponent::message(const juce::String& text) { status=text; repaint(); juce::AlertWindow::showMessageBoxAsync(juce::MessageBoxIconType::WarningIcon,"The Cuelist",text,"OK",this); }
 bool MainComponent::memoryFits(const ClipMap& collection) const {
-    int64_t bytes=0; for (const auto& item : collection) bytes+=(int64_t)item.second->samples.getNumSamples()*item.second->samples.getNumChannels()*4;
+    // Pasted Audio cells intentionally share one immutable PCM object; counting
+    // the same shared media once per cell would reject valid large shows.
+    int64_t bytes=0;
+    std::set<const AudioClip*> counted;
+    for (const auto& item:collection) if (item.second && counted.insert(item.second.get()).second)
+        bytes+=(int64_t)item.second->samples.getNumSamples()*item.second->samples.getNumChannels()*4;
     return bytes<=512LL*1024*1024;
 }
 void MainComponent::importDialog() {
