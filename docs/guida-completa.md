@@ -90,12 +90,12 @@ I simboli si evidenziano quando attivi. I livelli di cella, cue e colonna si mol
 
 1. Aggiungi una colonna **MIDI** con **+ Colonna**.
 2. Seleziona la cella e usa **Importa MIDI** per un `.mid`/`.midi`, oppure **Crea clip MIDI** per partire da una clip vuota di 4 beat. Puoi anche trascinare un file sulla cella.
-3. Un doppio clic sulla cella apre il **piano roll**; il pulsante Play della cella avvia la riproduzione.
+3. Seleziona una cella MIDI e scegli **Crea clip MIDI / Modifica piano roll** oppure clicca sulla clip nella timeline per aprire il **Clip Editor**; il pulsante Play della cella avvia la riproduzione.
 4. Nelle utility seleziona l'**uscita MIDI**. Serve un sintetizzatore esterno, un'applicazione o uno strumento collegato a quella porta: The Cuelist non contiene un sintetizzatore.
 
 Nel piano roll: clic sinistro nella griglia vuota per inserire una nota; trascina la nota per spostare tempo e altezza, oppure il bordo destro per cambiare durata. **Tasto destro + trascinamento** seleziona più note in un rettangolo; **Shift+clic** aggiunge o rimuove note dalla selezione. Le note selezionate possono essere spostate o eliminate insieme, e ricevono collettivamente le modifiche a **Velocity** (1–127) e **Canale** (1–16). **Canc** o **Elimina nota** le rimuovono. **Snap** sceglie la griglia da 1/4 a 1/32 oppure **Off** per spostamenti liberi; **+ / −** cambiano lo zoom e le barre scorrono la vista. **Beat clip** regola la durata senza tagliare note esistenti. I beat sono quarti; C4 corrisponde alla nota MIDI 60.
 
-**Applica** trasferisce le modifiche alla cella; **Annulla** o la chiusura della finestra le scartano. Salva poi lo show per conservarle su disco. Aprire l'editor ferma il trasporto.
+Le modifiche MIDI vengono **applicate subito al modello della clip**, senza un pulsante Applica. **Undo/Redo** annullano o ripetono le modifiche alle note. Il pannello può essere ridotto, chiuso oppure staccato e riagganciato; chiuderlo non annulla i cambiamenti. Premi **Salva** per conservarli nel file dello show.
 
 Le clip MIDI partecipano a GO, Auto Stop, loop, pausa e seek della timeline; si possono spostare tra celle MIDI e trascinare nella timeline. I livelli in dB e il pan agiscono sull'audio; per le note si usa la velocity. Il trasporto MIDI usa il clock del dispositivo audio, che deve quindi essere aperto anche per uno show solo MIDI.
 
