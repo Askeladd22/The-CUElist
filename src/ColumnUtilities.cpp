@@ -199,6 +199,9 @@ void ColumnUtilities::refresh() {
         for (int i=0;i<(int)owner.show.columns.size();++i) { auto strip=std::make_unique<Strip>(owner,i); addAndMakeVisible(*strip); strips.push_back(std::move(strip)); }
     }
     for (auto& strip : strips) strip->sync();
+    // Preserve the historical strip-child order used by the UI and tests.
+    // The Master remains an overlay in the left utility area and is last.
+    owner.masterSlider.toFront(false);
     resized(); repaint();
 }
 void ColumnUtilities::syncScroll(int x) { if (scrollX!=x) { scrollX=x; resized(); repaint(); } }
