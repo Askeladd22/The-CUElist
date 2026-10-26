@@ -30,6 +30,26 @@ Il workflow viene eseguito sui commit al ramo `feat/desktop-foundation`, nelle p
 
 **Portabilita dei dati:** il programma non richiede un profilo utente per memorizzare gli show. Quando salvi, scegli una posizione accessibile (per esempio una cartella vicino all'eseguibile): porta sempre con te il file `.cuelist` e la relativa cartella `_media`. I percorsi dei media all'interno dello show sono relativi. La configurazione delle interfacce audio e MIDI puo dipendere dall'hardware del PC su cui esegui il programma; Windows e i driver possono mantenere propri dati di sistema.
 
+## Control & Mapping (prima implementazione)
+
+Il pulsante **CONTROL MAPPING** nella barra superiore apre il pannello di gestione dei controlli fisici. Il sistema e separato dalle clip MIDI e OSC e opera sugli eventi ricevuti da un ingresso MIDI scelto espressamente. Al momento la UI comprende solo la prima versione: per costruire un mapping bisogna disporre di un controller collegato e usare MIDI Learn.
+
+1. Collega un controller MIDI e apri **CONTROL MAPPING**. Seleziona esplicitamente la porta nel menu *Ingresso MIDI*. La lista *Aggiorna porte* ricarica i dispositivi disponibili; non vengono scelti automaticamente controller sostitutivi in caso di scollegamento.
+2. Premi **MIDI Learn** e muovi un fader, un encoder, un pad o un pulsante. Il sistema legge **CC**, **Note On/Off** o **Pitch Bend**, indicando canale e numero. Il callback hardware utilizza una coda a capacita fissa e non avvia operazioni GUI o rete.
+3. Scegli l'**ambito**: Globale, Colonna, Preset oppure Singola cue. In **Preset cue** crea un preset condiviso (ad esempio `Luci sala`) e assegnalo alla cue selezionata. Cambiare selezione nella griglia non attiva i suoi mapping; e necessario un GO riuscito.
+4. Scegli la **destinazione**: Master Audio, Gain di una colonna Audio, GO, PANIC, MIDI CC oppure OSC Float. Per le destinazioni di colonna scegli una colonna compatibile dal menu. Per MIDI CC imposta il numero del CC di uscita; per OSC il percorso address. I controlli verso MIDI e OSC usano le uscite gia configurate nelle Utility Colonne.
+5. Seleziona **Pickup** per evitare salti di volume quando il cursore fisico e in una posizione diversa dal valore corrente, oppure **Jump** per applicare immediatamente il valore. Il pannello permette l'inversione dell'asse. **Aggiungi mapping** registra la regola nello show; selezionala dall'elenco per eliminarla.
+
+**Priorita:** override della singola cue, poi preset della cue, mapping della colonna e infine mapping globale. Un pulsante GO o PANIC non deve ripetersi fino a quando non viene rilasciato; il cambio di cue non azzera il debounce fisico.
+
+**Cue attiva:** la cue diventa attiva solo dopo che GO ha accettato il comando; selezionare una riga o avviare una singola cella non cambia il preset attivo. Panic disattiva i mapping specifici della cue ma lascia disponibili quelli globali. I comandi vengono inseriti nel trasporto audio e vengono elaborati dal suo callback: tra il GO e la sua esecuzione puo esserci la latenza di un blocco audio. Un allineamento a livello di campione restera un miglioramento successivo.
+
+**Uscite generiche:** l'invio MIDI CC viene effettuato dal worker MIDI esistente e **non apre una seconda istanza della stessa porta**. Gli OSC di mapping vengono inviati in UDP tramite un worker indipendente con coda limitata; non vi e garanzia di consegna. Panic annulla gli invii che non sono ancora stati elaborati, non quelli gia ricevuti dai dispositivi.
+
+**Limiti attuali:** per i livelli Audio il mapping utilizza ancora la ricostruzione dello stato di rendering con l'aggiornamento GUI a 25 Hz; prima di un impiego live con fader ad alta frequenza occorrera usare parametri audio atomici e test di carico. Mancano inoltre richiamo automatico dei valori al cambio scena, feedback LED/motorizzato e un'interfaccia dedicata per i mapping multipli. Non sono state eseguite build o prove reali nell'ambito di questa PR.
+
+**Persistenza:** i progetti sono salvati in formato `.cuelist` **v10**. Preset, binding, ingresso MIDI prescelto e associazione delle cue vengono serializzati insieme agli altri dati. Aprire file v1-v9 inizializza il sistema di mapping vuoto; i nomi e gli ID dei dispositivi dipendono dal computer utilizzato.
+
 ## Cue e riproduzione
 
 La sessione iniziale contiene una cue e una colonna Audio senza nomi precompilati. **+ Cue** e **+ Colonna** estendono la griglia.
@@ -152,7 +172,7 @@ Le uscite sono memorizzate per identificativo: un dispositivo assente non viene 
 
 Sovrascrivendo uno show, la versione precedente resta in `.cuelist.bak`. Le generazioni precedenti dei media vengono conservate per rendere utilizzabile il backup: salvataggi ripetuti possono aumentare lo spazio occupato.
 
-Il formato corrente è **v9**. **Apri** legge anche v1/v2/v3/v4/v5/v6/v7/v8 e backup. La v9 aggiunge automazioni OSC, punti di controllo e argomenti booleani. Il flag Auto Stop per cella viene letto dagli show v7 e inizializzato su ON negli show precedenti. Le clip MIDI sono salvate direttamente nello show, senza dipendere dal file MIDI importato:
+Il formato corrente è **v10**. **Apri** legge anche v1/v2/v3/v4/v5/v6/v7/v8/v9 e backup. La v9 aggiunge automazioni OSC, punti di controllo e argomenti booleani. Il flag Auto Stop per cella viene letto dagli show v7 e inizializzato su ON negli show precedenti. Le clip MIDI sono salvate direttamente nello show, senza dipendere dal file MIDI importato:
 
 - Auto Stop viene abilitato per default nei progetti precedenti alla v4.
 - Nei progetti v1/v2, i vecchi Restart e Stop diventano Retrigger e le utility di colonna partono neutre.
