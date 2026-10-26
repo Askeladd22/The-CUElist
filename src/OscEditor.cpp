@@ -119,7 +119,8 @@ void OscClipEditor::paint(juce::Graphics& g) {
     const double step=1.0/(1<<juce::jlimit(0,3,resolution.getSelectedId()-1));
     if (grid.getToggleState()) {
         // Render a bounded number of lines even for clips with very fine snap.
-        const double visualStep=std::max(step,clip.length/260.0);
+        const int stride=std::max(1,(int)std::ceil(clip.length/(260.0*step)));
+        const double visualStep=step*stride; // every painted line is a true snap-grid multiple
         for (int i=0;i<=260 && i*visualStep<=clip.length+.00001;++i) {
             const float x=xForTime(i*visualStep);
             g.setColour(palette::line.withAlpha(.75f));
