@@ -119,6 +119,15 @@ inline juce::Result validateControls(const ControlSettings& s,
         if (p.id<1 || p.id>=s.nextId || !ids.insert(p.id).second ||
             p.name.trim().isEmpty() || p.name.length()>120)
             return juce::Result::fail("Preset mapping non valido.");
+    for (size_t i=0;i<s.bindings.size();++i)
+        for (size_t j=i+1;j<s.bindings.size();++j) {
+            const auto& a=s.bindings[i],&b=s.bindings[j];
+            if (!a.enabled || !b.enabled || a.deviceId!=b.deviceId ||
+                a.kind!=b.kind || a.channel!=b.channel || a.number!=b.number ||
+                a.scope!=b.scope) continue;
+            if (a.scope==ControlScope::column || a.scopeId==b.scopeId)
+                return juce::Result::fail("Due mapping con lo stesso controllo e la stessa priorita.");
+        }
     for (const auto& b:s.bindings) {
         if (b.id<1 || b.id>=s.nextId || !ids.insert(b.id).second || b.deviceId.length()>255
             || (int)b.kind<0 || (int)b.kind>2 || (int)b.scope<0 || (int)b.scope>3
