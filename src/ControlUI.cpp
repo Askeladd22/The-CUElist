@@ -727,7 +727,8 @@ private:
                 if (col.id==item.columnId) {source=col.name;break;}
             const auto& b=item.binding;
             const bool local=item.columnId==sourceColumnId;
-            summary+="\n"+juce::String(local ? "LOCAL / " : "INHERITED / ")+
+            summary+="\n"+juce::String(local ? (item.overrides ? "OVERRIDE / " : "LOCAL / ") :
+                (item.overrides ? "INHERITED OVERRIDE / " : "INHERITED / "))+
                 source+" ("+(item.priority==0 ? juce::String("legacy") :
                       "P"+juce::String(item.priority))+")  "+
                 (b.kind==ControlKind::cc ? "CC " :

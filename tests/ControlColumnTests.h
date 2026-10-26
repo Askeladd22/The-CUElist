@@ -25,6 +25,7 @@ void controlColumnTests() {
               "High priority override replaced an unrelated input");
         const auto effective=mapping.effectiveForCue(22);
         check(effective.size()==2 && effective[0].columnId==200 &&
+              effective[0].overrides && !effective[1].overrides &&
               effective[1].columnId==100,
               "Merged preview lost inherited mapping or override provenance");
     });

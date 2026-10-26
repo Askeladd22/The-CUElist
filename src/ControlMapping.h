@@ -73,6 +73,7 @@ struct EffectiveControl {
     ControlBinding binding;
     int columnId=0,priority=1;
     bool inherited=false;
+    bool overrides=false;
 };
 struct MappedControl {
     ControlBinding binding;
@@ -134,7 +135,7 @@ public:
                     });
                 if (it==result.end()) result.push_back({b,layer.columnId,layer.priority,layer.locked});
                 else if (layer.priority>=it->priority)
-                    *it={b,layer.columnId,layer.priority,layer.locked};
+                    *it={b,layer.columnId,layer.priority,layer.locked,true};
             }
         }
         return result;
