@@ -8,8 +8,13 @@ void controlsV4Tests() {
         for (int c=0;c<3;++c) {
             auto* strip=utilities->getChildComponent(c);
             auto* output=dynamic_cast<juce::ComboBox*>(controlsV3::named(*strip,"columnOutput"));
-            check(output && output->isVisible(),"Column output selector missing");
-            check(output->isEnabled()==(c!=2),"Audio/MIDI routing unavailable or OSC incorrectly enabled");
+            check(output && output->isVisible()==(c!=2),"Audio/MIDI routing or OSC destination visibility incorrect");
+            if (c!=2) check(output->isEnabled(),"Audio/MIDI routing unavailable");
+            else {
+                auto* destination=dynamic_cast<juce::TextButton*>(controlsV3::named(*strip,"columnOscDestination"));
+                check(destination && destination->isVisible(),"OSC UDP destination missing");
+                check(destination->getButtonText()=="127.0.0.1:9000","OSC route default incorrect");
+            }
             for (const auto* name : {"columnGainDb","columnPan","columnMute","columnPhase"})
                 check(controlsV3::named(*strip,name)->isVisible()==(c==0),"MIDI OSC utility area is not blank");
         }
