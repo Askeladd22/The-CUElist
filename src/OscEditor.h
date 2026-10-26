@@ -39,7 +39,10 @@ private:
     juce::ToggleButton grid{"Griglia"},snap{"Snap"};
     juce::TextButton add{"+"},ramp{"+ Rampa"},remove{"Elimina"},duplicate{"Duplica"},detach{"Stacca"};
     int selectedEvent=-1,selectedAutomation=-1,selectedPoint=-1,dragEvent=-1,dragAutomation=-1,dragPoint=-1;
+    enum class RampDrag { none, move, resize, point };
+    RampDrag rampDrag=RampDrag::none;
     bool dragging=false,changedDuringDrag=false;
+    juce::String newTrackAddress="/parameter";
     int laneScroll=0;
     double cursor=0,dragStartTime=0;
     OscClip dragBefore;
@@ -56,6 +59,8 @@ private:
     double valueForY(int index,float y) const;
     void chooseEvent(int index);
     void chooseAutomation(int index);
+    void createAutomationAt(double start);
+    void editTrackAddress(int index);
     void notify(const OscClip& before,bool complete=true);
     void deleteSelection();
     void duplicateSelection();
