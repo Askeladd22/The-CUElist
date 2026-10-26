@@ -69,27 +69,36 @@ public:
             owner.selected=owner.selectedNotes.empty() ? -1 : *owner.selectedNotes.rbegin();
             owner.selectionChanged(); repaint(); return;
         }
-        if (hitIndex<0) { owner.selected=-1; owner.selectedNotes.clear(); owner.selectionChanged(); repaint(); return; }
+        if (hitIndex<0) {
+            owner.selected=-1; owner.selectedNotes.clear();
+            if (e.x>=keysWidth && e.y>=rulerHeight) {
+                if (owner.clip.notes.size()>=10000) { owner.hint="Limite: 10.000 note per clip."; repaint(); return; }
+                const auto before=owner.clip;
+                const double step=owner.gridStep();
+                const double rawBeat=(e.x-keysWidth)/owner.pixelsPerBeat;
+                const double beat=owner.snapEnabled() ? std::floor(rawBeat/step)*step : rawBeat;
+                if (beat>=0 && beat<owner.clip.lengthBeats) {
+                    MidiNote note;
+                    note.beat=beat;
+                    note.length=std::min(owner.snapEnabled() ? step : .25,owner.clip.lengthBeats-beat);
+                    note.pitch=juce::jlimit(0,127,127-(e.y-rulerHeight)/noteHeight);
+                    note.velocity=(int)owner.velocity.getValue(); note.channel=owner.channel.getSelectedId();
+                    owner.clip.notes.push_back(note); owner.selected=(int)owner.clip.notes.size()-1;
+                    owner.selectedNotes.insert(owner.selected);
+                    owner.notify(before);
+                }
+            }
+            owner.selectionChanged(); repaint(); return;
+        }
         if (!owner.selectedNotes.count(hitIndex)) { owner.selectedNotes.clear(); owner.selectedNotes.insert(hitIndex); }
         owner.selected=hitIndex;
+        gestureStart=owner.clip;
         original=owner.clip.notes[(size_t)hitIndex];
         resizing=e.x>=noteBox(original).getRight()-7;
         originals.clear();
         for (int index:owner.selectedNotes) originals.push_back({index,owner.clip.notes[(size_t)index]});
         dragging=true;
         owner.selectionChanged(); repaint();
-    }
-    void mouseDoubleClick(const juce::MouseEvent& e) override {
-        if (!e.mods.isLeftButtonDown() || e.x<keysWidth || e.y<rulerHeight || hit(e.position)>=0) return;
-        if (owner.clip.notes.size()>=10000) { owner.hint="Limite: 10.000 note per clip."; owner.repaint(); return; }
-        const double step=owner.gridStep();
-        const double rawBeat=(e.x-keysWidth)/owner.pixelsPerBeat;
-        const double beat=owner.snapEnabled() ? std::floor(rawBeat/step)*step : rawBeat;
-        if (beat<0 || beat>=owner.clip.lengthBeats) return;
-        MidiNote note; note.beat=beat; note.length=std::min(owner.snapEnabled() ? step : .25,owner.clip.lengthBeats-beat);
-        note.pitch=juce::jlimit(0,127,127-(e.y-rulerHeight)/noteHeight);
-        note.velocity=(int)owner.velocity.getValue(); note.channel=owner.channel.getSelectedId();
-        owner.clip.notes.push_back(note); owner.selected=(int)owner.clip.notes.size()-1; owner.selectedNotes.clear(); owner.selectedNotes.insert(owner.selected); owner.selectionChanged(); repaint();
     }
     void mouseDrag(const juce::MouseEvent& e) override {
         if (selecting) {
@@ -127,36 +136,73 @@ public:
                 note.beat=pair.second.beat+delta; note.pitch=pair.second.pitch+pitchDelta;
             }
         }
+        owner.notify(gestureStart,false);
         owner.selectionChanged(); repaint();
     }
-    void mouseUp(const juce::MouseEvent&) override { dragging=false; selecting=false; repaint(); }
+    void mouseUp(const juce::MouseEvent&) override {
+        if (dragging && !selecting) owner.notify(gestureStart,true);
+        dragging=false; selecting=false; repaint();
+    }
     bool keyPressed(const juce::KeyPress& key) override {
+        if (key.getModifiers().isCommandDown() && (key.getKeyCode()=='Z' || key.getKeyCode()=='z')) {
+            if (key.getModifiers().isShiftDown()) { if (owner.onRedo) owner.onRedo(); }
+            else if (owner.onUndo) owner.onUndo();
+            return true;
+        }
+        if (key.getModifiers().isCommandDown() && (key.getKeyCode()=='Y' || key.getKeyCode()=='y')) {
+            if (owner.onRedo) owner.onRedo(); return true;
+        }
         if (key==juce::KeyPress::deleteKey || key==juce::KeyPress::backspaceKey) { owner.deleteSelected(); return true; }
         return false;
     }
 private:
-    PianoRollEditor& owner; MidiNote original;
+    PianoRollEditor& owner; MidiNote original; MidiClip gestureStart;
     std::vector<std::pair<int,MidiNote>> originals;
     juce::Point<float> marqueeStart,marqueeEnd;
     bool dragging=false,resizing=false,selecting=false;
 };
-PianoRollEditor::PianoRollEditor(MidiClip value,std::function<void(const MidiClip&)> callback)
-    : clip(std::move(value)),commit(std::move(callback)),canvas(std::make_unique<Canvas>(*this)) {
+PianoRollEditor::PianoRollEditor(MidiClip value,OnEdit callback)
+    : clip(std::move(value)),onEdit(std::move(callback)),canvas(std::make_unique<Canvas>(*this)) {
     setLookAndFeel(&theme);
-    for (juce::Component* c:std::initializer_list<juce::Component*>{&viewport,&snap,&channel,&velocity,&length,&remove,&zoomOut,&zoomIn,&apply,&cancel}) addAndMakeVisible(c);
+    setName("sharedPianoRoll");
+    for (juce::Component* c:std::initializer_list<juce::Component*>{
+        &viewport,&snap,&channel,&velocity,&length,&remove,&zoomOut,&zoomIn,&detach,&undo,&redo
+    }) addAndMakeVisible(c);
     viewport.setViewedComponent(canvas.get(),false); viewport.setScrollBarsShown(true,true);
     viewport.onScroll=[this] { repaint(); };
-    snap.addItemList({"1/4","1/8","1/16","1/32"},1); snap.addItem("Off",5); snap.setSelectedId(3);
-    snap.setName("midiSnap"); channel.setName("midiChannel"); velocity.setName("midiVelocity"); length.setName("midiLength");
-    for (int i=1;i<=16;++i) channel.addItem(juce::String(i),i); channel.setSelectedId(1);
-    velocity.setSliderStyle(juce::Slider::LinearHorizontal); velocity.setTextBoxStyle(juce::Slider::TextBoxRight,false,46,24); velocity.setRange(1,127,1); velocity.setValue(100);
-    length.setSliderStyle(juce::Slider::IncDecButtons); length.setTextBoxStyle(juce::Slider::TextBoxLeft,false,66,24); length.setRange(.25,4096,.25); length.setValue(clip.lengthBeats,juce::dontSendNotification);
+    snap.addItemList({"1/4","1/8","1/16","1/32"},1); snap.addItem("Off",5);
+    snap.setSelectedId(3);
+    snap.setName("midiSnap"); channel.setName("midiChannel");
+    velocity.setName("midiVelocity"); length.setName("midiLength");
+    detach.setName("clipEditorDetach"); undo.setName("clipEditorUndo"); redo.setName("clipEditorRedo");
+    for (int i=1;i<=16;++i) channel.addItem(juce::String(i),i);
+    channel.setSelectedId(1);
+    velocity.setSliderStyle(juce::Slider::LinearHorizontal);
+    velocity.setTextBoxStyle(juce::Slider::TextBoxRight,false,46,24);
+    velocity.setRange(1,127,1); velocity.setValue(100);
+    length.setSliderStyle(juce::Slider::IncDecButtons);
+    length.setTextBoxStyle(juce::Slider::TextBoxLeft,false,66,24);
+    length.setRange(.25,4096,.25); length.setValue(clip.lengthBeats,juce::dontSendNotification);
     snap.onChange=[this] { canvas->repaint(); };
-    channel.onChange=[this] { for (int index:selectedNotes) clip.notes[(size_t)index].channel=channel.getSelectedId(); selectionChanged(); canvas->repaint(); };
-    velocity.onValueChange=[this] { for (int index:selectedNotes) clip.notes[(size_t)index].velocity=(int)velocity.getValue(); canvas->repaint(); };
+    channel.onChange=[this] {
+        if (selectedNotes.empty()) return;
+        auto before=clip;
+        for (int index:selectedNotes) clip.notes[(size_t)index].channel=channel.getSelectedId();
+        notify(before); selectionChanged(); canvas->repaint();
+    };
+    velocity.onValueChange=[this] {
+        if (selectedNotes.empty()) return;
+        auto before=clip;
+        for (int index:selectedNotes) clip.notes[(size_t)index].velocity=(int)velocity.getValue();
+        notify(before); canvas->repaint();
+    };
     length.onValueChange=[this] {
-        double minimum=.25; for (const auto& n:clip.notes) minimum=std::max(minimum,n.beat+n.length);
-        clip.lengthBeats=std::max(std::ceil(minimum*4)/4,length.getValue()); length.setValue(clip.lengthBeats,juce::dontSendNotification); updateCanvas();
+        auto before=clip;
+        double minimum=.25;
+        for (const auto& n:clip.notes) minimum=std::max(minimum,n.beat+n.length);
+        clip.lengthBeats=std::max(std::ceil(minimum*4)/4,length.getValue());
+        length.setValue(clip.lengthBeats,juce::dontSendNotification);
+        updateCanvas(); notify(before);
     };
     remove.onClick=[this] { deleteSelected(); };
     auto zoom=[this](double factor) {
@@ -165,9 +211,10 @@ PianoRollEditor::PianoRollEditor(MidiClip value,std::function<void(const MidiCli
         viewport.setViewPosition((int)(left*pixelsPerBeat),viewport.getViewPositionY());
     };
     zoomOut.onClick=[zoom] { zoom(.5); }; zoomIn.onClick=[zoom] { zoom(2); };
-    apply.onClick=[this] { auto result=validateMidiClip(clip); if (result.failed()) { hint=result.getErrorMessage(); repaint(); return; } commit(clip); close(); };
-    cancel.onClick=[this] { close(); };
-    for (auto* b:{&remove,&zoomOut,&zoomIn,&apply,&cancel}) b->setWantsKeyboardFocus(false);
+    detach.onClick=[this] { if (onDetach) onDetach(); };
+    undo.onClick=[this] { if (onUndo) onUndo(); };
+    redo.onClick=[this] { if (onRedo) onRedo(); };
+    for (auto* b:{&remove,&zoomOut,&zoomIn,&detach,&undo,&redo}) b->setWantsKeyboardFocus(false);
     setSize(940,620); updateCanvas(); selectionChanged();
     const int pitch=clip.notes.empty() ? 64 : clip.notes.front().pitch;
     viewport.setViewPosition(0,std::max(0,rulerHeight+(127-pitch)*noteHeight-viewport.getHeight()/2));
@@ -177,43 +224,61 @@ juce::Component& PianoRollEditor::getCanvas() { return *canvas; }
 double PianoRollEditor::gridStep() const { return snapEnabled() ? std::pow(.5,std::max(0,snap.getSelectedId()-1)) : .25; }
 bool PianoRollEditor::snapEnabled() const { return snap.getSelectedId()!=5; }
 void PianoRollEditor::updateCanvas() { canvas->setSize(std::max(viewport.getWidth()-14,keysWidth+(int)std::ceil(clip.lengthBeats*pixelsPerBeat)+24),rulerHeight+128*noteHeight); canvas->repaint(); }
+void PianoRollEditor::setFloating(bool floating) {
+    detach.setButtonText(floating ? "Riaggancia" : "Stacca");
+}
+void PianoRollEditor::notify(const MidiClip& before,bool complete) {
+    if (!onEdit) return;
+    const auto valid=validateMidiClip(clip);
+    if (valid.failed()) { hint=valid.getErrorMessage(); repaint(); return; }
+    onEdit(before,clip,complete);
+}
+void PianoRollEditor::loadClip(const MidiClip& replacement) {
+    clip=replacement; selected=-1; selectedNotes.clear();
+    length.setValue(clip.lengthBeats,juce::dontSendNotification);
+    updateCanvas(); selectionChanged();
+}
 void PianoRollEditor::selectionChanged() {
     if (selected>=0) { const auto& n=clip.notes[(size_t)selected]; velocity.setValue(n.velocity,juce::dontSendNotification); channel.setSelectedId(n.channel,juce::dontSendNotification);
         hint=selectedNotes.size()>1 ? juce::String((int)selectedNotes.size())+" note selezionate (trascina, modifica velocity/canale o Canc)"
             : "Nota "+juce::String(n.pitch)+"  |  Beat "+juce::String(n.beat+1,2)+"  |  Durata "+juce::String(n.length,2)+" beat";
-    } else hint="Doppio clic: aggiungi  |  Destro+trascina: seleziona  |  Shift+clic: aggiungi  |  Canc: elimina";
+    } else hint="Clic: crea nota  |  Destro+trascina: selezione  |  Shift+clic: aggiungi  |  Canc: elimina";
     remove.setEnabled(!selectedNotes.empty()); repaint();
 }
 void PianoRollEditor::deleteSelected() {
     if (selectedNotes.empty()) return;
+    auto before=clip;
     for (auto it=selectedNotes.rbegin();it!=selectedNotes.rend();++it) clip.notes.erase(clip.notes.begin()+*it);
-    selectedNotes.clear(); selected=-1; selectionChanged(); canvas->repaint();
+    selectedNotes.clear(); selected=-1; notify(before); selectionChanged(); canvas->repaint();
 }
-void PianoRollEditor::close() { if (auto* dialog=findParentComponentOfClass<juce::DialogWindow>()) dialog->exitModalState(0); }
 void PianoRollEditor::paint(juce::Graphics& g) {
     g.fillAll(palette::panel);
-    label(g,"PIANO ROLL  /  note MIDI",{16,8,310,25},17,palette::amber,true);
-    label(g,"Snap",{16,44,40,24},11,palette::muted); label(g,"Canale",{142,44,48,24},11,palette::muted);
-    label(g,"Velocity",{274,44,50,24},11,palette::muted); label(g,"Beat clip",{510,44,58,24},11,palette::muted);
-    g.saveState(); g.reduceClipRegion(16,80,getWidth()-48,24);
-    label(g,"Beat",{20,80,50,24},10,palette::muted);
+    label(g,"PIANO ROLL  /  note MIDI",{16,6,290,25},15,palette::amber,true);
+    label(g,"Snap",{16,38,40,22},11,palette::muted);
+    label(g,"Canale",{142,38,48,22},11,palette::muted);
+    label(g,"Velocity",{270,38,50,22},11,palette::muted);
+    label(g,"Beat",{504,38,42,22},11,palette::muted);
+    g.saveState(); g.reduceClipRegion(16,67,getWidth()-32,17);
     const int scroll=viewport.getViewPositionX();
     const int first=std::max(0,(int)std::floor((scroll-keysWidth)/pixelsPerBeat));
     const int last=std::min((int)std::ceil(clip.lengthBeats),first+(int)(getWidth()/pixelsPerBeat)+2);
     for (int beat=first;beat<=last;++beat) {
         const int x=16+keysWidth+(int)(beat*pixelsPerBeat)-scroll;
-        g.setColour(palette::line); g.drawVerticalLine(x,84,104);
-        label(g,juce::String(beat+1),{x+4,80,48,24},10,palette::muted);
+        g.setColour(palette::line); g.drawVerticalLine(x,67,82);
+        label(g,juce::String(beat+1),{x+4,67,48,17},10,palette::muted);
     }
     g.restoreState();
-    label(g,hint,{16,getHeight()-58,getWidth()-32,22},11,palette::muted);
-    label(g,"Tempo della cue. Uscita MIDI nelle utility; nessun sintetizzatore interno.",{16,getHeight()-32,getWidth()-220,22},10,palette::muted);
+    label(g,hint,{16,getHeight()-25,getWidth()-32,22},11,palette::muted);
 }
 void PianoRollEditor::resized() {
-    snap.setBounds(56,44,76,26); channel.setBounds(194,44,66,26); velocity.setBounds(328,44,172,26); length.setBounds(570,44,110,26);
-    zoomOut.setBounds(getWidth()-88,8,32,26); zoomIn.setBounds(getWidth()-48,8,32,26); remove.setBounds(getWidth()-140,44,124,26);
-    viewport.setBounds(16,106,getWidth()-32,getHeight()-170);
-    cancel.setBounds(getWidth()-194,getHeight()-32,82,26); apply.setBounds(getWidth()-104,getHeight()-32,88,26);
+    const int w=getWidth(),h=getHeight();
+    snap.setBounds(54,35,80,26); channel.setBounds(190,35,67,26);
+    velocity.setBounds(325,35,166,26); length.setBounds(546,35,96,26);
+    remove.setBounds(std::max(650,w-333),35,89,26);
+    detach.setBounds(w-96,4,86,26);
+    undo.setBounds(w-185,4,74,26); redo.setBounds(w-269,4,74,26);
+    zoomOut.setBounds(w-90,35,32,26); zoomIn.setBounds(w-50,35,32,26);
+    viewport.setBounds(16,85,std::max(20,w-32),std::max(20,h-112));
     if (canvas) updateCanvas();
 }
 }
