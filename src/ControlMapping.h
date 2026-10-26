@@ -59,11 +59,15 @@ struct ControlLayer {
     ControlSet set;
 };
 struct ControlPreset { int id=0; juce::String name; };
+// Reusable content is distinct from the Control Column that determines when
+// and with which priority the content becomes active.
+struct ControlSetTemplate { int id=0; juce::String name; ControlSet set; };
 struct ControlSettings {
     juce::String midiInputId;
     int nextId=1;
     std::vector<ControlPreset> presets;
     std::vector<ControlBinding> bindings;
+    std::vector<ControlSetTemplate> templates;
 };
 struct EffectiveControl {
     ControlBinding binding;
@@ -176,13 +180,17 @@ private:
 inline juce::Result validateControls(const ControlSettings& s,
         const std::vector<int>& rowIds,const std::vector<int>& columnIds) {
     if (s.midiInputId.length()>255 || s.nextId<1 || s.nextId>=1000000000 ||
-        s.bindings.size()>2048 || s.presets.size()>256)
+        s.bindings.size()>2048 || s.presets.size()>256 || s.templates.size()>128)
         return juce::Result::fail("MIDI mapping limits exceeded.");
     std::set<int> ids;
     for (const auto& p:s.presets)
         if (p.id<1 || p.id>=s.nextId || !ids.insert(p.id).second ||
             p.name.trim().isEmpty() || p.name.length()>120)
             return juce::Result::fail("Invalid mapping preset.");
+    for (const auto& t:s.templates)
+        if (t.id<1 || t.id>=s.nextId || !ids.insert(t.id).second ||
+            t.name.trim().isEmpty() || t.name.length()>120)
+            return juce::Result::fail("Invalid Control Set template.");
     for (size_t i=0;i<s.bindings.size();++i)
         for (size_t j=i+1;j<s.bindings.size();++j) {
             const auto& a=s.bindings[i],&b=s.bindings[j];

@@ -125,6 +125,8 @@ public:
     bool addControlSetBinding(int row,int column,ControlBinding);
     bool deleteControlSetBinding(int row,int column,int id);
     bool updateControlBinding(int row,int column,int id,ControlBinding updated,bool inControlSet);
+    int saveControlSetTemplate(int row,int column,const juce::String& name);
+    bool applyControlSetTemplate(int row,int column,int templateId);
     std::vector<EffectiveControl> effectiveControlSet(int cueId) const {
         return controlMapping.effectiveForCue(cueId);
     }

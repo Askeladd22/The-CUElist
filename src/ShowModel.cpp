@@ -150,6 +150,10 @@ juce::Result validateShow(const Show& show) {
     std::set<int> allControlBindingIds;
     for (const auto& binding:show.controls.bindings)
         allControlBindingIds.insert(binding.id);
+    for (const auto& preset:show.controls.presets)
+        allControlBindingIds.insert(preset.id);
+    for (const auto& item:show.controls.templates)
+        allControlBindingIds.insert(item.id);
     // Source-column priority conflicts are resolved deterministically at runtime.
     const auto validateSet=[&](const ControlSet& set)->juce::Result {
         if (set.bindings.size()>256) return fail("Control Set exceeds 256 mappings.");
@@ -178,6 +182,8 @@ juce::Result validateShow(const Show& show) {
         }
         return juce::Result::ok();
     };
+    for (const auto& item:show.controls.templates)
+        if (auto result=validateSet(item.set);result.failed()) return result;
     for (size_t i=0;i<show.columns.size();++i) {
         const auto& column=show.columns[i];
         if (column.type!=ColumnType::control) {
@@ -325,8 +331,13 @@ juce::String encodeShow(const Show& show) {
             {"oscHost",binding.oscHost},{"oscPort",binding.oscPort},{"oscAddress",binding.oscAddress},
             {"minimum",binding.minimum},{"maximum",binding.maximum},{"invert",binding.invert},
             {"enabled",binding.enabled},{"takeover",(int)binding.takeover},{"curve",(int)binding.curve}}));
+    juce::Array<juce::var> templates;
+    for (const auto& item:show.controls.templates)
+        templates.add(object({{"id",item.id},{"name",item.name},
+                              {"set",controlSetObject(item.set)}}));
     const auto controls=object({{"midiInputId",show.controls.midiInputId},
-        {"nextId",show.controls.nextId},{"presets",presets},{"bindings",bindings}});
+        {"nextId",show.controls.nextId},{"presets",presets},
+        {"bindings",bindings},{"templates",templates}});
     return juce::JSON::toString(object({{"format","TheCuelist"},{"version",10},
         {"name",show.name},{"masterGain",show.masterGain},{"masterPan",show.masterPan},
         {"masterMuted",show.masterMuted},{"nextId",show.nextId},
@@ -349,6 +360,12 @@ juce::Result decodeShow(const juce::String& text, Show& destination) {
             show.controls.nextId=integer(data,"nextId");
             for (const auto& p:array(data,"presets"))
                 show.controls.presets.push_back({integer(p,"id"),string(p,"name")});
+            // Optional v10 extension; absence is normal for older projects.
+            if (data.hasProperty("templates"))
+                for (const auto& item:array(data,"templates"))
+                    show.controls.templates.push_back({
+                        integer(item,"id"),string(item,"name"),
+                        parseControlSet(required(item,"set"))});
             for (const auto& item:array(data,"bindings")) {
                 ControlBinding b;
                 b.id=integer(item,"id"); b.deviceId=string(item,"deviceId");
