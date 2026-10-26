@@ -3,6 +3,8 @@
 #include <algorithm>
 #include <cmath>
 #include <optional>
+#include <map>
+#include <set>
 #include <vector>
 
 namespace cuelist {
