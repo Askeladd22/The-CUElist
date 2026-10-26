@@ -448,16 +448,18 @@ void oscAutomationV9Tests() {
         OscClipEditor editor(clip,{{0,120,4,4}},
             [](const OscClip&,const OscClip&,bool){});
         editor.setSize(940,260);
-        // A single scrolling offset pushes EVENTS out of view and reveals
-        // the empty automation lane at the old first-track screen coordinate.
+        editor.addAutomation(); editor.addAutomation(); editor.addAutomation();
+        // A single scrolling offset pushes EVENTS out of view and exposes
+        // the second persisted track at y=204, where the first track used to be.
         juce::MouseWheelDetails wheel;
         wheel.deltaY=-1.0f;
         const juce::Point<float> scroll{350,204};
         editor.mouseWheelMove(cueViewFixtures::event(editor,scroll,scroll),wheel);
         editor.mouseDoubleClick(cueViewFixtures::event(editor,scroll,scroll));
         check(editor.getClip().events.size()==1,"Scroll redirected a track gesture to EVENTS");
-        check(editor.getClip().tracks.size()==1 &&
-              editor.getClip().automations.size()==1,
+        check(editor.getClip().tracks.size()==3 &&
+              editor.getClip().automations.size()==1 &&
+              editor.getClip().automations[0].message.address==editor.getClip().tracks[1].message.address,
               "Scrolled automation track was not reachable at its displayed position");
         check(validateOscClip(editor.getClip()).wasOk(),"Scrolled edit damaged OSC data");
     });
