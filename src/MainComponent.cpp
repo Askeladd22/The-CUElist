@@ -2,6 +2,7 @@
 #include "PianoRoll.h"
 #include "OscEditor.h"
 #include "MidiClip.h"
+#include "BinaryData.h"
 #include <sstream>
 
 namespace cuelist {
@@ -133,7 +134,13 @@ void MainComponent::paint(juce::Graphics& g) {
     const int w=getWidth(),h=getHeight(); g.fillAll(palette::background);
     g.setColour(palette::panel); g.fillRect(0,0,w,72); g.fillRect(0,73,180,h-73);
     g.setColour(palette::line); g.drawHorizontalLine(72,0,(float)w); g.drawVerticalLine(180,73,(float)h);
-    for (int i=0;i<3;++i) { g.setColour(i==1 ? palette::teal : palette::text); g.fillRoundedRectangle(23.0f,23.0f+i*9,23.0f-i*4,4,2); }
+    static const auto appIcon=juce::ImageFileFormat::loadFrom(
+        BinaryData::thecuelist_icon_png,BinaryData::thecuelist_icon_pngSize);
+    if (appIcon.isValid()) g.drawImage(appIcon,23,18,30,33,0,0,appIcon.getWidth(),appIcon.getHeight());
+    else for (int i=0;i<3;++i) {
+        g.setColour(i==1 ? palette::teal : palette::text);
+        g.fillRoundedRectangle(23.0f,23.0f+i*9,23.0f-i*4,4,2);
+    }
     label(g,"The Cuelist",{60,16,150,30},23,palette::text,true);
     label(g,"SHOW CONTROL",{61,45,130,15},10,palette::muted,true);
     label(g,"SESSION",{232,25,100,22},12,palette::teal,true);
