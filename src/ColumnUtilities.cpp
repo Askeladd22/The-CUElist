@@ -10,6 +10,7 @@ struct ColumnUtilities::Strip final : juce::Component {
     UtilityIcon mute{false},phase{true};
     juce::ComboBox output;
     juce::TextButton oscDestination{"OSC / destination"};
+    juce::TextButton controlLock{"Lock"},controlPriority{"Medium"},controlEdit{"Edit set"};
     int routingChannels=-1, routingOutput=-1;
     ColumnType routingType=ColumnType::audio;
     juce::String midiSignature;
@@ -23,6 +24,33 @@ struct ColumnUtilities::Strip final : juce::Component {
         gain.setName("columnGainDb"); pan.setName("columnPan"); mute.setName("columnMute"); phase.setName("columnPhase");
         addAndMakeVisible(output); output.setName("columnOutput");
         addAndMakeVisible(oscDestination); oscDestination.setName("columnOscDestination");
+        addAndMakeVisible(controlLock); addAndMakeVisible(controlPriority);
+        addAndMakeVisible(controlEdit);
+        controlLock.setName("controlColumnLock");
+        controlPriority.setName("controlColumnPriority");
+        controlEdit.setName("controlColumnEditSet");
+        controlLock.setTooltip("Lock this Control Column as a low-priority default for all cues.");
+        controlLock.onClick=[this] {
+            const auto& col=owner.show.columns[(size_t)index];
+            owner.setControlColumnLocked(index,!col.controlLocked,owner.selectedRow);
+        };
+        controlPriority.onClick=[this] {
+            if (owner.show.columns[(size_t)index].controlLocked) return;
+            juce::PopupMenu menu;
+            menu.addItem(2,"Medium"); menu.addItem(3,"High"); menu.addItem(4,"Maximum");
+            auto safe=juce::Component::SafePointer<MainComponent>(&owner);
+            const int columnId=id;
+            menu.showMenuAsync(juce::PopupMenu::Options().withTargetComponent(&controlPriority),
+                [safe,columnId](int value) {
+                    if (!safe || value<2 || value>4) return;
+                    for (int j=0;j<(int)safe->show.columns.size();++j)
+                        if (safe->show.columns[(size_t)j].id==columnId)
+                            {safe->setControlColumnPriority(j,value);return;}
+                });
+        };
+        controlEdit.onClick=[this] {
+            owner.editControlSet(owner.selectedRow,index);
+        };
         oscDestination.setTooltip("OSC receiver IP address or host and UDP port.");
         oscDestination.onClick=[this] {
             const auto columnId=id;
@@ -70,11 +98,25 @@ struct ColumnUtilities::Strip final : juce::Component {
         phase.setToggleState(col.phaseInverted,juce::dontSendNotification);
         for (juce::Component* control : std::initializer_list<juce::Component*>{&gain,&pan,&mute,&phase}) control->setVisible(col.type==ColumnType::audio);
         oscDestination.setVisible(col.type==ColumnType::osc);
-        output.setVisible(col.type!=ColumnType::osc);
+        output.setVisible(col.type==ColumnType::audio || col.type==ColumnType::midi);
+        const bool control=col.type==ColumnType::control;
+        controlLock.setVisible(control);controlPriority.setVisible(control);
+        controlEdit.setVisible(control);
+        if (control) {
+            controlLock.setButtonText(col.controlLocked ? "Unlock" : "Lock");
+            controlPriority.setButtonText(col.controlLocked ? "Low" :
+                col.controlPriority==4 ? "Maximum" :
+                col.controlPriority==3 ? "High" : "Medium");
+            controlPriority.setEnabled(!col.controlLocked);
+            controlEdit.setButtonText(col.controlLocked ? "Edit default" : "Edit Q set");
+        }
         syncRouting();
     }
     void syncRouting() {
         const auto& col=owner.show.columns[index]; int channels=2;
+        if (col.type==ColumnType::control) {
+            routingType=ColumnType::control; return;
+        }
         if (col.type==ColumnType::osc) {
             routingType=ColumnType::osc;
             oscDestination.setButtonText(col.oscHost+":"+juce::String(col.oscPort));
@@ -124,9 +166,22 @@ struct ColumnUtilities::Strip final : juce::Component {
         pan.setBounds(w-56,34,46,46);
         mute.setBounds(w-77,h-36,32,29);
         phase.setBounds(w-42,h-36,32,29);
+        controlLock.setBounds(6,5,65,29);
+        controlPriority.setBounds(75,5,w-81,29);
+        controlEdit.setBounds(8,44,w-16,32);
     }
     void paint(juce::Graphics& g) override {
         g.setColour(palette::line); g.drawVerticalLine(0,0,(float)getHeight());
+        if (owner.show.columns[(size_t)index].type==ColumnType::control) {
+            const auto& col=owner.show.columns[(size_t)index];
+            label(g,col.controlLocked ? "DEFAULT / ALL CUES" : "CUE-SPECIFIC",
+                  {7,91,getWidth()-14,22},11,palette::teal,true);
+            label(g,col.controlLocked ? "Priority: LOW" :
+                  col.controlPriority==4 ? "Priority: MAXIMUM" :
+                  col.controlPriority==3 ? "Priority: HIGH" : "Priority: MEDIUM",
+                  {7,120,getWidth()-14,20},10,palette::muted);
+            return;
+        }
         if (owner.show.columns[(size_t)index].type!=ColumnType::audio) return;
         const int h=getHeight(),w=getWidth();
         label(g,"PAN",{w-60,82,54,13},9,palette::muted,true,juce::Justification::centred);
