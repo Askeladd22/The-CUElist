@@ -7,7 +7,7 @@
 namespace cuelist {
 // One shared dockable/floating OSC editor: event lane and automation curves
 // share their ruler, grid, snap, and horizontally scrolling beat/second axis.
-class OscClipEditor final : public juce::Component {
+class OscClipEditor final : public juce::Component, public juce::SettableTooltipClient {
 public:
     explicit OscClipEditor(OscClip,std::vector<TempoPoint>,
         std::function<void(const OscClip&,const OscClip&,bool)>);
