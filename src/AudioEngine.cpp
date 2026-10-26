@@ -383,9 +383,24 @@ std::unique_ptr<RenderState> makeRenderState(const Show& show,const ClipMap& cli
             v.oscHost=show.columns[i].oscHost; v.oscPort=show.columns[i].oscPort;
             v.oscDuration=c.osc->useBeats ? secondsAtBeat(row.tempo,c.osc->length) : c.osc->length;
             if (v.oscDuration<=0) continue;
-            for (const auto& e:c.osc->events)
-                v.oscEvents.push_back({c.osc->useBeats ? secondsAtBeat(row.tempo,e.time) : e.time,encodeOscMessage(e)});
-            std::stable_sort(v.oscEvents.begin(),v.oscEvents.end(),[](const auto& a,const auto& b){return a.seconds<b.seconds;});
+            const auto toSeconds=[&](double units) {
+                return c.osc->useBeats ? secondsAtBeat(row.tempo,units) : units;
+            };
+            const auto toUnits=[&](double seconds) {
+                if (!c.osc->useBeats) return seconds;
+                double low=0,high=std::max(1.0,seconds*4.0);
+                while (secondsAtBeat(row.tempo,high)<seconds && high<1.0e7) high*=2;
+                for (int i=0;i<48;++i) {
+                    const auto middle=(low+high)*0.5;
+                    if (secondsAtBeat(row.tempo,middle)<seconds) low=middle;
+                    else high=middle;
+                }
+                return (low+high)*0.5;
+            };
+            for (auto& e:prepareOscClip(*c.osc,toSeconds,toUnits))
+                v.oscEvents.push_back({e.seconds,std::move(e.bytes)});
+            // The initial value of each automation is prepared at its exact
+            // start and will replay on retrigger and loop. No reset is sent on Stop.
             uint64_t hash=1469598103934665603ull;
             const auto mix=[&](const void* ptr,size_t len) { const auto* p=static_cast<const uint8_t*>(ptr);
                 for (size_t k=0;k<len;++k) { hash^=p[k]; hash*=1099511628211ull; } };
