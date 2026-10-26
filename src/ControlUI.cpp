@@ -347,7 +347,8 @@ public:
         for (juce::Component* c : std::initializer_list<juce::Component*>{
             &device,&connect,&learn,&add,&remove,&newPreset,&assignPreset,
             &presetName,&presets,&scope,&target,&takeover,&columns,&bindingList,&state,
-            &outputCc,&oscAddress,&invert,&updateSelected,&curve,&minimum,&maximum,&effectivePreview})
+            &outputCc,&oscAddress,&invert,&updateSelected,&curve,&minimum,&maximum,
+             &effectivePreview,&templateName,&templates,&saveTemplate,&loadTemplate})
             addAndMakeVisible(c);
         device.setName("controlInputDevice");
         device.setTooltip("Select a device explicitly. No automatic fallback on disconnect.");
@@ -369,6 +370,37 @@ public:
         effectivePreview.setReadOnly(true);
         effectivePreview.setScrollbarsShown(true);
         effectivePreview.setVisible(editSet);
+        templateName.setVisible(editSet); templates.setVisible(editSet);
+        saveTemplate.setVisible(editSet); loadTemplate.setVisible(editSet);
+        templateName.setTextToShowWhenEmpty("Reusable Set name",palette::muted);
+        templateName.setName("controlTemplateName");
+        templates.setName("controlTemplates");
+        saveTemplate.setName("saveControlTemplate");
+        loadTemplate.setName("loadControlTemplate");
+        saveTemplate.setButtonText("Save Set");
+        loadTemplate.setButtonText("Apply Set");
+        saveTemplate.onClick=[this] {
+            if (!owner) return;
+            int row=-1,col=-1;
+            if (!resolveSource(row,col)) return;
+            const int id=owner->saveControlSetTemplate(row,col,templateName.getText());
+            if (id) {
+                refreshTemplates();templates.setSelectedId(id+1,juce::dontSendNotification);
+                state.setText("Control Set saved for reuse.",juce::dontSendNotification);
+            } else state.setText(owner->status,juce::dontSendNotification);
+        };
+        loadTemplate.onClick=[this] {
+            if (!owner || templates.getSelectedId()<2) return;
+            int row=-1,col=-1;
+            if (!resolveSource(row,col)) return;
+            if (owner->applyControlSetTemplate(row,col,templates.getSelectedId()-1)) {
+                selected=-1;bindingList.deselectAllRows();
+                bindingList.updateContent();bindingList.repaint();
+                updateSelected.setEnabled(false);
+                updateEffectivePreview();
+                state.setText("Reusable Set applied.",juce::dontSendNotification);
+            } else state.setText(owner->status,juce::dontSendNotification);
+        };
         effectivePreview.setColour(juce::TextEditor::outlineColourId,palette::line);
         remove.setButtonText("Remove selected");
         newPreset.setButtonText("New preset");
@@ -449,9 +481,9 @@ public:
                                            std::max(0,presets.getSelectedId()-1)))
                 state.setText("Preset assigned to selected cue.",juce::dontSendNotification);
         };
-        refreshDevices(); refreshPresets(); refreshColumns();
+        refreshDevices(); refreshPresets(); refreshColumns();refreshTemplates();
         updateEffectivePreview();
-        setSize(780,610); startTimerHz(10);
+        setSize(780,editSet ? 718 : 610); startTimerHz(10);
     }
     ~ControlPanel() override {stopTimer();bindingList.setModel(nullptr);}
     void paint(juce::Graphics& g) override {
@@ -469,14 +501,15 @@ public:
         const auto currentTitle=editSet ? juce::String("Control Column / ") +
               juce::String(sourceColumnId) : juce::String("Cue preset");
         label(g,currentTitle,{17,324,300,17},11,palette::muted,true);
+        if (editSet) label(g,"REUSABLE CONTROL SETS",{17,421,290,18},10,palette::teal,true);
         label(g,editSet ? "Mappings in this Control Set" : "Saved mappings",
-              {17,402,300,20},12,palette::teal,true);
+              {17,editSet ? 475 : 402,350,20},12,palette::teal,true);
         label(g,"Curve",{440,263,100,16},10,palette::muted,true);
         label(g,"Min",{572,263,75,16},10,palette::muted,true);
         label(g,"Max",{671,263,75,16},10,palette::muted,true);
         label(g,editSet ? "Control Set takes effect on GO; locked sets apply to every cue." :
               "Mapping chooses its active destination after GO, not when selecting a row.",
-              {17,579,getWidth()-32,19},10,palette::muted);
+              {17,editSet ? 686 : 579,getWidth()-32,19},10,palette::muted);
     }
     void resized() override {
         const int w=getWidth();
@@ -494,15 +527,19 @@ public:
         curve.setBounds(440,281,116,29);
         minimum.setBounds(572,281,86,29);
         maximum.setBounds(671,281,86,29);
-        effectivePreview.setBounds(17,344,w-34,65);
+        effectivePreview.setBounds(17,344,w-34,66);
+        templateName.setBounds(17,440,170,27);
+        templates.setBounds(193,440,232,27);
+        saveTemplate.setBounds(432,440,140,27);
+        loadTemplate.setBounds(580,440,w-597,27);
         presets.setBounds(17,344,200,30);
         assignPreset.setBounds(226,344,150,30);
         presetName.setBounds(388,344,w-536,30);
         newPreset.setBounds(w-140,344,123,30);
-        bindingList.setBounds(17,425,w-230,139);
-        add.setBounds(w-202,426,184,37);
-        updateSelected.setBounds(w-202,472,184,37);
-        remove.setBounds(w-202,518,184,37);
+        bindingList.setBounds(17,editSet ? 501 : 425,w-230,editSet ? 164 : 139);
+        add.setBounds(w-202,editSet ? 501 : 426,184,37);
+        updateSelected.setBounds(w-202,editSet ? 547 : 472,184,37);
+        remove.setBounds(w-202,editSet ? 593 : 518,184,37);
     }
 private:
     juce::Component::SafePointer<MainComponent> owner;
@@ -531,9 +568,9 @@ private:
         const auto& cell=owner->show.rows[(size_t)row].cells[(size_t)columnIndex];
         return cell.controlSet ? &cell.controlSet->bindings : nullptr;
     }
-    juce::ComboBox device,presets,scope,target,takeover,columns,curve;
-    juce::TextButton connect,learn,add,remove,updateSelected,newPreset,assignPreset;
-    juce::TextEditor presetName,outputCc,oscAddress,minimum,maximum,effectivePreview;
+    juce::ComboBox device,presets,scope,target,takeover,columns,curve,templates;
+    juce::TextButton connect,learn,add,remove,updateSelected,newPreset,assignPreset,saveTemplate,loadTemplate;
+    juce::TextEditor presetName,outputCc,oscAddress,minimum,maximum,effectivePreview,templateName;
     juce::ToggleButton invert{"Invert"};
     juce::Label state;
     juce::ListBox bindingList;
@@ -563,6 +600,16 @@ private:
             if (owner->show.controls.midiInputId==d.identifier) selectedId=id;
         }
         device.setSelectedId(selectedId,juce::dontSendNotification);
+    }
+    void refreshTemplates() {
+        if (!owner) return;
+        const int old=templates.getSelectedId();
+        templates.clear(juce::dontSendNotification);
+        templates.addItem("Choose saved set",1);
+        for (const auto& item:owner->show.controls.templates)
+            templates.addItem(item.name,item.id+1);
+        templates.setSelectedId(old>0 && templates.indexOfItemId(old)>=0 ? old : 1,
+                                juce::dontSendNotification);
     }
     void refreshPresets() {
         if (!owner) return;
