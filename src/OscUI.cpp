@@ -23,6 +23,7 @@ void MainComponent::editOscClip() {
     }
     const int id=cell.id;
     if (oscEditor) {
+        oscEditor->setTempo(show.rows[selectedRow].tempo);
         if (oscEditorCellId!=id) { oscEditorCellId=id; oscEditor->loadClip(*cell.osc); }
         clipCollapsed=false; clipCollapseButton.setButtonText("Riduci");
         if (oscWindow) oscWindow->toFront(true); else resized();
@@ -30,10 +31,10 @@ void MainComponent::editOscClip() {
     }
     oscEditorCellId=id;
     auto safe=juce::Component::SafePointer<MainComponent>(this);
-    oscEditor=std::make_unique<OscClipEditor>(*cell.osc,show.rows[selectedRow].tempo,[safe,id](const OscClip& updated) {
+    oscEditor=std::make_unique<OscClipEditor>(*cell.osc,show.rows[selectedRow].tempo,[safe](const OscClip& updated) {
         if (!safe || validateOscClip(updated).failed()) return;
         for (auto& row:safe->show.rows)
-            for (size_t c=0;c<row.cells.size();++c) if (row.cells[c].id==id && safe->show.columns[c].type==ColumnType::osc) {
+            for (size_t c=0;c<row.cells.size();++c) if (row.cells[c].id==safe->oscEditorCellId && safe->show.columns[c].type==ColumnType::osc) {
                 row.cells[c].osc=updated; row.cells[c].file.clear();
                 safe->dirty=true; safe->engine.publish(makeRenderState(safe->show,safe->clips));
                 safe->status="Messaggi OSC aggiornati: salva lo show.";
@@ -54,6 +55,7 @@ void MainComponent::syncOscEditor() {
     if (!oscEditor) return;
     if (show.columns[selectedColumn].type!=ColumnType::osc) { closeOscClip(); return; }
     const auto& cell=show.rows[selectedRow].cells[selectedColumn];
+    oscEditor->setTempo(show.rows[selectedRow].tempo);
     if (oscEditorCellId==cell.id) return;
     oscEditorCellId=cell.id;
     oscEditor->loadClip(cell.osc.value_or(OscClip{}));
