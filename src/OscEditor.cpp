@@ -63,12 +63,16 @@ OscClipEditor::OscClipEditor(OscClip value,std::vector<TempoPoint> points,
     detach.setName("oscDetach");
     detach.onClick=[this] { if (onDetach) onDetach(); };
     for (auto* button:{&add,&ramp,&remove,&duplicate,&detach}) button->setWantsKeyboardFocus(false);
+    newTrackAddress=clip.automations.empty() ? "/parameter"
+        : "/parameter/"+juce::String((int)clip.automations.size()+1);
     setSize(940,320);
 }
 OscClipEditor::~OscClipEditor() { setLookAndFeel(nullptr); }
 void OscClipEditor::setFloating(bool floating) { detach.setButtonText(floating?"Riaggancia":"Stacca"); }
 void OscClipEditor::loadClip(const OscClip& next) {
     ++revision; clip=next; selectedEvent=selectedAutomation=selectedPoint=-1;
+    newTrackAddress=clip.automations.empty() ? "/parameter"
+        : "/parameter/"+juce::String((int)clip.automations.size()+1);
     dragging=false; rampDrag=RampDrag::none; laneScroll=0;
     unit.setSelectedId(clip.useBeats ? 2 : 1,juce::dontSendNotification);
     repaint();
@@ -388,6 +392,7 @@ void OscClipEditor::showContext(const juce::MouseEvent& e) {
     menu.addItem(1,"Modifica",selectedEvent>=0 || selectedAutomation>=0);
     menu.addItem(2,"Duplica",selectedEvent>=0 || selectedAutomation>=0);
     menu.addItem(3,"Elimina",selectedEvent>=0 || selectedAutomation>=0);
+    menu.addItem(4,"Address traccia OSC",selectedAutomation>=0);
     auto safe=juce::Component::SafePointer<OscClipEditor>(this);
     menu.showMenuAsync(juce::PopupMenu::Options().withTargetComponent(this),[safe](int item) {
         if (!safe) return;
@@ -396,6 +401,8 @@ void OscClipEditor::showContext(const juce::MouseEvent& e) {
             else if (safe->selectedAutomation>=0) safe->editAutomation(safe->selectedAutomation);
         } else if (item==2) safe->duplicateSelection();
         else if (item==3) safe->deleteSelection();
+        else if (item==4 && safe->selectedAutomation>=0)
+            safe->editTrackAddress(safe->selectedAutomation);
     });
 }
 void OscClipEditor::addEvent() {

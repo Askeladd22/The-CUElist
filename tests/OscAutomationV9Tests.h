@@ -277,6 +277,15 @@ void oscAutomationV9Tests() {
               "Double click unexpectedly opened a ramp modal");
         check(validateOscClip(editor.getClip()).wasOk(),"Created ramp invalid");
     });
+    test("one-second OSC ramp uses true seconds even on a beat timeline",[] {
+        OscClip clip; clip.useBeats=true; clip.length=8;
+        OscClipEditor editor(clip,{{0,120,4,4}},
+            [](const OscClip&,const OscClip&,bool){});
+        editor.setSize(940,360); editor.addAutomation();
+        check(editor.getClip().automations.size()==1,"Beat timeline ramp not created");
+        near(editor.getClip().automations[0].duration,2); // two beats at 120 BPM = 1 s
+        check(validateOscClip(editor.getClip()).wasOk(),"Beat-mode ramp invalid");
+    });
     test("OSC ramp can be moved and resized with timeline snapping",[] {
         OscClipEditor editor(OscClip{},{{0,120,4,4}},
             [](const OscClip&,const OscClip&,bool){});
