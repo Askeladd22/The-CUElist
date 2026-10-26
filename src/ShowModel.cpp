@@ -31,7 +31,7 @@ void addRow(Show& show, const juce::String& name) {
 void addColumn(Show& show, ColumnType type, const juce::String& name) {
     juce::String label=name;
     if (label.trim().isEmpty()) {
-        const juce::String prefix=type==ColumnType::audio ? "Audio" : type==ColumnType::midi ? "MIDI" : "OSC";
+        const juce::String prefix=type==ColumnType::audio ? "Audio" : type==ColumnType::midi ? "MIDI" : type==ColumnType::osc ? "OSC" : "Control";
         int ordinal=1;
         for (const auto& col:show.columns) if (col.type==type) ++ordinal;
         label=prefix+" "+juce::String(ordinal);
@@ -75,11 +75,14 @@ juce::Result validateShow(const Show& show) {
     auto unique = [&](int id) { return id > 0 && id < 1000000000 && ids.insert(id).second; };
     for (const auto& column : show.columns) {
         if (!unique(column.id) || column.output < 0 || column.output > 1022
-            || (int)column.type < 0 || (int)column.type > 2
+            || (int)column.type < 0 || (int)column.type > 3
             || column.oscPort<1 || column.oscPort>65535 || column.oscHost.isEmpty()
             || column.oscHost.length()>255 || column.oscHost.containsChar(' ')
             || !std::isfinite(column.gain) || column.gain < 0 || column.gain > 4
-            || !std::isfinite(column.pan) || column.pan < -1 || column.pan > 1) return fail("Invalid column.");
+            || !std::isfinite(column.pan) || column.pan < -1 || column.pan > 1
+            || (column.type==ColumnType::control && (column.controlPriority<1 || column.controlPriority>4 ||
+                (column.controlLocked && column.controlPriority!=1) ||
+                (!column.controlLocked && column.controlPriority==1)))) return fail("Invalid column.");
     }
     for (const auto& row : show.rows) {
         if (!unique(row.id) || row.cells.size()!=show.columns.size() || row.tempo.empty()
@@ -102,6 +105,11 @@ juce::Result validateShow(const Show& show) {
                 if (show.columns[i].type!=ColumnType::osc || c.file.isNotEmpty() || c.midi) return fail("OSC clip in a non-OSC column.");
                 const auto result=validateOscClip(*c.osc); if (result.failed()) return result;
             }
+            if (show.columns[i].type==ColumnType::control) {
+                if (c.midi || c.osc || c.file.isNotEmpty() ||
+                    (show.columns[i].controlLocked && c.controlSet))
+                    return fail("Invalid Control Column cell.");
+            } else if (c.controlSet) return fail("Control Set in a non-Control column.");
             if (!unique(c.id) || !std::isfinite(c.gain) || c.gain < 0 || c.gain > 4 || (int)c.behaviour < 0 || (int)c.behaviour > 3
                 || !std::isfinite(c.startSeconds) || c.startSeconds < 0 || c.startSeconds > 86400)
                 return fail("Invalid cell.");
@@ -136,6 +144,44 @@ juce::Result validateShow(const Show& show) {
                 return fail("Gain mapping requires an Audio column.");
         }
     }
+    // Reuse existing binding validation for every independently stored set;
+    // source-column priority conflicts are intentionally resolved at runtime.
+    const auto validateSet=[&](const ControlSet& set)->juce::Result {
+        if (set.bindings.size()>256) return fail("Control Set exceeds 256 mappings.");
+        ControlSettings probe; probe.nextId=show.controls.nextId;
+        probe.bindings=set.bindings;
+        auto result=validateControls(probe,rowIds,columnIds);
+        if (result.failed()) return result;
+        for (const auto& binding:set.bindings) {
+            if (binding.scope!=ControlScope::global)
+                return fail("Control Set bindings must be independent of legacy scopes.");
+            if (binding.target==ControlTarget::columnGain ||
+                binding.target==ControlTarget::midiCc ||
+                binding.target==ControlTarget::oscFloat) {
+                const auto destination=std::find_if(show.columns.begin(),show.columns.end(),
+                    [&](const Column& col){return col.id==binding.targetColumnId;});
+                if (destination==show.columns.end() ||
+                    (binding.target==ControlTarget::columnGain && destination->type!=ColumnType::audio) ||
+                    (binding.target==ControlTarget::midiCc && destination->type!=ColumnType::midi) ||
+                    (binding.target==ControlTarget::oscFloat && destination->type!=ColumnType::osc))
+                    return fail("Invalid Control Set target column type.");
+            }
+        }
+        return juce::Result::ok();
+    };
+    for (size_t i=0;i<show.columns.size();++i) {
+        const auto& column=show.columns[i];
+        if (column.type!=ColumnType::control) {
+            if (column.controlLocked || !column.controlDefaultSet.bindings.empty())
+                return fail("Control settings in a non-Control column.");
+            continue;
+        }
+        if (!column.controlLocked && !column.controlDefaultSet.bindings.empty())
+            return fail("Unlocked Control Column has a default set.");
+        if (auto result=validateSet(column.controlDefaultSet);result.failed()) return result;
+        for (const auto& row:show.rows) if (row.cells[i].controlSet)
+            if (auto result=validateSet(*row.cells[i].controlSet);result.failed()) return result;
+    }
     return juce::Result::ok();
 }
 namespace {
@@ -163,10 +209,48 @@ juce::Array<juce::var> array(const juce::var& o,const char* key) {
     auto v = required(o,key); if (!v.isArray()) throw std::runtime_error("Invalid list."); return *v.getArray();
 }
 }
+// A Control Set stores the same binding schema as legacy Control Mapping,
+// but without a competing cue/preset scope. Optional v10 extension.
+juce::var controlSetObject(const ControlSet& set) {
+    juce::Array<juce::var> bindings;
+    for (const auto& b:set.bindings)
+        bindings.add(object({{"id",b.id},{"deviceId",b.deviceId},
+            {"kind",(int)b.kind},{"channel",b.channel},{"number",b.number},
+            {"scope",(int)b.scope},{"scopeId",b.scopeId},{"target",(int)b.target},
+            {"targetColumnId",b.targetColumnId},{"outputChannel",b.outputChannel},
+            {"outputNumber",b.outputNumber},{"outputDeviceId",b.outputDeviceId},
+            {"oscHost",b.oscHost},{"oscPort",b.oscPort},{"oscAddress",b.oscAddress},
+            {"minimum",b.minimum},{"maximum",b.maximum},{"invert",b.invert},
+            {"enabled",b.enabled},{"takeover",(int)b.takeover}}));
+    return object({{"bindings",bindings}});
+}
+ControlSet parseControlSet(const juce::var& data) {
+    ControlSet set;
+    for (const auto& item:array(data,"bindings")) {
+        ControlBinding b;
+        b.id=integer(item,"id"); b.deviceId=string(item,"deviceId");
+        b.kind=(ControlKind)integer(item,"kind");
+        b.channel=integer(item,"channel"); b.number=integer(item,"number");
+        b.scope=(ControlScope)integer(item,"scope");
+        b.scopeId=integer(item,"scopeId"); b.target=(ControlTarget)integer(item,"target");
+        b.targetColumnId=integer(item,"targetColumnId");
+        b.outputChannel=integer(item,"outputChannel");
+        b.outputNumber=integer(item,"outputNumber"); b.outputDeviceId=string(item,"outputDeviceId");
+        b.oscHost=string(item,"oscHost"); b.oscPort=integer(item,"oscPort");
+        b.oscAddress=string(item,"oscAddress");
+        b.minimum=(float)number(item,"minimum"); b.maximum=(float)number(item,"maximum");
+        b.invert=boolean(item,"invert"); b.enabled=boolean(item,"enabled");
+        b.takeover=(ControlTakeover)integer(item,"takeover");
+        set.bindings.push_back(std::move(b));
+    }
+    return set;
+}
 juce::String encodeShow(const Show& show) {
     juce::Array<juce::var> columns, rows;
     for (const auto& c : show.columns) columns.add(object({{"id",c.id},{"name",c.name},{"type",(int)c.type},{"output",c.output},
-        {"gain",c.gain},{"pan",c.pan},{"muted",c.muted},{"phaseInverted",c.phaseInverted},{"midiOutputId",c.midiOutputId},{"oscHost",c.oscHost},{"oscPort",c.oscPort}}));
+        {"gain",c.gain},{"pan",c.pan},{"muted",c.muted},{"phaseInverted",c.phaseInverted},{"midiOutputId",c.midiOutputId},{"oscHost",c.oscHost},{"oscPort",c.oscPort},
+        {"controlLocked",c.controlLocked},{"controlPriority",c.controlPriority},
+        {"controlDefaultSet",controlSetObject(c.controlDefaultSet)}}));
     for (const auto& r : show.rows) {
         juce::Array<juce::var> tempo, cells;
         for (const auto& p : r.tempo) tempo.add(object({{"beat",p.beat},{"bpm",p.bpm},{"numerator",p.numerator},{"denominator",p.denominator}}));
@@ -212,7 +296,8 @@ juce::String encodeShow(const Show& show) {
                     {"events",events},{"automations",automations},{"tracks",tracks}});
             }
             cells.add(object({{"id",c.id},{"name",c.name},{"file",c.file},{"followsRow",c.followsRow},
-                {"loop",c.loop},{"stopOnNext",c.stopOnNext},{"gain",c.gain},{"startSeconds",c.startSeconds},{"behaviour",(int)c.behaviour},{"midi",midi},{"osc",osc}}));
+                {"loop",c.loop},{"stopOnNext",c.stopOnNext},{"gain",c.gain},{"startSeconds",c.startSeconds},{"behaviour",(int)c.behaviour},{"midi",midi},{"osc",osc},
+                {"controlSet",c.controlSet ? controlSetObject(*c.controlSet) : juce::var()}}));
         }
         rows.add(object({{"id",r.id},{"name",r.name},{"tempo",tempo},{"cells",cells},{"gain",r.gain},
             {"muted",r.muted},{"loop",r.loop},{"overrideBehaviour",r.overrideBehaviour},{"behaviour",(int)r.behaviour},{"stopOnNext",r.stopOnNext},
@@ -287,6 +372,14 @@ juce::Result decodeShow(const juce::String& text, Show& destination) {
                 column.gain=(float)number(c,"gain"); column.pan=(float)number(c,"pan");
                 column.muted=boolean(c,"muted"); column.phaseInverted=boolean(c,"phaseInverted");
             }
+            if (auto* obj=c.getDynamicObject()) {
+                if (obj->hasProperty("controlLocked")) column.controlLocked=boolean(c,"controlLocked");
+                if (obj->hasProperty("controlPriority")) column.controlPriority=integer(c,"controlPriority");
+                if (obj->hasProperty("controlDefaultSet")) {
+                    auto value=c.getProperty("controlDefaultSet",{});
+                    if (!value.isVoid()) column.controlDefaultSet=parseControlSet(value);
+                }
+            }
             show.columns.push_back(column);
         }
         for (auto& r : array(root,"rows")) {
@@ -302,6 +395,11 @@ juce::Result decodeShow(const juce::String& text, Show& destination) {
                 Cell cell; cell.id=integer(c,"id"); cell.name=string(c,"name"); cell.file=string(c,"file");
                 cell.followsRow=boolean(c,"followsRow"); cell.loop=boolean(c,"loop"); cell.gain=(float)number(c,"gain"); cell.behaviour=activation(integer(c,"behaviour"));
                 if (version >= 2) cell.startSeconds=number(c,"startSeconds");
+                if (auto* obj=c.getDynamicObject())
+                    if (obj->hasProperty("controlSet")) {
+                        auto value=c.getProperty("controlSet",{});
+                        if (!value.isVoid()) cell.controlSet=parseControlSet(value);
+                    }
                 if (version >= 7) cell.stopOnNext=boolean(c,"stopOnNext");
                 if (version>=5) {
                     const auto m=required(c,"midi");
