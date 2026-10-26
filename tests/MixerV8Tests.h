@@ -1,4 +1,5 @@
 #pragma once
+#include "GainMeterFader.h"
 #include <cmath>
 void mixerV8Tests() {
     test("v8 master PCM gain roundtrip and v7 migration to unity", [] {
