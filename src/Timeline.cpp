@@ -188,7 +188,24 @@ void Timeline::paint(juce::Graphics& g) {
         const bool present=owner.hasClip(owner.selectedRow,c); if (present) ++loaded;
         if (y+32<tracksTop || y>=bottom) continue;
         const auto& name=owner.show.columns[c].name;
-        label(g,name.isEmpty() ? (owner.show.columns[c].type==ColumnType::midi ? "MIDI " : "Audio ")+juce::String(c+1) : name,{16,y,115,30},12,c==owner.selectedColumn ? palette::text : palette::muted);
+        label(g,name.isEmpty() ? (owner.show.columns[c].type==ColumnType::midi ? "MIDI " :
+            owner.show.columns[c].type==ColumnType::control ? "Control " :
+            owner.show.columns[c].type==ColumnType::osc ? "OSC " : "Audio ")+juce::String(c+1) : name,{16,y,115,30},12,c==owner.selectedColumn ? palette::text : palette::muted);
+        if (owner.show.columns[c].type==ColumnType::control) {
+            const auto& column=owner.show.columns[(size_t)c];
+            const auto& cell=row.cells[(size_t)c];
+            const ControlSet* set=column.controlLocked ? &column.controlDefaultSet :
+                (cell.controlSet ? &*cell.controlSet : nullptr);
+            g.setColour(palette::type((int)ColumnType::control).withAlpha(.16f));
+            g.fillRoundedRectangle((float)timelineStart,(float)y,
+                (float)area,31.0f,4.0f);
+            label(g,column.controlLocked ? "LOCKED DEFAULT / ALL CUES" :
+                  set && !set->bindings.empty() ?
+                  juce::String((int)set->bindings.size())+" control mappings" : "No Control Set",
+                  {timelineStart+9,y+5,std::max(1,area-18),21},11,
+                  palette::type((int)ColumnType::control),true);
+            continue;
+        }
         if (!present) continue;
         const auto& cell=row.cells[c]; const double seconds=owner.clipDuration(owner.selectedRow,c);
         const auto colour=palette::type((int)owner.show.columns[c].type);
@@ -273,6 +290,9 @@ void Timeline::mouseDown(const juce::MouseEvent& e) {
     const auto& row=owner.show.rows[owner.selectedRow];
     for (int c=0;c<(int)row.cells.size();++c) {
         if (track++!=wanted) continue;
+        if (owner.show.columns[c].type==ColumnType::control) {
+            owner.editControlSet(owner.selectedRow,c); return;
+        }
         const auto& cell=row.cells[c]; if (!owner.hasClip(owner.selectedRow,c)) return;
         const double position=dragViewStart+(e.x-timelineStart)*dragLength/area, end=cell.startSeconds+owner.clipDuration(owner.selectedRow,c);
         const auto rowId=row.id; const auto start=cell.startSeconds;
@@ -302,6 +322,9 @@ void Timeline::mouseDoubleClick(const juce::MouseEvent& e) {
     for (int c=0;c<(int)row.cells.size();++c) {
         if (track++!=wanted) continue;
         const auto& cell=row.cells[(size_t)c];
+        if (owner.show.columns[c].type==ColumnType::control) {
+            owner.editControlSet(owner.selectedRow,c); return;
+        }
         if ((cell.midi || cell.osc)
             && position>=cell.startSeconds && position<=cell.startSeconds+owner.clipDuration(owner.selectedRow,c)
             && owner.select(owner.selectedRow,c)) {
