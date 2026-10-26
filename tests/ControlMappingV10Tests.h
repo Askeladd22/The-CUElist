@@ -1,6 +1,8 @@
 #pragma once
 #include "ControlMapping.h"
 #include "MidiInputManager.h"
+#include "ControlOutputRouter.h"
+#include <limits>
 
 void controlMappingV10Tests() {
     test("Control Mapping v10 roundtrip, saved preset and v9 migration",[] {
@@ -96,6 +98,32 @@ void controlMappingV10Tests() {
         mapping.setActiveCue(99,0);
         check(!mapping.resolve(make(10),.75f).has_value(),"Cue switch failed to reset pickup");
         check(mapping.resolve(make(110),.75f).has_value(),"New cue pickup never captured");
+    });
+    test("conflicting equal-priority triggers and wrong protocol columns are rejected",[] {
+        auto show=makeShow();
+        ControlBinding one; one.id=1; one.deviceId="dev"; one.number=19;
+        ControlBinding two=one; two.id=2; two.target=ControlTarget::go;
+        show.controls.nextId=3; show.controls.bindings={one,two};
+        check(validateShow(show).failed(),"Conflicting global CC mappings allowed");
+        show.controls.bindings.resize(1);
+        show.controls.bindings[0].target=ControlTarget::midiCc;
+        show.controls.bindings[0].targetColumnId=show.columns[0].id;
+        check(validateShow(show).failed(),"MIDI CC routed to an audio column");
+        show.controls.bindings[0].target=ControlTarget::oscFloat;
+        check(validateShow(show).failed(),"OSC routed to an audio column");
+        addColumn(show,ColumnType::midi,"MIDI 1");
+        show.controls.bindings[0].target=ControlTarget::midiCc;
+        show.controls.bindings[0].targetColumnId=show.columns[1].id;
+        check(validateShow(show).wasOk(),"MIDI CC binding rejected on MIDI column");
+    });
+    test("independent OSC controller worker rejects invalid destinations",[] {
+        ControlOutputRouter output;
+        check(!output.sendOscFloat("",9000,"/value",.5f),"Empty OSC host accepted");
+        check(!output.sendOscFloat("127.0.0.1",0,"/value",.5f),"Invalid UDP port accepted");
+        check(!output.sendOscFloat("127.0.0.1",9000,"bad",.5f),"Invalid OSC path accepted");
+        check(!output.sendOscFloat("127.0.0.1",9000,"/value",
+                std::numeric_limits<float>::infinity()),"Infinite OSC value accepted");
+        check(output.droppedCount()==0,"Invalid sends incorrectly filled output queue");
     });
     test("hardware CC, notes and bend are accepted and bounded off the UI thread",[] {
         MidiInputManager input;
