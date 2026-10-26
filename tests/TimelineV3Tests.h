@@ -1,4 +1,5 @@
 #pragma once
+#include "PianoRoll.h"
 
 void timelineV3Tests() {
     using namespace cueViewFixtures;
