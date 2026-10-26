@@ -266,6 +266,7 @@ juce::String encodeShow(const Show& show) {
     for (const auto& c : show.columns) columns.add(object({{"id",c.id},{"name",c.name},{"type",(int)c.type},{"output",c.output},
         {"gain",c.gain},{"pan",c.pan},{"muted",c.muted},{"phaseInverted",c.phaseInverted},{"midiOutputId",c.midiOutputId},{"oscHost",c.oscHost},{"oscPort",c.oscPort},
         {"controlLocked",c.controlLocked},{"controlPriority",c.controlPriority},
+        {"controlDefaultSourceRowId",c.controlDefaultSourceRowId},
         {"controlDefaultSet",controlSetObject(c.controlDefaultSet)}}));
     for (const auto& r : show.rows) {
         juce::Array<juce::var> tempo, cells;
@@ -403,6 +404,8 @@ juce::Result decodeShow(const juce::String& text, Show& destination) {
             if (auto* obj=c.getDynamicObject()) {
                 if (obj->hasProperty("controlLocked")) column.controlLocked=boolean(c,"controlLocked");
                 if (obj->hasProperty("controlPriority")) column.controlPriority=integer(c,"controlPriority");
+                if (obj->hasProperty("controlDefaultSourceRowId"))
+                    column.controlDefaultSourceRowId=integer(c,"controlDefaultSourceRowId");
                 if (obj->hasProperty("controlDefaultSet")) {
                     auto value=c.getProperty("controlDefaultSet",{});
                     if (!value.isVoid()) column.controlDefaultSet=parseControlSet(value);

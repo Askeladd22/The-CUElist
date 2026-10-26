@@ -20,6 +20,7 @@ struct Column {
     bool controlLocked=false;
     int controlPriority=2; // 1=Low (locked), 2=Medium, 3=High, 4=Maximum
     ControlSet controlDefaultSet;
+    int controlDefaultSourceRowId=0; // original cue for lossless unlock
 };
 struct Cell {
     int id = 0;

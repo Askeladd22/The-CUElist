@@ -199,17 +199,35 @@ bool MainComponent::setControlColumnLocked(int column,bool locked,int sourceRow)
             for (auto& binding:col.controlDefaultSet.bindings)
                 binding.id=candidate.controls.nextId++;
         }
+        col.controlDefaultSourceRowId=candidate.rows[(size_t)sourceRow].id;
         col.controlLocked=true; col.controlPriority=1;
     } else if (!locked && col.controlLocked) {
-        // Retain edits made to the locked default when returning to cue scope.
-        // Other cue-specific sets, held dormant during lock, reappear untouched.
-        auto& source=candidate.rows[(size_t)sourceRow].cells[(size_t)column];
-        if (!col.controlDefaultSet.bindings.empty()) {
-            source.controlSet=col.controlDefaultSet;
-            for (auto& binding:source.controlSet->bindings)
+        // Always restore the edited default to its original source cue, not
+        // the currently selected cue: otherwise unlocking could silently
+        // destroy a different Q's partial override.
+        int destination=-1;
+        for (int i=0;i<(int)candidate.rows.size();++i)
+            if (candidate.rows[(size_t)i].id==col.controlDefaultSourceRowId)
+                {destination=i;break;}
+        if (destination<0) {
+            if (!candidate.rows[(size_t)sourceRow].cells[(size_t)column].controlSet)
+                destination=sourceRow;
+            else for (int i=0;i<(int)candidate.rows.size();++i)
+                if (!candidate.rows[(size_t)i].cells[(size_t)column].controlSet)
+                    {destination=i;break;}
+        }
+        if (destination<0 && !col.controlDefaultSet.bindings.empty()) {
+            status="Cannot unlock without overwriting another Control Set. Add an empty cue first.";
+            repaint(); return false;
+        }
+        if (destination>=0 && !col.controlDefaultSet.bindings.empty()) {
+            auto& target=candidate.rows[(size_t)destination].cells[(size_t)column];
+            target.controlSet=col.controlDefaultSet;
+            for (auto& binding:target.controlSet->bindings)
                 binding.id=candidate.controls.nextId++;
         }
         col.controlDefaultSet.bindings.clear();
+        col.controlDefaultSourceRowId=0;
         col.controlLocked=false; col.controlPriority=2;
     } else return true;
     if (auto valid=validateShow(candidate);valid.failed()) {
