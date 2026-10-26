@@ -22,9 +22,9 @@ void CellPlaybackTelemetry::write(CellPlaybackInfo value) noexcept {
 }
 void RenderState::updateTelemetry() noexcept {
     for (const auto& v:voices) if (v.telemetry) {
-        const double rate=v.isMidi ? 1 : (v.clip ? v.clip->sampleRate : 0);
+        const double rate=(v.isMidi || v.isOsc) ? 1 : (v.clip ? v.clip->sampleRate : 0);
         v.telemetry->write({rate>0 ? v.position/rate : 0,
-            v.isMidi ? v.midiDuration : (rate>0 ? v.clip->samples.getNumSamples()/rate : 0),
+            v.isMidi ? v.midiDuration : v.isOsc ? v.oscDuration : (rate>0 ? v.clip->samples.getNumSamples()/rate : 0),
             v.playing, v.playing && v.rowMode && v.delaySeconds>1.0e-12, v.paused});
     }
 }
@@ -32,6 +32,11 @@ namespace {
 void placeOnTimeline(Voice& v, double seconds) noexcept {
     v.delaySeconds=std::max(0.0,v.startSeconds-seconds);
     v.position=0;
+    if (v.isOsc) {
+        const double elapsed=std::max(0.0,seconds-v.startSeconds);
+        v.position=(v.loop || v.rowLoop) ? std::fmod(elapsed,v.oscDuration) : std::min(elapsed,v.oscDuration);
+        v.oscNeedsSync=true; return;
+    }
     if (v.isMidi) {
         const double elapsed=std::max(0.0,seconds-v.startSeconds);
         v.position=(v.loop || v.rowLoop) ? std::fmod(elapsed,v.midiDuration) : std::min(elapsed,v.midiDuration);
@@ -49,12 +54,14 @@ void placeOnTimeline(Voice& v, double seconds) noexcept {
 void RenderState::inheritPlayback(const RenderState& previous) noexcept {
     // Copy only scalar runtime state. Shared media ownership stays entirely on the UI thread.
     for (auto& v:voices) for (const auto& old:previous.voices)
-        if (v.cellId==old.cellId && v.clip.get()==old.clip.get() && v.isMidi==old.isMidi
-            && (!v.isMidi || (v.midiHash==old.midiHash && v.midiOutputId==old.midiOutputId))) {
+        if (v.cellId==old.cellId && v.clip.get()==old.clip.get() && v.isMidi==old.isMidi && v.isOsc==old.isOsc
+            && (!v.isMidi || (v.midiHash==old.midiHash && v.midiOutputId==old.midiOutputId))
+            && (!v.isOsc || (v.oscHash==old.oscHash && v.oscColumnId==old.oscColumnId))) {
             v.position=old.position; v.playing=old.playing; v.paused=old.paused; v.delaySeconds=old.delaySeconds;
             v.rowMode=old.rowMode; v.pendingSeek=old.pendingSeek;
             v.heldNotes=old.heldNotes; v.midiCursor=old.midiCursor; v.midiNeedsSync=old.midiNeedsSync;
             v.heldVelocity=old.heldVelocity;
+            v.oscCursor=old.oscCursor; v.oscNeedsSync=old.oscNeedsSync;
             if (v.rowMode && v.startSeconds!=old.startSeconds)
                 for (const auto& row:previous.rows) if (row.id==v.rowId) placeOnTimeline(v,row.seconds);
             break;
@@ -114,7 +121,7 @@ void RenderState::trigger(int id,bool row,bool stop) noexcept {
             v.playing=false; v.paused=false; v.position=0; v.delaySeconds=0; v.pendingSeek=false; v.rowMode=false;
             stopClock=true; continue;
         }
-        if (!v.isMidi && (!v.clip || v.clip->samples.getNumSamples()==0)) continue;
+        if (!v.isMidi && !v.isOsc && (!v.clip || v.clip->samples.getNumSamples()==0)) continue;
         if (!row) { v.delaySeconds=0; v.pendingSeek=false; }
         const bool wasRowMode=v.rowMode; v.rowMode=row;
         switch (behaviour) {
@@ -155,6 +162,10 @@ void RenderState::panic() noexcept {
     for (auto& row:rows) { row.seconds=0; row.playing=false; row.pendingSeek=false; row.ended=false; }
 }
 void RenderState::releaseMidi(Voice& v,int offset,bool cancelPending) noexcept {
+    if (v.isOsc && v.oscStream) {
+        v.oscStream->epoch.fetch_add(1);
+        v.oscNeedsSync=true;
+    }
     if (!v.isMidi) return;
     if (cancelPending && v.midiStream) v.midiStream->epoch.fetch_add(1);
     if (v.midiSink) v.midiSink->selectStream(v.midiStream.get());
@@ -198,6 +209,34 @@ void RenderState::render(float* const* outputs,int channels,int frames,double sa
                 if (v.position>=v.midiDuration-1.0e-10) {
                     releaseMidi(v,i+1,false);
                     if (v.loop || v.rowLoop) v.position=std::max(0.0,v.position-v.midiDuration);
+                    else { v.position=0; v.playing=false; }
+                }
+            }
+            continue;
+        }
+        if (v.isOsc && v.playing) {
+            if (v.oscSink) v.oscSink->selectStream(v.oscStream.get());
+            for (int i=0;i<frames && v.playing;++i) {
+                if (v.rowMode && v.delaySeconds>1.0e-12) {
+                    v.delaySeconds=std::max(0.0,v.delaySeconds-1.0/sampleRate); continue;
+                }
+                if (v.position>=v.oscDuration) {
+                    if (v.loop || v.rowLoop) { v.position=std::fmod(v.position,v.oscDuration); v.oscNeedsSync=true; }
+                    else { v.position=0; v.playing=false; break; }
+                }
+                if (v.oscNeedsSync) {
+                    v.oscCursor=0;
+                    while (v.oscCursor<v.oscEvents.size() && v.oscEvents[v.oscCursor].seconds<v.position-1.0e-10) ++v.oscCursor;
+                    v.oscNeedsSync=false;
+                }
+                while (v.oscCursor<v.oscEvents.size() && v.oscEvents[v.oscCursor].seconds<=v.position+1.0e-10) {
+                    const auto& e=v.oscEvents[v.oscCursor++];
+                    if (v.oscSink && !v.rowMuted && !v.columnMuted)
+                        v.oscSink->emit(v.oscRoute,e.bytes.data(),(unsigned)e.bytes.size(),i);
+                }
+                v.position+=1.0/sampleRate;
+                if (v.position>=v.oscDuration-1.0e-10) {
+                    if (v.loop || v.rowLoop) { v.position=std::max(0.0,v.position-v.oscDuration); v.oscNeedsSync=true; }
                     else { v.position=0; v.playing=false; }
                 }
             }
@@ -288,6 +327,23 @@ std::unique_ptr<RenderState> makeRenderState(const Show& show,const ClipMap& cli
             mix(&v.midiDuration,sizeof(v.midiDuration));
             for (const auto& e:v.midiEvents) { mix(&e.seconds,sizeof(e.seconds)); mix(&e.status,sizeof(e.status)); mix(&e.pitch,sizeof(e.pitch)); mix(&e.velocity,sizeof(e.velocity)); }
             v.midiHash=hash;
+        } else if (show.columns[i].type==ColumnType::osc && c.osc) {
+            if (validateOscClip(*c.osc).failed()) continue;
+            v.isOsc=true; v.oscColumnId=show.columns[i].id;
+            v.oscHost=show.columns[i].oscHost; v.oscPort=show.columns[i].oscPort;
+            v.oscDuration=c.osc->useBeats ? secondsAtBeat(row.tempo,c.osc->length) : c.osc->length;
+            if (v.oscDuration<=0) continue;
+            for (const auto& e:c.osc->events)
+                v.oscEvents.push_back({c.osc->useBeats ? secondsAtBeat(row.tempo,e.time) : e.time,encodeOscMessage(e)});
+            std::stable_sort(v.oscEvents.begin(),v.oscEvents.end(),[](const auto& a,const auto& b){return a.seconds<b.seconds;});
+            uint64_t hash=1469598103934665603ull;
+            const auto mix=[&](const void* ptr,size_t len) { const auto* p=static_cast<const uint8_t*>(ptr);
+                for (size_t k=0;k<len;++k) { hash^=p[k]; hash*=1099511628211ull; } };
+            mix(&v.oscDuration,sizeof(v.oscDuration));
+            for (const auto& e:v.oscEvents) {
+                mix(&e.seconds,sizeof(e.seconds)); mix(e.bytes.data(),e.bytes.size());
+            }
+            v.oscHash=hash;
         } else if (show.columns[i].type==ColumnType::audio) {
             const auto it=clips.find(c.id); if (it==clips.end()) continue; v.clip=it->second;
         } else continue;
@@ -320,15 +376,20 @@ void AudioEngine::publish(std::unique_ptr<RenderState> state,bool preservePlayba
     std::map<int, PlaybackEntry> nextPlayback;
     for (auto& v:state->voices) {
         if (v.isMidi) { v.midiRoute=midiRouter.route(v.midiOutputId); v.midiSink=&midiRouter; v.midiStream=midiRouter.stream(v.cellId,v.midiRoute); }
+        if (v.isOsc) {
+            v.oscRoute=oscRouter.configure(v.oscColumnId,v.oscHost,v.oscPort);
+            v.oscSink=&oscRouter; v.oscStream=oscRouter.stream(v.cellId,v.oscRoute);
+        }
         if (!v.telemetry) v.telemetry=std::make_shared<CellPlaybackTelemetry>();
         CellPlaybackInfo display;
         if (v.clip && v.clip->sampleRate>0) display.durationSeconds=v.clip->samples.getNumSamples()/v.clip->sampleRate;
         if (v.isMidi) display.durationSeconds=v.midiDuration;
+        if (v.isOsc) display.durationSeconds=v.oscDuration;
         const auto old=playback.find(v.cellId);
-        if (preservePlayback && old!=playback.end() && old->second.clip.get()==v.clip.get() && old->second.midiHash==v.midiHash)
+        if (preservePlayback && old!=playback.end() && old->second.clip.get()==v.clip.get() && old->second.midiHash==v.midiHash && old->second.oscHash==v.oscHash)
             display=old->second.telemetry->read();
         v.telemetry->write(display);
-        nextPlayback.emplace(v.cellId,PlaybackEntry{v.clip,v.telemetry,v.midiHash});
+        nextPlayback.emplace(v.cellId,PlaybackEntry{v.clip,v.telemetry,v.midiHash,v.oscHash});
     }
     playback=std::move(nextPlayback);
     state->revision=++revision;
@@ -357,7 +418,7 @@ bool AudioEngine::seekRow(int id,double seconds) noexcept {
     commands[w]={id,true,false,revision,panicEpoch.load(),true,std::max(0.0,seconds)};
     writeIndex.store(next,std::memory_order_release); return true;
 }
-void AudioEngine::panic() noexcept { panicEpoch.fetch_add(1); midiRouter.emergencyStop(); }
+void AudioEngine::panic() noexcept { panicEpoch.fetch_add(1); midiRouter.emergencyStop(); oscRouter.emergencyStop(); }
 void AudioEngine::audioDeviceAboutToStart(juce::AudioIODevice* device) {
     deviceSampleRate=device->getCurrentSampleRate(); connected.store(true); panic();
 }
@@ -368,6 +429,7 @@ void AudioEngine::audioDeviceIOCallbackWithContext(const float* const*,int,float
 }
 void AudioEngine::processBlock(float* const* outputs,int channels,int frames,double sampleRate) noexcept {
     midiRouter.beginBlock(sampleRate);
+    oscRouter.beginBlock(sampleRate);
     if (retired.load()==nullptr) {
         if (auto* next=pending.exchange(nullptr)) {
             if (current && next->preservePlayback && next->minimumCommandRevision==current->minimumCommandRevision)
@@ -381,6 +443,17 @@ void AudioEngine::processBlock(float* const* outputs,int channels,int frames,dou
                             if (v.startSeconds!=old.startSeconds || v.rowMuted!=old.rowMuted) {
                                 current->releaseMidi(old); v.heldNotes.fill(0); v.midiNeedsSync=true;
                             }
+                            break;
+                        }
+                    if (!transferred) current->releaseMidi(old);
+                }
+                for (auto& old:current->voices) if (old.isOsc) {
+                    bool transferred=false;
+                    if (next->preservePlayback && next->minimumCommandRevision==current->minimumCommandRevision)
+                        for (auto& v:next->voices) if (v.cellId==old.cellId && v.isOsc
+                            && v.oscHash==old.oscHash && v.oscColumnId==old.oscColumnId) {
+                            transferred=true;
+                            if (v.startSeconds!=old.startSeconds) current->releaseMidi(old);
                             break;
                         }
                     if (!transferred) current->releaseMidi(old);
