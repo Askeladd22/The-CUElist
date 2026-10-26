@@ -120,7 +120,12 @@ public:
     void setMasterAudio(float gain);
     void setMasterPan(float pan);
     void setMasterMute(bool muted);
-    void openControlPanel();
+    void openControlPanel(bool editSet=false);
+    void editControlSet(int row,int column);
+    bool addControlSetBinding(int row,int column,ControlBinding);
+    bool deleteControlSetBinding(int row,int column,int id);
+    bool setControlColumnLocked(int column,bool locked,int sourceRow);
+    bool setControlColumnPriority(int column,int priority);
     juce::Result selectControlInput(const juce::String&);
     bool addMappingBinding(ControlBinding);
     bool deleteMappingBinding(int);

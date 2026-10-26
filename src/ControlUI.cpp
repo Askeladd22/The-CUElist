@@ -223,7 +223,8 @@ void MainComponent::dispatchControl(const ControlEvent& input) {
 class ControlPanel final : public juce::Component, private juce::Timer,
                            private juce::ListBoxModel {
 public:
-    explicit ControlPanel(MainComponent& main):owner(&main) {
+    explicit ControlPanel(MainComponent& main,bool useSet):owner(&main),
+        editSet(useSet),sourceRow(main.selectedRow),sourceColumn(main.selectedColumn) {
         setName("controlMappingPanel");
         for (juce::Component* c : std::initializer_list<juce::Component*>{
             &device,&connect,&learn,&add,&remove,&newPreset,&assignPreset,
@@ -243,6 +244,9 @@ public:
         state.setJustificationType(juce::Justification::centredLeft);
         scope.addItemList({"Global","Column","Preset","Single cue"},1);
         scope.setSelectedId(1);
+        scope.setVisible(!editSet);
+        presets.setVisible(!editSet); newPreset.setVisible(!editSet);
+        assignPreset.setVisible(!editSet); presetName.setVisible(!editSet);
         target.addItemList({"Master Audio","Audio column gain","GO next cue","PANIC",
                             "MIDI CC","OSC Float"},1);
         target.setSelectedId(1);
@@ -279,9 +283,13 @@ public:
         };
         add.onClick=[this]{ createBinding(); };
         remove.onClick=[this]{
-            if (!owner || selected<0 || selected>=(int)owner->show.controls.bindings.size()) return;
-            const int id=owner->show.controls.bindings[(size_t)selected].id;
-            if (owner->deleteMappingBinding(id)) {
+            const auto* bindings=currentBindings();
+            if (!owner || !bindings || selected<0 || selected>=(int)bindings->size()) return;
+            const int id=(*bindings)[(size_t)selected].id;
+            const bool removed=editSet ?
+                owner->deleteControlSetBinding(sourceRow,sourceColumn,id) :
+                owner->deleteMappingBinding(id);
+            if (removed) {
                 selected=-1; bindingList.updateContent(); bindingList.repaint();
             }
         };
@@ -304,17 +312,21 @@ public:
     ~ControlPanel() override {stopTimer();bindingList.setModel(nullptr);}
     void paint(juce::Graphics& g) override {
         g.fillAll(palette::panel);
-        label(g,"CONTROL & MAPPING",{17,12,330,26},20,palette::teal,true);
+        label(g,editSet ? "CONTROL SET / Q"+juce::String(sourceRow+1) :
+              "CONTROL & MAPPING",{17,12,350,26},20,palette::teal,true);
         label(g,"MIDI input",{17,55,250,19},11,palette::muted,true);
         label(g,"MIDI Learn",{17,120,150,19},11,palette::muted,true);
-        label(g,"Rule",{17,205,120,17},11,palette::muted,true);
+        label(g,editSet ? "Column-level priority (set in utilities)" : "Scope",
+              {17,205,195,17},11,palette::muted,true);
         label(g,"Destination",{213,205,120,17},11,palette::muted,true);
         label(g,"Takeover",{410,205,120,17},11,palette::muted,true);
         label(g,"Output CC",{17,263,95,16},10,palette::muted,true);
         label(g,"OSC address",{112,263,140,16},10,palette::muted,true);
-        label(g,"Cue preset",{17,324,200,17},11,palette::muted,true);
+        label(g,editSet ? "Control Column: "+owner->show.columns[(size_t)sourceColumn].name :
+              "Cue preset",{17,324,300,17},11,palette::muted,true);
         label(g,"Saved mappings",{17,402,250,20},12,palette::teal,true);
-        label(g,"Mapping chooses its active destination after GO, not when selecting a row.",
+        label(g,editSet ? "Control Set takes effect on GO; locked sets apply to every cue." :
+              "Mapping chooses its active destination after GO, not when selecting a row.",
               {17,579,getWidth()-32,19},10,palette::muted);
     }
     void resized() override {
@@ -340,6 +352,19 @@ public:
     }
 private:
     juce::Component::SafePointer<MainComponent> owner;
+    bool editSet=false;
+    int sourceRow=0,sourceColumn=0;
+    const std::vector<ControlBinding>* currentBindings() const {
+        if (!owner) return nullptr;
+        if (!editSet) return &owner->show.controls.bindings;
+        if (sourceColumn<0 || sourceColumn>=(int)owner->show.columns.size() ||
+            sourceRow<0 || sourceRow>=(int)owner->show.rows.size()) return nullptr;
+        const auto& column=owner->show.columns[(size_t)sourceColumn];
+        if (column.type!=ColumnType::control) return nullptr;
+        if (column.controlLocked) return &column.controlDefaultSet.bindings;
+        const auto& cell=owner->show.rows[(size_t)sourceRow].cells[(size_t)sourceColumn];
+        return cell.controlSet ? &cell.controlSet->bindings : nullptr;
+    }
     juce::ComboBox device,presets,scope,target,takeover,columns;
     juce::TextButton connect,learn,add,remove,newPreset,assignPreset;
     juce::TextEditor presetName,outputCc,oscAddress;
@@ -442,18 +467,20 @@ private:
                    b.target==ControlTarget::columnGain) {
             b.minimum=0; b.maximum=1;
         }
-        if (owner->addMappingBinding(b)) {
+        if ((editSet ? owner->addControlSetBinding(sourceRow,sourceColumn,b) :
+                       owner->addMappingBinding(b))) {
             bindingList.updateContent(); bindingList.repaint();
             state.setText("Mapping saved to the show.",juce::dontSendNotification);
         } else state.setText(owner->status,juce::dontSendNotification);
     }
     int getNumRows() override {
-        return owner ? (int)owner->show.controls.bindings.size():0;
+        const auto* entries=currentBindings();
+        return entries ? (int)entries->size():0;
     }
     void selectedRowsChanged(int row) override {selected=row;}
     void paintListBoxItem(int row,juce::Graphics& g,int width,int height,bool active) override {
         if (!owner || row<0 || row>=getNumRows()) return;
-        const auto& b=owner->show.controls.bindings[(size_t)row];
+        const auto& b=(*currentBindings())[(size_t)row];
         if (active) g.fillAll(palette::teal.withAlpha(.20f));
         juce::String targetName=b.target==ControlTarget::go ? "GO" :
             b.target==ControlTarget::panic ? "PANIC" :
@@ -465,11 +492,14 @@ private:
             {7,0,width-14,height},12,active?palette::text:palette::muted);
     }
 };
-void MainComponent::openControlPanel() {
-    if (controlDialog) {controlDialog->toFront(true);return;}
+void MainComponent::openControlPanel(bool editSet) {
+    if (controlDialog) {
+        controlDialog->setVisible(false); controlDialog=nullptr;
+    }
     juce::DialogWindow::LaunchOptions options;
-    options.content.setOwned(new ControlPanel(*this));
-    options.dialogTitle="The Cuelist — Control & Mapping";
+    options.content.setOwned(new ControlPanel(*this,editSet));
+    options.dialogTitle=editSet ? "The Cuelist — Control Set" :
+        "The Cuelist — Control & Mapping";
     options.dialogBackgroundColour=palette::panel;
     options.escapeKeyTriggersCloseButton=true;
     options.useNativeTitleBar=true;

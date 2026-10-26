@@ -107,7 +107,7 @@ juce::Result validateShow(const Show& show) {
             }
             if (show.columns[i].type==ColumnType::control) {
                 if (c.midi || c.osc || c.file.isNotEmpty() ||
-                    (show.columns[i].controlLocked && c.controlSet))
+                    false)
                     return fail("Invalid Control Column cell.");
             } else if (c.controlSet) return fail("Control Set in a non-Control column.");
             if (!unique(c.id) || !std::isfinite(c.gain) || c.gain < 0 || c.gain > 4 || (int)c.behaviour < 0 || (int)c.behaviour > 3
