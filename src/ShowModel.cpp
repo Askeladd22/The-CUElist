@@ -155,10 +155,23 @@ juce::String encodeShow(const Show& show) {
                 for (const auto& e:c.osc->events) {
                     juce::Array<juce::var> args;
                     for (const auto& a:e.arguments) args.add(object({{"type",(int)a.type},{"integer",a.integer},
-                        {"decimal",(double)a.decimal},{"text",a.text}}));
+                        {"decimal",(double)a.decimal},{"text",a.text},{"boolean",a.boolean}}));
                     events.add(object({{"time",e.time},{"address",e.address},{"args",args}}));
                 }
-                osc=object({{"useBeats",c.osc->useBeats},{"length",c.osc->length},{"events",events}});
+                juce::Array<juce::var> automations;
+                for (const auto& a:c.osc->automations) {
+                    juce::Array<juce::var> args,points;
+                    for (const auto& v:a.message.arguments)
+                        args.add(object({{"type",(int)v.type},{"integer",v.integer},
+                            {"decimal",(double)v.decimal},{"text",v.text},{"boolean",v.boolean}}));
+                    for (const auto& point:a.points)
+                        points.add(object({{"time",point.time},{"value",point.value}}));
+                    automations.add(object({{"address",a.message.address},{"args",args},
+                        {"argumentIndex",a.argumentIndex},{"time",a.time},
+                        {"duration",a.duration},{"points",points}}));
+                }
+                osc=object({{"useBeats",c.osc->useBeats},{"length",c.osc->length},
+                    {"events",events},{"automations",automations}});
             }
             cells.add(object({{"id",c.id},{"name",c.name},{"file",c.file},{"followsRow",c.followsRow},
                 {"loop",c.loop},{"stopOnNext",c.stopOnNext},{"gain",c.gain},{"startSeconds",c.startSeconds},{"behaviour",(int)c.behaviour},{"midi",midi},{"osc",osc}}));
@@ -166,14 +179,14 @@ juce::String encodeShow(const Show& show) {
         rows.add(object({{"id",r.id},{"name",r.name},{"tempo",tempo},{"cells",cells},{"gain",r.gain},
             {"muted",r.muted},{"loop",r.loop},{"overrideBehaviour",r.overrideBehaviour},{"behaviour",(int)r.behaviour},{"stopOnNext",r.stopOnNext}}));
     }
-    return juce::JSON::toString(object({{"format","TheCuelist"},{"version",8},{"name",show.name},{"masterGain",show.masterGain},{"nextId",show.nextId},{"columns",columns},{"rows",rows}}));
+    return juce::JSON::toString(object({{"format","TheCuelist"},{"version",9},{"name",show.name},{"masterGain",show.masterGain},{"nextId",show.nextId},{"columns",columns},{"rows",rows}}));
 }
 juce::Result decodeShow(const juce::String& text, Show& destination) {
     if (text.length() > 32*1024*1024) return juce::Result::fail("Progetto troppo grande (massimo 32 MB). ");
     try {
         auto root = juce::JSON::parse(text);
         const auto version = integer(root,"version");
-        if (string(root,"format") != "TheCuelist" || version < 1 || version > 8) return juce::Result::fail("Formato o versione progetto non supportati.");
+        if (string(root,"format") != "TheCuelist" || version < 1 || version > 9) return juce::Result::fail("Formato o versione progetto non supportati.");
         const auto activation = [version](int value) {
             if (version < 3 && (value == 1 || value == 4)) return Behaviour::retrigger;
             return (Behaviour)value;
@@ -226,9 +239,33 @@ juce::Result decodeShow(const juce::String& text, Show& destination) {
                             for (const auto& a:args) {
                                 OscValue value; value.type=(OscValueType)integer(a,"type");
                                 value.integer=integer(a,"integer"); value.decimal=(float)number(a,"decimal");
-                                value.text=string(a,"text"); ev.arguments.push_back(value);
+                                value.text=string(a,"text");
+                                if (version>=9) value.boolean=boolean(a,"boolean");
+                                ev.arguments.push_back(value);
                             }
                             clip.events.push_back(std::move(ev));
+                        }
+                        if (version>=9) {
+                            const auto automations=array(o,"automations");
+                            if (automations.size()>16) throw std::runtime_error("Troppe automazioni OSC.");
+                            for (const auto& a:automations) {
+                                OscAutomation au; au.message.address=string(a,"address");
+                                au.argumentIndex=integer(a,"argumentIndex");
+                                au.time=number(a,"time"); au.duration=number(a,"duration");
+                                const auto args=array(a,"args");
+                                if (args.size()>16) throw std::runtime_error("Troppi argomenti OSC.");
+                                for (const auto& v:args) {
+                                    OscValue arg; arg.type=(OscValueType)integer(v,"type");
+                                    arg.integer=integer(v,"integer"); arg.decimal=(float)number(v,"decimal");
+                                    arg.text=string(v,"text"); arg.boolean=boolean(v,"boolean");
+                                    au.message.arguments.push_back(arg);
+                                }
+                                const auto points=array(a,"points");
+                                if (points.size()>128) throw std::runtime_error("Troppi punti OSC.");
+                                for (const auto& point:points)
+                                    au.points.push_back({number(point,"time"),number(point,"value")});
+                                clip.automations.push_back(std::move(au));
+                            }
                         }
                         cell.osc=std::move(clip);
                     }
