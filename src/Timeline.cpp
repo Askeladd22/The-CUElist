@@ -209,6 +209,7 @@ void Timeline::mouseDown(const juce::MouseEvent& e) {
         const auto rowId=row.id; const auto start=cell.startSeconds;
         if (position<start || position>end || !owner.select(owner.selectedRow,c)) return;
         dragColumn=c; dragRowId=rowId; dragStartSeconds=start;
+        if (owner.show.columns[c].type==ColumnType::midi) owner.editMidiClip();
         setMouseCursor(juce::MouseCursor::DraggingHandCursor); return;
     }
 }
