@@ -86,8 +86,9 @@ bool MainComponent::addControlSetBinding(int row,int column,ControlBinding b) {
         return false;
     auto candidate=show;
     auto& col=candidate.columns[(size_t)column];
-    ControlSet* set=col.controlLocked ? &col.controlDefaultSet :
-        &candidate.rows[(size_t)row].cells[(size_t)column].controlSet.emplace();
+    auto& cellSet=candidate.rows[(size_t)row].cells[(size_t)column].controlSet;
+    if (!col.controlLocked && !cellSet) cellSet.emplace();
+    ControlSet* set=col.controlLocked ? &col.controlDefaultSet : &*cellSet;
     b.id=candidate.controls.nextId++;
     b.scope=ControlScope::global; b.scopeId=0;
     set->bindings.push_back(std::move(b));
@@ -122,14 +123,21 @@ bool MainComponent::setControlColumnLocked(int column,bool locked,int sourceRow)
         // Preserve source cue and any other cue-specific Control Sets as
         // dormant metadata. Unlocking makes those sets editable again.
         const auto& cell=candidate.rows[(size_t)sourceRow].cells[(size_t)column];
-        if (cell.controlSet) col.controlDefaultSet=*cell.controlSet;
+        if (cell.controlSet) {
+            col.controlDefaultSet=*cell.controlSet;
+            for (auto& binding:col.controlDefaultSet.bindings)
+                binding.id=candidate.controls.nextId++;
+        }
         col.controlLocked=true; col.controlPriority=1;
     } else if (!locked && col.controlLocked) {
         // Retain edits made to the locked default when returning to cue scope.
         // Other cue-specific sets, held dormant during lock, reappear untouched.
         auto& source=candidate.rows[(size_t)sourceRow].cells[(size_t)column];
-        if (!col.controlDefaultSet.bindings.empty())
+        if (!col.controlDefaultSet.bindings.empty()) {
             source.controlSet=col.controlDefaultSet;
+            for (auto& binding:source.controlSet->bindings)
+                binding.id=candidate.controls.nextId++;
+        }
         col.controlDefaultSet.bindings.clear();
         col.controlLocked=false; col.controlPriority=2;
     } else return true;

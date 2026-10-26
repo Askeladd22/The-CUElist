@@ -106,8 +106,7 @@ juce::Result validateShow(const Show& show) {
                 const auto result=validateOscClip(*c.osc); if (result.failed()) return result;
             }
             if (show.columns[i].type==ColumnType::control) {
-                if (c.midi || c.osc || c.file.isNotEmpty() ||
-                    false)
+                if (c.midi || c.osc || c.file.isNotEmpty())
                     return fail("Invalid Control Column cell.");
             } else if (c.controlSet) return fail("Control Set in a non-Control column.");
             if (!unique(c.id) || !std::isfinite(c.gain) || c.gain < 0 || c.gain > 4 || (int)c.behaviour < 0 || (int)c.behaviour > 3
@@ -144,8 +143,12 @@ juce::Result validateShow(const Show& show) {
                 return fail("Gain mapping requires an Audio column.");
         }
     }
-    // Reuse existing binding validation for every independently stored set;
-    // source-column priority conflicts are intentionally resolved at runtime.
+    // Validate all stored sets, including dormant sets on locked columns.
+    // IDs must remain unique across the whole show (pickup uses binding IDs).
+    std::set<int> allControlBindingIds;
+    for (const auto& binding:show.controls.bindings)
+        allControlBindingIds.insert(binding.id);
+    // Source-column priority conflicts are resolved deterministically at runtime.
     const auto validateSet=[&](const ControlSet& set)->juce::Result {
         if (set.bindings.size()>256) return fail("Control Set exceeds 256 mappings.");
         ControlSettings probe; probe.nextId=show.controls.nextId;
@@ -153,6 +156,8 @@ juce::Result validateShow(const Show& show) {
         auto result=validateControls(probe,rowIds,columnIds);
         if (result.failed()) return result;
         for (const auto& binding:set.bindings) {
+            if (!allControlBindingIds.insert(binding.id).second)
+                return fail("Duplicate Control Set binding ID.");
             if (binding.scope!=ControlScope::global)
                 return fail("Control Set bindings must be independent of legacy scopes.");
             if (binding.target==ControlTarget::columnGain ||

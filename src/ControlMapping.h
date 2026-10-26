@@ -88,8 +88,12 @@ public:
             if (!best || priority(b.scope)>priority(best->scope) ||
                 (priority(b.scope)==priority(best->scope) && b.id<best->id)) best=&b;
         }
-        // A Control Column takes precedence over legacy global/preset rules
-        // for only the same physical input. Later columns win an exact tie.
+        // Control Column precedence: Maximum > High > Medium > Low.
+        // For the SAME priority the RIGHTMOST Control Column in show order
+        // wins. refreshControlSettings() constructs layers in that order;
+        // the >= comparison below is therefore deliberate and deterministic.
+        // Other physical inputs remain inherited from lower-priority layers
+        // or the pre-existing global/preset mapping system.
         int winningPriority=0;
         for (const auto& layer:layers) {
             if (!layer.locked && (activeCueId<=0 || layer.cueId!=activeCueId)) continue;
