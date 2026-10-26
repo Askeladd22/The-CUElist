@@ -109,7 +109,11 @@ MainComponent::MainComponent(bool startAudio) {
     goButton.onClick=[this] { goNext(); }; panicButton.onClick=[this] { stopAll(); };
     deviceButton.onClick=[this] { showDevices(); };
     controlButton.setTooltip("MIDI input, MIDI Learn, and global/per-cue mappings.");
-    controlButton.onClick=[this] { openControlPanel(); };
+    controlButton.onClick=[this] {
+        if (show.columns[(size_t)selectedColumn].type==ColumnType::control)
+            editControlSet(selectedRow,selectedColumn);
+        else openControlPanel(false); // legacy global/preset editor remains available
+    };
     importButton.onClick=[this] { importDialog(); };
     playCellButton.onClick=[this] { triggerCell(); }; stopCellButton.onClick=[this] { send(show.rows[selectedRow].cells[selectedColumn].id,false,true); };
     clearButton.onClick=[this] {
