@@ -3,6 +3,7 @@
 #include <vector>
 #include <optional>
 #include "MidiClip.h"
+#include "OscClip.h"
 
 namespace cuelist {
 enum class ColumnType { audio, midi, osc };
@@ -13,6 +14,8 @@ struct Column {
     float gain = 1.0f, pan = 0.0f;
     bool muted = false, phaseInverted = false;
     juce::String midiOutputId;
+    juce::String oscHost="127.0.0.1";
+    int oscPort=9000;
 };
 struct Cell {
     int id = 0;
@@ -22,6 +25,7 @@ struct Cell {
     double startSeconds = 0;
     Behaviour behaviour = Behaviour::retrigger;
     std::optional<MidiClip> midi;
+    std::optional<OscClip> osc;
 };
 struct Row {
     int id = 0; juce::String name; std::vector<TempoPoint> tempo {{}}; std::vector<Cell> cells;

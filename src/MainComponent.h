@@ -4,6 +4,7 @@
 namespace cuelist {
 class MainComponent;
 class PianoRollEditor;
+class OscClipEditor;
 class MidiUndoAction;
 class CueGrid final : public juce::Component, public juce::FileDragAndDropTarget {
 public:
@@ -83,6 +84,12 @@ public:
     void importFile(const juce::File&);
     void importDialog();
     void editMidiClip();
+    void editOscClip();
+    void detachOscClip();
+    void dockOscClip();
+    void closeOscClip();
+    void setOscDestination(int column,const juce::String& host,int port);
+    OscClipEditor* activeOscEditor() const { return oscEditor.get(); }
     void detachMidiClip();
     void dockMidiClip();
     void closeMidiClip();
@@ -126,6 +133,7 @@ private:
     juce::TextButton goButton{"GO  /  SPAZIO"},panicButton{"PANIC  /  ESC"},deviceButton{"Dispositivi audio"};
     juce::TextButton importButton{"Importa WAV / MP3"},playCellButton{"Avvia cella"},stopCellButton{"Ferma"},clearButton{"Rimuovi audio"};
     juce::TextButton midiEditButton{"Crea clip MIDI"};
+    juce::TextButton oscEditButton{"Crea clip OSC"};
     juce::TextButton cellTab{"Cella"},rowTab{"Intera cue"};
     juce::TextButton tempoButton{"Mappa tempo"},applyButton{"Applica modifiche"};
     juce::TextEditor rowName,cellName,bpm;
@@ -140,6 +148,9 @@ private:
     std::unique_ptr<juce::FileChooser> chooser;
     juce::Component::SafePointer<juce::DialogWindow> deviceDialog;
     std::unique_ptr<PianoRollEditor> clipEditor;
+    std::unique_ptr<OscClipEditor> oscEditor;
+    std::unique_ptr<juce::DocumentWindow> oscWindow;
+    int oscEditorCellId=-1;
     std::unique_ptr<juce::DocumentWindow> clipWindow;
     int clipEditorCellId=-1;
     bool clipCollapsed=false;
@@ -155,6 +166,7 @@ private:
     void midiClipEdited(int cellId,const MidiClip& before,const MidiClip& after,bool complete);
     void restoreMidiClip(int cellId,const MidiClip& snapshot);
     void syncClipEditor();
+    void syncOscEditor();
 
     void refresh();
     void refreshInspector();

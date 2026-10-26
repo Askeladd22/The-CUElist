@@ -5,7 +5,7 @@ Questa pagina conserva le istruzioni operative e tecniche dettagliate della vers
 
 **0.5.0 · Windows x64 · Portable · C++17 / JUCE 8 · Licenza proprietaria**
 
-Controllo di spettacoli mediante una griglia di cue, clip audio e timeline. Riproduce WAV e MP3; non gestisce video. Supporta clip MIDI di note e un piano roll integrato. OSC rimane predisposto ma non operativo.
+Controllo di spettacoli mediante una griglia di cue, clip audio e timeline. Riproduce WAV e MP3; non gestisce video. Supporta clip MIDI di note e un piano roll integrato. Le colonne OSC inviano messaggi UDP a un destinatario IP/host e porta configurati nelle utility. Le clip OSC possono contenere eventi in secondi o beat e argomenti tipizzati (interi, float e stringhe).
 
 ## Avvio rapido
 
@@ -63,6 +63,15 @@ Disattivalo sulle righe che devono continuare in sovrapposizione. Anche il GO di
 
 **Loop** è indipendente dall'attivazione. **Partecipa al GO della riga** include o esclude la cella dal lancio collettivo. Nella scheda **Intera cue** puoi impostare livello, mute, loop e un comportamento comune per il GO; il lancio diretto mantiene il comportamento della cella.
 
+## Clip OSC / UDP
+
+1. Aggiungi una colonna **OSC**. Nelle **utility colonna** premi il pulsante con `host:porta` e imposta il ricevitore (esempio `127.0.0.1:9000`). La destinazione appartiene alla colonna e viene riutilizzata dalle clip di tutte le sue cue.
+2. Seleziona una cella OSC e premi **Crea clip OSC** oppure clicca la clip OSC nella timeline. L'editor compare nel pannello integrato e puo essere staccato o riagganciato alla finestra principale.
+3. Premi **Aggiungi** per inserire un messaggio. Compila **Tempo** (dall'inizio della clip), **Indirizzo OSC** (es. `/luci/intensita`) e gli **Argomenti** con formato `i:7; f:0.5; s:scena`. Il prefisso `i` indica int32, `f` float32, `s` stringa. Gli argomenti sono separati da punto e virgola.
+4. In **Unita** scegli **Secondi** o **Beat**: quando cambi unita, l'editor converte durata ed eventi preservando la posizione temporale usando la mappa BPM della cue. La durata della clip si modifica separatamente. I messaggi sono inviati con GO/cella, rispettano la timeline, seek, loop e Stop. Modifiche valide sono applicate subito; premi **Salva** per conservarle nello show.
+
+L'invio utilizza **OSC 1.0 su UDP**. Non viene confermato dal ricevitore e non esistono comandi OSC generici universali di «note off»: Stop/Panic annullano i messaggi non ancora inviati, non revocano azioni gia ricevute dal dispositivo. Il dispatcher usa il clock audio e richiede un dispositivo audio inizializzato anche per show solo OSC. Testa indirizzo, porta e comportamento sul ricevitore prima di uno spettacolo.
+
 ## Modifica e timeline
 
 - Doppio click sul titolo di cue o colonna per rinominarlo: il campo riceve subito il focus. **Invio** conferma anche i nomi nell'inspector.
@@ -84,7 +93,7 @@ I parametri audio si aggiornano senza azzerare il trasporto. Invio, **Applica mo
 | Altoparlante barrato | Mute, senza fermare la clip |
 | Cerchio barrato | Inversione della polarità di entrambi i canali |
 
-I simboli si evidenziano quando attivi. I livelli di cella, cue e colonna si moltiplicano. Le uscite si aggiornano cambiando dispositivo o canali attivi. Sotto MIDI i controlli audio sono nascosti e il selettore permette di scegliere un dispositivo MIDI hardware o virtuale. Sotto OSC il selettore rimane non operativo.
+I simboli si evidenziano quando attivi. I livelli di cella, cue e colonna si moltiplicano. Le uscite si aggiornano cambiando dispositivo o canali attivi. Sotto MIDI i controlli audio sono nascosti e il selettore permette di scegliere un dispositivo MIDI hardware o virtuale. Sotto OSC e disponibile il pulsante destinazione UDP: specifica il nome host o indirizzo IP e la porta del ricevitore. L'invio non fornisce conferma di ricezione (UDP).
 
 ## Clip MIDI e piano roll
 
@@ -109,7 +118,7 @@ Le uscite sono memorizzate per identificativo: un dispositivo assente non viene 
 
 Sovrascrivendo uno show, la versione precedente resta in `.cuelist.bak`. Le generazioni precedenti dei media vengono conservate per rendere utilizzabile il backup: salvataggi ripetuti possono aumentare lo spazio occupato.
 
-Il formato corrente è **v5**. **Apri** legge anche v1/v2/v3/v4 e backup. Le clip MIDI sono salvate direttamente nello show, senza dipendere dal file MIDI importato:
+Il formato corrente è **v6**. **Apri** legge anche v1/v2/v3/v4/v5 e backup. Le clip MIDI sono salvate direttamente nello show, senza dipendere dal file MIDI importato:
 
 - Auto Stop viene abilitato per default nei progetti precedenti alla v4.
 - Nei progetti v1/v2, i vecchi Restart e Stop diventano Retrigger e le utility di colonna partono neutre.
@@ -132,7 +141,7 @@ I BPM e la mappa tempo regolano le note MIDI; non cambiano la velocità dei file
 
 - Una clip WAV/MP3 mono/stereo per cella; PCM precaricato fino a **128 MB per file e 512 MB per show**. Streaming e multitraccia interno non implementati.
 - Decodifica sul thread dell'interfaccia: file grandi possono provocare attese. Il callback del renderer non esegue I/O, allocazioni o mutex.
-- Motore OSC, LTC/MTC, mapping ingressi, autosave e recupero dopo crash non implementati. ASIO disabilitato in questa build; WASAPI disponibile tramite JUCE.
+- OSC UDP con invio di messaggi int32/float/string implementato; LTC/MTC, mapping ingressi, autosave e recupero dopo crash non implementati. ASIO disabilitato in questa build; WASAPI disponibile tramite JUCE.
 - Ricampionamento lineare e saturazione di sicurezza a ±1. Prove prolungate di ascolto, jitter e disconnessione su hardware esterno restano da eseguire.
 
 ## Sviluppo e verifiche

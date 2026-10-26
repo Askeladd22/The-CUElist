@@ -51,17 +51,21 @@ private:
 bool MainComponent::hasClip(int row,int column) const {
     if (row<0 || column<0 || row>=(int)show.rows.size() || column>=(int)show.columns.size()) return false;
     const auto& cell=show.rows[(size_t)row].cells[(size_t)column];
-    return show.columns[(size_t)column].type==ColumnType::midi ? cell.midi.has_value() : clips.count(cell.id)>0;
+    const auto type=show.columns[(size_t)column].type;
+    return type==ColumnType::midi ? cell.midi.has_value()
+        : type==ColumnType::osc ? cell.osc.has_value() : clips.count(cell.id)>0;
 }
 double MainComponent::clipDuration(int row,int column) const {
     if (!hasClip(row,column)) return 0;
     const auto& cue=show.rows[(size_t)row]; const auto& cell=cue.cells[(size_t)column];
     if (cell.midi) return secondsAtBeat(cue.tempo,cell.midi->lengthBeats);
+    if (cell.osc) return cell.osc->useBeats ? secondsAtBeat(cue.tempo,cell.osc->length) : cell.osc->length;
     const auto clip=clips.find(cell.id);
     return clip!=clips.end() && clip->second->sampleRate>0 ? clip->second->samples.getNumSamples()/clip->second->sampleRate : 0;
 }
 void MainComponent::editMidiClip() {
     if (show.columns[selectedColumn].type!=ColumnType::midi || !applyInspector()) return;
+    closeOscClip();
     auto& cell=show.rows[selectedRow].cells[selectedColumn];
     if (!cell.midi) {
         cell.midi=MidiClip{};

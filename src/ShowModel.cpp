@@ -59,6 +59,8 @@ juce::Result validateShow(const Show& show) {
     for (const auto& column : show.columns) {
         if (!unique(column.id) || column.output < 0 || column.output > 1022
             || (int)column.type < 0 || (int)column.type > 2
+            || column.oscPort<1 || column.oscPort>65535 || column.oscHost.isEmpty()
+            || column.oscHost.length()>255 || column.oscHost.containsChar(' ')
             || !std::isfinite(column.gain) || column.gain < 0 || column.gain > 4
             || !std::isfinite(column.pan) || column.pan < -1 || column.pan > 1) return fail("Colonna non valida.");
     }
@@ -76,8 +78,12 @@ juce::Result validateShow(const Show& show) {
         for (size_t i=0; i<row.cells.size(); ++i) {
             const auto& c = row.cells[i];
             if (c.midi) {
-                if (show.columns[i].type!=ColumnType::midi || c.file.isNotEmpty()) return fail("Clip MIDI in colonna non MIDI.");
+                if (show.columns[i].type!=ColumnType::midi || c.file.isNotEmpty() || c.osc) return fail("Clip MIDI in colonna non MIDI.");
                 auto result=validateMidiClip(*c.midi); if (result.failed()) return result;
+            }
+            if (c.osc) {
+                if (show.columns[i].type!=ColumnType::osc || c.file.isNotEmpty() || c.midi) return fail("Clip OSC in colonna non OSC.");
+                const auto result=validateOscClip(*c.osc); if (result.failed()) return result;
             }
             if (!unique(c.id) || !std::isfinite(c.gain) || c.gain < 0 || c.gain > 4 || (int)c.behaviour < 0 || (int)c.behaviour > 3
                 || !std::isfinite(c.startSeconds) || c.startSeconds < 0 || c.startSeconds > 86400)
@@ -117,7 +123,7 @@ juce::Array<juce::var> array(const juce::var& o,const char* key) {
 juce::String encodeShow(const Show& show) {
     juce::Array<juce::var> columns, rows;
     for (const auto& c : show.columns) columns.add(object({{"id",c.id},{"name",c.name},{"type",(int)c.type},{"output",c.output},
-        {"gain",c.gain},{"pan",c.pan},{"muted",c.muted},{"phaseInverted",c.phaseInverted},{"midiOutputId",c.midiOutputId}}));
+        {"gain",c.gain},{"pan",c.pan},{"muted",c.muted},{"phaseInverted",c.phaseInverted},{"midiOutputId",c.midiOutputId},{"oscHost",c.oscHost},{"oscPort",c.oscPort}}));
     for (const auto& r : show.rows) {
         juce::Array<juce::var> tempo, cells;
         for (const auto& p : r.tempo) tempo.add(object({{"beat",p.beat},{"bpm",p.bpm},{"numerator",p.numerator},{"denominator",p.denominator}}));
@@ -128,20 +134,31 @@ juce::String encodeShow(const Show& show) {
                 for (const auto& n:c.midi->notes) notes.add(object({{"beat",n.beat},{"length",n.length},{"pitch",n.pitch},{"velocity",n.velocity},{"channel",n.channel}}));
                 midi=object({{"lengthBeats",c.midi->lengthBeats},{"notes",notes}});
             }
+            juce::var osc;
+            if (c.osc) {
+                juce::Array<juce::var> events;
+                for (const auto& e:c.osc->events) {
+                    juce::Array<juce::var> args;
+                    for (const auto& a:e.arguments) args.add(object({{"type",(int)a.type},{"integer",a.integer},
+                        {"decimal",(double)a.decimal},{"text",a.text}}));
+                    events.add(object({{"time",e.time},{"address",e.address},{"args",args}}));
+                }
+                osc=object({{"useBeats",c.osc->useBeats},{"length",c.osc->length},{"events",events}});
+            }
             cells.add(object({{"id",c.id},{"name",c.name},{"file",c.file},{"followsRow",c.followsRow},
-                {"loop",c.loop},{"gain",c.gain},{"startSeconds",c.startSeconds},{"behaviour",(int)c.behaviour},{"midi",midi}}));
+                {"loop",c.loop},{"gain",c.gain},{"startSeconds",c.startSeconds},{"behaviour",(int)c.behaviour},{"midi",midi},{"osc",osc}}));
         }
         rows.add(object({{"id",r.id},{"name",r.name},{"tempo",tempo},{"cells",cells},{"gain",r.gain},
             {"muted",r.muted},{"loop",r.loop},{"overrideBehaviour",r.overrideBehaviour},{"behaviour",(int)r.behaviour},{"stopOnNext",r.stopOnNext}}));
     }
-    return juce::JSON::toString(object({{"format","TheCuelist"},{"version",5},{"name",show.name},{"nextId",show.nextId},{"columns",columns},{"rows",rows}}));
+    return juce::JSON::toString(object({{"format","TheCuelist"},{"version",6},{"name",show.name},{"nextId",show.nextId},{"columns",columns},{"rows",rows}}));
 }
 juce::Result decodeShow(const juce::String& text, Show& destination) {
     if (text.length() > 32*1024*1024) return juce::Result::fail("Progetto troppo grande (massimo 32 MB). ");
     try {
         auto root = juce::JSON::parse(text);
         const auto version = integer(root,"version");
-        if (string(root,"format") != "TheCuelist" || version < 1 || version > 5) return juce::Result::fail("Formato o versione progetto non supportati.");
+        if (string(root,"format") != "TheCuelist" || version < 1 || version > 6) return juce::Result::fail("Formato o versione progetto non supportati.");
         const auto activation = [version](int value) {
             if (version < 3 && (value == 1 || value == 4)) return Behaviour::retrigger;
             return (Behaviour)value;
@@ -150,6 +167,7 @@ juce::Result decodeShow(const juce::String& text, Show& destination) {
         for (auto& c : array(root,"columns")) {
             Column column {integer(c,"id"),string(c,"name"),(ColumnType)integer(c,"type"),integer(c,"output")};
             if (version>=5) column.midiOutputId=string(c,"midiOutputId");
+            if (version>=6) { column.oscHost=string(c,"oscHost"); column.oscPort=integer(c,"oscPort"); }
             if (version >= 3) {
                 column.gain=(float)number(c,"gain"); column.pan=(float)number(c,"pan");
                 column.muted=boolean(c,"muted"); column.phaseInverted=boolean(c,"phaseInverted");
@@ -176,6 +194,26 @@ juce::Result decodeShow(const juce::String& text, Show& destination) {
                         if (notes.size()>10000) throw std::runtime_error("Troppe note MIDI.");
                         for (const auto& n:notes) clip.notes.push_back({number(n,"beat"),number(n,"length"),integer(n,"pitch"),integer(n,"velocity"),integer(n,"channel")});
                         cell.midi=std::move(clip);
+                    }
+                }
+                if (version>=6) {
+                    const auto o=required(c,"osc");
+                    if (!o.isVoid()) {
+                        OscClip clip; clip.useBeats=boolean(o,"useBeats"); clip.length=number(o,"length");
+                        const auto events=array(o,"events");
+                        if (events.size()>256) throw std::runtime_error("Troppi eventi OSC.");
+                        for (const auto& e:events) {
+                            OscEvent ev; ev.time=number(e,"time"); ev.address=string(e,"address");
+                            const auto args=array(e,"args");
+                            if (args.size()>16) throw std::runtime_error("Troppi argomenti OSC.");
+                            for (const auto& a:args) {
+                                OscValue value; value.type=(OscValueType)integer(a,"type");
+                                value.integer=integer(a,"integer"); value.decimal=(float)number(a,"decimal");
+                                value.text=string(a,"text"); ev.arguments.push_back(value);
+                            }
+                            clip.events.push_back(std::move(ev));
+                        }
+                        cell.osc=std::move(clip);
                     }
                 }
                 if (version == 1 && cell.file.isNotEmpty() && !juce::File::isAbsolutePath(cell.file)) return juce::Result::fail("Percorso v1 non assoluto.");

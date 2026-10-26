@@ -151,7 +151,7 @@ void Timeline::paint(juce::Graphics& g) {
     }
     g.setColour(palette::line); g.drawHorizontalLine(45,0,(float)getWidth());
     const double length=visibleLength(); const int area=std::max(1,getWidth()-timelineStart-20), bottom=getHeight()-48;
-    int audioTracks=0; for (const auto& column : owner.show.columns) if (column.type!=ColumnType::osc) ++audioTracks;
+    const int audioTracks=(int)owner.show.columns.size();
     trackScroll=juce::jlimit(0,std::max(0,audioTracks*trackHeight-std::max(1,bottom-tracksTop)),trackScroll);
     for (int i=0;i<=4;++i) {
         const int x=timelineStart+area*i/4;
@@ -184,7 +184,6 @@ void Timeline::paint(juce::Graphics& g) {
     int track=0, loaded=0;
     g.saveState(); g.reduceClipRegion(0,tracksTop,getWidth(),std::max(0,bottom-tracksTop));
     for (int c=0;c<(int)row.cells.size();++c) {
-        if (owner.show.columns[c].type==ColumnType::osc) continue;
         const int y=tracksTop+track++*trackHeight-trackScroll;
         const bool present=owner.hasClip(owner.selectedRow,c); if (present) ++loaded;
         if (y+32<tracksTop || y>=bottom) continue;
@@ -198,7 +197,13 @@ void Timeline::paint(juce::Graphics& g) {
         g.setColour(colour.withAlpha(c==owner.selectedColumn ? .22f : .12f)); g.fillRoundedRectangle(x,(float)y,width,31,4);
         g.setColour(colour.withAlpha(.6f)); g.drawRoundedRectangle(x,(float)y,width,31,4,1);
         g.setColour(colour.withAlpha(.4f));
-        if (cell.midi) {
+        if (cell.osc) {
+            for (const auto& event:cell.osc->events) {
+                const double moment=cell.osc->useBeats ? secondsAtBeat(row.tempo,event.time) : event.time;
+                const float dx=x+(float)(area*moment/length);
+                g.fillRect(dx,(float)y+6,2.0f,19.0f);
+            }
+        } else if (cell.midi) {
             for (const auto& note:cell.midi->notes) {
                 const double begin=secondsAtBeat(row.tempo,note.beat), end=secondsAtBeat(row.tempo,note.beat+note.length);
                 g.fillRect(x+(float)(area*begin/length),(float)y+3+(127-note.pitch)*.18f,std::max(1.0f,(float)(area*(end-begin)/length)),2.0f);
@@ -212,7 +217,7 @@ void Timeline::paint(juce::Graphics& g) {
             g.fillRect(x+px,(float)y+15-amp/2,1.0f,std::max(1.0f,amp));
         }
         }
-        label(g,(cell.name.isEmpty() && cell.midi ? "MIDI" : cell.name)+"  +"+juce::String(cell.startSeconds,2)+"s",{(int)x+8,y+5,std::max(1,(int)width-16),20},11,palette::text);
+        label(g,(cell.name.isEmpty() ? (cell.midi ? "MIDI" : cell.osc ? "OSC" : "AUDIO") : cell.name)+"  +"+juce::String(cell.startSeconds,2)+"s",{(int)x+8,y+5,std::max(1,(int)width-16),20},11,palette::text);
         g.restoreState();
     }
     g.restoreState();
@@ -224,7 +229,7 @@ void Timeline::paint(juce::Graphics& g) {
             juce::Path marker; marker.addTriangle(x-5,71,x+5,71,x,78); g.fillPath(marker);
         }
     }
-    label(g,juce::String(row.tempo.front().bpm,1)+" BPM  /  4/4  /  clic MIDI: Clip Editor  /  "+row.name+"  /  "+juce::String(zoom,1)+"x",
+    label(g,juce::String(row.tempo.front().bpm,1)+" BPM  /  4/4  /  clic MIDI/OSC: Clip Editor  /  "+row.name+"  /  "+juce::String(zoom,1)+"x",
           {16,getHeight()-27,getWidth()-30,20},10,palette::muted);
     const int available=std::max(1,bottom-tracksTop), total=track*trackHeight;
     if (total>available) {
@@ -252,13 +257,14 @@ void Timeline::mouseDown(const juce::MouseEvent& e) {
     const int wanted=(e.y-tracksTop+trackScroll)/trackHeight; int track=0;
     const auto& row=owner.show.rows[owner.selectedRow];
     for (int c=0;c<(int)row.cells.size();++c) {
-        if (owner.show.columns[c].type==ColumnType::osc || track++!=wanted) continue;
+        if (track++!=wanted) continue;
         const auto& cell=row.cells[c]; if (!owner.hasClip(owner.selectedRow,c)) return;
         const double position=dragViewStart+(e.x-timelineStart)*dragLength/area, end=cell.startSeconds+owner.clipDuration(owner.selectedRow,c);
         const auto rowId=row.id; const auto start=cell.startSeconds;
         if (position<start || position>end || !owner.select(owner.selectedRow,c)) return;
         dragColumn=c; dragRowId=rowId; dragStartSeconds=start;
         if (owner.show.columns[c].type==ColumnType::midi) owner.editMidiClip();
+        else if (owner.show.columns[c].type==ColumnType::osc) owner.editOscClip();
         setMouseCursor(juce::MouseCursor::DraggingHandCursor); return;
     }
 }
@@ -274,11 +280,13 @@ void Timeline::mouseDoubleClick(const juce::MouseEvent& e) {
     const int area=std::max(1,getWidth()-timelineStart-20);
     const double position=viewStart+(e.x-timelineStart)*visibleLength()/area;
     for (int c=0;c<(int)row.cells.size();++c) {
-        if (owner.show.columns[c].type==ColumnType::osc || track++!=wanted) continue;
+        if (track++!=wanted) continue;
         const auto& cell=row.cells[(size_t)c];
-        if (owner.show.columns[c].type==ColumnType::midi && cell.midi
+        if ((cell.midi || cell.osc)
             && position>=cell.startSeconds && position<=cell.startSeconds+owner.clipDuration(owner.selectedRow,c)
-            && owner.select(owner.selectedRow,c)) owner.editMidiClip();
+            && owner.select(owner.selectedRow,c)) {
+            if (cell.midi) owner.editMidiClip(); else owner.editOscClip();
+        }
         return;
     }
 }
@@ -296,7 +304,7 @@ void Timeline::mouseWheelMove(const juce::MouseEvent& e, const juce::MouseWheelD
     if (e.mods.isCtrlDown()) {
         changeZoom(std::pow(2.0,wheel.deltaY*3),(double)(e.x-timelineStart)/std::max(1,getWidth()-timelineStart-20)); return;
     }
-    int tracks=0; for (const auto& column : owner.show.columns) if (column.type!=ColumnType::osc) ++tracks;
+    const int tracks=(int)owner.show.columns.size();
     const int maxScroll=std::max(0,tracks*trackHeight-std::max(1,getHeight()-48-tracksTop));
     trackScroll=juce::jlimit(0,maxScroll,trackScroll-(int)std::round(wheel.deltaY*trackHeight*3)); repaint();
 }

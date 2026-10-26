@@ -32,6 +32,7 @@ struct ColumnUtilities::Strip final : juce::Component {
     juce::Slider gain,pan;
     UtilityIcon mute{false},phase{true};
     juce::ComboBox output;
+    juce::TextButton oscDestination{"OSC / destinazione"};
     int routingChannels=-1, routingOutput=-1;
     ColumnType routingType=ColumnType::audio;
     juce::String midiSignature;
@@ -45,7 +46,26 @@ struct ColumnUtilities::Strip final : juce::Component {
         }
         gain.setName("columnGainDb"); pan.setName("columnPan"); mute.setName("columnMute"); phase.setName("columnPhase");
         addAndMakeVisible(output); output.setName("columnOutput");
-        output.setTooltip("Uscita della colonna. MIDI: dispositivo hardware o porta virtuale. OSC: previsto.");
+        addAndMakeVisible(oscDestination); oscDestination.setName("columnOscDestination");
+        oscDestination.setTooltip("Indirizzo IP o host e porta UDP del ricevitore OSC.");
+        oscDestination.onClick=[this] {
+            const auto columnId=id;
+            const auto& col=owner.show.columns[(size_t)index];
+            auto* dialog=new juce::AlertWindow("Destinazione OSC UDP","Inserisci host/IP e porta del ricevitore OSC.",juce::MessageBoxIconType::NoIcon,&owner);
+            dialog->addTextEditor("host",col.oscHost,"Host / indirizzo IP");
+            dialog->addTextEditor("port",juce::String(col.oscPort),"Porta UDP (1-65535)");
+            dialog->addButton("Salva",1); dialog->addButton("Annulla",0);
+            auto safe=juce::Component::SafePointer<MainComponent>(&owner);
+            dialog->enterModalState(true,juce::ModalCallbackFunction::create([safe,dialog,columnId](int result) {
+                if (!safe || result!=1) return;
+                const auto host=dialog->getTextEditorContents("host").trim();
+                const auto portText=dialog->getTextEditorContents("port").trim();
+                if (portText.isEmpty() || portText.retainCharacters("0123456789")!=portText) return;
+                for (int i=0;i<(int)safe->show.columns.size();++i)
+                    if (safe->show.columns[(size_t)i].id==columnId) { safe->setOscDestination(i,host,portText.getIntValue()); return; }
+            }),true);
+        };
+        output.setTooltip("Uscita audio o MIDI della colonna.");
         output.onChange=[this] {
             if (owner.show.columns[index].type==ColumnType::midi) {
                 const int selected=output.getSelectedId()-1;
@@ -78,10 +98,17 @@ struct ColumnUtilities::Strip final : juce::Component {
         pan.setValue(col.pan,juce::dontSendNotification); mute.setToggleState(col.muted,juce::dontSendNotification);
         phase.setToggleState(col.phaseInverted,juce::dontSendNotification);
         for (juce::Component* control : std::initializer_list<juce::Component*>{&gain,&pan,&mute,&phase}) control->setVisible(col.type==ColumnType::audio);
+        oscDestination.setVisible(col.type==ColumnType::osc);
+        output.setVisible(col.type!=ColumnType::osc);
         syncRouting();
     }
     void syncRouting() {
         const auto& col=owner.show.columns[index]; int channels=2;
+        if (col.type==ColumnType::osc) {
+            routingType=ColumnType::osc;
+            oscDestination.setButtonText(col.oscHost+":"+juce::String(col.oscPort));
+            return;
+        }
         if (col.type==ColumnType::midi) {
             const double now=juce::Time::getMillisecondCounterHiRes();
             if (routingType==ColumnType::midi && lastMidiId==col.midiOutputId && now<nextMidiScan) return;
@@ -114,6 +141,7 @@ struct ColumnUtilities::Strip final : juce::Component {
     }
     void resized() override {
         output.setBounds(6,4,getWidth()-12,24);
+        oscDestination.setBounds(6,4,getWidth()-12,28);
         gain.setBounds(5,32,getWidth()-10,24); pan.setBounds(5,58,getWidth()-10,24);
         mute.setBounds(27,84,44,28); phase.setBounds(88,84,44,28);
     }
@@ -142,6 +170,6 @@ void ColumnUtilities::paint(juce::Graphics& g) {
     g.fillAll(palette::panel); g.setColour(palette::line); g.drawHorizontalLine(0,0,(float)getWidth());
     label(g,"UTILITY COLONNE",{14-scrollX,10,CueGrid::nameWidth-28,20},11,palette::teal,true);
     label(g,"Uscite / Livello / Pan",{14-scrollX,37,CueGrid::nameWidth-28,22},11,palette::muted);
-    label(g,"Mute / Inversione di fase",{14-scrollX,66,CueGrid::nameWidth-28,22},11,palette::muted);
+    label(g,"Mute / Inversione di fase; OSC: destinazione UDP",{14-scrollX,66,CueGrid::nameWidth-28,22},11,palette::muted);
 }
 }
