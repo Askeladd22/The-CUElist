@@ -108,6 +108,17 @@ juce::Result validateShow(const Show& show) {
         }
     }
     if (show.nextId <= *ids.rbegin() || show.nextId >= 1000000000) return fail("Contatore identificativi non valido.");
+    std::vector<int> rowIds,columnIds;
+    for (const auto& row:show.rows) {
+        rowIds.push_back(row.id);
+        if (row.mappingPresetId!=0 &&
+            std::none_of(show.controls.presets.begin(),show.controls.presets.end(),
+                [&](const auto& p){ return p.id==row.mappingPresetId; }))
+            return fail("Cue con preset mapping inesistente.");
+    }
+    for (const auto& column:show.columns) columnIds.push_back(column.id);
+    if (auto controlResult=validateControls(show.controls,rowIds,columnIds); controlResult.failed())
+        return controlResult;
     return juce::Result::ok();
 }
 namespace {
@@ -177,21 +188,63 @@ juce::String encodeShow(const Show& show) {
                 {"loop",c.loop},{"stopOnNext",c.stopOnNext},{"gain",c.gain},{"startSeconds",c.startSeconds},{"behaviour",(int)c.behaviour},{"midi",midi},{"osc",osc}}));
         }
         rows.add(object({{"id",r.id},{"name",r.name},{"tempo",tempo},{"cells",cells},{"gain",r.gain},
-            {"muted",r.muted},{"loop",r.loop},{"overrideBehaviour",r.overrideBehaviour},{"behaviour",(int)r.behaviour},{"stopOnNext",r.stopOnNext}}));
+            {"muted",r.muted},{"loop",r.loop},{"overrideBehaviour",r.overrideBehaviour},{"behaviour",(int)r.behaviour},{"stopOnNext",r.stopOnNext},
+            {"mappingPresetId",r.mappingPresetId}}));
     }
-    return juce::JSON::toString(object({{"format","TheCuelist"},{"version",9},{"name",show.name},{"masterGain",show.masterGain},{"nextId",show.nextId},{"columns",columns},{"rows",rows}}));
+    juce::Array<juce::var> presets,bindings;
+    for (const auto& preset:show.controls.presets)
+        presets.add(object({{"id",preset.id},{"name",preset.name}}));
+    for (const auto& binding:show.controls.bindings)
+        bindings.add(object({{"id",binding.id},{"deviceId",binding.deviceId},
+            {"kind",(int)binding.kind},{"channel",binding.channel},{"number",binding.number},
+            {"scope",(int)binding.scope},{"scopeId",binding.scopeId},{"target",(int)binding.target},
+            {"targetColumnId",binding.targetColumnId},{"outputChannel",binding.outputChannel},
+            {"outputNumber",binding.outputNumber},{"outputDeviceId",binding.outputDeviceId},
+            {"oscHost",binding.oscHost},{"oscPort",binding.oscPort},{"oscAddress",binding.oscAddress},
+            {"minimum",binding.minimum},{"maximum",binding.maximum},{"invert",binding.invert},
+            {"enabled",binding.enabled},{"takeover",(int)binding.takeover}}));
+    const auto controls=object({{"midiInputId",show.controls.midiInputId},
+        {"nextId",show.controls.nextId},{"presets",presets},{"bindings",bindings}});
+    return juce::JSON::toString(object({{"format","TheCuelist"},{"version",10},
+        {"name",show.name},{"masterGain",show.masterGain},{"nextId",show.nextId},
+        {"columns",columns},{"rows",rows},{"controls",controls}}));
 }
 juce::Result decodeShow(const juce::String& text, Show& destination) {
     if (text.length() > 32*1024*1024) return juce::Result::fail("Progetto troppo grande (massimo 32 MB). ");
     try {
         auto root = juce::JSON::parse(text);
         const auto version = integer(root,"version");
-        if (string(root,"format") != "TheCuelist" || version < 1 || version > 9) return juce::Result::fail("Formato o versione progetto non supportati.");
+        if (string(root,"format") != "TheCuelist" || version < 1 || version > 10) return juce::Result::fail("Formato o versione progetto non supportati.");
         const auto activation = [version](int value) {
             if (version < 3 && (value == 1 || value == 4)) return Behaviour::retrigger;
             return (Behaviour)value;
         };
         Show show; show.name = string(root,"name"); show.nextId = integer(root,"nextId");
+        if (version>=10) {
+            const auto data=required(root,"controls");
+            show.controls.midiInputId=string(data,"midiInputId");
+            show.controls.nextId=integer(data,"nextId");
+            for (const auto& p:array(data,"presets"))
+                show.controls.presets.push_back({integer(p,"id"),string(p,"name")});
+            for (const auto& item:array(data,"bindings")) {
+                ControlBinding b;
+                b.id=integer(item,"id"); b.deviceId=string(item,"deviceId");
+                b.kind=(ControlKind)integer(item,"kind");
+                b.channel=integer(item,"channel"); b.number=integer(item,"number");
+                b.scope=(ControlScope)integer(item,"scope"); b.scopeId=integer(item,"scopeId");
+                b.target=(ControlTarget)integer(item,"target");
+                b.targetColumnId=integer(item,"targetColumnId");
+                b.outputChannel=integer(item,"outputChannel");
+                b.outputNumber=integer(item,"outputNumber");
+                b.outputDeviceId=string(item,"outputDeviceId");
+                b.oscHost=string(item,"oscHost"); b.oscPort=integer(item,"oscPort");
+                b.oscAddress=string(item,"oscAddress");
+                b.minimum=(float)number(item,"minimum"); b.maximum=(float)number(item,"maximum");
+                b.invert=boolean(item,"invert"); b.enabled=boolean(item,"enabled");
+                b.takeover=(ControlTakeover)integer(item,"takeover");
+                show.controls.bindings.push_back(std::move(b));
+            }
+        }
         if (version>=8) show.masterGain=(float)number(root,"masterGain");
         for (auto& c : array(root,"columns")) {
             Column column {integer(c,"id"),string(c,"name"),(ColumnType)integer(c,"type"),integer(c,"output")};
@@ -205,6 +258,7 @@ juce::Result decodeShow(const juce::String& text, Show& destination) {
         }
         for (auto& r : array(root,"rows")) {
             Row row; row.id = integer(r,"id"); row.name = string(r,"name"); row.tempo.clear();
+            if (version>=10) row.mappingPresetId=integer(r,"mappingPresetId");
             if (version >= 4) row.stopOnNext=boolean(r,"stopOnNext");
             if (version >= 2) {
                 row.gain=(float)number(r,"gain"); row.muted=boolean(r,"muted"); row.loop=boolean(r,"loop");
