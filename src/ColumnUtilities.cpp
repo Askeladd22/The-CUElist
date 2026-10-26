@@ -2,32 +2,6 @@
 #include "GainMeterFader.h"
 
 namespace cuelist {
-namespace {
-class UtilityIcon final : public juce::ToggleButton {
-public:
-    explicit UtilityIcon(bool invert) : phase(invert) { setButtonText(invert ? "Inversione di fase" : "Mute"); }
-    void paintButton(juce::Graphics& g,bool hover,bool down) override {
-        const auto box=getLocalBounds().toFloat().reduced(2);
-        const auto active=phase ? palette::teal : palette::red;
-        g.setColour(getToggleState() ? active.withAlpha(.18f) : palette::raised);
-        g.fillRoundedRectangle(box,4);
-        g.setColour(getToggleState() ? active : hover || down ? palette::text : palette::muted);
-        g.drawRoundedRectangle(box,4,getToggleState() ? 1.4f : .7f);
-        const auto icon=juce::Rectangle<float>(20,20).withCentre(box.getCentre());
-        if (phase) {
-            g.drawEllipse(icon.reduced(2),2.3f);
-            g.drawLine(icon.getX()+3,icon.getBottom(),icon.getRight()-3,icon.getY(),2.8f);
-        } else {
-            const float x=icon.getX(),y=icon.getY();
-            juce::Path speaker; speaker.startNewSubPath(x+2,y+7); speaker.lineTo(x+7,y+7);
-            speaker.lineTo(x+14,y+2); speaker.lineTo(x+14,y+18); speaker.lineTo(x+7,y+13);
-            speaker.lineTo(x+2,y+13); speaker.closeSubPath(); g.fillPath(speaker);
-            g.drawLine(x+1,y+1,x+19,y+19,3.0f);
-        }
-    }
-private: bool phase;
-};
-}
 struct ColumnUtilities::Strip final : juce::Component {
     MainComponent& owner;
     int id, index;
@@ -45,9 +19,7 @@ struct ColumnUtilities::Strip final : juce::Component {
     Strip(MainComponent& p,int i) : owner(p),id(p.show.columns[i].id),index(i) {
         addAndMakeVisible(gain);
         addAndMakeVisible(pan);
-        pan.setDoubleClickReturnValue(true,0);
-        pan.setSliderStyle(juce::Slider::RotaryVerticalDrag);
-        pan.setTextBoxStyle(juce::Slider::NoTextBox,false,0,0);
+        configureMixerPan(pan);
         gain.setName("columnGainDb"); pan.setName("columnPan"); mute.setName("columnMute"); phase.setName("columnPhase");
         addAndMakeVisible(output); output.setName("columnOutput");
         addAndMakeVisible(oscDestination); oscDestination.setName("columnOscDestination");
@@ -76,10 +48,6 @@ struct ColumnUtilities::Strip final : juce::Component {
                 if (selected>=0 && selected<midiIds.size()) owner.setMidiOutput(index,midiIds[selected]);
             } else if (output.getSelectedId()>0) owner.setColumnOutput(index,output.getSelectedId()-1);
         };
-        pan.setRange(-1,1,0.01);
-        pan.textFromValueFunction=[](double value) { return std::abs(value)<0.005 ? juce::String("C") : juce::String(value<0 ? "L " : "R ")+juce::String((int)std::round(std::abs(value)*100)); };
-        pan.valueFromTextFunction=[](const juce::String& text) { return text.containsIgnoreCase("L") ? -std::abs(text.retainCharacters("0123456789.").getDoubleValue())/100 : text.containsIgnoreCase("R") ? std::abs(text.retainCharacters("0123456789.").getDoubleValue())/100 : text.getDoubleValue(); };
-        pan.updateText();
         gain.setTooltip("Livello di tutte le clip della colonna. Doppio click: 0 dB.");
         pan.setTooltip("Pan / bilanciamento stereo. Doppio click: centro.");
         phase.setTooltip("Inverte la polarita di entrambi i canali della colonna."); mute.setTooltip("Silenzia tutta la colonna senza fermare le clip.");
@@ -180,21 +148,36 @@ void ColumnUtilities::refresh() {
     // Preserve the historical strip-child order used by the UI and tests.
     // The Master remains an overlay in the left utility area and is last.
     owner.masterSlider.toFront(false);
+    owner.masterPan.toFront(false);
+    owner.masterMute.toFront(false);
     resized(); repaint();
 }
 void ColumnUtilities::syncScroll(int x) { if (scrollX!=x) { scrollX=x; resized(); repaint(); } }
 void ColumnUtilities::refreshRouting() { for (auto& strip : strips) strip->syncRouting(); }
-void ColumnUtilities::refreshMeters() { for (auto& strip : strips) strip->updateMeter(); }
+void ColumnUtilities::refreshMeters() {
+    for (auto& strip : strips) strip->updateMeter();
+    const auto connected=owner.engine.connected.load(std::memory_order_relaxed);
+    owner.masterSlider.setStereoPeaks(
+        connected ? owner.engine.masterPeakLeft.load(std::memory_order_relaxed) : 0.0f,
+        connected ? owner.engine.masterPeakRight.load(std::memory_order_relaxed) : 0.0f);
+}
 void ColumnUtilities::resized() {
-    owner.masterSlider.setBounds(21-scrollX,34,76,std::max(92,getHeight()-37));
+    owner.masterSlider.setBounds(21-scrollX,34,92,std::max(92,getHeight()-37));
+    owner.masterPan.setBounds(174-scrollX,36,48,48);
+    owner.masterMute.setBounds(180-scrollX,122,35,31);
     for (size_t i=0;i<strips.size();++i)
         strips[i]->setBounds(CueGrid::nameWidth+(int)i*CueGrid::columnWidth-scrollX,1,CueGrid::columnWidth,getHeight()-2);
 }
 void ColumnUtilities::paint(juce::Graphics& g) {
     g.fillAll(palette::panel); g.setColour(palette::line); g.drawHorizontalLine(0,0,(float)getWidth());
     label(g,"MASTER AUDIO",{14-scrollX,10,CueGrid::nameWidth-28,20},11,palette::teal,true);
-    label(g,"Volume generale",{112-scrollX,58,175,20},12,palette::text);
-    label(g,"Solo audio PCM",{112-scrollX,84,175,18},10,palette::muted);
-    label(g,"MIDI e OSC invariati",{112-scrollX,104,175,18},10,palette::muted);
+    label(g,"PAN",{175-scrollX,86,50,14},9,palette::muted,true,juce::Justification::centred);
+    const auto pan=owner.show.masterPan;
+    label(g,std::abs(pan)<.005f ? juce::String("C") : juce::String(pan<0?"L ":"R ")
+        +juce::String((int)std::round(std::abs(pan)*100)),
+        {171-scrollX,103,58,15},9,palette::text,false,juce::Justification::centred);
+    label(g,"MUTE",{220-scrollX,128,56,19},10,palette::muted,true);
+    label(g,"Solo audio PCM",{119-scrollX,16,155,16},10,palette::muted);
+    label(g,"MIDI e OSC invariati",{118-scrollX,159,175,16},9,palette::muted);
 }
 }

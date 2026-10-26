@@ -263,6 +263,48 @@ void oscAutomationV9Tests() {
         state->render(channels,1,100,1000);
         check(sink.received.size()==before,"Explicit Stop emitted an OSC reset");
     });
+    test("double-clicking the empty OSC lane creates a one-second 0-to-1 ramp",[] {
+        OscClipEditor editor(OscClip{},{{0,120,4,4}},
+            [](const OscClip&,const OscClip&,bool){});
+        editor.setSize(940,360);
+        const juce::Point<float> point{300,204};
+        editor.mouseDoubleClick(cueViewFixtures::event(editor,point,point));
+        check(editor.getClip().automations.size()==1,"Double click did not create the ramp");
+        const auto& a=editor.getClip().automations[0];
+        near(a.duration,1); near(a.points[0].value,0); near(a.points[1].value,1);
+        check(a.message.address=="/parameter","Default address not assigned");
+        check(juce::ModalComponentManager::getInstance()->getNumModalComponents()==0,
+              "Double click unexpectedly opened a ramp modal");
+        check(validateOscClip(editor.getClip()).wasOk(),"Created ramp invalid");
+    });
+    test("one-second OSC ramp uses true seconds even on a beat timeline",[] {
+        OscClip clip; clip.useBeats=true; clip.length=8;
+        OscClipEditor editor(clip,{{0,120,4,4}},
+            [](const OscClip&,const OscClip&,bool){});
+        editor.setSize(940,360); editor.addAutomation();
+        check(editor.getClip().automations.size()==1,"Beat timeline ramp not created");
+        near(editor.getClip().automations[0].duration,2); // two beats at 120 BPM = 1 s
+        check(validateOscClip(editor.getClip()).wasOk(),"Beat-mode ramp invalid");
+    });
+    test("OSC ramp can be moved and resized with timeline snapping",[] {
+        OscClipEditor editor(OscClip{},{{0,120,4,4}},
+            [](const OscClip&,const OscClip&,bool){});
+        editor.setSize(940,360);
+        const juce::Point<float> create{190,204};
+        editor.mouseDoubleClick(cueViewFixtures::event(editor,create,create));
+        const juce::Point<float> moveFrom{290,205},moveTo{500,205};
+        editor.mouseDown(cueViewFixtures::event(editor,moveFrom,moveFrom));
+        editor.mouseDrag(cueViewFixtures::event(editor,moveTo,moveFrom,1,true));
+        editor.mouseUp(cueViewFixtures::event(editor,moveTo,moveFrom,1,true));
+        near(editor.getClip().automations[0].time,1.5);
+        const juce::Point<float> edgeFrom{603,205},edgeTo{813,205};
+        editor.mouseDown(cueViewFixtures::event(editor,edgeFrom,edgeFrom));
+        editor.mouseDrag(cueViewFixtures::event(editor,edgeTo,edgeFrom,1,true));
+        editor.mouseUp(cueViewFixtures::event(editor,edgeTo,edgeFrom,1,true));
+        near(editor.getClip().automations[0].duration,2);
+        near(editor.getClip().automations[0].points.back().time,2);
+        check(validateOscClip(editor.getClip()).wasOk(),"Dragged automation invalid");
+    });
     test("OSC editor creates timeline events and automation ramps with separate grid and snap",[] {
         OscClipEditor editor(OscClip{},{{0,120,4,4}},
             [](const OscClip&,const OscClip&,bool){});
@@ -274,8 +316,8 @@ void oscAutomationV9Tests() {
         check(editor.getClip().automations.size()==1 &&
               editor.getClip().automations[0].points.size()==2,
               "Ramp button did not create a linear automation");
-        if (auto* modal=juce::ModalComponentManager::getInstance()->getModalComponent(0))
-            delete modal;
+        check(juce::ModalComponentManager::getInstance()->getNumModalComponents()==0,
+              "Creating a ramp must not open any configuration dialog");
         check(validateOscClip(editor.getClip()).wasOk(),"Editor created invalid OSC automation");
     });
 }

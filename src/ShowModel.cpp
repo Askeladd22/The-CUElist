@@ -67,6 +67,8 @@ juce::Result validateShow(const Show& show) {
     const auto fail = [](const char* s) { return juce::Result::fail(s); };
     if (show.name.trim().isEmpty() || show.columns.empty() || show.rows.empty()) return fail("Nome, righe o colonne mancanti.");
     if (!std::isfinite(show.masterGain) || show.masterGain<0 || show.masterGain>4) return fail("Master audio non valido.");
+    if (!std::isfinite(show.masterPan) || show.masterPan < -1 || show.masterPan > 1)
+        return fail("Master pan non valido.");
     if (show.columns.size() > 10000 || show.rows.size() > 10000 || show.rows.size()*show.columns.size() > 1000000)
         return fail("Progetto oltre il limite di sicurezza di un milione di celle.");
     std::set<int> ids;
@@ -221,7 +223,8 @@ juce::String encodeShow(const Show& show) {
     const auto controls=object({{"midiInputId",show.controls.midiInputId},
         {"nextId",show.controls.nextId},{"presets",presets},{"bindings",bindings}});
     return juce::JSON::toString(object({{"format","TheCuelist"},{"version",10},
-        {"name",show.name},{"masterGain",show.masterGain},{"nextId",show.nextId},
+        {"name",show.name},{"masterGain",show.masterGain},{"masterPan",show.masterPan},
+        {"masterMuted",show.masterMuted},{"nextId",show.nextId},
         {"columns",columns},{"rows",rows},{"controls",controls}}));
 }
 juce::Result decodeShow(const juce::String& text, Show& destination) {
@@ -261,6 +264,11 @@ juce::Result decodeShow(const juce::String& text, Show& destination) {
             }
         }
         if (version>=8) show.masterGain=(float)number(root,"masterGain");
+        // Optional fields keep every existing v10 document backwards-compatible.
+        if (auto* obj=root.getDynamicObject()) {
+            if (obj->hasProperty("masterPan")) show.masterPan=(float)number(root,"masterPan");
+            if (obj->hasProperty("masterMuted")) show.masterMuted=boolean(root,"masterMuted");
+        }
         for (auto& c : array(root,"columns")) {
             Column column {integer(c,"id"),string(c,"name"),(ColumnType)integer(c,"type"),integer(c,"output")};
             if (version>=5) column.midiOutputId=string(c,"midiOutputId");

@@ -2,8 +2,19 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
+#include <cstdlib>
 
 namespace cuelist {
+namespace {
+bool parseFiniteNumber(const juce::String& text,double& value) {
+    const auto trimmed=text.trim();
+    if (trimmed.isEmpty()) return false;
+    const char* start=trimmed.toRawUTF8();
+    char* end=nullptr;
+    value=std::strtod(start,&end);
+    return end!=start && *end=='\0' && std::isfinite(value);
+}
+}
 OscClipEditor::OscClipEditor(OscClip value,std::vector<TempoPoint> points,
              std::function<void(const OscClip&,const OscClip&,bool)> commit)
     : clip(std::move(value)),tempo(std::move(points)),onEdit(std::move(commit)) {
@@ -52,13 +63,17 @@ OscClipEditor::OscClipEditor(OscClip value,std::vector<TempoPoint> points,
     detach.setName("oscDetach");
     detach.onClick=[this] { if (onDetach) onDetach(); };
     for (auto* button:{&add,&ramp,&remove,&duplicate,&detach}) button->setWantsKeyboardFocus(false);
+    newTrackAddress=clip.automations.empty() ? "/parameter"
+        : "/parameter/"+juce::String((int)clip.automations.size()+1);
     setSize(940,320);
 }
 OscClipEditor::~OscClipEditor() { setLookAndFeel(nullptr); }
 void OscClipEditor::setFloating(bool floating) { detach.setButtonText(floating?"Riaggancia":"Stacca"); }
 void OscClipEditor::loadClip(const OscClip& next) {
     ++revision; clip=next; selectedEvent=selectedAutomation=selectedPoint=-1;
-    dragging=false; laneScroll=0;
+    newTrackAddress=clip.automations.empty() ? "/parameter"
+        : "/parameter/"+juce::String((int)clip.automations.size()+1);
+    dragging=false; rampDrag=RampDrag::none; laneScroll=0;
     unit.setSelectedId(clip.useBeats ? 2 : 1,juce::dontSendNotification);
     repaint();
 }
@@ -111,7 +126,7 @@ double OscClipEditor::valueForY(int index,float y) const {
 void OscClipEditor::paint(juce::Graphics& g) {
     g.fillAll(palette::panel);
     label(g,"OSC  /  timeline",{13,38,225,24},13,palette::teal,true);
-    label(g,"Clic: evento  ·  Doppio clic: modifica  ·  Trascina: sposta / curva",
+    label(g,"Doppio clic: nuova rampa / modifica  ·  Trascina: sposta o ridimensiona  ·  Shift+clic: punto",
           {230,38,getWidth()-245,24},10,palette::muted);
     const int left=axisLeft(),right=left+axisWidth();
     const auto ruler=juce::Rectangle<float>((float)left,rulerTop,(float)axisWidth(),rulerBottom-rulerTop);
@@ -141,8 +156,12 @@ void OscClipEditor::paint(juce::Graphics& g) {
         const float y=eventTop+10+(i%2)*17;
         g.setColour(i==selectedEvent ? palette::amber : palette::teal);
         g.fillRoundedRectangle(x-5,y,10,14,2);
-        if (i==selectedEvent || axisWidth()/std::max(1,(int)clip.events.size())>74)
-            label(g,e.address,{(int)x+7,(int)y-1,110,17},10,palette::text);
+        if (i==selectedEvent || axisWidth()/std::max(1,(int)clip.events.size())>74) {
+            const auto arguments=describeArguments(e.arguments);
+            const auto summary=e.address+(arguments.isNotEmpty() ? "   "+arguments : juce::String());
+            label(g,summary,{(int)x+7,(int)y-1,
+                std::max(0,std::min(245,right-(int)x-11)),17},10,palette::text);
+        }
     }
     g.setColour(palette::muted);
     g.drawHorizontalLine(eventTop+eventHeight+4,(float)left,(float)right);
@@ -152,11 +171,16 @@ void OscClipEditor::paint(juce::Graphics& g) {
         if (y>=getHeight() || y+laneHeight<rulerBottom) continue;
         g.setColour(i%2 ? palette::raised : palette::background);
         g.fillRect(left,y,axisWidth(),laneHeight-4);
-        label(g,"AUTO "+juce::String(i+1),{6,y+4,68,16},9,i==selectedAutomation ? palette::amber : palette::teal,true);
-        label(g,a.message.address,{left+9,y+2,std::max(25,axisWidth()-16),16},10,palette::muted);
+        label(g,"AUTO "+juce::String(i+1),{6,y+4,68,16},9,
+              i==selectedAutomation ? palette::amber : palette::teal,true);
+        label(g,a.message.address+"  (doppio clic: address)",
+              {left+9,y+2,std::max(25,axisWidth()-16),16},10,palette::muted);
         const float x0=xForTime(a.time),x1=xForTime(a.time+a.duration);
-        g.setColour(palette::teal.withAlpha(.10f));
-        g.fillRect(x0,(float)y+20,std::max(1.0f,x1-x0),(float)laneHeight-25);
+        g.setColour(palette::teal.withAlpha(i==selectedAutomation ? .23f : .12f));
+        g.fillRoundedRectangle(x0,(float)y+20,std::max(1.0f,x1-x0),
+                               (float)laneHeight-25,3.0f);
+        g.setColour(i==selectedAutomation ? palette::amber : palette::teal);
+        g.fillRoundedRectangle(x1-4,(float)y+23,8,(float)laneHeight-31,2.0f);
         juce::Path curve;
         bool first=true;
         for (int p=0;p<(int)a.points.size();++p) {
@@ -167,6 +191,19 @@ void OscClipEditor::paint(juce::Graphics& g) {
             g.fillEllipse(x-4,py-4,8,8);
         }
         g.setColour(palette::teal); g.strokePath(curve,juce::PathStrokeType(2.0f));
+    }
+    // Ready-to-use empty track; no change to the serialized automation model.
+    if (clip.automations.size()<16) {
+        const int y=laneTop((int)clip.automations.size());
+        if (y<getHeight() && y+laneHeight>rulerBottom) {
+            g.setColour(palette::raised.withAlpha(.65f));
+            g.fillRect(left,y,axisWidth(),laneHeight-4);
+            label(g,"+ AUTO",{6,y+4,68,17},9,palette::teal,true);
+            label(g,newTrackAddress+"  (address prossima traccia)",
+                  {left+9,y+3,std::max(25,axisWidth()-16),17},10,palette::muted);
+            label(g,"Doppio clic qui: rampa 0 → 1 / 1 secondo",
+                  {left+12,y+32,std::max(25,axisWidth()-20),22},11,palette::muted);
+        }
     }
     g.setColour(palette::amber.withAlpha(.7f));
     g.drawVerticalLine((int)xForTime(cursor),(float)rulerTop,(float)getHeight());
@@ -190,7 +227,9 @@ void OscClipEditor::mouseDown(const juce::MouseEvent& e) {
         e.position.x>axisLeft()+axisWidth() || e.position.y<rulerTop) return;
     cursor=quantize(timeForX(e.position.x));
     dragEvent=dragAutomation=dragPoint=-1;
+    rampDrag=RampDrag::none;
     dragging=false; changedDuringDrag=false; dragBefore=clip;
+    dragStartTime=timeForX(e.position.x);
     if (e.position.y>=rulerTop && e.position.y<rulerBottom) { repaint(); return; }
     if (e.position.y>=eventTop && e.position.y<eventTop+eventHeight) {
         for (int i=(int)clip.events.size()-1;i>=0;--i)
@@ -207,55 +246,98 @@ void OscClipEditor::mouseDown(const juce::MouseEvent& e) {
         return;
     }
     const int index=automationAt(e.position.y);
-    if (index<0) return;
+    if (index<0) return; // The empty lane only responds to double-click.
     chooseAutomation(index);
     const auto& automation=clip.automations[(size_t)index];
+    const float x0=xForTime(automation.time),x1=xForTime(automation.time+automation.duration);
+    if (e.position.y<laneTop(index)+20 || e.position.x<x0-5 || e.position.x>x1+6) return;
+    dragAutomation=index;
+    if (std::abs(e.position.x-x1)<=9) { rampDrag=RampDrag::resize; return; }
     for (int i=0;i<(int)automation.points.size();++i) {
         const auto& p=automation.points[(size_t)i];
-        if (std::abs(xForTime(automation.time+p.time)-e.position.x)<8 &&
+        if (std::abs(xForTime(automation.time+p.time)-e.position.x)<7 &&
             std::abs(yForValue(index,p.value)-e.position.y)<9) {
-            selectedPoint=dragPoint=i; dragAutomation=index; repaint(); return;
+            selectedPoint=dragPoint=i; rampDrag=RampDrag::point; repaint(); return;
         }
     }
-    if (cursor>=automation.time && cursor<=automation.time+automation.duration) {
-        // Click a curve to add a controllable intermediate point.
-        if (automation.points.size()>=128) return;
-        const auto relative=cursor-automation.time;
-        if (relative<=.0001 || relative>=automation.duration-.0001) return;
-        const auto before=clip;
-        auto& au=clip.automations[(size_t)index];
-        au.points.push_back({relative,valueForY(index,e.position.y)});
-        std::sort(au.points.begin(),au.points.end(),
-            [](const auto& a,const auto& b){return a.time<b.time;});
-        notify(before);
+    // Shift-click creates intermediate points; ordinary drag moves the ramp.
+    if (e.mods.isShiftDown() && automation.points.size()<128) {
+        const double relative=cursor-automation.time;
+        if (relative>.0001 && relative<automation.duration-.0001) {
+            const auto before=clip;
+            auto& au=clip.automations[(size_t)index];
+            const double value=valueForY(index,e.position.y);
+            au.points.push_back({relative,
+                au.message.arguments[(size_t)au.argumentIndex].type==OscValueType::integer
+                    ? std::round(value) : value});
+            std::sort(au.points.begin(),au.points.end(),
+                [](const auto& a,const auto& b){return a.time<b.time;});
+            notify(before);
+        }
+        return;
     }
+    rampDrag=RampDrag::move;
 }
 void OscClipEditor::mouseDrag(const juce::MouseEvent& e) {
     if (dragEvent>=0 && dragEvent<(int)clip.events.size()) {
         const auto before=clip;
         clip.events[(size_t)dragEvent].time=quantize(timeForX(e.position.x));
         if (clip.events[(size_t)dragEvent].time!=before.events[(size_t)dragEvent].time) {
-            notify(before,false); changedDuringDrag=true;
+            notify(before,false);
+            if (clip.events[(size_t)dragEvent].time!=before.events[(size_t)dragEvent].time)
+                changedDuringDrag=true;
         }
-    } else if (dragAutomation>=0 && dragPoint>=0) {
+    } else if (dragAutomation>=0 && dragAutomation<(int)clip.automations.size() &&
+               rampDrag!=RampDrag::none) {
         const auto before=clip;
         auto& a=clip.automations[(size_t)dragAutomation];
-        auto& p=a.points[(size_t)dragPoint];
-        if (dragPoint>0 && dragPoint+1<(int)a.points.size()) {
-            const auto relative=quantize(timeForX(e.position.x))-a.time;
-            p.time=juce::jlimit(a.points[(size_t)dragPoint-1].time+.0001,
-                a.points[(size_t)dragPoint+1].time-.0001,relative);
+        const auto& original=dragBefore.automations[(size_t)dragAutomation];
+        if (rampDrag==RampDrag::move) {
+            const double offset=timeForX(e.position.x)-dragStartTime;
+            a.time=juce::jlimit(0.0,std::max(0.0,clip.length-original.duration),
+                                quantize(original.time+offset));
+        } else if (rampDrag==RampDrag::resize) {
+            // Unlike instant events, a ramp's right edge may reach clip.length.
+            // Preserve exact endpoint snapping instead of clipping to length-epsilon.
+            const double raw=juce::jlimit(0.0,clip.length,
+                (double)(e.position.x-axisLeft())/axisWidth()*clip.length);
+            const double step=1.0/(1<<juce::jlimit(0,3,resolution.getSelectedId()-1));
+            const double end=snap.getToggleState()
+                ? juce::jlimit(0.0,clip.length,std::round(raw/step)*step) : raw;
+            const double next=end-original.time;
+            if (next<.01 || original.time+next>clip.length) return;
+            a.duration=next;
+            for (size_t i=0;i<a.points.size();++i)
+                a.points[i].time=i+1==a.points.size() ? next
+                    : original.points[i].time*next/original.duration;
+        } else if (rampDrag==RampDrag::point && dragPoint>=0) {
+            auto& p=a.points[(size_t)dragPoint];
+            if (dragPoint>0 && dragPoint+1<(int)a.points.size()) {
+                const double relative=quantize(timeForX(e.position.x))-a.time;
+                p.time=juce::jlimit(a.points[(size_t)dragPoint-1].time+.0001,
+                    a.points[(size_t)dragPoint+1].time-.0001,relative);
+            }
+            p.value=valueForY(dragAutomation,e.position.y);
+            if (a.message.arguments[(size_t)a.argumentIndex].type==OscValueType::integer)
+                p.value=std::round(p.value);
         }
-        p.value=valueForY(dragAutomation,e.position.y);
-        if (a.message.arguments[(size_t)a.argumentIndex].type==OscValueType::integer)
-            p.value=std::round(p.value);
-        notify(before,false); changedDuringDrag=true;
+        bool changed=a.time!=before.automations[(size_t)dragAutomation].time ||
+            a.duration!=before.automations[(size_t)dragAutomation].duration;
+        if (rampDrag==RampDrag::point && dragPoint>=0) {
+            const auto& prior=before.automations[(size_t)dragAutomation].points[(size_t)dragPoint];
+            changed=changed || a.points[(size_t)dragPoint].time!=prior.time ||
+                a.points[(size_t)dragPoint].value!=prior.value;
+        }
+        if (changed) {
+            if (validateOscClip(clip).failed()) { clip=before; repaint(); return; }
+            notify(before,false); changedDuringDrag=true;
+        }
     }
 }
 void OscClipEditor::mouseUp(const juce::MouseEvent&) {
     if (changedDuringDrag && onEdit) onEdit(dragBefore,clip,true);
     dragEvent=dragAutomation=dragPoint=-1;
-    changedDuringDrag=false; repaint();
+    rampDrag=RampDrag::none; changedDuringDrag=false; repaint();
 }
 void OscClipEditor::mouseDoubleClick(const juce::MouseEvent& e) {
     if (e.position.y>=eventTop && e.position.y<eventTop+eventHeight) {
@@ -265,10 +347,22 @@ void OscClipEditor::mouseDoubleClick(const juce::MouseEvent& e) {
             }
     }
     const int index=automationAt(e.position.y);
-    if (index>=0) editAutomation(index);
+    if (index>=0) {
+        if (e.position.x<axisLeft() || e.position.y<laneTop(index)+20)
+            editTrackAddress(index);
+        else editAutomation(index);
+        return;
+    }
+    if (clip.automations.size()<16 &&
+        e.position.y>=laneTop((int)clip.automations.size()) &&
+        e.position.y<laneTop((int)clip.automations.size())+laneHeight-4) {
+        if (e.position.x<axisLeft()) editTrackAddress(-1);
+        else if (e.position.x<=axisLeft()+axisWidth())
+            createAutomationAt(quantize(timeForX(e.position.x)));
+    }
 }
 void OscClipEditor::mouseWheelMove(const juce::MouseEvent&,const juce::MouseWheelDetails& wheel) {
-    const int total=(int)clip.automations.size()*laneHeight+eventTop+eventHeight;
+    const int total=((int)clip.automations.size()+1)*laneHeight+eventTop+eventHeight;
     laneScroll=juce::jlimit(0,std::max(0,total-getHeight()+42),
         laneScroll-(int)(wheel.deltaY*100));
     repaint();
@@ -298,6 +392,7 @@ void OscClipEditor::showContext(const juce::MouseEvent& e) {
     menu.addItem(1,"Modifica",selectedEvent>=0 || selectedAutomation>=0);
     menu.addItem(2,"Duplica",selectedEvent>=0 || selectedAutomation>=0);
     menu.addItem(3,"Elimina",selectedEvent>=0 || selectedAutomation>=0);
+    menu.addItem(4,"Address traccia OSC",selectedAutomation>=0);
     auto safe=juce::Component::SafePointer<OscClipEditor>(this);
     menu.showMenuAsync(juce::PopupMenu::Options().withTargetComponent(this),[safe](int item) {
         if (!safe) return;
@@ -306,6 +401,8 @@ void OscClipEditor::showContext(const juce::MouseEvent& e) {
             else if (safe->selectedAutomation>=0) safe->editAutomation(safe->selectedAutomation);
         } else if (item==2) safe->duplicateSelection();
         else if (item==3) safe->deleteSelection();
+        else if (item==4 && safe->selectedAutomation>=0)
+            safe->editTrackAddress(safe->selectedAutomation);
     });
 }
 void OscClipEditor::addEvent() {
@@ -315,19 +412,54 @@ void OscClipEditor::addEvent() {
     chooseEvent((int)clip.events.size()-1);
     notify(before); editEvent(selectedEvent);
 }
-void OscClipEditor::addAutomation() {
-    if (clip.automations.size()>=16) return;
+void OscClipEditor::addAutomation() { createAutomationAt(cursor); }
+
+void OscClipEditor::createAutomationAt(double start) {
+    if (clip.automations.size()>=16 || !std::isfinite(start)) return;
     const auto before=clip;
     OscAutomation au;
-    au.time=juce::jlimit(0.0,std::max(0.0,clip.length-.01),cursor);
-    au.duration=std::min(1.0,clip.length-au.time);
-    if (au.duration<=0) return;
-    au.message.address="/parameter";
+    au.time=juce::jlimit(0.0,clip.length,start);
+    // One true second even when the visible axis is in musical beats.
+    au.duration=clip.useBeats
+        ? beatFromSeconds(tempo,secondsAtBeat(tempo,au.time)+1.0)-au.time
+        : 1.0;
+    if (!(au.duration>0) || au.time+au.duration>86400) return;
+    au.message.address=newTrackAddress;
     au.message.arguments={{OscValueType::decimal,0,0,juce::String()}};
     au.points={{0,0},{au.duration,1}};
+    clip.length=std::max(clip.length,au.time+au.duration);
     clip.automations.push_back(au);
+    if (validateOscClip(clip).failed()) { clip=before; return; }
     chooseAutomation((int)clip.automations.size()-1);
-    notify(before); editAutomation(selectedAutomation);
+    newTrackAddress="/parameter/"+juce::String((int)clip.automations.size()+1);
+    notify(before);
+}
+
+void OscClipEditor::editTrackAddress(int index) {
+    if (index>=(int)clip.automations.size()) return;
+    const juce::String address=index<0 ? newTrackAddress :
+        clip.automations[(size_t)index].message.address;
+    auto* dialog=new juce::AlertWindow("Address traccia OSC",
+        "Indirizzo condiviso dai messaggi della rampa.",
+        juce::MessageBoxIconType::NoIcon,this);
+    dialog->addTextEditor("address",address,"OSC address");
+    dialog->addButton("Salva",1); dialog->addButton("Annulla",0);
+    auto safe=juce::Component::SafePointer<OscClipEditor>(this);
+    const auto generation=revision;
+    dialog->enterModalState(true,juce::ModalCallbackFunction::create(
+        [safe,dialog,index,generation](int response) {
+            if (!safe || response!=1 || generation!=safe->revision) return;
+            const auto address=dialog->getTextEditorContents("address").trim();
+            if (index<0) {
+                OscClip test; test.events={{0,address,{}}};
+                if (validateOscClip(test).failed()) return;
+                safe->newTrackAddress=address; safe->repaint(); return;
+            }
+            if (index>=(int)safe->clip.automations.size()) return;
+            const auto before=safe->clip;
+            safe->clip.automations[(size_t)index].message.address=address;
+            safe->notify(before);
+        }),true);
 }
 void OscClipEditor::deleteSelection() {
     const auto before=clip;
@@ -385,34 +517,42 @@ void OscClipEditor::editAutomation(int index) {
     if (index<0 || index>=(int)clip.automations.size()) return;
     chooseAutomation(index);
     const auto old=clip.automations[(size_t)index];
-    auto* dialog=new juce::AlertWindow("Automazione OSC",
-        "Punti relativi all'inizio: tempo:valore; tempo:valore.\n"
-        "Semplice = due punti; avanzata = piu punti (interpolazione lineare).",
+    const auto type=old.message.arguments[(size_t)old.argumentIndex].type;
+    auto* dialog=new juce::AlertWindow("Rampa OSC",
+        "Modifica i valori e il tipo. Sposta la rampa trascinandola; per la durata usa la maniglia destra.\n"
+        "Per l'address fai doppio clic sull'intestazione della traccia.",
         juce::MessageBoxIconType::NoIcon,this);
-    dialog->addTextEditor("time",juce::String(old.time,3),"Inizio");
-    dialog->addTextEditor("duration",juce::String(old.duration,3),"Durata");
-    dialog->addTextEditor("address",old.message.address,"Address OSC");
-    dialog->addTextEditor("args",describeArguments(old.message.arguments),"Argomenti");
-    dialog->addTextEditor("index",juce::String(old.argumentIndex+1),"Argomento numerico (1, 2, ...)");
-    dialog->addTextEditor("points",describePoints(old.points),"Punti di controllo");
+    dialog->addTextEditor("minimum",juce::String(old.points.front().value,3),"Inizio / Min");
+    dialog->addTextEditor("maximum",juce::String(old.points.back().value,3),"Fine / Max");
+    dialog->addTextEditor("type",type==OscValueType::integer?"i":"f","Tipo: f (float) o i (integer)");
     dialog->addButton("Salva",1); dialog->addButton("Annulla",0);
-    auto safe=juce::Component::SafePointer<OscClipEditor>(this); const auto generation=revision;
+    auto safe=juce::Component::SafePointer<OscClipEditor>(this);
+    const auto generation=revision;
     dialog->enterModalState(true,juce::ModalCallbackFunction::create(
         [safe,dialog,index,generation](int answer) {
-            if (!safe || answer!=1 || generation!=safe->revision || index>=(int)safe->clip.automations.size()) return;
-            const auto time=dialog->getTextEditorContents("time").trim();
-            const auto length=dialog->getTextEditorContents("duration").trim();
-            if (time.isEmpty() || length.isEmpty() ||
-                time.retainCharacters("0123456789.")!=time ||
-                length.retainCharacters("0123456789.")!=length) return;
+            if (!safe || answer!=1 || generation!=safe->revision ||
+                index>=(int)safe->clip.automations.size()) return;
+            double minimum=0,maximum=0;
+            if (!parseFiniteNumber(dialog->getTextEditorContents("minimum"),minimum) ||
+                !parseFiniteNumber(dialog->getTextEditorContents("maximum"),maximum)) return;
+            const auto type=dialog->getTextEditorContents("type").trim().toLowerCase();
+            if (type!="f" && type!="i") return;
             auto updated=safe->clip;
             auto& a=updated.automations[(size_t)index];
-            a.time=time.getDoubleValue(); a.duration=length.getDoubleValue();
-            a.message.address=dialog->getTextEditorContents("address").trim();
-            a.argumentIndex=dialog->getTextEditorContents("index").getIntValue()-1;
-            if (parseArguments(dialog->getTextEditorContents("args"),a.message.arguments).failed() ||
-                parsePoints(dialog->getTextEditorContents("points"),a.points).failed() ||
-                validateOscClip(updated).failed()) return;
+            const double previousStart=a.points.front().value;
+            const double previousEnd=a.points.back().value;
+            for (auto& p:a.points) {
+                const double fraction=std::abs(previousEnd-previousStart)>1.e-12
+                    ? (p.value-previousStart)/(previousEnd-previousStart)
+                    : p.time/a.duration;
+                p.value=minimum+(maximum-minimum)*fraction;
+                if (type=="i") p.value=std::round(p.value);
+            }
+            a.points.front().value=type=="i" ? std::round(minimum) : minimum;
+            a.points.back().value=type=="i" ? std::round(maximum) : maximum;
+            a.message.arguments[(size_t)a.argumentIndex].type=
+                type=="i" ? OscValueType::integer : OscValueType::decimal;
+            if (validateOscClip(updated).failed()) return;
             const auto before=safe->clip;
             safe->clip=std::move(updated);
             safe->notify(before);
