@@ -23,6 +23,7 @@ void test(const char* name, const std::function<void()>& body) {
 #include "PianoRollTests.h"
 #include "MidiTests.h"
 #include "OscTests.h"
+#include "OscAutomationV9Tests.h"
 #include "AutoStopV7Tests.h"
 #include "MixerV8Tests.h"
 #include "GainMeterFaderTests.h"
@@ -33,6 +34,7 @@ int main() {
     pianoRollTests();
     registerMidiTests();
     oscTests();
+    oscAutomationV9Tests();
     autoStopV7Tests();
     mixerV8Tests();
     gainMeterFaderTests();

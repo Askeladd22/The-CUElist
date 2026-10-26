@@ -94,6 +94,7 @@ public:
     void dockOscClip();
     void closeOscClip();
     void setOscDestination(int column,const juce::String& host,int port);
+    void restoreOscClip(int cellId,const OscClip&);
     OscClipEditor* activeOscEditor() const { return oscEditor.get(); }
     void detachMidiClip();
     void dockMidiClip();
@@ -197,6 +198,7 @@ private:
     void midiClipEdited(int cellId,const MidiClip& before,const MidiClip& after,bool complete);
     void restoreMidiClip(int cellId,const MidiClip& snapshot);
     void syncClipEditor();
+    void oscClipEdited(int cellId,const OscClip& before,const OscClip& after,bool complete);
     void syncOscEditor();
 
     void refresh();
