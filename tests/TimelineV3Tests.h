@@ -54,14 +54,15 @@ void timelineV3Tests() {
         timeline->mouseUp(event(*timeline,to,from,1,true));
         near(ui.show.rows[0].cells[0].startSeconds,35.0*10/640);
     });
-    test("timeline MIDI double-click opens existing clip editor",[] {
+    test("timeline MIDI single click opens shared docked clip editor",[] {
         MainComponent ui(false); addColumn(ui.show,ColumnType::midi,{});
         ui.show.rows[0].cells[1].midi=MidiClip{4,{{0,1,60,100,1}}};
         auto* timeline=find<Timeline>(ui); timeline->setSize(800,250);
         const juce::Point<float> p{160,136};
-        timeline->mouseDoubleClick(event(*timeline,p,p,2));
-        check(cueViewFixtures::find<PianoRollEditor>(ui)==nullptr,"Editor accidentally nested in main view");
-        check(juce::ModalComponentManager::getInstance()->getModalComponent(0)!=nullptr,"MIDI timeline double-click did not open editor");
+        timeline->mouseDown(event(*timeline,p,p));
+        check(cueViewFixtures::find<PianoRollEditor>(ui)!=nullptr,"Timeline click did not dock editor");
+        check(ui.activeClipEditor()!=nullptr && !ui.isClipEditorFloating(),"Timeline editor not integrated");
+        ui.closeMidiClip();
     });
     test("timeline Ctrl wheel anchors time and changing row cancels a seek", [] {
         MainComponent ui(false); addRow(ui.show,{});
