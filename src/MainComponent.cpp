@@ -835,23 +835,26 @@ bool MainComponent::pasteSelectedCell() {
     }
     if (!applyInspector()) return false;
     auto updatedClips=clips;
-    auto& target=show.rows[(size_t)selectedRow].cells[(size_t)selectedColumn];
-    if (copiedAudio) updatedClips[target.id]=copiedAudio;
-    else updatedClips.erase(target.id);
+    const int id=show.rows[(size_t)selectedRow].cells[(size_t)selectedColumn].id;
+    if (copiedAudio) updatedClips[id]=copiedAudio;
+    else updatedClips.erase(id);
     if (!memoryFits(updatedClips)) {
         message("Cannot paste: media memory limit exceeded."); return false;
     }
-    const int id=target.id;
-    closeMidiClip(); closeOscClip();
+    auto candidate=show;
+    auto& target=candidate.rows[(size_t)selectedRow].cells[(size_t)selectedColumn];
     target=*copiedCell;
-    target.id=id; // Stable destination identity; other cues and telemetry are unaffected.
-    clips=std::move(updatedClips);
-    if (copiedType==ColumnType::control) {
-        auto& pasted=show.rows[(size_t)selectedRow].cells[(size_t)selectedColumn];
-        if (pasted.controlSet) for (auto& binding:pasted.controlSet->bindings)
-            binding.id=show.controls.nextId++;
-        refreshControlSettings();
+    target.id=id; // Stable destination cell identity.
+    if (copiedType==ColumnType::control && target.controlSet)
+        for (auto& binding:target.controlSet->bindings)
+            binding.id=candidate.controls.nextId++; // never alias another set
+    if (auto result=validateShow(candidate);result.failed()) {
+        message(result.getErrorMessage()); return false;
     }
+    closeMidiClip(); closeOscClip();
+    show=std::move(candidate);
+    clips=std::move(updatedClips);
+    if (copiedType==ColumnType::control) refreshControlSettings();
     changed("Cell content and settings pasted.");
     return true;
 }
