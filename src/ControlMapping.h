@@ -104,8 +104,24 @@ public:
     int activeCue() const noexcept { return activeCueId; }
     // Compose the visible effective mapping for a selected cue. No live state
     // is altered: selecting a row must never activate hardware mappings.
-    std::vector<EffectiveControl> effectiveForCue(int cueId) const {
+    std::vector<EffectiveControl> effectiveForCue(int cueId,int presetId=0) const {
         std::vector<EffectiveControl> result;
+        // Preserve legacy global/column/preset/cue mappings as the lowest
+        // fallback layer, matching the behavior of matched().
+        for (const auto& b:settings.bindings) if (b.enabled &&
+            scopeApplies(b,cueId,presetId)) {
+            const auto it=std::find_if(result.begin(),result.end(),
+                [&](const EffectiveControl& v) {
+                    const auto& a=v.binding;
+                    return a.deviceId==b.deviceId && a.kind==b.kind &&
+                        a.channel==b.channel && a.number==b.number;
+                });
+            if (it==result.end()) result.push_back({b,0,0,true});
+            else if (priority(b.scope)>priority(it->binding.scope) ||
+                (priority(b.scope)==priority(it->binding.scope) &&
+                 b.id<it->binding.id))
+                *it={b,0,0,true};
+        }
         for (const auto& layer:layers) {
             if (!layer.locked && (cueId==0 || layer.cueId!=cueId)) continue;
             for (const auto& b:layer.set.bindings) {

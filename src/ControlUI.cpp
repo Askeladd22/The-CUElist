@@ -722,13 +722,14 @@ private:
             "PREVIEW Q"+juce::String(row+1)+" — changes take effect after GO";
         if (resolved.empty()) summary+="\nNo active Control Column mappings.";
         for (const auto& item:resolved) {
-            juce::String source="unknown";
+            juce::String source="Global / legacy";
             for (const auto& col:owner->show.columns)
                 if (col.id==item.columnId) {source=col.name;break;}
             const auto& b=item.binding;
             const bool local=item.columnId==sourceColumnId;
             summary+="\n"+juce::String(local ? "LOCAL / " : "INHERITED / ")+
-                source+" (P"+juce::String(item.priority)+")  "+
+                source+" ("+(item.priority==0 ? juce::String("legacy") :
+                      "P"+juce::String(item.priority))+")  "+
                 (b.kind==ControlKind::cc ? "CC " :
                  b.kind==ControlKind::note ? "NOTE " : "BEND ")+
                 juce::String(b.channel)+":"+juce::String(b.number)+

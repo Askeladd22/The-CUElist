@@ -128,7 +128,10 @@ public:
     int saveControlSetTemplate(int row,int column,const juce::String& name);
     bool applyControlSetTemplate(int row,int column,int templateId);
     std::vector<EffectiveControl> effectiveControlSet(int cueId) const {
-        return controlMapping.effectiveForCue(cueId);
+        int preset=0;
+        for (const auto& row:show.rows)
+            if (row.id==cueId) {preset=row.mappingPresetId;break;}
+        return controlMapping.effectiveForCue(cueId,preset);
     }
     bool setControlColumnLocked(int column,bool locked,int sourceRow);
     bool setControlColumnPriority(int column,int priority);
