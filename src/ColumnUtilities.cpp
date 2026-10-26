@@ -179,14 +179,14 @@ struct ColumnUtilities::Strip final : juce::Component {
             g.setColour(db>=0 ? palette::red.withAlpha(.50f) : db>=-9 ? palette::amber.withAlpha(.5f) : palette::teal.withAlpha(.5f));
             g.fillRect(x+1,top+meterHeight-fillH,meterWidth-2,fillH);
         }
-        for (int tick:{6,0,-6,-12,-24,-36,-48,-60}) {
+        for (int tick:{0,-12,-24,-36,-48,-60}) {
             const float y=top+meterHeight*(1.0f-(tick+60.0f)/66.0f);
             g.setColour(palette::line.withAlpha(.9f));
             g.drawHorizontalLine((int)std::round(y),x+3,x+meterWidth-3);
             label(g,tick>0 ? "+6" : juce::String(tick),{(int)x+2,(int)y-7,26,13},8,palette::text);
         }
         g.setColour(palette::line); g.drawRoundedRectangle(x,top,meterWidth,meterHeight,3,1);
-        label(g,"PEAK dB",{9,h-29,69,13},8,palette::muted,true);
+        label(g,"dB",{65,40,25,13},8,palette::muted,true);
     }
 };
 ColumnUtilities::ColumnUtilities(MainComponent& p) : owner(p) {}
