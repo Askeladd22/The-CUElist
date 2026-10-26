@@ -1,23 +1,80 @@
-THE CUELIST - LICENZA PROPRIETARIA
+THE CUELIST — LICENZA PROPRIETARIA D'USO
+Versione 1.0 — 26 ottobre 2026
 
-Copyright (c) 2026 i rispettivi titolari dei diritti.
+Copyright © 2026 titolari dei diritti di The Cuelist.
 Tutti i diritti riservati.
 
-Il codice originale, la documentazione e le risorse originali di The Cuelist
-sono proprietari e non sono concessi sotto una licenza open source.
+1. TITOLARITÀ
+The Cuelist, inclusi codice originale, interfaccia, documentazione e risorse
+originali, è software proprietario, non distribuito sotto una licenza open
+source. La disponibilità pubblica dei sorgenti su GitHub non concede di per
+sé il diritto di utilizzare, modificare o redistribuire il software.
 
-Salvo autorizzazione scritta del titolare dei diritti o quanto consentito
-inderogabilmente dalla legge, non e consentito copiare, modificare,
-redistribuire, pubblicare, sublicenziare o vendere il software o i suoi
-sorgenti. L'accesso al repository non concede tali diritti.
+2. LICENZA D'USO PERPETUA
+A chi acquista regolarmente The Cuelist o riceve un'autorizzazione esplicita
+dal titolare viene concessa una licenza non esclusiva, a tempo indeterminato,
+per utilizzare la versione legittimamente ottenuta, per finalità personali
+o professionali.
 
-L'utilizzo da parte di terzi richiede un'autorizzazione del titolare dei
-diritti, alle condizioni da questi stabilite. Questo documento non
-stabilisce prezzi, abbonamenti o una licenza d'uso gratuita.
+Per le licenze commerciali il corrispettivo è pagato una sola volta: non è
+previsto un abbonamento periodico obbligatorio per continuare a utilizzare
+la versione acquistata. L'acquisto non trasferisce la proprietà del codice
+né i diritti d'autore. La licenza è riferita al singolo acquirente (persona
+fisica o organizzazione) e consente l'installazione su un massimo di due
+computer sotto il suo controllo, senza uso simultaneo, salvo diverse
+condizioni esplicitamente concordate per iscritto.
 
-Nei limiti consentiti dalla legge, il software e fornito senza garanzie;
-i titolari non rispondono dei danni derivanti dal suo utilizzo.
+3. USI CONSENTITI E LIMITAZIONI
+Sono consentiti l'esecuzione del programma, l'utilizzo negli spettacoli e
+nelle attività lavorative e le copie strettamente necessarie all'installazione
+o al backup.
 
-Le dipendenze di terze parti restano soggette alle rispettive licenze.
-Questo documento non ne modifica i termini e non concede diritti su JUCE.
-Vedere NOTICE.md. File audio e show degli utenti restano dei loro titolari.
+Salvo consenso scritto del titolare o diritti inderogabili riconosciuti
+dalla legge, non è consentito:
+- distribuire o mettere a disposizione di terzi copie del programma;
+- pubblicare, riutilizzare commercialmente o sublicenziare i sorgenti;
+- rimuovere gli avvisi di copyright e di attribuzione;
+- modificare o decompilare il programma oltre quanto permesso dalla legge.
+
+Restano impregiudicati gli eventuali diritti di trasferimento della copia
+e gli altri diritti inderogabili previsti dalla normativa applicabile.
+
+4. VERSIONI E AGGIORNAMENTI
+Il diritto di utilizzo della versione acquistata non scade. Le nuove
+versioni principali possono essere offerte separatamente e a pagamento.
+Sono garantiti gli aggiornamenti, anche di sicurezza, e i rimedi richiesti
+dalla legge applicabile e dalle condizioni dell'offerta di acquisto.
+Questo testo non promette gratuitamente tutte le future versioni del
+software.
+
+5. FILE E CONTENUTI DELL'UTENTE
+I file audio, MIDI e gli show creati o importati dall'utente restano di
+proprietà dei rispettivi titolari. Questa licenza non trasferisce a The
+Cuelist i relativi diritti né autorizza l'impiego di contenuti di terzi
+senza i necessari permessi.
+
+6. SOFTWARE DI TERZE PARTI
+The Cuelist utilizza JUCE e altre componenti di terzi, soggette alle
+rispettive licenze. Questa licenza si applica soltanto alle parti originali
+di The Cuelist e non sostituisce né modifica i termini di JUCE.
+Consultare NOTICE.md e JUCE-LICENSE.md nel pacchetto distribuito.
+Prima di commercializzare o distribuire il programma, il titolare deve
+verificare e assicurare una licenza JUCE idonea.
+
+7. CONFORMITÀ, RESPONSABILITÀ E UTILIZZO DAL VIVO
+Il software può contenere difetti; prima dell'impiego durante eventi dal
+vivo è opportuno verificarne il funzionamento con i dispositivi utilizzati
+e predisporre procedure di emergenza. Niente in questo documento esclude
+o limita i diritti inderogabili dei consumatori, la garanzia legale di
+conformità, le responsabilità che non possono essere escluse per legge
+o gli eventuali obblighi contrattuali del venditore.
+
+8. CONDIZIONI DI VENDITA
+Identità e recapiti del venditore, prezzo, modalità di pagamento, consegna,
+assistenza, recesso e altre informazioni precontrattuali sono comunicati
+separatamente prima dell'acquisto, secondo la normativa applicabile.
+Eventuali autorizzazioni per prove e beta testing possono prevedere
+condizioni aggiuntive esplicitamente comunicate.
+
+Questa licenza non costituisce una licenza commerciale di JUCE e non
+certifica, da sola, che una specifica distribuzione sia autorizzata.
