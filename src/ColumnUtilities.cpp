@@ -9,7 +9,7 @@ struct ColumnUtilities::Strip final : juce::Component {
     juce::Slider pan;
     UtilityIcon mute{false},phase{true};
     juce::ComboBox output;
-    juce::TextButton oscDestination{"OSC / destinazione"};
+    juce::TextButton oscDestination{"OSC / destination"};
     int routingChannels=-1, routingOutput=-1;
     ColumnType routingType=ColumnType::audio;
     juce::String midiSignature;
@@ -23,14 +23,14 @@ struct ColumnUtilities::Strip final : juce::Component {
         gain.setName("columnGainDb"); pan.setName("columnPan"); mute.setName("columnMute"); phase.setName("columnPhase");
         addAndMakeVisible(output); output.setName("columnOutput");
         addAndMakeVisible(oscDestination); oscDestination.setName("columnOscDestination");
-        oscDestination.setTooltip("Indirizzo IP o host e porta UDP del ricevitore OSC.");
+        oscDestination.setTooltip("OSC receiver IP address or host and UDP port.");
         oscDestination.onClick=[this] {
             const auto columnId=id;
             const auto& col=owner.show.columns[(size_t)index];
-            auto* dialog=new juce::AlertWindow("Destinazione OSC UDP","Inserisci host/IP e porta del ricevitore OSC.",juce::MessageBoxIconType::NoIcon,&owner);
-            dialog->addTextEditor("host",col.oscHost,"Host / indirizzo IP");
-            dialog->addTextEditor("port",juce::String(col.oscPort),"Porta UDP (1-65535)");
-            dialog->addButton("Salva",1); dialog->addButton("Annulla",0);
+            auto* dialog=new juce::AlertWindow("OSC UDP Destination","Enter the OSC receiver host/IP and port.",juce::MessageBoxIconType::NoIcon,&owner);
+            dialog->addTextEditor("host",col.oscHost,"Host / IP address");
+            dialog->addTextEditor("port",juce::String(col.oscPort),"UDP port (1–65535)");
+            dialog->addButton("Save",1); dialog->addButton("Cancel",0);
             auto safe=juce::Component::SafePointer<MainComponent>(&owner);
             dialog->enterModalState(true,juce::ModalCallbackFunction::create([safe,dialog,columnId](int result) {
                 if (!safe || result!=1) return;
@@ -41,16 +41,16 @@ struct ColumnUtilities::Strip final : juce::Component {
                     if (safe->show.columns[(size_t)i].id==columnId) { safe->setOscDestination(i,host,portText.getIntValue()); return; }
             }),true);
         };
-        output.setTooltip("Uscita audio o MIDI della colonna.");
+        output.setTooltip("Column audio or MIDI output.");
         output.onChange=[this] {
             if (owner.show.columns[index].type==ColumnType::midi) {
                 const int selected=output.getSelectedId()-1;
                 if (selected>=0 && selected<midiIds.size()) owner.setMidiOutput(index,midiIds[selected]);
             } else if (output.getSelectedId()>0) owner.setColumnOutput(index,output.getSelectedId()-1);
         };
-        gain.setTooltip("Livello di tutte le clip della colonna. Doppio click: 0 dB.");
-        pan.setTooltip("Pan / bilanciamento stereo. Doppio click: centro.");
-        phase.setTooltip("Inverte la polarita di entrambi i canali della colonna."); mute.setTooltip("Silenzia tutta la colonna senza fermare le clip.");
+        gain.setTooltip("Gain for all clips in this column. Double-click: 0 dB.");
+        pan.setTooltip("Stereo pan/balance. Double-click: center.");
+        phase.setTooltip("Invert the polarity of both column channels."); mute.setTooltip("Mute the entire column without stopping clips.");
         addAndMakeVisible(mute); addAndMakeVisible(phase); mute.setWantsKeyboardFocus(false); phase.setWantsKeyboardFocus(false);
         auto update=[this](int control) {
             const auto col=owner.show.columns[index];
@@ -89,13 +89,13 @@ struct ColumnUtilities::Strip final : juce::Component {
             for (const auto& device:available) signature+=device.identifier+"/"+device.name+"|";
             if (routingType==ColumnType::midi && midiSignature==signature) return;
             routingType=col.type; midiSignature=signature; midiIds.clear(); midiIds.add({});
-            output.clear(juce::dontSendNotification); output.setEnabled(true); output.addItem("Nessuna uscita MIDI",1);
+            output.clear(juce::dontSendNotification); output.setEnabled(true); output.addItem("No MIDI output",1);
             int selected=col.midiOutputId.isEmpty() ? 1 : 0;
             for (const auto& device:available) {
                 midiIds.add(device.identifier); output.addItem(device.name,midiIds.size());
                 if (device.identifier==col.midiOutputId) selected=midiIds.size();
             }
-            if (!selected) { midiIds.add(col.midiOutputId); selected=midiIds.size(); output.addItem("Uscita MIDI assente",selected); }
+            if (!selected) { midiIds.add(col.midiOutputId); selected=midiIds.size(); output.addItem("MIDI output unavailable",selected); }
             output.setSelectedId(selected,juce::dontSendNotification); return;
         }
         if (auto* device=owner.engine.devices.getCurrentAudioDevice()) channels=std::max(1,device->getActiveOutputChannels().countNumberOfSetBits());
@@ -103,7 +103,7 @@ struct ColumnUtilities::Strip final : juce::Component {
         routingChannels=channels; routingOutput=col.output; routingType=col.type;
         output.clear(juce::dontSendNotification); output.setEnabled(col.type==ColumnType::audio);
         if (col.type!=ColumnType::audio) {
-            output.addItem(col.type==ColumnType::midi ? "MIDI - previsto" : "OSC - previsto",1);
+            output.addItem(col.type==ColumnType::midi ? "MIDI – planned" : "OSC – planned",1);
             output.setSelectedId(1,juce::dontSendNotification); return;
         }
         for (int i=0;i<channels;i+=2) output.addItem("Out "+juce::String(i+1)+(i+1<channels ? " / "+juce::String(i+2) : " (mono)"),i+1);
@@ -177,7 +177,7 @@ void ColumnUtilities::paint(juce::Graphics& g) {
         +juce::String((int)std::round(std::abs(pan)*100)),
         {171-scrollX,103,58,15},9,palette::text,false,juce::Justification::centred);
     label(g,"MUTE",{220-scrollX,128,56,19},10,palette::muted,true);
-    label(g,"Solo audio PCM",{119-scrollX,16,155,16},10,palette::muted);
-    label(g,"MIDI e OSC invariati",{118-scrollX,159,175,16},9,palette::muted);
+    label(g,"PCM audio only",{119-scrollX,16,155,16},10,palette::muted);
+    label(g,"MIDI and OSC unaffected",{118-scrollX,159,175,16},9,palette::muted);
 }
 }

@@ -36,8 +36,8 @@ private:
     std::vector<TempoPoint> tempo;
     std::function<void(const OscClip&,const OscClip&,bool)> onEdit;
     juce::ComboBox unit,resolution;
-    juce::ToggleButton grid{"Griglia"},snap{"Snap"};
-    juce::TextButton add{"+"},ramp{"+ Rampa"},remove{"Elimina"},duplicate{"Duplica"},detach{"Stacca"};
+    juce::ToggleButton grid{"Grid"},snap{"Snap"};
+    juce::TextButton add{"+"},ramp{"+ Ramp"},remove{"Delete"},duplicate{"Duplicate"},detach{"Detach"};
     int selectedEvent=-1,selectedAutomation=-1,selectedPoint=-1,dragEvent=-1,dragAutomation=-1,dragPoint=-1;
     enum class RampDrag { none, move, resize, point };
     RampDrag rampDrag=RampDrag::none;

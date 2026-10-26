@@ -61,24 +61,24 @@ Timeline::Timeline(MainComponent& p) : owner(p) {
         combo->addItemList({"1/4","1/8","1/16","1/32"},1);
     gridDivision.setSelectedId(3,juce::dontSendNotification);
     snapDivision.setSelectedId(3,juce::dontSendNotification);
-    gridToggle.setTooltip("Mostra o nasconde soltanto le linee musicali BPM; lo snap non cambia.");
-    gridDivision.setTooltip("Suddivisione della griglia musicale visualizzata, indipendente dallo snap.");
-    snapDivision.setTooltip("Suddivisione usata dall'aggancio dei clip, anche con griglia nascosta.");
-    snapToggle.setButtonText("Magnete ON");
+    gridToggle.setTooltip("Show/hide BPM grid lines without changing snap.");
+    gridDivision.setTooltip("Displayed musical grid division, independent of snap.");
+    snapDivision.setTooltip("Division used to snap clips, even when the grid is hidden.");
+    snapToggle.setButtonText("Snap ON");
     snapToggle.setToggleState(true,juce::dontSendNotification);
-    snapToggle.setTooltip("Magnete ON: clip agganciate ai beat. Click per disattivare.");
+    snapToggle.setTooltip("Snap ON: clips align to beats. Click to disable.");
     gridToggle.onClick=[this] {
         gridVisible=!gridVisible;
-        gridToggle.setButtonText(gridVisible ? "Griglia ON" : "Griglia OFF");
+        gridToggle.setButtonText(gridVisible ? "Grid ON" : "Grid OFF");
         repaint();
     };
     snapToggle.onClick=[this] {
         snapEnabled=!snapEnabled;
         snapToggle.setToggleState(snapEnabled,juce::dontSendNotification);
-        snapToggle.setButtonText(snapEnabled ? "Magnete ON" : "Magnete OFF");
+        snapToggle.setButtonText(snapEnabled ? "Snap ON" : "Snap OFF");
         snapToggle.setTooltip(snapEnabled
-            ? "Magnete ON: clip agganciate ai beat. Click per disattivare."
-            : "Magnete OFF: spostamento libero. Click per riattivare.");
+            ? "Snap ON: clips align to beats. Click to disable."
+            : "Snap OFF: move clips freely. Click to enable.");
         repaint();
     };
     gridDivision.onChange=[this] { repaint(); };
@@ -142,7 +142,7 @@ void Timeline::paint(juce::Graphics& g) {
     if (owner.selectedRow<0 || owner.selectedRow>=(int)owner.show.rows.size()) return;
     const auto& row=owner.show.rows[owner.selectedRow];
     label(g,"TIMELINE",{16,11,110,23},11,palette::teal,true);
-    label(g,"GRIGLIA",{143,11,52,23},10,palette::muted,true);
+    label(g,"GRID",{143,11,52,23},10,palette::muted,true);
     label(g,"SNAP",{370,11,35,23},10,palette::muted,true);
     for (int i=0;i<3;++i) {
         const auto box=zoomButton(getWidth(),i);
@@ -236,7 +236,7 @@ void Timeline::paint(juce::Graphics& g) {
         g.restoreState();
     }
     g.restoreState();
-    if (loaded==0) label(g,"Importa audio o crea una clip MIDI per visualizzarla.",{timelineStart,83,getWidth()-160,32},12,palette::muted);
+    if (loaded==0) label(g,"Import audio or create a MIDI clip to see it here.",{timelineStart,83,getWidth()-160,32},12,palette::muted);
     if (owner.engine.monitoredRowId.load()==row.id) {
         const auto seconds=owner.engine.playheadSeconds.load(); const auto x=(float)(timelineStart+area*(seconds-viewStart)/length);
         if (x>=timelineStart && x<=getWidth()-20) {
@@ -244,7 +244,7 @@ void Timeline::paint(juce::Graphics& g) {
             juce::Path marker; marker.addTriangle(x-5,71,x+5,71,x,78); g.fillPath(marker);
         }
     }
-    label(g,juce::String(row.tempo.front().bpm,1)+" BPM  /  trascina bordo destro MIDI/OSC: durata  /  "+row.name+"  /  "+juce::String(zoom,1)+"x",
+    label(g,juce::String(row.tempo.front().bpm,1)+" BPM  /  drag MIDI/OSC right edge: length  /  "+row.name+"  /  "+juce::String(zoom,1)+"x",
           {16,getHeight()-27,getWidth()-30,20},10,palette::muted);
     const int available=std::max(1,bottom-tracksTop), total=track*trackHeight;
     if (total>available) {

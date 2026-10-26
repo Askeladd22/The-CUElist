@@ -46,7 +46,7 @@ void MainComponent::editOscClip() {
     if (oscEditor) {
         oscEditor->setTempo(show.rows[selectedRow].tempo);
         if (oscEditorCellId!=id) { oscEditorCellId=id; oscEditor->loadClip(*cell.osc); }
-        clipCollapsed=false; clipCollapseButton.setButtonText("Riduci");
+        clipCollapsed=false; clipCollapseButton.setButtonText("Collapse");
         if (oscWindow) oscWindow->toFront(true); else resized();
         return;
     }
@@ -64,7 +64,7 @@ void MainComponent::editOscClip() {
     };
     oscEditor->setFloating(false);
     addAndMakeVisible(*oscEditor);
-    clipCollapsed=false; clipCollapseButton.setButtonText("Riduci");
+    clipCollapsed=false; clipCollapseButton.setButtonText("Collapse");
     resized(); repaint();
 }
 void MainComponent::oscClipEdited(int cellId,const OscClip& before,const OscClip& updated,bool complete) {
@@ -74,10 +74,10 @@ void MainComponent::oscClipEdited(int cellId,const OscClip& before,const OscClip
         if (cell.id!=cellId || show.columns[c].type!=ColumnType::osc) continue;
         cell.osc=updated; cell.file.clear();
         dirty=true; engine.publish(makeRenderState(show,clips));
-        status="OSC aggiornato. Salva lo show per conservarlo.";
+        status="OSC updated. Save the show to keep your changes.";
         grid.repaint(); timeline.repaint(); repaint();
         if (complete) {
-            editHistory.beginNewTransaction("Modifica clip OSC");
+            editHistory.beginNewTransaction("Edit OSC clip");
             editHistory.perform(new OscUndoAction(*this,cellId,before,updated));
         }
         return;
@@ -89,7 +89,7 @@ void MainComponent::restoreOscClip(int cellId,const OscClip& snapshot) {
         row.cells[c].osc=snapshot; dirty=true;
         engine.publish(makeRenderState(show,clips));
         if (oscEditor && oscEditorCellId==cellId) oscEditor->loadClip(snapshot);
-        status="Modifica OSC ripristinata.";
+        status="OSC edit reverted.";
         grid.repaint(); timeline.repaint(); repaint();
         return;
     }
@@ -125,7 +125,7 @@ void MainComponent::dockOscClip() {
     oscWindow->setVisible(false); oscWindow.reset();
     addAndMakeVisible(*oscEditor);
     oscEditor->setFloating(false);
-    clipCollapsed=false; clipCollapseButton.setButtonText("Riduci");
+    clipCollapsed=false; clipCollapseButton.setButtonText("Collapse");
     resized(); repaint();
 }
 void MainComponent::closeOscClip() {
@@ -147,6 +147,6 @@ void MainComponent::setOscDestination(int column,const juce::String& host,int po
     candidate.columns[(size_t)column].oscPort=port;
     if (const auto valid=validateShow(candidate); valid.failed()) { message(valid.getErrorMessage()); return; }
     show=std::move(candidate);
-    changed("Destinazione OSC UDP aggiornata: "+host+":"+juce::String(port));
+    changed("OSC UDP destination updated: "+host+":"+juce::String(port));
 }
 }

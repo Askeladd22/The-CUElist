@@ -77,7 +77,7 @@ void MainComponent::editMidiClip() {
             clipEditorCellId=id; clipEditor->loadClip(*cell.midi);
         }
         clipCollapsed=false;
-        clipCollapseButton.setButtonText("Riduci");
+        clipCollapseButton.setButtonText("Collapse");
         if (clipWindow) clipWindow->toFront(true);
         else { resized(); repaint(); }
         return;
@@ -98,7 +98,7 @@ void MainComponent::editMidiClip() {
     clipEditor->onRedo=[safe] { if (safe) safe->redoEdit(); };
     clipEditor->setFloating(false);
     addAndMakeVisible(*clipEditor);
-    clipCollapsed=false; clipCollapseButton.setButtonText("Riduci");
+    clipCollapsed=false; clipCollapseButton.setButtonText("Collapse");
     resized(); repaint();
 }
 void MainComponent::syncClipEditor() {
@@ -133,7 +133,7 @@ void MainComponent::dockMidiClip() {
     clipWindow.reset();
     addAndMakeVisible(*clipEditor);
     clipEditor->setFloating(false);
-    clipCollapsed=false; clipCollapseButton.setButtonText("Riduci");
+    clipCollapsed=false; clipCollapseButton.setButtonText("Collapse");
     resized(); repaint();
 }
 void MainComponent::closeMidiClip() {
@@ -159,11 +159,11 @@ void MainComponent::midiClipEdited(int cellId,const MidiClip& before,const MidiC
             if (!cell.midi || !sameMidiClip(*cell.midi,after)) {
                 cell.midi=after; cell.file.clear(); dirty=true;
                 engine.publish(makeRenderState(show,clips));
-                status="Clip MIDI aggiornata. Salva lo show per conservarla.";
+                status="MIDI clip updated. Save the show to keep your changes.";
                 timeline.repaint(); grid.repaint(); repaint();
             }
             if (complete) {
-                editHistory.beginNewTransaction("Modifica clip MIDI");
+                editHistory.beginNewTransaction("Edit MIDI clip");
                 editHistory.perform(new MidiUndoAction(*this,cellId,before,after));
             }
             return;
@@ -175,7 +175,7 @@ void MainComponent::restoreMidiClip(int cellId,const MidiClip& snapshot) {
         row.cells[c].midi=snapshot;
         dirty=true; engine.publish(makeRenderState(show,clips));
         if (clipEditor && clipEditorCellId==cellId) clipEditor->loadClip(snapshot);
-        status="Modifica MIDI ripristinata."; grid.repaint(); timeline.repaint(); repaint();
+        status="MIDI edit reverted."; grid.repaint(); timeline.repaint(); repaint();
         return;
     }
 }
@@ -195,6 +195,6 @@ void MainComponent::setMidiOutput(int column,const juce::String& identifier) {
         if (ready.failed()) { message(ready.getErrorMessage()); utilities.refresh(); return; }
     }
     show.columns[column].midiOutputId=identifier;
-    changed(identifier.isEmpty() ? "Uscita MIDI disattivata." : "Uscita MIDI della colonna aggiornata.",true);
+    changed(identifier.isEmpty() ? "MIDI output disabled." : "Column MIDI output updated.",true);
 }
 }

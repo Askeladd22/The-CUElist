@@ -72,7 +72,7 @@ public:
         if (hitIndex<0) {
             owner.selected=-1; owner.selectedNotes.clear();
             if (e.x>=keysWidth && e.y>=rulerHeight) {
-                if (owner.clip.notes.size()>=10000) { owner.hint="Limite: 10.000 note per clip."; repaint(); return; }
+                if (owner.clip.notes.size()>=10000) { owner.hint="Limit: 10,000 notes per clip."; repaint(); return; }
                 const auto before=owner.clip;
                 const double step=owner.gridStep();
                 const double rawBeat=(e.x-keysWidth)/owner.pixelsPerBeat;
@@ -225,7 +225,7 @@ double PianoRollEditor::gridStep() const { return snapEnabled() ? std::pow(.5,st
 bool PianoRollEditor::snapEnabled() const { return snap.getSelectedId()!=5; }
 void PianoRollEditor::updateCanvas() { canvas->setSize(std::max(viewport.getWidth()-14,keysWidth+(int)std::ceil(clip.lengthBeats*pixelsPerBeat)+24),rulerHeight+128*noteHeight); canvas->repaint(); }
 void PianoRollEditor::setFloating(bool floating) {
-    detach.setButtonText(floating ? "Riaggancia" : "Stacca");
+    detach.setButtonText(floating ? "Reattach" : "Detach");
 }
 void PianoRollEditor::notify(const MidiClip& before,bool complete) {
     if (!onEdit) return;
@@ -240,9 +240,9 @@ void PianoRollEditor::loadClip(const MidiClip& replacement) {
 }
 void PianoRollEditor::selectionChanged() {
     if (selected>=0) { const auto& n=clip.notes[(size_t)selected]; velocity.setValue(n.velocity,juce::dontSendNotification); channel.setSelectedId(n.channel,juce::dontSendNotification);
-        hint=selectedNotes.size()>1 ? juce::String((int)selectedNotes.size())+" note selezionate (trascina, modifica velocity/canale o Canc)"
-            : "Nota "+juce::String(n.pitch)+"  |  Beat "+juce::String(n.beat+1,2)+"  |  Durata "+juce::String(n.length,2)+" beat";
-    } else hint="Clic: crea nota  |  Destro+trascina: selezione  |  Shift+clic: aggiungi  |  Canc: elimina";
+        hint=selectedNotes.size()>1 ? juce::String((int)selectedNotes.size())+" notes selected (drag, change velocity/channel or Delete)"
+            : "Note "+juce::String(n.pitch)+"  |  Beat "+juce::String(n.beat+1,2)+"  |  Durata "+juce::String(n.length,2)+" beat";
+    } else hint="Click: add note  |  Right-drag: select  |  Shift+click: add  |  Delete: remove";
     remove.setEnabled(!selectedNotes.empty()); repaint();
 }
 void PianoRollEditor::deleteSelected() {
@@ -253,9 +253,9 @@ void PianoRollEditor::deleteSelected() {
 }
 void PianoRollEditor::paint(juce::Graphics& g) {
     g.fillAll(palette::panel);
-    label(g,"PIANO ROLL  /  note MIDI",{16,6,290,25},15,palette::amber,true);
+    label(g,"PIANO ROLL  /  MIDI notes",{16,6,290,25},15,palette::amber,true);
     label(g,"Snap",{16,38,40,22},11,palette::muted);
-    label(g,"Canale",{142,38,48,22},11,palette::muted);
+    label(g,"Channel",{142,38,48,22},11,palette::muted);
     label(g,"Velocity",{270,38,50,22},11,palette::muted);
     label(g,"Beat",{504,38,42,22},11,palette::muted);
     g.saveState(); g.reduceClipRegion(16,67,getWidth()-32,17);

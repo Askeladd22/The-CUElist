@@ -8,7 +8,7 @@ namespace cuelist {
 class UtilityIcon final : public juce::ToggleButton {
 public:
     explicit UtilityIcon(bool invert) : phase(invert) {
-        setButtonText(invert ? "Inversione di fase" : "Mute");
+        setButtonText(invert ? "Phase inversion" : "Mute");
     }
     void paintButton(juce::Graphics& g,bool hover,bool down) override {
         const auto box=getLocalBounds().toFloat().reduced(2);

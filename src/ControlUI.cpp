@@ -24,8 +24,8 @@ juce::Result MainComponent::selectControlInput(const juce::String& id) {
     // switch to the first available device.
     show.controls.midiInputId=id;
     dirty=true;
-    status=result.wasOk() ? (id.isEmpty() ? "Ingresso MIDI disattivato." :
-        "Ingresso MIDI collegato.") : result.getErrorMessage();
+    status=result.wasOk() ? (id.isEmpty() ? "MIDI input disabled." :
+        "MIDI input connected.") : result.getErrorMessage();
     repaint(); return result;
 }
 bool MainComponent::addMappingBinding(ControlBinding b) {
@@ -35,7 +35,7 @@ bool MainComponent::addMappingBinding(ControlBinding b) {
     const auto valid=validateShow(candidate);
     if (valid.failed()) { status=valid.getErrorMessage(); return false; }
     show=std::move(candidate); refreshControlSettings();
-    dirty=true; status="Mapping aggiunto."; repaint(); return true;
+    dirty=true; status="Mapping added."; repaint(); return true;
 }
 bool MainComponent::deleteMappingBinding(int id) {
     auto& bindings=show.controls.bindings;
@@ -43,7 +43,7 @@ bool MainComponent::deleteMappingBinding(int id) {
     bindings.erase(std::remove_if(bindings.begin(),bindings.end(),
         [id](const auto& b){return b.id==id;}),bindings.end());
     if (bindings.size()==n) return false;
-    refreshControlSettings(); dirty=true; status="Mapping eliminato."; repaint();
+    refreshControlSettings(); dirty=true; status="Mapping removed."; repaint();
     return true;
 }
 int MainComponent::createMappingPreset(const juce::String& name) {
@@ -53,7 +53,7 @@ int MainComponent::createMappingPreset(const juce::String& name) {
     candidate.controls.presets.push_back({id,label});
     if (validateShow(candidate).failed()) return 0;
     show=std::move(candidate); refreshControlSettings(); dirty=true;
-    status="Preset "+label+" creato."; repaint(); return id;
+    status="Preset "+label+" created."; repaint(); return id;
 }
 bool MainComponent::assignMappingPreset(int rowId,int presetId) {
     auto candidate=show;
@@ -64,7 +64,7 @@ bool MainComponent::assignMappingPreset(int rowId,int presetId) {
     for (auto& row:candidate.rows) if (row.id==rowId) {row.mappingPresetId=presetId;found=true;break;}
     if (!found || validateShow(candidate).failed()) return false;
     show=std::move(candidate); refreshControlSettings(); dirty=true;
-    status="Preset Control Mapping assegnato."; repaint(); return true;
+    status="Control Mapping preset assigned."; repaint(); return true;
 }
 void MainComponent::dispatchControl(const ControlEvent& input) {
     // Track physical button edges even when a cue has no matching binding.
@@ -125,7 +125,7 @@ void MainComponent::dispatchControl(const ControlEvent& input) {
             col.type==ColumnType::midi) {
             if (!engine.sendMappedMidiCc(col.midiOutputId,binding.outputChannel,
                     binding.outputNumber,juce::jlimit(0,127,(int)std::lround(action->scaled))))
-                status="Controllo MIDI: uscita assente o coda piena.";
+                status="MIDI control: output unavailable or queue full.";
             break;
         }
     } else if (binding.target==ControlTarget::oscFloat) {
@@ -133,7 +133,7 @@ void MainComponent::dispatchControl(const ControlEvent& input) {
             col.type==ColumnType::osc) {
             if (!controlOutput.sendOscFloat(col.oscHost,col.oscPort,
                 binding.oscAddress,action->scaled))
-                status="Controllo OSC: destinazione non valida o coda piena.";
+                status="OSC control: invalid destination or queue full.";
             break;
         }
     }
@@ -149,19 +149,19 @@ public:
             &outputCc,&oscAddress,&invert})
             addAndMakeVisible(c);
         device.setName("controlInputDevice");
-        device.setTooltip("Selezione esplicita. Nessuna sostituzione automatica in caso di disconnessione.");
-        connect.setButtonText("Aggiorna porte");
+        device.setTooltip("Select a device explicitly. No automatic fallback on disconnect.");
+        connect.setButtonText("Refresh ports");
         learn.setButtonText("MIDI Learn");
-        add.setButtonText("Aggiungi mapping");
-        remove.setButtonText("Elimina selezionato");
-        newPreset.setButtonText("Nuovo preset");
-        assignPreset.setButtonText("Assegna alla cue");
-        presetName.setTextToShowWhenEmpty("Nome nuovo preset",palette::muted);
+        add.setButtonText("Add mapping");
+        remove.setButtonText("Remove selected");
+        newPreset.setButtonText("New preset");
+        assignPreset.setButtonText("Assign to cue");
+        presetName.setTextToShowWhenEmpty("New preset name",palette::muted);
         state.setName("mappingStatus");
         state.setJustificationType(juce::Justification::centredLeft);
-        scope.addItemList({"Globale","Colonna","Preset","Singola cue"},1);
+        scope.addItemList({"Global","Column","Preset","Single cue"},1);
         scope.setSelectedId(1);
-        target.addItemList({"Master Audio","Gain colonna Audio","GO cue successiva","PANIC",
+        target.addItemList({"Master Audio","Audio column gain","GO next cue","PANIC",
                             "MIDI CC","OSC Float"},1);
         target.setSelectedId(1);
         target.onChange=[this]{ refreshColumns(); };
@@ -180,7 +180,7 @@ public:
             int index=device.getSelectedId()-2;
             if (index>=0 && index<(int)deviceIds.size()) id=deviceIds[(size_t)index];
             auto result=owner->selectControlInput(id);
-            state.setText(result.wasOk() ? "Dispositivo selezionato." : result.getErrorMessage(),
+            state.setText(result.wasOk() ? "Device selected." : result.getErrorMessage(),
                 juce::dontSendNotification);
         };
         connect.onClick=[this]{
@@ -190,10 +190,10 @@ public:
         };
         learn.onClick=[this]{
             if (!owner || !owner->midiInput.connected()) {
-                state.setText("Connetti un ingresso MIDI.",juce::dontSendNotification); return;
+                state.setText("Connect a MIDI input.",juce::dontSendNotification); return;
             }
             captured.reset(); owner->armControlLearn();
-            state.setText("Muovi un fader o premi un tasto sul controller...",juce::dontSendNotification);
+            state.setText("Move a fader or press a button on the controller...",juce::dontSendNotification);
         };
         add.onClick=[this]{ createBinding(); };
         remove.onClick=[this]{
@@ -206,7 +206,7 @@ public:
         newPreset.onClick=[this]{
             if (!owner) return;
             const int id=owner->createMappingPreset(presetName.getText());
-            if (id==0) {state.setText("Nome preset non valido.",juce::dontSendNotification);return;}
+            if (id==0) {state.setText("Invalid preset name.",juce::dontSendNotification);return;}
             refreshPresets(); presets.setSelectedId(id+1);
             presetName.clear();
         };
@@ -214,7 +214,7 @@ public:
             if (!owner) return;
             if (owner->assignMappingPreset(owner->show.rows[(size_t)owner->selectedRow].id,
                                            std::max(0,presets.getSelectedId()-1)))
-                state.setText("Preset assegnato alla cue selezionata.",juce::dontSendNotification);
+                state.setText("Preset assigned to selected cue.",juce::dontSendNotification);
         };
         refreshDevices(); refreshPresets(); refreshColumns();
         setSize(780,610); startTimerHz(10);
@@ -223,16 +223,16 @@ public:
     void paint(juce::Graphics& g) override {
         g.fillAll(palette::panel);
         label(g,"CONTROL & MAPPING",{17,12,330,26},20,palette::teal,true);
-        label(g,"Ingresso MIDI",{17,55,250,19},11,palette::muted,true);
+        label(g,"MIDI input",{17,55,250,19},11,palette::muted,true);
         label(g,"MIDI Learn",{17,120,150,19},11,palette::muted,true);
-        label(g,"Regola",{17,205,120,17},11,palette::muted,true);
-        label(g,"Destinazione",{213,205,120,17},11,palette::muted,true);
+        label(g,"Rule",{17,205,120,17},11,palette::muted,true);
+        label(g,"Destination",{213,205,120,17},11,palette::muted,true);
         label(g,"Takeover",{410,205,120,17},11,palette::muted,true);
-        label(g,"CC uscita",{17,263,95,16},10,palette::muted,true);
-        label(g,"Address OSC",{112,263,140,16},10,palette::muted,true);
-        label(g,"Preset cue",{17,324,200,17},11,palette::muted,true);
-        label(g,"Mapping salvati",{17,402,250,20},12,palette::teal,true);
-        label(g,"Il mapping seleziona la destinazione attiva dopo GO, non al clic sulla riga.",
+        label(g,"Output CC",{17,263,95,16},10,palette::muted,true);
+        label(g,"OSC address",{112,263,140,16},10,palette::muted,true);
+        label(g,"Cue preset",{17,324,200,17},11,palette::muted,true);
+        label(g,"Saved mappings",{17,402,250,20},12,palette::teal,true);
+        label(g,"Mapping chooses its active destination after GO, not when selecting a row.",
               {17,579,getWidth()-32,19},10,palette::muted);
     }
     void resized() override {
@@ -261,7 +261,7 @@ private:
     juce::ComboBox device,presets,scope,target,takeover,columns;
     juce::TextButton connect,learn,add,remove,newPreset,assignPreset;
     juce::TextEditor presetName,outputCc,oscAddress;
-    juce::ToggleButton invert{"Inverti"};
+    juce::ToggleButton invert{"Invert"};
     juce::Label state;
     juce::ListBox bindingList;
     std::vector<juce::String> deviceIds;
@@ -280,7 +280,7 @@ private:
     void refreshDevices() {
         if (!owner) return;
         device.clear(juce::dontSendNotification);
-        deviceIds.clear(); device.addItem("Disconnesso",1);
+        deviceIds.clear(); device.addItem("Disconnected",1);
         int selectedId=1;
         for (const auto& d:juce::MidiInput::getAvailableDevices()) {
             deviceIds.push_back(d.identifier);
@@ -294,7 +294,7 @@ private:
         if (!owner) return;
         const int old=presets.getSelectedId();
         presets.clear(juce::dontSendNotification);
-        presets.addItem("Nessun preset",1);
+        presets.addItem("No preset",1);
         for (const auto& p:owner->show.controls.presets) presets.addItem(p.name,p.id+1);
         int current=owner->show.rows[(size_t)owner->selectedRow].mappingPresetId+1;
         presets.setSelectedId(old>0 && presets.indexOfItemId(old)>=0 ? old : current,
@@ -317,7 +317,7 @@ private:
     }
     void createBinding() {
         if (!owner || !captured) {
-            state.setText("Usa prima MIDI Learn.",juce::dontSendNotification); return;
+            state.setText("Use MIDI Learn first.",juce::dontSendNotification); return;
         }
         ControlBinding b;
         b.deviceId=captured->deviceId;
@@ -341,7 +341,7 @@ private:
             b.target==ControlTarget::midiCc || b.target==ControlTarget::oscFloat) {
             const int i=columns.getSelectedId()-1;
             if (i<0 || i>=(int)columnIds.size()) {
-                state.setText("Seleziona una colonna di destinazione.",juce::dontSendNotification);return;
+                state.setText("Select a destination column.",juce::dontSendNotification);return;
             }
             b.targetColumnId=columnIds[(size_t)i];
             if (b.scope==ControlScope::column) b.scopeId=b.targetColumnId;
@@ -362,7 +362,7 @@ private:
         }
         if (owner->addMappingBinding(b)) {
             bindingList.updateContent(); bindingList.repaint();
-            state.setText("Mapping registrato nello show.",juce::dontSendNotification);
+            state.setText("Mapping saved to the show.",juce::dontSendNotification);
         } else state.setText(owner->status,juce::dontSendNotification);
     }
     int getNumRows() override {

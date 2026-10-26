@@ -32,8 +32,8 @@ private:
     std::unique_ptr<Canvas> canvas;
     juce::ComboBox snap, channel;
     juce::Slider velocity, length;
-    juce::TextButton remove{"Elimina"}, zoomOut{"-"}, zoomIn{"+"},
-                     detach{"Stacca"}, undo{"Undo"}, redo{"Redo"};
+    juce::TextButton remove{"Delete"}, zoomOut{"-"}, zoomIn{"+"},
+                     detach{"Detach"}, undo{"Undo"}, redo{"Redo"};
     juce::String hint;
     int selected=-1;
     std::set<int> selectedNotes;
