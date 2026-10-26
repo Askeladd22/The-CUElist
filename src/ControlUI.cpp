@@ -8,6 +8,20 @@ void MainComponent::resetActiveMapping() {
 }
 void MainComponent::refreshControlSettings() {
     controlMapping.setSettings(show.controls);
+    std::vector<ControlLayer> layers;
+    for (size_t column=0;column<show.columns.size();++column) {
+        const auto& col=show.columns[column];
+        if (col.type!=ColumnType::control) continue;
+        if (col.controlLocked) {
+            layers.push_back({col.id,0,1,true,col.controlDefaultSet});
+        } else {
+            for (const auto& row:show.rows)
+                if (row.cells[column].controlSet)
+                    layers.push_back({col.id,row.id,col.controlPriority,false,
+                                      *row.cells[column].controlSet});
+        }
+    }
+    controlMapping.setLayers(std::move(layers));
     int preset=0;
     for (const auto& row:show.rows)
         if (row.id==activeCueId) { preset=row.mappingPresetId; break; }
@@ -65,6 +79,74 @@ bool MainComponent::assignMappingPreset(int rowId,int presetId) {
     if (!found || validateShow(candidate).failed()) return false;
     show=std::move(candidate); refreshControlSettings(); dirty=true;
     status="Control Mapping preset assigned."; repaint(); return true;
+}
+bool MainComponent::addControlSetBinding(int row,int column,ControlBinding b) {
+    if (row<0 || row>=(int)show.rows.size() || column<0 ||
+        column>=(int)show.columns.size() || show.columns[column].type!=ColumnType::control)
+        return false;
+    auto candidate=show;
+    auto& col=candidate.columns[(size_t)column];
+    ControlSet* set=col.controlLocked ? &col.controlDefaultSet :
+        &candidate.rows[(size_t)row].cells[(size_t)column].controlSet.emplace();
+    b.id=candidate.controls.nextId++;
+    b.scope=ControlScope::global; b.scopeId=0;
+    set->bindings.push_back(std::move(b));
+    if (auto valid=validateShow(candidate);valid.failed()) {
+        status=valid.getErrorMessage(); repaint(); return false;
+    }
+    show=std::move(candidate); refreshControlSettings(); dirty=true;
+    status="Control Set mapping added."; refresh(); return true;
+}
+bool MainComponent::deleteControlSetBinding(int row,int column,int id) {
+    if (row<0 || row>=(int)show.rows.size() || column<0 ||
+        column>=(int)show.columns.size() || show.columns[column].type!=ColumnType::control)
+        return false;
+    auto& col=show.columns[(size_t)column];
+    ControlSet* set=col.controlLocked ? &col.controlDefaultSet :
+        (show.rows[(size_t)row].cells[(size_t)column].controlSet ?
+         &*show.rows[(size_t)row].cells[(size_t)column].controlSet : nullptr);
+    if (!set) return false;
+    const auto size=set->bindings.size();
+    set->bindings.erase(std::remove_if(set->bindings.begin(),set->bindings.end(),
+        [id](const ControlBinding& b){return b.id==id;}),set->bindings.end());
+    if (set->bindings.size()==size) return false;
+    refreshControlSettings();dirty=true;status="Control Set mapping removed.";refresh();return true;
+}
+bool MainComponent::setControlColumnLocked(int column,bool locked,int sourceRow) {
+    if (column<0 || column>=(int)show.columns.size() ||
+        show.columns[(size_t)column].type!=ColumnType::control ||
+        sourceRow<0 || sourceRow>=(int)show.rows.size()) return false;
+    auto candidate=show;
+    auto& col=candidate.columns[(size_t)column];
+    if (locked && !col.controlLocked) {
+        // Preserve source cue and any other cue-specific Control Sets as
+        // dormant metadata. Unlocking makes those sets editable again.
+        const auto& cell=candidate.rows[(size_t)sourceRow].cells[(size_t)column];
+        if (cell.controlSet) col.controlDefaultSet=*cell.controlSet;
+        col.controlLocked=true; col.controlPriority=1;
+    } else if (!locked && col.controlLocked) {
+        col.controlLocked=false; col.controlPriority=2;
+    } else return true;
+    if (auto valid=validateShow(candidate);valid.failed()) {
+        status=valid.getErrorMessage(); return false;
+    }
+    show=std::move(candidate);refreshControlSettings();dirty=true;refresh();
+    status=locked ? "Control Column locked: default set applies to every cue." :
+        "Control Column unlocked: cue-specific sets restored.";
+    return true;
+}
+bool MainComponent::setControlColumnPriority(int column,int priority) {
+    if (column<0 || column>=(int)show.columns.size() ||
+        show.columns[(size_t)column].type!=ColumnType::control ||
+        show.columns[(size_t)column].controlLocked || priority<2 || priority>4)
+        return false;
+    show.columns[(size_t)column].controlPriority=priority;
+    refreshControlSettings();dirty=true;refresh();
+    status="Control Column priority updated.";return true;
+}
+void MainComponent::editControlSet(int row,int column) {
+    if (!select(row,column) || show.columns[(size_t)column].type!=ColumnType::control) return;
+    openControlPanel(true);
 }
 void MainComponent::dispatchControl(const ControlEvent& input) {
     // Track physical button edges even when a cue has no matching binding.
