@@ -16,7 +16,6 @@ public:
     void undo();
     void redo();
     void setCloseHandler(std::function<void()> handler) { closeHandler=std::move(handler); }
-    void setDetached(bool detached);
 private:
     class Canvas;
     MidiClip clip;
