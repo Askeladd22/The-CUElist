@@ -208,6 +208,7 @@ void Timeline::mouseDown(const juce::MouseEvent& e) {
         const double position=dragViewStart+(e.x-timelineStart)*dragLength/area, end=cell.startSeconds+owner.clipDuration(owner.selectedRow,c);
         const auto rowId=row.id; const auto start=cell.startSeconds;
         if (position<start || position>end || !owner.select(owner.selectedRow,c)) return;
+        if (owner.show.columns[c].type==ColumnType::midi) owner.editMidiClip();
         dragColumn=c; dragRowId=rowId; dragStartSeconds=start;
         setMouseCursor(juce::MouseCursor::DraggingHandCursor); return;
     }
