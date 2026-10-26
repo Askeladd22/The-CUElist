@@ -37,6 +37,18 @@ jobs:
         shell: powershell
         run: .\scripts\check-package.ps1
 
+      - name: Prepare ready-to-run portable folder
+        shell: powershell
+        run: Expand-Archive -LiteralPath "dist/The-Cuelist-0.5.0-Windows-x64.zip" -DestinationPath "dist/portable-ready" -Force
+
+      - name: Upload ready-to-run portable app (single extraction)
+        uses: actions/upload-artifact@v4
+        with:
+          name: The-Cuelist-Windows-x64-READY
+          path: dist/portable-ready/**/*
+          if-no-files-found: error
+          retention-days: 30
+
       - name: Upload portable ZIP and checksum
         uses: actions/upload-artifact@v4
         with:
