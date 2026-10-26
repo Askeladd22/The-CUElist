@@ -195,6 +195,9 @@ void RenderState::render(float* const* outputs,int channels,int frames,double sa
         const auto used=std::min((size_t)std::max(0,frames),t.mix[0].size());
         for (auto& channel:t.mix) std::fill_n(channel.begin(),used,0.0f);
         t.oversizeVoicePeak={{0.0f,0.0f}};
+        t.peak.store(0.0f,std::memory_order_relaxed);
+        t.left.store(0.0f,std::memory_order_relaxed);
+        t.right.store(0.0f,std::memory_order_relaxed);
     }
     if (sampleRate<=0 || !std::isfinite(sampleRate)) return;
     for (auto& row:rows) if (row.playing) row.seconds+=(double)frames/sampleRate;
