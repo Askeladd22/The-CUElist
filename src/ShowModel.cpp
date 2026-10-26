@@ -29,7 +29,21 @@ void addRow(Show& show, const juce::String& name) {
     show.rows.push_back(std::move(row));
 }
 void addColumn(Show& show, ColumnType type, const juce::String& name) {
-    show.columns.push_back({show.nextId++, name, type, 0});
+    juce::String label=name;
+    if (label.trim().isEmpty()) {
+        const juce::String prefix=type==ColumnType::audio ? "Audio" : type==ColumnType::midi ? "MIDI" : "OSC";
+        int ordinal=1;
+        for (const auto& col:show.columns) if (col.type==type) ++ordinal;
+        label=prefix+" "+juce::String(ordinal);
+        // Existing projects may contain user-defined names matching generated
+        // labels. Never assign the same automatic label twice.
+        const auto taken=[&](const juce::String& candidate) {
+            for (const auto& col:show.columns) if (col.name.equalsIgnoreCase(candidate)) return true;
+            return false;
+        };
+        while (taken(label)) label=prefix+" "+juce::String(++ordinal);
+    }
+    show.columns.push_back({show.nextId++, label, type, 0});
     for (auto& row : show.rows) { Cell c; c.id = show.nextId++; row.cells.push_back(c); }
 }
 Show makeShow() {
