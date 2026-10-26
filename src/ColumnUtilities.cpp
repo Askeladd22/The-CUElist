@@ -144,7 +144,8 @@ struct ColumnUtilities::Strip final : juce::Component {
     }
     void updateMeter() {
         if (owner.show.columns[(size_t)index].type!=ColumnType::audio) return;
-        const auto stereo=owner.engine.getColumnStereoPeak(id);
+        const auto stereo=owner.engine.connected.load(std::memory_order_relaxed)
+            ? owner.engine.getColumnStereoPeak(id) : std::array<float,2>{{0.0f,0.0f}};
         gain.setStereoPeaks(stereo[0],stereo[1]);
     }
     void resized() override {
