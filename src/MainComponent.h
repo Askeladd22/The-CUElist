@@ -3,6 +3,8 @@
 #include "Theme.h"
 namespace cuelist {
 class MainComponent;
+class PianoRollEditor;
+class MidiUndoAction;
 class CueGrid final : public juce::Component, public juce::FileDragAndDropTarget {
 public:
     explicit CueGrid(MainComponent& parent) : owner(parent) {}
@@ -74,6 +76,13 @@ public:
     void importFile(const juce::File&);
     void importDialog();
     void editMidiClip();
+    void detachMidiClip();
+    void dockMidiClip();
+    void closeMidiClip();
+    bool undoEdit();
+    bool redoEdit();
+    PianoRollEditor* activeClipEditor() const { return clipEditor.get(); }
+    bool isClipEditorFloating() const { return clipWindow != nullptr; }
     void setMidiOutput(int column,const juce::String& identifier);
     bool hasClip(int row,int column) const;
     double clipDuration(int row,int column) const;
@@ -101,7 +110,7 @@ public:
     int selectedRow=0, selectedColumn=0;
     AudioEngine engine;
 private:
-    friend class CueGrid; friend class Timeline;
+    friend class CueGrid; friend class Timeline; friend class MidiUndoAction;
     Theme theme;
     juce::TooltipWindow tooltip{this,600};
     CueGrid grid{*this}; Timeline timeline{*this}; juce::Viewport viewport;
@@ -123,7 +132,12 @@ private:
     int nextCue=0;
     std::unique_ptr<juce::FileChooser> chooser;
     juce::Component::SafePointer<juce::DialogWindow> deviceDialog;
-    juce::Component::SafePointer<juce::DialogWindow> midiDialog;
+    std::unique_ptr<PianoRollEditor> clipEditor;
+    std::unique_ptr<juce::DocumentWindow> clipWindow;
+    int clipEditorCellId=-1;
+    bool clipCollapsed=false;
+    juce::TextButton clipCollapseButton{"Riduci"}, clipCloseButton{"Chiudi"};
+    juce::UndoManager editHistory;
     juce::File projectFile;
     juce::String status="Pronto. Seleziona una cella Audio e importa un WAV.";
     bool dirty=false;
@@ -131,6 +145,10 @@ private:
     float displayPeak=0;
     int midiRefreshTicks=0;
     void timerCallback() override;
+    void midiClipEdited(int cellId,const MidiClip& before,const MidiClip& after,bool complete);
+    void restoreMidiClip(int cellId,const MidiClip& snapshot);
+    void syncClipEditor();
+
     void refresh();
     void refreshInspector();
     void changed(const juce::String&,bool stopPlayback=false);
