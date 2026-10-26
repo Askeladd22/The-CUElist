@@ -2,6 +2,7 @@
 #include <juce_core/juce_core.h>
 #include <cstdint>
 #include <vector>
+#include <functional>
 
 namespace cuelist {
 enum class OscValueType { integer, decimal, text, boolean };
@@ -35,4 +36,10 @@ struct OscClip {
 // Packets have a fixed 1024-byte upper bound for lock-free RT dispatch.
 juce::Result validateOscClip(const OscClip&);
 std::vector<uint8_t> encodeOscMessage(const OscEvent&);
+struct OscScheduledMessage { double seconds=0; std::vector<uint8_t> bytes; };
+// Prepared on the UI thread, with a bounded network event budget.
+// The render callback dispatches immutable packets only: no encoding or allocations.
+std::vector<OscScheduledMessage> prepareOscClip(const OscClip&,
+    const std::function<double(double)>& secondsAt,
+    const std::function<double(double)>& unitAtSeconds);
 }
