@@ -35,7 +35,7 @@ OscClipEditor::OscClipEditor(OscClip value,std::vector<TempoPoint> points,
         notify(before);
     };
     resolution.setName("oscGridResolution");
-    for (int i=0;i<4;++i) resolution.addItem(juce::String(1<<i)+"/16",i+1);
+    for (int i=0;i<4;++i) resolution.addItem("1/"+juce::String(4<<i),i+1);
     resolution.setSelectedId(2,juce::dontSendNotification);
     resolution.setTooltip("Risoluzione musicale o frazione di secondo dello snap.");
     grid.setName("oscGridVisible"); grid.setToggleState(true,juce::dontSendNotification);
@@ -76,7 +76,7 @@ float OscClipEditor::xForTime(double time) const {
     return (float)axisLeft()+(float)(juce::jlimit(0.0,clip.length,time)/clip.length)*axisWidth();
 }
 double OscClipEditor::timeForX(float x) const {
-    return juce::jlimit(0.0,clip.length-.00001,
+    return juce::jlimit(0.0,std::max(0.0,clip.length-.00001),
         (double)(x-axisLeft())/axisWidth()*clip.length);
 }
 double OscClipEditor::quantize(double t) const {
