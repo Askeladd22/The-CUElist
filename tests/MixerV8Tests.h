@@ -87,9 +87,9 @@ void mixerV8Tests() {
         utilities->refresh(); ui.resized();
         auto* master=dynamic_cast<juce::Slider*>(controlsV3::named(ui,"masterAudioDb"));
         check(master && master->getValue()==0,"Master slider missing or not at 0 dB");
-        const auto* audio=utilities->getChildComponent(0);
-        const auto* midiStrip=utilities->getChildComponent(1);
-        const auto* oscStrip=utilities->getChildComponent(2);
+        auto* audio=utilities->getChildComponent(0);
+        auto* midiStrip=utilities->getChildComponent(1);
+        auto* oscStrip=utilities->getChildComponent(2);
         auto* fader=dynamic_cast<juce::Slider*>(controlsV3::named(*audio,"columnGainDb"));
         auto* pan=dynamic_cast<juce::Slider*>(controlsV3::named(*audio,"columnPan"));
         check(fader && fader->getSliderStyle()==juce::Slider::LinearVertical,"Fader not vertical");
