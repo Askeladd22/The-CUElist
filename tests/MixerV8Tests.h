@@ -143,7 +143,8 @@ void mixerV8Tests() {
         check(ui.hasUnsavedChanges(),"Master UI failed to mark show dirty");
         masterPan->setValue(-.4,juce::sendNotificationSync);
         near(ui.show.masterPan,-.4);
-        masterMute->triggerClick();
+        cueViewFixtures::click(*masterMute,(float)masterMute->getWidth()*.5f,
+                               (float)masterMute->getHeight()*.5f);
         check(ui.show.masterMuted,"Master mute UI did not reach the model");
     });
 }
