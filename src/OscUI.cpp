@@ -58,4 +58,50 @@ void MainComponent::syncOscEditor() {
     oscEditorCellId=cell.id;
     oscEditor->loadClip(cell.osc.value_or(OscClip{}));
 }
+void MainComponent::detachOscClip() {
+    if (!oscEditor || oscWindow) return;
+    if (oscEditor->getParentComponent()==this) removeChildComponent(oscEditor.get());
+    auto safe=juce::Component::SafePointer<MainComponent>(this);
+    oscWindow=std::make_unique<FloatingOscWindow>([safe] {
+        juce::MessageManager::callAsync([safe] { if (safe) safe->dockOscClip(); });
+    });
+    oscWindow->setUsingNativeTitleBar(true);
+    oscWindow->setResizable(true,true);
+    oscWindow->setResizeLimits(760,320,1800,1200);
+    oscWindow->setContentNonOwned(oscEditor.get(),true);
+    oscWindow->centreWithSize(1000,500);
+    oscEditor->setFloating(true);
+    oscWindow->setVisible(true); oscWindow->toFront(true);
+    resized(); repaint();
+}
+void MainComponent::dockOscClip() {
+    if (!oscEditor || !oscWindow) return;
+    oscWindow->clearContentComponent();
+    oscWindow->setVisible(false); oscWindow.reset();
+    addAndMakeVisible(*oscEditor);
+    oscEditor->setFloating(false);
+    clipCollapsed=false; clipCollapseButton.setButtonText("Riduci");
+    resized(); repaint();
+}
+void MainComponent::closeOscClip() {
+    if (oscWindow) {
+        oscWindow->clearContentComponent();
+        oscWindow->setVisible(false); oscWindow.reset();
+    }
+    if (oscEditor) {
+        if (oscEditor->getParentComponent()==this) removeChildComponent(oscEditor.get());
+        oscEditor.reset();
+    }
+    oscEditorCellId=-1;
+    clipCollapsed=false; resized(); repaint();
+}
+void MainComponent::setOscDestination(int column,const juce::String& host,int port) {
+    if (column<0 || column>=(int)show.columns.size() || show.columns[(size_t)column].type!=ColumnType::osc) return;
+    auto candidate=show;
+    candidate.columns[(size_t)column].oscHost=host.trim();
+    candidate.columns[(size_t)column].oscPort=port;
+    if (const auto valid=validateShow(candidate); valid.failed()) { message(valid.getErrorMessage()); return; }
+    show=std::move(candidate);
+    changed("Destinazione OSC UDP aggiornata: "+host+":"+juce::String(port));
+}
 }
