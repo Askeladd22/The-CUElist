@@ -122,5 +122,4 @@ inline void pianoRollTests() {
         ui.closeMidiClip();
         check(ui.activeClipEditor()==nullptr,"Editor failed to close");
     });
-);
 }
