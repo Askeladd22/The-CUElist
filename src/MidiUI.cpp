@@ -158,7 +158,10 @@ void MainComponent::midiClipEdited(int cellId,const MidiClip& before,const MidiC
                 status="Clip MIDI aggiornata. Salva lo show per conservarla.";
                 timeline.repaint(); grid.repaint(); repaint();
             }
-            if (complete) editHistory.perform(new MidiUndoAction(*this,cellId,before,after),"Modifica clip MIDI");
+            if (complete) {
+                editHistory.beginNewTransaction("Modifica clip MIDI");
+                editHistory.perform(new MidiUndoAction(*this,cellId,before,after));
+            }
             return;
         }
 }
