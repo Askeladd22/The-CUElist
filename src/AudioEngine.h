@@ -6,6 +6,7 @@
 #include <map>
 #include <memory>
 #include "MidiOutputRouter.h"
+#include "OscOutputRouter.h"
 
 namespace cuelist {
 struct AudioClip { juce::AudioBuffer<float> samples; double sampleRate = 48000; };
@@ -26,8 +27,18 @@ struct Voice {
     std::shared_ptr<const AudioClip> clip;
     struct NoteEvent { double seconds=0; int status=0, pitch=0, velocity=0; };
     std::vector<NoteEvent> midiEvents;
-    bool isMidi=false;
+    bool isMidi=false, isOsc=false;
     double midiDuration=0;
+    struct OscPreparedEvent { double seconds=0; std::vector<uint8_t> bytes; };
+    std::vector<OscPreparedEvent> oscEvents;
+    double oscDuration=0;
+    size_t oscCursor=0;
+    bool oscNeedsSync=true;
+    uint64_t oscHash=0;
+    int oscColumnId=0,oscRoute=-1,oscPort=9000;
+    juce::String oscHost;
+    OscEventSink* oscSink=nullptr;
+    std::shared_ptr<OscStream> oscStream;
     uint64_t midiHash=0;
     juce::String midiOutputId;
     int midiRoute=-1;
@@ -99,10 +110,11 @@ public:
     std::atomic<bool> rowPlaying {false};
 private:
     MidiOutputRouter midiRouter;
+    OscOutputRouter oscRouter;
     struct PlaybackEntry {
         std::shared_ptr<const AudioClip> clip;
         std::shared_ptr<CellPlaybackTelemetry> telemetry;
-        uint64_t midiHash=0;
+        uint64_t midiHash=0, oscHash=0;
     };
     std::map<int, PlaybackEntry> playback; // UI-thread owned; no callback map access
     struct Command { int id = 0; bool row = false, stop = false; uint64_t revision = 0, epoch = 0; bool seek = false; double seconds = 0; };
