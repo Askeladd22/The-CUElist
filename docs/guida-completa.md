@@ -84,7 +84,7 @@ I parametri audio si aggiornano senza azzerare il trasporto. Invio, **Applica mo
 | Altoparlante barrato | Mute, senza fermare la clip |
 | Cerchio barrato | Inversione della polarità di entrambi i canali |
 
-I simboli si evidenziano quando attivi. I livelli di cella, cue e colonna si moltiplicano. Le uscite si aggiornano cambiando dispositivo o canali attivi. Sotto MIDI i controlli audio sono nascosti e il selettore permette di scegliere un dispositivo MIDI hardware o virtuale. Sotto OSC il selettore rimane non operativo.
+I simboli si evidenziano quando attivi. I livelli di cella, cue e colonna si moltiplicano. Le uscite si aggiornano cambiando dispositivo o canali attivi. Sotto MIDI i controlli audio sono nascosti e il selettore permette di scegliere un dispositivo MIDI hardware o virtuale. Sotto OSC e disponibile il pulsante destinazione UDP: specifica il nome host o indirizzo IP e la porta del ricevitore. L'invio non fornisce conferma di ricezione (UDP).
 
 ## Clip MIDI e piano roll
 
