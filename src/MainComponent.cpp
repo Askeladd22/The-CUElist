@@ -30,7 +30,7 @@ MainComponent::MainComponent(bool startAudio) {
     setLookAndFeel(&theme); setWantsKeyboardFocus(true); setSize(1440,900);
     for (juce::Component* c : std::initializer_list<juce::Component*>{&openButton,&saveButton,&newButton,&addRowButton,&addColumnButton,
          &goButton,&panicButton,&deviceButton,&importButton,&midiEditButton,&playCellButton,&stopCellButton,&clearButton,&tempoButton,&applyButton,
-         &cellTab,&rowTab,&rowGain,&rowBehaviour,&rowMute,&rowLoop,&rowName,&cellName,&bpm,&behaviour,&meter,&follow,&loop,&gain,&viewport,&timeline,&utilities}) addAndMakeVisible(c);
+         &cellTab,&rowTab,&rowGain,&rowBehaviour,&rowMute,&rowLoop,&rowName,&cellName,&bpm,&behaviour,&follow,&loop,&gain,&viewport,&timeline,&utilities}) addAndMakeVisible(c);
     for (auto* b : {&openButton,&saveButton,&newButton,&addRowButton,&addColumnButton,&goButton,&panicButton,&deviceButton,
                     &importButton,&midiEditButton,&playCellButton,&stopCellButton,&clearButton,&tempoButton,&applyButton}) b->setWantsKeyboardFocus(false);
     viewport.setViewedComponent(&grid,false); viewport.setScrollBarsShown(true,true);
@@ -39,7 +39,6 @@ MainComponent::MainComponent(bool startAudio) {
     panicButton.setColour(juce::TextButton::textColourOffId,palette::red);
     importButton.setColour(juce::TextButton::buttonColourId,palette::teal.darker(0.65f));
     behaviour.addItemList({"Retrigger","Pausa / Restart","Pausa / Resume","Continue"},1);
-    meter.addItemList({"4/4","3/4","6/8","7/8","5/4"},1);
     gain.setSliderStyle(juce::Slider::LinearHorizontal); gain.setTextBoxStyle(juce::Slider::TextBoxRight,false,52,24);
     for (auto* slider : {&gain,&rowGain}) {
         slider->setSliderStyle(juce::Slider::LinearHorizontal); slider->setTextBoxStyle(juce::Slider::TextBoxRight,false,72,24);
@@ -141,7 +140,7 @@ void MainComponent::paint(juce::Graphics& g) {
     g.saveState();
     if (h<890) { const float factor=(float)(h-232)/658.0f; g.addTransform(juce::AffineTransform(1,0,0,0,factor,226*(1-factor))); }
     label(g,"Nome della cue",{x,235,220,18},11,palette::muted);
-    label(g,"BPM",{x,303,85,18},11,palette::muted); label(g,"Metrica",{x+112,303,100,18},11,palette::muted);
+    label(g,"BPM  /  quarti in 4/4",{x,303,220,18},11,palette::muted);
     g.setColour(palette::line); g.drawHorizontalLine(405,(float)x,(float)x+228);
     if (!rowSettings) {
     label(g,"CELLA  /  "+col.name,{x,420,228,20},11,palette::muted,true);
@@ -171,7 +170,7 @@ void MainComponent::resized() {
     int x=editorX+16;
     cellTab.setBounds(x,198,106,27); rowTab.setBounds(x+114,198,114,27);
     rowBehaviour.setBounds(x,479,228,30); rowMute.setBounds(x,527,228,24); rowLoop.setBounds(x,553,228,24); rowGain.setBounds(x,610,228,27);
-    rowName.setBounds(x,258,228,31); bpm.setBounds(x,326,100,31); meter.setBounds(x+112,326,116,31);
+    rowName.setBounds(x,258,228,31); bpm.setBounds(x,326,228,31);
     tempoButton.setBounds(x,368,228,27); cellName.setBounds(x,450,228,29);
     behaviour.setBounds(x,512,228,30);
     follow.setBounds(x-3,556,235,24); loop.setBounds(x-3,587,230,24); gain.setBounds(x+56,619,175,26);
@@ -181,7 +180,7 @@ void MainComponent::resized() {
     // Compact inspector on smaller displays, keeping all actions reachable.
     if (h<890) {
         const float factor=(float)(h-232)/658.0f;
-        for (juce::Component* c : std::initializer_list<juce::Component*>{&rowBehaviour,&rowMute,&rowLoop,&rowGain,&rowName,&bpm,&meter,&tempoButton,&cellName,&behaviour,&follow,&loop,&gain,&importButton,&midiEditButton,&playCellButton,&stopCellButton,&clearButton,&applyButton}) {
+        for (juce::Component* c : std::initializer_list<juce::Component*>{&rowBehaviour,&rowMute,&rowLoop,&rowGain,&rowName,&bpm,&tempoButton,&cellName,&behaviour,&follow,&loop,&gain,&importButton,&midiEditButton,&playCellButton,&stopCellButton,&clearButton,&applyButton}) {
             auto b=c->getBounds(); b.setY(226+(int)((b.getY()-226)*factor)); b.setHeight(std::max(22,(int)(b.getHeight()*factor))); c->setBounds(b);
         }
     }
@@ -196,9 +195,6 @@ void MainComponent::refreshInspector() {
     rowName.setTextToShowWhenEmpty("Nome della cue",palette::muted);
     rowName.setText(row.name,false); cellName.setText(c.name,false); cellName.setTextToShowWhenEmpty("Nome della cella",palette::muted);
     bpm.setText(juce::String(row.tempo.front().bpm,1),false);
-    auto signature=juce::String(row.tempo.front().numerator)+"/"+juce::String(row.tempo.front().denominator);
-    int item=0; for (int i=0;i<meter.getNumItems();++i) if (meter.getItemText(i)==signature) item=meter.getItemId(i);
-    if (!item) { item=meter.getNumItems()+1; meter.addItem(signature,item); } meter.setSelectedId(item,juce::dontSendNotification);
     behaviour.setSelectedId((int)c.behaviour+1,juce::dontSendNotification);
     follow.setToggleState(c.followsRow,juce::dontSendNotification); loop.setToggleState(c.loop,juce::dontSendNotification);
     gain.setValue(juce::Decibels::gainToDecibels(c.gain,-60.0f),juce::dontSendNotification);
@@ -230,8 +226,7 @@ bool MainComponent::select(int row,int column) {
 void MainComponent::changed(const juce::String& text,bool stopPlayback) { if (stopPlayback) engine.panic(); engine.publish(makeRenderState(show,clips),!stopPlayback); dirty=true; status=text; refresh(); }
 bool MainComponent::inspectorDiffers() const {
     const auto& row=show.rows[selectedRow]; const auto& cell=row.cells[selectedColumn];
-    auto signature=juce::String(row.tempo.front().numerator)+"/"+juce::String(row.tempo.front().denominator);
-    if (rowName.getText().trim()!=row.name || bpm.getText()!=juce::String(row.tempo.front().bpm,1) || meter.getText()!=signature) return true;
+    if (rowName.getText().trim()!=row.name || bpm.getText()!=juce::String(row.tempo.front().bpm,1)) return true;
     if (rowMute.getToggleState()!=row.muted || rowLoop.getToggleState()!=row.loop
         || rowBehaviour.getSelectedId()!=(row.overrideBehaviour ? (int)row.behaviour+2 : 1)
         || std::abs(rowGain.getValue()-juce::Decibels::gainToDecibels(row.gain,-60.0f))>0.051) return true;
@@ -248,8 +243,6 @@ bool MainComponent::applyInspector() {
     if (row.overrideBehaviour) row.behaviour=(Behaviour)(rowBehaviour.getSelectedId()-2);
     row.gain=juce::Decibels::decibelsToGain((float)rowGain.getValue(),-60.0f);
     if (bpm.getText()!=juce::String(row.tempo.front().bpm,1)) row.tempo.front().bpm=bpm.getText().getDoubleValue();
-    auto sig=juce::StringArray::fromTokens(meter.getText(),"/","");
-    row.tempo.front().numerator=sig[0].getIntValue(); row.tempo.front().denominator=sig[1].getIntValue();
     if (candidate.columns[selectedColumn].type!=ColumnType::osc) {
         cell.name=cellName.getText().trim(); cell.behaviour=(Behaviour)(behaviour.getSelectedId()-1);
         cell.followsRow=follow.getToggleState(); cell.loop=loop.getToggleState(); cell.gain=juce::Decibels::decibelsToGain((float)gain.getValue(),-60.0f);
@@ -443,15 +436,15 @@ void MainComponent::editTempo() {
     if (!applyInspector()) return;
     stopAll();
     const int rowId=show.rows[selectedRow].id; juce::String text;
-    for (const auto& p : show.rows[selectedRow].tempo) text+=juce::String(p.beat)+" "+juce::String(p.bpm)+" "+juce::String(p.numerator)+"/"+juce::String(p.denominator)+"\n";
-    prompt(this,"Mappa tempo della cue","Una riga per cambio: beat BPM metrica. Beat in quarti, partenza da 0. Non modifica la velocita dei WAV.",text,true,
+    for (const auto& p : show.rows[selectedRow].tempo) text+=juce::String(p.beat)+" "+juce::String(p.bpm)+"\n";
+    prompt(this,"Mappa tempo della cue","Una riga per cambio: beat BPM. Metrica 4/4; beat in quarti, partenza da 0. Non modifica la velocita dei WAV.",text,true,
         [safe=juce::Component::SafePointer<MainComponent>(this),rowId](juce::String input) {
             if (!safe) return;
             std::vector<TempoPoint> points;
             for (const auto& line : juce::StringArray::fromLines(input)) {
                 if (line.trim().isEmpty()) continue;
-                std::istringstream stream(line.toStdString()); TempoPoint p; char slash=0; std::string extra;
-                if (!(stream>>p.beat>>p.bpm>>p.numerator>>slash>>p.denominator) || slash!='/' || stream>>extra) { safe->message("Formato richiesto: 0 120 4/4. Una riga per ogni cambio."); return; }
+                std::istringstream stream(line.toStdString()); TempoPoint p; std::string extra;
+                if (!(stream>>p.beat>>p.bpm) || stream>>extra) { safe->message("Formato richiesto: 0 120. Una riga per ogni cambio."); return; }
                 points.push_back(p);
             }
             auto candidate=safe->show; for (auto& row : candidate.rows) if (row.id==rowId) row.tempo=points;

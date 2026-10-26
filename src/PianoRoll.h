@@ -1,6 +1,7 @@
 #pragma once
 #include "ShowModel.h"
 #include "Theme.h"
+#include <set>
 
 namespace cuelist {
 class PianoRollEditor final : public juce::Component {
@@ -26,8 +27,10 @@ private:
     juce::TextButton remove{"Elimina nota"}, zoomOut{"-"}, zoomIn{"+"}, apply{"Applica"}, cancel{"Annulla"};
     juce::String hint;
     int selected=-1;
+    std::set<int> selectedNotes;
     double pixelsPerBeat=80;
     double gridStep() const;
+    bool snapEnabled() const;
     void selectionChanged();
     void deleteSelected();
     void updateCanvas();

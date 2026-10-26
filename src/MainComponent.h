@@ -25,6 +25,7 @@ public:
     void resized() override;
     void paint(juce::Graphics&) override;
     void mouseDown(const juce::MouseEvent&) override;
+    void mouseDoubleClick(const juce::MouseEvent&) override;
     void mouseDrag(const juce::MouseEvent&) override;
     void mouseUp(const juce::MouseEvent&) override;
     void mouseWheelMove(const juce::MouseEvent&, const juce::MouseWheelDetails&) override;
@@ -35,6 +36,11 @@ private:
     double dragStartSeconds=0, dragLength=10, dragViewStart=0, dragPixels=1;
     double zoom=1, viewStart=0;
     juce::ScrollBar horizontalScroll{false};
+    juce::ComboBox snapDivision;
+    juce::TextButton snapToggle{"Magnete ON"};
+    bool snapEnabled=true;
+    double snapStepBeats() const;
+    double snapSeconds(double seconds) const;
     double fullLength() const;
     double visibleLength() const;
     void syncViewport();
@@ -107,7 +113,7 @@ private:
     juce::TextButton cellTab{"Cella"},rowTab{"Intera cue"};
     juce::TextButton tempoButton{"Mappa tempo"},applyButton{"Applica modifiche"};
     juce::TextEditor rowName,cellName,bpm;
-    juce::ComboBox behaviour,meter;
+    juce::ComboBox behaviour;
     juce::ToggleButton follow{"Partecipa al GO della riga"},loop{"Ripeti in loop"};
     juce::Slider gain;
     juce::Slider rowGain;

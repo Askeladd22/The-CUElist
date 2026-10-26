@@ -48,6 +48,40 @@ inline void pianoRollTests() {
         folder.createDirectory(); auto out=folder.getChildFile("piano-roll-preview.png").createOutputStream();
         if (out) { out->setPosition(0); out->truncate(); juce::PNGImageFormat{}.writeImageToStream(editor.createComponentSnapshot(editor.getLocalBounds()),*out); }
     });
+    test("piano roll right-button marquee selects moves and deletes multiple notes",[] {
+        PianoRollEditor editor(MidiClip{4,{{0,.25,60,100,1},{1,.25,61,100,1},{2,.25,60,100,1}}},[](const MidiClip&){});
+        auto& canvas=editor.getCanvas(); const auto time=juce::Time::getCurrentTime();
+        const juce::Point<float> a{60,1195},b{245,1260};
+        auto right=[&](juce::Point<float> p,bool drag) {
+            return juce::MouseEvent(juce::Desktop::getInstance().getMainMouseSource(),p,
+                juce::ModifierKeys(juce::ModifierKeys::rightButtonModifier),1,0,0,0,0,
+                &canvas,&canvas,time,a,time,1,drag);
+        };
+        canvas.mouseDown(right(a,false)); canvas.mouseDrag(right(b,true)); canvas.mouseUp(right(b,true));
+        const juce::Point<float> from{70,1240},to{90,1240};
+        canvas.mouseDown(cueViewFixtures::event(canvas,from,from));
+        canvas.mouseDrag(cueViewFixtures::event(canvas,to,from,1,true));
+        canvas.mouseUp(cueViewFixtures::event(canvas,to,from,1,true));
+        near(editor.getClip().notes[0].beat,.25);
+        near(editor.getClip().notes[1].beat,1.25);
+        near(editor.getClip().notes[2].beat,2.25);
+        canvas.keyPressed(juce::KeyPress(juce::KeyPress::deleteKey));
+        check(editor.getClip().notes.empty(),"Marquee did not select and delete all notes");
+    });
+    test("piano roll snap Off permits unsnapped placement and movement",[] {
+        PianoRollEditor editor(MidiClip{},[](const MidiClip&){});
+        auto& canvas=editor.getCanvas();
+        for (auto* child:editor.getChildren()) if (child->getName()=="midiSnap")
+            dynamic_cast<juce::ComboBox*>(child)->setSelectedId(5,juce::sendNotificationSync);
+        const juce::Point<float> from{94,1240};
+        canvas.mouseDoubleClick(cueViewFixtures::event(canvas,from,from,2));
+        near(editor.getClip().notes[0].beat,.375);
+        const juce::Point<float> dragFrom{100,1240},dragTo{112,1240};
+        canvas.mouseDown(cueViewFixtures::event(canvas,dragFrom,dragFrom));
+        canvas.mouseDrag(cueViewFixtures::event(canvas,dragTo,dragFrom,1,true));
+        canvas.mouseUp(cueViewFixtures::event(canvas,dragTo,dragFrom,1,true));
+        near(editor.getClip().notes[0].beat,.525);
+    });
     test("MIDI grid drag and timeline offset preserve embedded notes",[] {
         MainComponent ui(false); addColumn(ui.show,ColumnType::midi,{}); addRow(ui.show,{});
         ui.show.rows[0].cells[1].midi=MidiClip{4,{{0,1,60,100,1}}};
