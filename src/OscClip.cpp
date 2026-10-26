@@ -75,10 +75,14 @@ juce::Result validateOscClip(const OscClip& clip) {
     for (size_t i=0;i<clip.automations.size();++i)
         for (size_t j=i+1;j<clip.automations.size();++j) {
             const auto& a=clip.automations[i],&b=clip.automations[j];
-            if (a.message.address==b.message.address
-                && a.message.arguments.size()==b.message.arguments.size()
-                && a.argumentIndex==b.argumentIndex
-                && a.time<b.time+b.duration && b.time<a.time+a.duration)
+            if (a.message.address!=b.message.address ||
+                a.time>=b.time+b.duration || b.time>=a.time+a.duration) continue;
+            if (a.message.arguments.size()!=b.message.arguments.size())
+                return juce::Result::fail("Curve sullo stesso address OSC devono avere lo stesso formato.");
+            for (size_t arg=0;arg<a.message.arguments.size();++arg)
+                if (a.message.arguments[arg].type!=b.message.arguments[arg].type)
+                    return juce::Result::fail("Tipi OSC incompatibili fra automazioni dello stesso address.");
+            if (a.argumentIndex==b.argumentIndex)
                 return juce::Result::fail("Automazioni OSC sovrapposte sullo stesso argomento.");
         }
     return juce::Result::ok();
