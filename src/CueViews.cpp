@@ -3,7 +3,7 @@
 
 namespace cuelist {
 namespace {
-juce::String columnTypeName(ColumnType type) { return type==ColumnType::audio ? "AUDIO" : type==ColumnType::midi ? "MIDI" : "OSC"; }
+juce::String columnTypeName(ColumnType type) { return type==ColumnType::audio ? "AUDIO" : type==ColumnType::midi ? "MIDI" : type==ColumnType::osc ? "OSC" : "CONTROL"; }
 juce::String timeText(double seconds) {
     const auto whole=(int)seconds;
     return juce::String(whole/60).paddedLeft('0',2)+":"+juce::String(whole%60).paddedLeft('0',2);
@@ -39,9 +39,12 @@ void CueGrid::paint(juce::Graphics& g) {
         int ordinal=0;
         for (int n=0;n<=c;++n) if (show.columns[n].type==show.columns[c].type) ++ordinal;
         const auto prefix=show.columns[c].type==ColumnType::audio ? "Audio" :
-            show.columns[c].type==ColumnType::midi ? "MIDI" : "OSC";
+            show.columns[c].type==ColumnType::midi ? "MIDI" :
+            show.columns[c].type==ColumnType::osc ? "OSC" : "Control";
         const auto name=show.columns[c].name.isEmpty() ? juce::String(prefix)+" "+juce::String(ordinal) : show.columns[c].name;
         label(g,name,{x+10,36,columnWidth-20,22},12,palette::text,true);
+        if (show.columns[c].type==ColumnType::control && show.columns[c].controlLocked)
+            label(g,"LOCKED",{x+75,12,70,17},9,palette::amber,true);
         g.setColour(palette::line); g.drawVerticalLine(x,0,(float)getHeight());
     }
     const int tail=nameWidth+(int)show.columns.size()*columnWidth;
@@ -72,7 +75,19 @@ void CueGrid::paint(juce::Graphics& g) {
             const bool drop=dragging && dropRow==r && dropColumn==c;
             g.setColour(drop ? palette::amber : selected && c==owner.selectedColumn ? colour : palette::line.withAlpha(.65f));
             g.drawRoundedRectangle(box,5,drop || (selected && c==owner.selectedColumn) ? 1.5f : .6f);
-            if (loaded) {
+            if (show.columns[c].type==ColumnType::control) {
+                const auto& col=show.columns[c];
+                const ControlSet* set=col.controlLocked ? &col.controlDefaultSet :
+                    (cell.controlSet ? &*cell.controlSet : nullptr);
+                const int count=set ? (int)set->bindings.size() : 0;
+                label(g,col.controlLocked ? "DEFAULT / LOCKED" :
+                      count>0 ? "CONTROL SET" : "+ Control Set",
+                      {x+12,y+10,columnWidth-22,19},11,
+                      col.controlLocked ? palette::amber : count>0 ? palette::teal : palette::muted,
+                      count>0);
+                if (count>0) label(g,juce::String(count)+" mappings",
+                    {x+12,y+30,columnWidth-22,15},10,palette::muted);
+            } else if (loaded) {
                 auto playback=owner.engine.getCellPlayback(cell.id);
                 if (!owner.engine.connected.load()) playback.playing=playback.waiting=playback.paused=false;
                 label(g,cell.name.isEmpty() ? (cell.midi ? "MIDI" : cell.osc ? "OSC" : juce::File(cell.file).getFileNameWithoutExtension()) : cell.name,{x+13,y+10,columnWidth-68,22},12,palette::text);
@@ -99,8 +114,10 @@ void CueGrid::paint(juce::Graphics& g) {
                     effective ? palette::teal : !cell.stopOnNext ? palette::amber : palette::muted,
                     true,juce::Justification::centred);
             }
-            transportButton(g,{x+columnWidth-54,y+28,21,18},false,loaded);
-            transportButton(g,{x+columnWidth-29,y+28,21,18},true,loaded);
+            if (show.columns[c].type!=ColumnType::control) {
+                transportButton(g,{x+columnWidth-54,y+28,21,18},false,loaded);
+                transportButton(g,{x+columnWidth-29,y+28,21,18},true,loaded);
+            }
         }
         const auto tempo=row.tempo.front();
         label(g,juce::String(tempo.bpm,1),{tail+12,y+14,79,24},12,palette::teal);
@@ -143,11 +160,20 @@ void CueGrid::mouseDown(const juce::MouseEvent& e) {
     if (e.mods.isPopupMenu() && e.x>=nameWidth && e.y>=headerHeight) {
         const int row=(e.y-headerHeight)/rowHeight,col=(e.x-nameWidth)/columnWidth;
         if (row>=0 && row<(int)owner.show.rows.size() && col>=0 && col<(int)owner.show.columns.size() && owner.select(row,col)) {
-            juce::PopupMenu menu; menu.addItem(1,"Copy cell  Ctrl+C",owner.hasClip(row,col));
-            menu.addItem(2,"Paste cell  Ctrl+V",owner.copiedCell.has_value() && owner.copiedType==owner.show.columns[(size_t)col].type);
+            juce::PopupMenu menu;
+            const bool locked=owner.show.columns[(size_t)col].type==ColumnType::control &&
+                owner.show.columns[(size_t)col].controlLocked;
+            if (locked) menu.addItem(3,"Edit default Control Set");
+            menu.addItem(1,"Copy cell  Ctrl+C",owner.hasClip(row,col) && !locked);
+            menu.addItem(2,"Paste cell  Ctrl+V",owner.copiedCell.has_value() &&
+                owner.copiedType==owner.show.columns[(size_t)col].type && !locked);
             auto safe=juce::Component::SafePointer<MainComponent>(&owner);
             menu.showMenuAsync(juce::PopupMenu::Options().withTargetComponent(this),[safe](int item) {
-                if (safe) { if (item==1) safe->copySelectedCell(); else if (item==2) safe->pasteSelectedCell(); }
+                if (safe) {
+                    if (item==1) safe->copySelectedCell();
+                    else if (item==2) safe->pasteSelectedCell();
+                    else if (item==3) safe->editControlSet(safe->selectedRow,safe->selectedColumn);
+                }
             });
         }
         return;
@@ -200,7 +226,9 @@ void CueGrid::mouseDown(const juce::MouseEvent& e) {
     }
     if (e.x>=nameWidth && column<(int)owner.show.columns.size() && localY>=28 && localY<46) {
         const int localX=(e.x-nameWidth)%columnWidth;
-        if ((localX>=columnWidth-54 && localX<columnWidth-33) || (localX>=columnWidth-29 && localX<columnWidth-8)) {
+        if (owner.show.columns[(size_t)column].type!=ColumnType::control &&
+            ((localX>=columnWidth-54 && localX<columnWidth-33) ||
+             (localX>=columnWidth-29 && localX<columnWidth-8))) {
             if (e.getNumberOfClicks()==1 && owner.hasClip(row,column)) {
                 if (localX<columnWidth-33) owner.triggerCellAt(row,column); else owner.stopCellAt(row,column);
             }
@@ -221,8 +249,12 @@ void CueGrid::mouseDown(const juce::MouseEvent& e) {
         else if (localY>=17 && localY<38 && e.x>=54 && e.x<74) owner.deleteRow(row);
         else if (e.x>=84 && e.x<128 && localY>=12 && localY<42) owner.triggerRow(row);
         else owner.select(row,owner.selectedColumn);
-    } else if (column<(int)owner.show.columns.size() && owner.select(row,column) && owner.hasClip(row,column)) {
-        dragRow=row; dragColumn=column;
+    } else if (column<(int)owner.show.columns.size() && owner.select(row,column)) {
+        if (owner.show.columns[(size_t)column].type==ColumnType::control) {
+            if (e.getNumberOfClicks()==1) owner.editControlSet(row,column);
+        } else if (owner.hasClip(row,column)) {
+            dragRow=row; dragColumn=column;
+        }
     }
 }
 void CueGrid::mouseDrag(const juce::MouseEvent& e) {
@@ -256,6 +288,8 @@ void CueGrid::mouseDoubleClick(const juce::MouseEvent& e) {
         if (col<(int)owner.show.columns.size() && owner.select(row,col)) {
             if (owner.show.columns[col].type==ColumnType::midi) owner.editMidiClip();
             else if (owner.show.columns[col].type==ColumnType::osc) owner.editOscClip();
+            else if (owner.show.columns[col].type==ColumnType::control)
+                owner.editControlSet(row,col);
             else owner.triggerCell();
         }
     }
