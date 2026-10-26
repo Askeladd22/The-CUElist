@@ -153,7 +153,7 @@ private:
     juce::Slider gain;
     juce::Slider rowGain;
     juce::Slider masterSlider;
-    struct DockResizeHandle : juce::Component {
+    struct DockResizeHandle : juce::Component, juce::SettableTooltipClient {
         explicit DockResizeHandle(MainComponent& p) : owner(p) { setMouseCursor(juce::MouseCursor::UpDownResizeCursor); }
         void paint(juce::Graphics& g) override { g.setColour(palette::muted); g.fillRoundedRectangle(getLocalBounds().toFloat().withSizeKeepingCentre(76,3),1.5f); }
         void mouseDown(const juce::MouseEvent&) override { original=owner.dockHeight; }
