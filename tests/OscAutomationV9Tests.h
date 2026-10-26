@@ -150,6 +150,22 @@ void oscAutomationV9Tests() {
         check(sink.packets.size()==stopped+1,"Retrigger must re-send initial OSC value");
         check(sink.packets.back()==initial,"Retrigger initial OSC value changed");
     });
+    test("OSC timeline edits participate in application-wide Undo and Redo",[] {
+        MainComponent ui(false);
+        addColumn(ui.show,ColumnType::osc,"OSC");
+        check(ui.select(0,1),"Cannot select OSC column");
+        ui.editOscClip();
+        auto* editor=ui.activeOscEditor();
+        check(editor!=nullptr,"OSC editor missing");
+        editor->setSize(940,360);
+        const juce::Point<float> point{230,118};
+        editor->mouseDown(cueViewFixtures::event(*editor,point,point));
+        check(ui.show.rows[0].cells[1].osc->events.size()==1,"Mouse click did not insert event");
+        check(ui.undoEdit(),"OSC event Undo unavailable");
+        check(ui.show.rows[0].cells[1].osc->events.empty(),"OSC Undo did not restore old clip");
+        check(ui.redoEdit(),"OSC event Redo unavailable");
+        check(ui.show.rows[0].cells[1].osc->events.size()==1,"OSC Redo did not restore inserted event");
+    });
     test("OSC editor creates timeline events and automation ramps with separate grid and snap",[] {
         OscClipEditor editor(OscClip{},{{0,120,4,4}},
             [](const OscClip&,const OscClip&,bool){});
