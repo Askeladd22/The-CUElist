@@ -72,14 +72,18 @@ public:
         activeCueId=id; activePresetId=preset; pickup.clear();
     }
     int activeCue() const noexcept { return activeCueId; }
-    std::optional<MappedControl> resolve(const ControlEvent& e,
-                                         std::optional<float> currentTarget={}) {
+    const ControlBinding* matched(const ControlEvent& e) const {
         const ControlBinding* best=nullptr;
         for (const auto& b:settings.bindings) if (samePhysicalInput(b,e)
             && scopeApplies(b,activeCueId,activePresetId)) {
             if (!best || priority(b.scope)>priority(best->scope) ||
                 (priority(b.scope)==priority(best->scope) && b.id<best->id)) best=&b;
         }
+        return best;
+    }
+    std::optional<MappedControl> resolve(const ControlEvent& e,
+                                         std::optional<float> currentTarget={}) {
+        const ControlBinding* best=matched(e);
         if (!best) return {};
         const float raw=e.normalized();
         auto& state=pickup[best->id];
@@ -107,7 +111,8 @@ private:
 
 inline juce::Result validateControls(const ControlSettings& s,
         const std::vector<int>& rowIds,const std::vector<int>& columnIds) {
-    if (s.nextId<1 || s.nextId>=1000000000 || s.bindings.size()>2048 || s.presets.size()>256)
+    if (s.midiInputId.length()>255 || s.nextId<1 || s.nextId>=1000000000 ||
+        s.bindings.size()>2048 || s.presets.size()>256)
         return juce::Result::fail("Limiti mapping MIDI superati.");
     std::set<int> ids;
     for (const auto& p:s.presets)
