@@ -5,7 +5,7 @@ Questa pagina conserva le istruzioni operative e tecniche dettagliate della vers
 
 **0.5.0 · Windows x64 · Portable · C++17 / JUCE 8 · Licenza proprietaria**
 
-Controllo di spettacoli mediante una griglia di cue, clip audio e timeline. Riproduce WAV e MP3; non gestisce video. Supporta clip MIDI di note e un piano roll integrato. OSC rimane predisposto ma non operativo.
+Controllo di spettacoli mediante una griglia di cue, clip audio e timeline. Riproduce WAV e MP3; non gestisce video. Supporta clip MIDI di note e un piano roll integrato. Le colonne OSC inviano messaggi UDP a un destinatario IP/host e porta configurati nelle utility. Le clip OSC possono contenere eventi in secondi o beat e argomenti tipizzati (interi, float e stringhe).
 
 ## Avvio rapido
 
