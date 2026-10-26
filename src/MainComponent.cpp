@@ -428,7 +428,7 @@ void MainComponent::triggerRow(int row) {
     }
     repaint(); grid.repaint();
 }
-void MainComponent::goNext() { if (nextCue<(int)show.rows.size()) triggerRow(nextCue); else { status="Fine sequenza. Seleziona una cue per ripartire."; repaint(); } }
+void MainComponent::goNext() { if (nextCue<(int)show.rows.size()) triggerRow(nextCue); else { status="End of sequence. Select a cue to restart."; repaint(); } }
 void MainComponent::triggerCell() {
     if (!applyInspector()) return;
     auto& c=show.rows[selectedRow].cells[selectedColumn];
