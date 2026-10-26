@@ -107,13 +107,17 @@ void uiRefinementTests() {
     test("Master audio is within left column utilities and audio strips are compact", [] {
         MainComponent ui(false); ui.setSize(1500,900);
         auto* utilities=find<ColumnUtilities>(ui);
-        auto* master=dynamic_cast<juce::Slider*>(controlsV3::named(*utilities,"masterAudioDb"));
-        check(master && master->getParentComponent()==utilities,"Master not placed in utility panel");
+        auto* master=dynamic_cast<GainMeterFader*>(controlsV3::named(*utilities,"masterAudioDb"));
+        check(master && master->getParentComponent()==utilities,"Integrated Master not placed in utility panel");
+        auto* masterPan=dynamic_cast<juce::Slider*>(controlsV3::named(*utilities,"masterPan"));
+        auto* masterMute=dynamic_cast<juce::ToggleButton*>(controlsV3::named(*utilities,"masterMute"));
+        check(masterPan && masterMute,"Master pan and mute missing from utilities");
         auto* audio=utilities->getChildComponent(0);
         auto* fader=dynamic_cast<GainMeterFader*>(controlsV3::named(*audio,"columnGainDb"));
         auto* pan=dynamic_cast<juce::Slider*>(controlsV3::named(*audio,"columnPan"));
         check(fader && pan && pan->getWidth()>=43 && pan->getWidth()<=50 && fader->getWidth()<=96,"Strip controls were not reduced");
-        check(master->getWidth()<=80 && master->getSliderStyle()==juce::Slider::LinearVertical,
-              "Master fader not compact and vertical");
+        check(master->getWidth()<=96 && master->getHeight()>90 &&
+              master->getNumChildComponents()==0,
+              "Master does not use the compact integrated meter/fader");
     });
 }
