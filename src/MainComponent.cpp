@@ -30,7 +30,7 @@ void prompt(juce::Component* parent,const juce::String& title,const juce::String
 MainComponent::MainComponent(bool startAudio) {
     setLookAndFeel(&theme); setWantsKeyboardFocus(true); setSize(1440,900);
     for (juce::Component* c : std::initializer_list<juce::Component*>{&openButton,&saveButton,&newButton,&addRowButton,&addColumnButton,
-         &goButton,&panicButton,&deviceButton,&masterSlider,&importButton,&midiEditButton,&oscEditButton,&playCellButton,&stopCellButton,&clearButton,&tempoButton,&applyButton,
+         &goButton,&panicButton,&deviceButton,&dockResize,&importButton,&midiEditButton,&oscEditButton,&playCellButton,&stopCellButton,&clearButton,&tempoButton,&applyButton,
          &cellTab,&rowTab,&rowGain,&rowBehaviour,&rowMute,&rowLoop,&rowName,&cellName,&bpm,&behaviour,&follow,&loop,&cellAutoStop,&gain,&viewport,&timeline,&utilities,
          &clipCollapseButton,&clipCloseButton}) addAndMakeVisible(c);
     for (auto* b : {&openButton,&saveButton,&newButton,&addRowButton,&addColumnButton,&goButton,&panicButton,&deviceButton,
@@ -71,6 +71,8 @@ MainComponent::MainComponent(bool startAudio) {
     cellAutoStop.setName("cellAutoStop");
     cellAutoStop.setTooltip("La cella si arresta al GO di un'altra cue solo se Auto Stop della sua riga e attivo.");
     cellAutoStop.onClick=[this] { setCellAutoStop(selectedRow,selectedColumn,cellAutoStop.getToggleState()); };
+    dockResize.setName("clipEditorResizeHandle");
+    dockResize.setTooltip("Trascina in alto o in basso per ridimensionare il Clip Editor integrato.");
     clipCollapseButton.setName("clipEditorCollapse");
     clipCloseButton.setName("clipEditorClose");
     clipCollapseButton.setVisible(false); clipCloseButton.setVisible(false);
@@ -130,7 +132,7 @@ void MainComponent::paint(juce::Graphics& g) {
     label(g,"SESSION",{232,25,100,22},12,palette::teal,true);
     g.setColour(palette::teal); g.fillRect(232,69,65,3);
     label(g,"0.5  /  PORTABLE",{334,25,160,22},11,palette::muted);
-    label(g,"MASTER AUDIO",{std::max(380,w-833),25,115,22},11,palette::teal,true);
+
     g.setColour(engine.connected.load() ? palette::teal : palette::red); g.fillEllipse((float)w-367,32,6,6);
     label(g,engine.connected.load() ? "Audio disponibile" : "Audio non disponibile",{w-352,22,160,25},12,palette::muted);
     label(g,"WORKSPACE",{20,99,140,18},10,palette::muted,true);
@@ -188,10 +190,10 @@ void MainComponent::resized() {
     const int w=getWidth(),h=getHeight(); editorX=w-280;
     newButton.setBounds(w-190,23,68,29); openButton.setBounds(w-116,23,46,29); saveButton.setBounds(w-64,23,52,29);
     deviceButton.setBounds(20,188,140,33);
-    masterSlider.setBounds(std::max(490,w-715),22,224,29);
+
     addRowButton.setBounds(editorX-188,98,76,33); addColumnButton.setBounds(editorX-104,98,92,33);
     const bool docked=(clipEditor && !clipWindow) || (oscEditor && !oscWindow);
-    const int dockHeight=docked ? (clipCollapsed ? 36 : 208) : 0;
+    const int dockHeight=docked ? (clipCollapsed ? 36 : this->dockHeight) : 0;
     const int gridHeight=std::max(235,h-438-dockHeight);
     constexpr int utilityHeight=182;
     viewport.setBounds(204,154,editorX-220,gridHeight-utilityHeight);
@@ -200,6 +202,11 @@ void MainComponent::resized() {
     const int dockY=168+gridHeight;
     clipCollapseButton.setVisible(docked);
     clipCloseButton.setVisible(docked);
+    dockResize.setVisible(docked && !clipCollapsed);
+    if (docked && !clipCollapsed) {
+        dockResize.setBounds(std::max(700,editorX-245),dockY-8,94,11);
+        dockResize.toFront(false);
+    }
     if (docked) {
         clipCollapseButton.setBounds(522,dockY+4,86,26);
         clipCloseButton.setBounds(615,dockY+4,82,26);
