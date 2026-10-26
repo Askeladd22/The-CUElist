@@ -788,6 +788,7 @@ void MainComponent::deleteColumn(int index) {
     for (auto& col:show.columns) purge(col.controlDefaultSet);
     for (auto& row:show.rows) for (auto& cell:row.cells)
         if (cell.controlSet) purge(*cell.controlSet);
+    for (auto& saved:show.controls.templates) purge(saved.set);
     refreshControlSettings();
     selectedColumn=std::min(index,(int)show.columns.size()-1); changed("Column deleted. Original files retained.",true);
 }
