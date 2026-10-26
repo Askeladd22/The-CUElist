@@ -107,7 +107,7 @@ private:
     juce::TextButton cellTab{"Cella"},rowTab{"Intera cue"};
     juce::TextButton tempoButton{"Mappa tempo"},applyButton{"Applica modifiche"};
     juce::TextEditor rowName,cellName,bpm;
-    juce::ComboBox behaviour,meter;
+    juce::ComboBox behaviour;
     juce::ToggleButton follow{"Partecipa al GO della riga"},loop{"Ripeti in loop"};
     juce::Slider gain;
     juce::Slider rowGain;
