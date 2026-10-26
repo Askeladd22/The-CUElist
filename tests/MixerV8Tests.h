@@ -61,7 +61,10 @@ void mixerV8Tests() {
         const int columnId=ui.show.columns[0].id;
         ui.clips[ui.show.rows[0].cells[0].id]=clip;
         ui.engine.publish(makeRenderState(ui.show,ui.clips));
-        ui.triggerRow(0);
+        ui.engine.connected.store(true);
+        // Exercise the transport directly: a real UI GO would require an
+        // external MIDI port, which is intentionally unavailable in CI.
+        check(ui.engine.send(ui.show.rows[0].id,true),"Failed to queue mixed-media GO");
         juce::AudioBuffer<float> output(2,1);
         auto render=[&] { ui.engine.collectRetired();
             ui.engine.processBlock(output.getArrayOfWritePointers(),2,1,4);
