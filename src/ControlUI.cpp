@@ -93,7 +93,6 @@ void MainComponent::dispatchControl(const ControlEvent& input) {
             }
         }
         if (current.has_value() && b.invert) current=1.0f-*current;
-        break;
     }
     const auto action=controlMapping.resolve(input,current);
     if (!action) return;
