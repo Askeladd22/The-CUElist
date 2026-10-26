@@ -2,6 +2,7 @@
 #include "AudioEngine.h"
 #include "Theme.h"
 namespace cuelist {
+class PianoRollEditor;
 class MainComponent;
 class CueGrid final : public juce::Component, public juce::FileDragAndDropTarget {
 public:
@@ -74,6 +75,9 @@ public:
     void importFile(const juce::File&);
     void importDialog();
     void editMidiClip();
+    void detachMidiEditor();
+    void dockMidiEditor();
+    void closeMidiEditor();
     void setMidiOutput(int column,const juce::String& identifier);
     bool hasClip(int row,int column) const;
     double clipDuration(int row,int column) const;
@@ -124,6 +128,11 @@ private:
     std::unique_ptr<juce::FileChooser> chooser;
     juce::Component::SafePointer<juce::DialogWindow> deviceDialog;
     juce::Component::SafePointer<juce::DialogWindow> midiDialog;
+    std::unique_ptr<PianoRollEditor> clipEditor;
+    int clipEditorCellId=-1;
+    bool clipEditorExpanded=false;
+    juce::TextButton floatEditorButton{"Stacca editor"}, expandEditorButton{"Espandi"};
+    void layoutClipEditor();
     juce::File projectFile;
     juce::String status="Pronto. Seleziona una cella Audio e importa un WAV.";
     bool dirty=false;
