@@ -62,6 +62,7 @@ public:
         }
         if (!e.mods.isLeftButtonDown()) return;
         const int hitIndex=hit(e.position);
+        if (hitIndex<0 && !e.mods.isShiftDown() && e.x>=keysWidth && e.y>=rulerHeight) { addNote(e.position); return; }
         if (e.mods.isShiftDown()) {
             if (hitIndex>=0) {
                 if (!owner.selectedNotes.insert(hitIndex).second) owner.selectedNotes.erase(hitIndex);
@@ -76,20 +77,21 @@ public:
         resizing=e.x>=noteBox(original).getRight()-7;
         originals.clear();
         for (int index:owner.selectedNotes) originals.push_back({index,owner.clip.notes[(size_t)index]});
-        dragging=true;
+        dragging=true; owner.beginEdit();
         owner.selectionChanged(); repaint();
     }
-    void mouseDoubleClick(const juce::MouseEvent& e) override {
-        if (!e.mods.isLeftButtonDown() || e.x<keysWidth || e.y<rulerHeight || hit(e.position)>=0) return;
+    void mouseDoubleClick(const juce::MouseEvent&) override { /* Single click inserts notes. */ }
+    void addNote(juce::Point<float> p) {
+        if (p.x<keysWidth || p.y<rulerHeight || hit(p)>=0) return;
         if (owner.clip.notes.size()>=10000) { owner.hint="Limite: 10.000 note per clip."; owner.repaint(); return; }
         const double step=owner.gridStep();
-        const double rawBeat=(e.x-keysWidth)/owner.pixelsPerBeat;
+        const double rawBeat=(p.x-keysWidth)/owner.pixelsPerBeat;
         const double beat=owner.snapEnabled() ? std::floor(rawBeat/step)*step : rawBeat;
         if (beat<0 || beat>=owner.clip.lengthBeats) return;
         MidiNote note; note.beat=beat; note.length=std::min(owner.snapEnabled() ? step : .25,owner.clip.lengthBeats-beat);
-        note.pitch=juce::jlimit(0,127,127-(e.y-rulerHeight)/noteHeight);
+        note.pitch=juce::jlimit(0,127,127-(int)(p.y-rulerHeight)/noteHeight);
         note.velocity=(int)owner.velocity.getValue(); note.channel=owner.channel.getSelectedId();
-        owner.clip.notes.push_back(note); owner.selected=(int)owner.clip.notes.size()-1; owner.selectedNotes.clear(); owner.selectedNotes.insert(owner.selected); owner.selectionChanged(); repaint();
+        owner.beginEdit(); owner.clip.notes.push_back(note); owner.selected=(int)owner.clip.notes.size()-1; owner.selectedNotes.clear(); owner.selectedNotes.insert(owner.selected); owner.selectionChanged(); owner.endEdit(); repaint();
     }
     void mouseDrag(const juce::MouseEvent& e) override {
         if (selecting) {
@@ -129,9 +131,11 @@ public:
         }
         owner.selectionChanged(); repaint();
     }
-    void mouseUp(const juce::MouseEvent&) override { dragging=false; selecting=false; repaint(); }
+    void mouseUp(const juce::MouseEvent&) override { if (dragging) owner.endEdit(); dragging=false; selecting=false; repaint(); }
     bool keyPressed(const juce::KeyPress& key) override {
         if (key==juce::KeyPress::deleteKey || key==juce::KeyPress::backspaceKey) { owner.deleteSelected(); return true; }
+        if (key.getModifiers().isCommandDown() && (key.getKeyCode()=='Z' || key.getKeyCode()=='z')) { if (key.getModifiers().isShiftDown()) owner.redo(); else owner.undo(); return true; }
+        if (key.getModifiers().isCommandDown() && (key.getKeyCode()=='Y' || key.getKeyCode()=='y')) { owner.redo(); return true; }
         return false;
     }
 private:
@@ -143,7 +147,7 @@ private:
 PianoRollEditor::PianoRollEditor(MidiClip value,std::function<void(const MidiClip&)> callback)
     : clip(std::move(value)),commit(std::move(callback)),canvas(std::make_unique<Canvas>(*this)) {
     setLookAndFeel(&theme);
-    for (juce::Component* c:std::initializer_list<juce::Component*>{&viewport,&snap,&channel,&velocity,&length,&remove,&zoomOut,&zoomIn,&apply,&cancel}) addAndMakeVisible(c);
+    for (juce::Component* c:std::initializer_list<juce::Component*>{&viewport,&snap,&channel,&velocity,&length,&remove,&zoomOut,&zoomIn,&undoButton,&redoButton,&cancel}) addAndMakeVisible(c);
     viewport.setViewedComponent(canvas.get(),false); viewport.setScrollBarsShown(true,true);
     viewport.onScroll=[this] { repaint(); };
     snap.addItemList({"1/4","1/8","1/16","1/32"},1); snap.addItem("Off",5); snap.setSelectedId(3);
@@ -152,11 +156,12 @@ PianoRollEditor::PianoRollEditor(MidiClip value,std::function<void(const MidiCli
     velocity.setSliderStyle(juce::Slider::LinearHorizontal); velocity.setTextBoxStyle(juce::Slider::TextBoxRight,false,46,24); velocity.setRange(1,127,1); velocity.setValue(100);
     length.setSliderStyle(juce::Slider::IncDecButtons); length.setTextBoxStyle(juce::Slider::TextBoxLeft,false,66,24); length.setRange(.25,4096,.25); length.setValue(clip.lengthBeats,juce::dontSendNotification);
     snap.onChange=[this] { canvas->repaint(); };
-    channel.onChange=[this] { for (int index:selectedNotes) clip.notes[(size_t)index].channel=channel.getSelectedId(); selectionChanged(); canvas->repaint(); };
-    velocity.onValueChange=[this] { for (int index:selectedNotes) clip.notes[(size_t)index].velocity=(int)velocity.getValue(); canvas->repaint(); };
+    channel.onChange=[this] { if (selectedNotes.empty()) return; beginEdit(); for (int index:selectedNotes) clip.notes[(size_t)index].channel=channel.getSelectedId(); endEdit(); selectionChanged(); canvas->repaint(); };
+    velocity.onValueChange=[this] { if (selectedNotes.empty()) return; beginEdit(); for (int index:selectedNotes) clip.notes[(size_t)index].velocity=(int)velocity.getValue(); endEdit(); canvas->repaint(); };
     length.onValueChange=[this] {
+        beginEdit();
         double minimum=.25; for (const auto& n:clip.notes) minimum=std::max(minimum,n.beat+n.length);
-        clip.lengthBeats=std::max(std::ceil(minimum*4)/4,length.getValue()); length.setValue(clip.lengthBeats,juce::dontSendNotification); updateCanvas();
+        clip.lengthBeats=std::max(std::ceil(minimum*4)/4,length.getValue()); length.setValue(clip.lengthBeats,juce::dontSendNotification); updateCanvas(); endEdit();
     };
     remove.onClick=[this] { deleteSelected(); };
     auto zoom=[this](double factor) {
@@ -165,9 +170,9 @@ PianoRollEditor::PianoRollEditor(MidiClip value,std::function<void(const MidiCli
         viewport.setViewPosition((int)(left*pixelsPerBeat),viewport.getViewPositionY());
     };
     zoomOut.onClick=[zoom] { zoom(.5); }; zoomIn.onClick=[zoom] { zoom(2); };
-    apply.onClick=[this] { auto result=validateMidiClip(clip); if (result.failed()) { hint=result.getErrorMessage(); repaint(); return; } commit(clip); close(); };
+    undoButton.onClick=[this] { undo(); }; redoButton.onClick=[this] { redo(); };
     cancel.onClick=[this] { close(); };
-    for (auto* b:{&remove,&zoomOut,&zoomIn,&apply,&cancel}) b->setWantsKeyboardFocus(false);
+    for (auto* b:{&remove,&zoomOut,&zoomIn,&undoButton,&redoButton,&cancel}) b->setWantsKeyboardFocus(false);
     setSize(940,620); updateCanvas(); selectionChanged();
     const int pitch=clip.notes.empty() ? 64 : clip.notes.front().pitch;
     viewport.setViewPosition(0,std::max(0,rulerHeight+(127-pitch)*noteHeight-viewport.getHeight()/2));
@@ -181,15 +186,15 @@ void PianoRollEditor::selectionChanged() {
     if (selected>=0) { const auto& n=clip.notes[(size_t)selected]; velocity.setValue(n.velocity,juce::dontSendNotification); channel.setSelectedId(n.channel,juce::dontSendNotification);
         hint=selectedNotes.size()>1 ? juce::String((int)selectedNotes.size())+" note selezionate (trascina, modifica velocity/canale o Canc)"
             : "Nota "+juce::String(n.pitch)+"  |  Beat "+juce::String(n.beat+1,2)+"  |  Durata "+juce::String(n.length,2)+" beat";
-    } else hint="Doppio clic: aggiungi  |  Destro+trascina: seleziona  |  Shift+clic: aggiungi  |  Canc: elimina";
+    } else hint="Clic: aggiungi  |  Destro+trascina: seleziona  |  Shift+clic: aggiungi  |  Canc: elimina";
     remove.setEnabled(!selectedNotes.empty()); repaint();
 }
 void PianoRollEditor::deleteSelected() {
     if (selectedNotes.empty()) return;
-    for (auto it=selectedNotes.rbegin();it!=selectedNotes.rend();++it) clip.notes.erase(clip.notes.begin()+*it);
-    selectedNotes.clear(); selected=-1; selectionChanged(); canvas->repaint();
+    beginEdit(); for (auto it=selectedNotes.rbegin();it!=selectedNotes.rend();++it) clip.notes.erase(clip.notes.begin()+*it);
+    selectedNotes.clear(); selected=-1; selectionChanged(); endEdit(); canvas->repaint();
 }
-void PianoRollEditor::close() { if (auto* dialog=findParentComponentOfClass<juce::DialogWindow>()) dialog->exitModalState(0); }
+void PianoRollEditor::close() { if (closeHandler) closeHandler(); else if (auto* dialog=findParentComponentOfClass<juce::DialogWindow>()) dialog->exitModalState(0); }
 void PianoRollEditor::paint(juce::Graphics& g) {
     g.fillAll(palette::panel);
     label(g,"PIANO ROLL  /  note MIDI",{16,8,310,25},17,palette::amber,true);
@@ -213,7 +218,8 @@ void PianoRollEditor::resized() {
     snap.setBounds(56,44,76,26); channel.setBounds(194,44,66,26); velocity.setBounds(328,44,172,26); length.setBounds(570,44,110,26);
     zoomOut.setBounds(getWidth()-88,8,32,26); zoomIn.setBounds(getWidth()-48,8,32,26); remove.setBounds(getWidth()-140,44,124,26);
     viewport.setBounds(16,106,getWidth()-32,getHeight()-170);
-    cancel.setBounds(getWidth()-194,getHeight()-32,82,26); apply.setBounds(getWidth()-104,getHeight()-32,88,26);
+    undoButton.setBounds(getWidth()-390,getHeight()-32,145,26); redoButton.setBounds(getWidth()-237,getHeight()-32,95,26);
+    cancel.setBounds(getWidth()-116,getHeight()-32,100,26);
     if (canvas) updateCanvas();
 }
 }
