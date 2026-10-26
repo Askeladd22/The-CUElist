@@ -23,11 +23,13 @@ void test(const char* name, const std::function<void()>& body) {
 #include "PianoRollTests.h"
 #include "MidiTests.h"
 #include "OscTests.h"
+#include "AutoStopV7Tests.h"
 int main() {
     juce::ScopedJuceInitialiser_GUI initialiseJuce;
     pianoRollTests();
     registerMidiTests();
     oscTests();
+    autoStopV7Tests();
     test("MIDI columns accept file drops and enable their importer", [] {
         MainComponent ui(false); addColumn(ui.show,ColumnType::midi,{}); ui.select(0,1);
         auto* grid=cueViewFixtures::find<CueGrid>(ui);

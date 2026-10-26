@@ -21,6 +21,9 @@ struct Cell {
     int id = 0;
     juce::String name, file;
     bool followsRow = true, loop = false;
+    // Participates in the next cue's automatic stop, only if the containing row is armed.
+    // True is the legacy behaviour (all cells follow the row-level Auto Stop policy).
+    bool stopOnNext = true;
     float gain = 1.0f;
     double startSeconds = 0;
     Behaviour behaviour = Behaviour::retrigger;

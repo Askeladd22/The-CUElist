@@ -6,7 +6,7 @@
 
 ## Funzionalità principali
 
-- **Scaletta di cue:** griglia di righe e colonne con comandi GO, Stop, Panic e Auto Stop.
+- **Scaletta di cue:** griglia di righe e colonne con GO, Stop e Panic; Auto Stop 2.0 per cue e per singola cella audio/MIDI/OSC.
 - **Audio:** importazione e riproduzione di WAV e MP3, loop, livelli, pan e routing per colonna.
 - **MIDI:** importazione e creazione di clip di note, con Piano Roll e selezione dell'uscita MIDI esterna.
 - **OSC:** clip di messaggi UDP con parametri interi, float o stringa, tempi in secondi o beat e destinazione IP/porta per colonna.

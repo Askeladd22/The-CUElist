@@ -46,11 +46,15 @@ La sessione iniziale contiene una cue e una colonna Audio senza nomi precompilat
 
 Selezionare una riga riarma la sequenza da quella cue. I pulsanti Play/Stop delle celle e lo Stop di riga non cambiano la prossima cue. Spazio non lancia cue mentre si scrive in un campo testo.
 
-### Auto Stop
+### Auto Stop 2.0
 
-Il toggle **Auto Stop**, a destra di ogni riga, è **attivo per default**. Al GO di un'altra cue vengono fermate tutte le clip delle righe con questo toggle acceso, anche quelle lanciate singolarmente o escluse dal GO.
+**Auto Stop della riga** resta l'interruttore generale, a destra delle cue, ed e attivo per impostazione predefinita. Ogni cella Audio, MIDI o OSC ha inoltre il comando **AS ON / AS OFF**, nell'angolo superiore destro. Cliccalo per includere o escludere quella singola cella. La stessa opzione e disponibile nell'inspector, scheda **Cella**, come **Arresta al GO della prossima cue**.
 
-Disattivalo sulle righe che devono continuare in sovrapposizione. Anche il GO di una cue vuota attiva questo arresto; Play della singola cella e Stop espliciti non fermano altre righe. Riattivare la stessa cue non applica Auto Stop a sé stessa.
+**Una cella si ferma al GO di un'altra cue soltanto se sono ON sia l'Auto Stop della riga sia quello della cella.** Se la riga e OFF, tutte le sue clip continuano indipendentemente dalla scelta della cella. Se la riga e ON, le celle AS OFF continuano, mentre le altre si fermano. Le clip protette conservano il loro trasporto e la timeline della cue. La regola vale anche per i lanci diretti delle celle e quando la nuova cue e vuota. Il GO della stessa cue non applica Auto Stop a se stessa.
+
+**Stop diretto, Stop della cue e Panic** interrompono sempre la riproduzione, anche per le celle AS OFF. L'opzione Auto Stop e distinta da **Partecipa al GO della riga**: quest'ultima stabilisce solo se una cella parte quando si lancia il GO collettivo.
+
+I nuovi show hanno tutte le celle AS ON. All'apertura degli show precedenti (v1-v6), tutte le celle mantengono il valore predefinito ON, preservando il comportamento precedente del controllo Auto Stop di riga.
 
 ### Comportamenti di attivazione
 
@@ -118,7 +122,7 @@ Le uscite sono memorizzate per identificativo: un dispositivo assente non viene 
 
 Sovrascrivendo uno show, la versione precedente resta in `.cuelist.bak`. Le generazioni precedenti dei media vengono conservate per rendere utilizzabile il backup: salvataggi ripetuti possono aumentare lo spazio occupato.
 
-Il formato corrente è **v6**. **Apri** legge anche v1/v2/v3/v4/v5 e backup. Le clip MIDI sono salvate direttamente nello show, senza dipendere dal file MIDI importato:
+Il formato corrente è **v7**. **Apri** legge anche v1/v2/v3/v4/v5/v6 e backup. Il flag Auto Stop per cella viene letto dagli show v7 e inizializzato su ON negli show precedenti. Le clip MIDI sono salvate direttamente nello show, senza dipendere dal file MIDI importato:
 
 - Auto Stop viene abilitato per default nei progetti precedenti alla v4.
 - Nei progetti v1/v2, i vecchi Restart e Stop diventano Retrigger e le utility di colonna partono neutre.

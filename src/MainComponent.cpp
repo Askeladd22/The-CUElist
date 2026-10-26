@@ -31,7 +31,7 @@ MainComponent::MainComponent(bool startAudio) {
     setLookAndFeel(&theme); setWantsKeyboardFocus(true); setSize(1440,900);
     for (juce::Component* c : std::initializer_list<juce::Component*>{&openButton,&saveButton,&newButton,&addRowButton,&addColumnButton,
          &goButton,&panicButton,&deviceButton,&importButton,&midiEditButton,&oscEditButton,&playCellButton,&stopCellButton,&clearButton,&tempoButton,&applyButton,
-         &cellTab,&rowTab,&rowGain,&rowBehaviour,&rowMute,&rowLoop,&rowName,&cellName,&bpm,&behaviour,&follow,&loop,&gain,&viewport,&timeline,&utilities,
+         &cellTab,&rowTab,&rowGain,&rowBehaviour,&rowMute,&rowLoop,&rowName,&cellName,&bpm,&behaviour,&follow,&loop,&cellAutoStop,&gain,&viewport,&timeline,&utilities,
          &clipCollapseButton,&clipCloseButton}) addAndMakeVisible(c);
     for (auto* b : {&openButton,&saveButton,&newButton,&addRowButton,&addColumnButton,&goButton,&panicButton,&deviceButton,
                     &importButton,&midiEditButton,&oscEditButton,&playCellButton,&stopCellButton,&clearButton,&tempoButton,&applyButton}) b->setWantsKeyboardFocus(false);
@@ -59,6 +59,9 @@ MainComponent::MainComponent(bool startAudio) {
     gain.onValueChange=[this] { applyInspector(); }; rowGain.onValueChange=[this] { applyInspector(); };
     for (auto* combo : {&behaviour,&rowBehaviour}) combo->onChange=[this] { applyInspector(); };
     for (auto* toggle : {&follow,&loop,&rowMute,&rowLoop}) toggle->onClick=[this] { applyInspector(); };
+    cellAutoStop.setName("cellAutoStop");
+    cellAutoStop.setTooltip("La cella si arresta al GO di un'altra cue solo se Auto Stop della sua riga e attivo.");
+    cellAutoStop.onClick=[this] { setCellAutoStop(selectedRow,selectedColumn,cellAutoStop.getToggleState()); };
     clipCollapseButton.setName("clipEditorCollapse");
     clipCloseButton.setName("clipEditorClose");
     clipCollapseButton.setVisible(false); clipCloseButton.setVisible(false);
@@ -206,6 +209,7 @@ void MainComponent::resized() {
     tempoButton.setBounds(x,368,228,27); cellName.setBounds(x,450,228,29);
     behaviour.setBounds(x,512,228,30);
     follow.setBounds(x-3,556,235,24); loop.setBounds(x-3,587,230,24); gain.setBounds(x+56,619,175,26);
+    cellAutoStop.setBounds(x-3,647,235,24);
     midiEditButton.setBounds(x,673,228,32);
     oscEditButton.setBounds(x,673,228,32);
     importButton.setBounds(x,722,228,33); playCellButton.setBounds(x,765,142,30); stopCellButton.setBounds(x+150,765,78,30);
@@ -213,7 +217,7 @@ void MainComponent::resized() {
     // Compact inspector on smaller displays, keeping all actions reachable.
     if (h<890) {
         const float factor=(float)(h-232)/658.0f;
-        for (juce::Component* c : std::initializer_list<juce::Component*>{&rowBehaviour,&rowMute,&rowLoop,&rowGain,&rowName,&bpm,&tempoButton,&cellName,&behaviour,&follow,&loop,&gain,&importButton,&midiEditButton,&oscEditButton,&playCellButton,&stopCellButton,&clearButton,&applyButton}) {
+        for (juce::Component* c : std::initializer_list<juce::Component*>{&rowBehaviour,&rowMute,&rowLoop,&rowGain,&rowName,&bpm,&tempoButton,&cellName,&behaviour,&follow,&loop,&cellAutoStop,&gain,&importButton,&midiEditButton,&oscEditButton,&playCellButton,&stopCellButton,&clearButton,&applyButton}) {
             auto b=c->getBounds(); b.setY(226+(int)((b.getY()-226)*factor)); b.setHeight(std::max(22,(int)(b.getHeight()*factor))); c->setBounds(b);
         }
     }
@@ -235,11 +239,14 @@ void MainComponent::refreshInspector() {
     bpm.setText(juce::String(row.tempo.front().bpm,1),false);
     behaviour.setSelectedId((int)c.behaviour+1,juce::dontSendNotification);
     follow.setToggleState(c.followsRow,juce::dontSendNotification); loop.setToggleState(c.loop,juce::dontSendNotification);
+    cellAutoStop.setToggleState(c.stopOnNext,juce::dontSendNotification);
+    cellAutoStop.setTooltip(row.stopOnNext ? "ON: partecipa ad Auto Stop. OFF: continua al GO successivo."
+        : "Auto Stop della cue e OFF: l'opzione della cella diventa effettiva quando la cue torna ON.");
     gain.setValue(juce::Decibels::gainToDecibels(c.gain,-60.0f),juce::dontSendNotification);
     rowGain.setValue(juce::Decibels::gainToDecibels(row.gain,-60.0f),juce::dontSendNotification);
     rowMute.setToggleState(row.muted,juce::dontSendNotification); rowLoop.setToggleState(row.loop,juce::dontSendNotification);
     rowBehaviour.setSelectedId(row.overrideBehaviour ? (int)row.behaviour+2 : 1,juce::dontSendNotification);
-    for (juce::Component* component : std::initializer_list<juce::Component*>{&cellName,&behaviour,&follow,&loop,&gain,&importButton,&midiEditButton,&oscEditButton,&playCellButton,&stopCellButton,&clearButton}) component->setVisible(!rowSettings);
+    for (juce::Component* component : std::initializer_list<juce::Component*>{&cellName,&behaviour,&follow,&loop,&cellAutoStop,&gain,&importButton,&midiEditButton,&oscEditButton,&playCellButton,&stopCellButton,&clearButton}) component->setVisible(!rowSettings);
     for (juce::Component* component : std::initializer_list<juce::Component*>{&rowBehaviour,&rowGain,&rowMute,&rowLoop}) component->setVisible(rowSettings);
     bool audio=col.type==ColumnType::audio; const bool midi=col.type==ColumnType::midi;
     for (juce::Component* component : std::initializer_list<juce::Component*>{&importButton,&midiEditButton,&oscEditButton,&playCellButton,&stopCellButton,&clearButton,&gain,&loop,&behaviour,&follow,&cellName}) component->setEnabled(true);
@@ -412,7 +419,18 @@ void MainComponent::setAutoStop(int row,bool enabled) {
     status=enabled ? "La riga si fermera al GO di un'altra cue." : "La riga continuera anche al GO di un'altra cue.";
     grid.repaint(); repaint();
 }
-void MainComponent::stopAll() { engine.panic(); status="PANIC / tutte le riproduzioni audio e MIDI fermate."; repaint(); }
+void MainComponent::setCellAutoStop(int row,int column,bool enabled) {
+    if (row<0 || row>=(int)show.rows.size() || column<0 || column>=(int)show.columns.size()) return;
+    auto& cell=show.rows[(size_t)row].cells[(size_t)column];
+    if (cell.stopOnNext==enabled) return;
+    cell.stopOnNext=enabled;
+    dirty=true;
+    engine.publish(makeRenderState(show,clips));
+    if (row==selectedRow && column==selectedColumn) cellAutoStop.setToggleState(enabled,juce::dontSendNotification);
+    status=enabled ? "Cella inclusa in Auto Stop della cue." : "Cella esclusa da Auto Stop: continua al prossimo GO.";
+    grid.repaint(); repaint();
+}
+void MainComponent::stopAll() { engine.panic(); status="PANIC / riproduzioni audio, MIDI e OSC fermate."; repaint(); }
 bool MainComponent::keyPressed(const juce::KeyPress& key) {
     if (key.getModifiers().isCommandDown() && (key.getKeyCode()=='Z' || key.getKeyCode()=='z'))
         return key.getModifiers().isShiftDown() ? redoEdit() : undoEdit();

@@ -108,6 +108,7 @@ public:
     void setColumnUtilities(int column,float gain,float pan,bool muted,bool inverted);
     void setColumnOutput(int column,int output);
     void setAutoStop(int row,bool enabled);
+    void setCellAutoStop(int row,int column,bool enabled);
     void renameTitle(bool column,int index);
     void reorderRow(int index,int delta);
     void reorderColumn(int index,int delta);
@@ -139,6 +140,7 @@ private:
     juce::TextEditor rowName,cellName,bpm;
     juce::ComboBox behaviour;
     juce::ToggleButton follow{"Partecipa al GO della riga"},loop{"Ripeti in loop"};
+    juce::ToggleButton cellAutoStop{"Arresta al GO della prossima cue"};
     juce::Slider gain;
     juce::Slider rowGain;
     juce::ComboBox rowBehaviour;

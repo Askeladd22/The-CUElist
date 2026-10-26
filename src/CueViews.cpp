@@ -68,7 +68,7 @@ void CueGrid::paint(juce::Graphics& g) {
             if (loaded) {
                 auto playback=owner.engine.getCellPlayback(cell.id);
                 if (!owner.engine.connected.load()) playback.playing=playback.waiting=playback.paused=false;
-                label(g,cell.name.isEmpty() ? (cell.midi ? "MIDI" : cell.osc ? "OSC" : juce::File(cell.file).getFileNameWithoutExtension()) : cell.name,{x+13,y+10,columnWidth-40,22},12,palette::text);
+                label(g,cell.name.isEmpty() ? (cell.midi ? "MIDI" : cell.osc ? "OSC" : juce::File(cell.file).getFileNameWithoutExtension()) : cell.name,{x+13,y+10,columnWidth-68,22},12,palette::text);
                 const auto seconds=owner.clipDuration(r,c);
                 label(g,playback.waiting ? "ATTESA" : timeText(playback.positionSeconds)+" / "+timeText(seconds),
                       {x+13,y+30,columnWidth-72,14},9,colour);
@@ -79,6 +79,17 @@ void CueGrid::paint(juce::Graphics& g) {
                 if (playback.playing || playback.paused) g.fillEllipse((float)x+columnWidth-19,(float)y+13,6,6);
             } else label(g,missing ? "! File non disponibile" : show.columns[c].type==ColumnType::audio ? "+ WAV / MP3" : show.columns[c].type==ColumnType::midi ? "+ MIDI / Piano roll" : "+ OSC / messaggi",
                          {x+10,y+8,columnWidth-20,18},11,missing ? palette::red : palette::muted,false,juce::Justification::centred);
+            // Auto Stop is a per-cell choice. The row's switch remains the
+            // master gate; an OFF cell survives future GO commands.
+            const bool effective=row.stopOnNext && cell.stopOnNext;
+            const auto badge=juce::Rectangle<float>((float)x+columnWidth-52,(float)y+7,44,18);
+            g.setColour(effective ? palette::teal.withAlpha(.22f)
+                : (!cell.stopOnNext ? palette::amber.withAlpha(.16f) : palette::raised));
+            g.fillRoundedRectangle(badge,3.0f);
+            label(g,cell.stopOnNext ? "AS ON" : "AS OFF",
+                {x+columnWidth-52,y+7,44,18},9,
+                effective ? palette::teal : !cell.stopOnNext ? palette::amber : palette::muted,
+                true,juce::Justification::centred);
             transportButton(g,{x+columnWidth-54,y+28,21,18},false,loaded);
             transportButton(g,{x+columnWidth-29,y+28,21,18},true,loaded);
         }
@@ -117,6 +128,14 @@ void CueGrid::mouseDown(const juce::MouseEvent& e) {
     if (e.x>=tail+178 && e.x<tail+274 && localY>=10 && localY<44) {
         if (e.getNumberOfClicks()==1) owner.setAutoStop(row,!owner.show.rows[row].stopOnNext);
         return;
+    }
+    if (e.x>=nameWidth && column>=0 && column<(int)owner.show.columns.size() && localY>=5 && localY<27) {
+        const int localX=(e.x-nameWidth)%columnWidth;
+        if (localX>=columnWidth-52 && localX<columnWidth-8) {
+            if (e.getNumberOfClicks()==1)
+                owner.setCellAutoStop(row,column,!owner.show.rows[(size_t)row].cells[(size_t)column].stopOnNext);
+            return;
+        }
     }
     if (e.x>=nameWidth && column<(int)owner.show.columns.size() && localY>=28 && localY<46) {
         const int localX=(e.x-nameWidth)%columnWidth;
