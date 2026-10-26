@@ -185,6 +185,7 @@ void MainComponent::resized() {
     if (docked) {
         clipCollapseButton.setBounds(editorX-380,dockY+4,86,26);
         clipCloseButton.setBounds(editorX-286,dockY+4,82,26);
+        clipCollapseButton.toFront(false); clipCloseButton.toFront(false);
         clipEditor->setVisible(!clipCollapsed);
         if (!clipCollapsed) clipEditor->setBounds(204,dockY,editorX-220,dockHeight);
     }
