@@ -109,4 +109,25 @@ void controlColumnTests() {
               saved.targetColumnId==loaded.columns[0].id,
               "Updated pan destination or curve failed to roundtrip");
     });
+    test("Legacy mapping remains an inherited fallback in Control Column preview",[] {
+        ControlSettings settings; settings.nextId=3;
+        ControlBinding legacy; legacy.id=1;legacy.deviceId="dev";legacy.number=7;
+        legacy.target=ControlTarget::masterGain;
+        settings.bindings.push_back(legacy);
+        ControlBinding override=legacy;override.id=2;override.number=8;
+        override.target=ControlTarget::oscFloat;
+        ControlLayer layer;layer.columnId=45;layer.cueId=100;layer.priority=3;
+        layer.set.bindings={override};
+        ControlMappingEngine mapping;mapping.setSettings(settings);
+        mapping.setLayers({layer});mapping.setActiveCue(100,0);
+        const auto effective=mapping.effectiveForCue(100);
+        check(effective.size()==2 && effective[0].columnId==0 &&
+              effective[1].columnId==45,
+              "Effective view dropped the legacy fallback or local override");
+        ControlEvent f1{"dev",ControlKind::cc,1,7,64,false};
+        ControlEvent f2{"dev",ControlKind::cc,1,8,64,false};
+        check(mapping.matched(f1)->id==1 && mapping.matched(f2)->id==2,
+              "Legacy fallback differed from displayed effective mapping");
+    });
+
 }
