@@ -190,7 +190,7 @@ private:
     bool controlLearnArmed=false;
     std::optional<ControlEvent> learnedInput;
     juce::Component::SafePointer<juce::DialogWindow> controlDialog;
-    std::map<int,bool> pressedControls;
+    std::map<juce::String,bool> pressedInputs;
     void resetActiveMapping();
     void dispatchControl(const ControlEvent&);
     void refreshControlSettings();
