@@ -48,7 +48,7 @@ Selezionare una riga riarma la sequenza da quella cue. I pulsanti Play/Stop dell
 
 ### Mixer e Master audio
 
-Nelle **Utility Colonne** ogni colonna Audio presenta una striscia compatta: **fader verticale sovrapposto al meter PEAK** con scala interna dei dB, **pan rotativo ridotto** con indicatore L/C/R e pulsanti **Mute** e **inversione di fase**. Le uscite Audio, MIDI e OSC mantengono il proprio routing: le colonne MIDI mostrano la porta MIDI e quelle OSC la destinazione UDP, senza controlli del volume audio.
+Nelle **Utility Colonne** ogni colonna Audio presenta una striscia compatta: **fader verticale sovrapposto al meter PEAK** con scala interna dei dB, **pan rotativo compatto, di dimensioni intermedie** con indicatore L/C/R e pulsanti **Mute** e **inversione di fase**. Le uscite Audio, MIDI e OSC mantengono il proprio routing: le colonne MIDI mostrano la porta MIDI e quelle OSC la destinazione UDP, senza controlli del volume audio.
 
 Il meter di colonna misura il picco dei contributi audio **dopo il livello di cella/riga/colonna, il pan e il mute**, **prima del Master**; è un indicatore di picco per le voci della strip, non un misuratore RMS né un limiter. Una colonna senza segnale mostra il livello che decresce verso zero.
 
@@ -60,11 +60,15 @@ La regolazione Master è salvata nello show (formato v8). Gli show v1–v7 si ap
 
 Seleziona una cella e usa **Ctrl+C** per copiarne contenuto e impostazioni; seleziona una cella della **stessa tipologia di colonna** (Audio, MIDI oppure OSC) e usa **Ctrl+V** per incollare. Puoi utilizzare anche il **clic destro sulla cella** e il menu Copia/Incolla. L'ID della cella di destinazione rimane invariato, e per l'audio viene riutilizzato il media gia caricato nella sessione. Le colonne di tipo differente non possono ricevere l'incolla.
 
+Le nuove colonne senza nome vengono chiamate automaticamente **Audio 1**, **Audio 2**, **MIDI 1**, **OSC 1** e cosi via, contando separatamente i tipi. Un doppio clic sul titolo della colonna permette di rinominarla; i nomi personali restano invariati. I vecchi progetti con nomi vuoti visualizzano comunque un'etichetta numerata senza riscrivere il file salvato.
+
+Per le **righe complete**, usa il pulsante **…** accanto al nome della cue oppure il **clic destro sull'area del nome**: **Copia cue**, **Incolla cue sotto questa**, **Duplica cue**, **Elimina cue**. L'incolla crea una nuova riga sotto quella scelta, con i suoi tempi, tutte le clip e le impostazioni. La duplicazione crea subito una copia della riga con suffisso "(copia)". Entrambe assegnano nuovi identificativi alla riga e alle celle, senza cambiare gli ID originali. Il media audio precaricato puo essere condiviso in memoria; l'operazione interrompe il trasporto, analogamente al riordino o all'eliminazione delle righe. La copia conservata puo essere incollata anche dopo l'eliminazione della riga sorgente, purché la struttura delle colonne sia rimasta compatibile.
+
 La **scritta BPM sulla riga** e cliccabile: permette di cambiare direttamente il tempo iniziale della cue, lasciando intatti gli eventuali cambi BPM successivi. Il cambiamento ricostruisce la temporizzazione MIDI/OSC e arresta il trasporto durante l'operazione. La metrica non e piu mostrata nell'interfaccia della griglia.
 
 ### Auto Stop 2.0
 
-**Auto Stop della riga** resta l'interruttore generale, a destra delle cue, ed e attivo per impostazione predefinita. Il comando **AS ON / AS OFF** delle singole celle Audio, MIDI e OSC rimane nascosto per non affollare la griglia: premi **+** accanto all'Auto Stop generale della riga per mostrarlo o nasconderlo; poi clicca il comando della cella che vuoi includere/escludere. La stessa opzione e disponibile nell'inspector, scheda **Cella**, come **Arresta al GO della prossima cue**.
+**Auto Stop della riga** resta l'interruttore generale, a destra delle cue, ed e attivo per impostazione predefinita. Il comando **AS ON / AS OFF** delle singole celle Audio, MIDI e OSC rimane nascosto per non affollare la griglia: premi **+** posto **sotto il toggle Auto Stop** della stessa riga per mostrarlo o nasconderlo; poi clicca il comando della cella che vuoi includere/escludere. La stessa opzione e disponibile nell'inspector, scheda **Cella**, come **Arresta al GO della prossima cue**.
 
 **Una cella si ferma al GO di un'altra cue soltanto se sono ON sia l'Auto Stop della riga sia quello della cella.** Se la riga e OFF, tutte le sue clip continuano indipendentemente dalla scelta della cella. Se la riga e ON, le celle AS OFF continuano, mentre le altre si fermano. Le clip protette conservano il loro trasporto e la timeline della cue. La regola vale anche per i lanci diretti delle celle e quando la nuova cue e vuota. Il GO della stessa cue non applica Auto Stop a se stessa.
 
