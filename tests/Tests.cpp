@@ -48,7 +48,7 @@ int main() {
         check(grid->isInterestedInFileDrag({"notes.mid"}),"MIDI file drop rejected");
         bool importer=false;
         for (auto* child:ui.getChildren()) if (auto* button=dynamic_cast<juce::TextButton*>(child))
-            if (button->getButtonText()=="Importa MIDI") importer=button->isEnabled();
+            if (button->getButtonText()=="Import MIDI") importer=button->isEnabled();
         check(importer,"MIDI importer unavailable");
     });
     test("tempo changes integrate seconds, independent of other rows", [] {
@@ -193,7 +193,7 @@ int main() {
         {
             MainComponent ui(false);
             for (auto* child : ui.getChildren()) if (auto* button=dynamic_cast<juce::TextButton*>(child))
-                if (button->getButtonText()=="Dispositivi audio") button->onClick();
+                if (button->getButtonText()=="Audio devices") button->onClick();
             dialog=juce::ModalComponentManager::getInstance()->getModalComponent(0);
             check(dialog!=nullptr,"Device selector did not open");
         }
@@ -214,7 +214,7 @@ int main() {
         stream=folder.getChildFile("interface-mixed-progress.png").createOutputStream();
         if (stream) { stream->setPosition(0); stream->truncate(); juce::PNGImageFormat{}.writeImageToStream(preview.createComponentSnapshot(preview.getLocalBounds()),*stream); }
         for (auto* child : preview.getChildren()) if (auto* button=dynamic_cast<juce::TextButton*>(child))
-            if (button->getButtonText()=="Intera cue") button->onClick();
+            if (button->getButtonText()=="Entire cue") button->onClick();
         preview.setSize(1180,820);
         stream=folder.getChildFile("interface-row-small.png").createOutputStream();
         if (stream) { stream->setPosition(0); stream->truncate(); juce::PNGImageFormat{}.writeImageToStream(preview.createComponentSnapshot(preview.getLocalBounds()),*stream); }
