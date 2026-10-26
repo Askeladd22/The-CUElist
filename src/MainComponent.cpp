@@ -30,7 +30,7 @@ MainComponent::MainComponent(bool startAudio) {
     setLookAndFeel(&theme); setWantsKeyboardFocus(true); setSize(1440,900);
     for (juce::Component* c : std::initializer_list<juce::Component*>{&openButton,&saveButton,&newButton,&addRowButton,&addColumnButton,
          &goButton,&panicButton,&deviceButton,&importButton,&midiEditButton,&playCellButton,&stopCellButton,&clearButton,&tempoButton,&applyButton,
-         &cellTab,&rowTab,&rowGain,&rowBehaviour,&rowMute,&rowLoop,&rowName,&cellName,&bpm,&behaviour,&follow,&loop,&gain,&viewport,&timeline,&utilities}) addAndMakeVisible(c);
+         &floatEditorButton,&expandEditorButton,&cellTab,&rowTab,&rowGain,&rowBehaviour,&rowMute,&rowLoop,&rowName,&cellName,&bpm,&behaviour,&follow,&loop,&gain,&viewport,&timeline,&utilities}) addAndMakeVisible(c);
     for (auto* b : {&openButton,&saveButton,&newButton,&addRowButton,&addColumnButton,&goButton,&panicButton,&deviceButton,
                     &importButton,&midiEditButton,&playCellButton,&stopCellButton,&clearButton,&tempoButton,&applyButton}) b->setWantsKeyboardFocus(false);
     viewport.setViewedComponent(&grid,false); viewport.setScrollBarsShown(true,true);
@@ -79,6 +79,8 @@ MainComponent::MainComponent(bool startAudio) {
         auto& c=show.rows[selectedRow].cells[selectedColumn]; clips.erase(c.id); c.file.clear(); c.name.clear(); c.midi.reset(); changed("Clip rimossa dalla cella. File originale conservato.",true);
     };
     midiEditButton.onClick=[this] { editMidiClip(); };
+    floatEditorButton.onClick=[this] { detachMidiEditor(); };
+    expandEditorButton.onClick=[this] { clipEditorExpanded=!clipEditorExpanded; expandEditorButton.setButtonText(clipEditorExpanded ? "Riduci" : "Espandi"); resized(); };
     applyButton.onClick=[this] { applyInspector(); }; tempoButton.onClick=[this] { editTempo(); };
     importButton.setTooltip("WAV e MP3 mono/stereo. Importare ferma tutte le riproduzioni.");
     applyButton.setTooltip("Applica i parametri senza interrompere il trasporto. Invio conferma i nomi.");
@@ -91,6 +93,7 @@ MainComponent::~MainComponent() {
     stopTimer(); engine.panic(); chooser.reset();
     // The device selector holds a reference to engine.devices: destroy it first.
     delete deviceDialog.getComponent(); delete midiDialog.getComponent();
+    clipEditor.reset();
     viewport.setViewedComponent(nullptr,false); setLookAndFeel(nullptr);
 }
 
@@ -162,11 +165,20 @@ void MainComponent::resized() {
     newButton.setBounds(w-190,23,68,29); openButton.setBounds(w-116,23,46,29); saveButton.setBounds(w-64,23,52,29);
     deviceButton.setBounds(20,188,140,33);
     addRowButton.setBounds(editorX-188,98,76,33); addColumnButton.setBounds(editorX-104,98,92,33);
-    const int gridHeight=std::max(235,h-438);
+    const int dockHeight=clipEditor && !midiDialog && clipEditor->isVisible() ? (clipEditorExpanded ? 280 : 190) : 0;
+    const int gridHeight=std::max(235,h-438-dockHeight);
     viewport.setBounds(204,154,editorX-220,gridHeight-116);
     utilities.setBounds(204,154+gridHeight-116,editorX-220,116);
     utilities.syncScroll(viewport.getViewPositionX());
-    timeline.setBounds(204,168+gridHeight,editorX-220,h-gridHeight-215);
+    timeline.setBounds(204,168+gridHeight+dockHeight,editorX-220,std::max(100,h-gridHeight-215-dockHeight));
+    if (dockHeight>0) {
+        floatEditorButton.setBounds(editorX-380,158+gridHeight,116,25);
+        expandEditorButton.setBounds(editorX-257,158+gridHeight,95,25);
+        clipEditor->setBounds(204,188+gridHeight,editorX-220,dockHeight-34);
+        floatEditorButton.setVisible(true); expandEditorButton.setVisible(true);
+    } else {
+        floatEditorButton.setVisible(false); expandEditorButton.setVisible(false);
+    }
     int x=editorX+16;
     cellTab.setBounds(x,198,106,27); rowTab.setBounds(x+114,198,114,27);
     rowBehaviour.setBounds(x,479,228,30); rowMute.setBounds(x,527,228,24); rowLoop.setBounds(x,553,228,24); rowGain.setBounds(x,610,228,27);
@@ -221,8 +233,12 @@ bool MainComponent::select(int row,int column) {
     int viewY=viewport.getViewPositionY();
     if (top<viewY) viewY=top; else if (bottom>viewY+viewport.getViewHeight()) viewY=bottom-viewport.getViewHeight();
     viewport.setViewPosition(viewport.getViewPositionX(),std::max(0,viewY));
+    if (clipEditor && !midiDialog && clipEditorCellId!=show.rows[selectedRow].cells[selectedColumn].id) {
+        closeMidiEditor();
+    }
     repaint(); grid.repaint(); timeline.repaint(); return true;
 }
+void MainComponent::layoutClipEditor() { resized(); repaint(); }
 void MainComponent::changed(const juce::String& text,bool stopPlayback) { if (stopPlayback) engine.panic(); engine.publish(makeRenderState(show,clips),!stopPlayback); dirty=true; status=text; refresh(); }
 bool MainComponent::inspectorDiffers() const {
     const auto& row=show.rows[selectedRow]; const auto& cell=row.cells[selectedColumn];
