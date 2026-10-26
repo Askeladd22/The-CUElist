@@ -35,6 +35,33 @@ void timelineV3Tests() {
         auto* scroll=find<juce::ScrollBar>(*timeline);
         near(scroll->getCurrentRangeSize(),23.1); near(scroll->getCurrentRangeStart(),0);
     });
+    test("timeline magnet snaps audio clips by musical tempo and can be disabled",[] {
+        MainComponent ui(false);
+        auto clip=std::make_shared<AudioClip>(); clip->samples.setSize(1,48000); clip->samples.clear();
+        ui.clips[ui.show.rows[0].cells[0].id]=clip;
+        auto* timeline=find<Timeline>(ui); timeline->setSize(800,250);
+        const juce::Point<float> from{160,94},to{195,94};
+        timeline->mouseDown(event(*timeline,from,from));
+        timeline->mouseDrag(event(*timeline,to,from,1,true));
+        timeline->mouseUp(event(*timeline,to,from,1,true));
+        near(ui.show.rows[0].cells[0].startSeconds,.5);
+        for (auto* component:timeline->getChildren())
+            if (component->getName()=="timelineSnapToggle") dynamic_cast<juce::TextButton*>(component)->onClick();
+        ui.setClipStart(0,0);
+        timeline->mouseDown(event(*timeline,from,from));
+        timeline->mouseDrag(event(*timeline,to,from,1,true));
+        timeline->mouseUp(event(*timeline,to,from,1,true));
+        near(ui.show.rows[0].cells[0].startSeconds,35.0*10/640);
+    });
+    test("timeline MIDI double-click opens existing clip editor",[] {
+        MainComponent ui(false); addColumn(ui.show,ColumnType::midi,{});
+        ui.show.rows[0].cells[1].midi=MidiClip{4,{{0,1,60,100,1}}};
+        auto* timeline=find<Timeline>(ui); timeline->setSize(800,250);
+        const juce::Point<float> p{160,136};
+        timeline->mouseDoubleClick(event(*timeline,p,p,2));
+        check(cueViewFixtures::find<PianoRollEditor>(ui)==nullptr,"Editor accidentally nested in main view");
+        check(juce::ModalComponentManager::getInstance()->getModalComponent(0)!=nullptr,"MIDI timeline double-click did not open editor");
+    });
     test("timeline Ctrl wheel anchors time and changing row cancels a seek", [] {
         MainComponent ui(false); addRow(ui.show,{});
         auto* timeline=find<Timeline>(ui); timeline->setSize(800,250);
