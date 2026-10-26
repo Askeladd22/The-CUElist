@@ -52,6 +52,11 @@ bool MainComponent::hasClip(int row,int column) const {
     if (row<0 || column<0 || row>=(int)show.rows.size() || column>=(int)show.columns.size()) return false;
     const auto& cell=show.rows[(size_t)row].cells[(size_t)column];
     const auto type=show.columns[(size_t)column].type;
+    if (type==ColumnType::control) {
+        const auto& col=show.columns[(size_t)column];
+        return col.controlLocked ? !col.controlDefaultSet.bindings.empty() :
+            cell.controlSet.has_value() && !cell.controlSet->bindings.empty();
+    }
     return type==ColumnType::midi ? cell.midi.has_value()
         : type==ColumnType::osc ? cell.osc.has_value() : clips.count(cell.id)>0;
 }

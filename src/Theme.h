@@ -4,7 +4,7 @@ namespace cuelist {
 namespace palette {
 inline const juce::Colour background{0xff080f1b}, panel{0xff0d1828}, raised{0xff132236}, line{0xff23354b};
 inline const juce::Colour text{0xffe4edf7}, muted{0xff8498af}, teal{0xff20d9c0}, amber{0xffedbb57}, purple{0xffa78bfa}, red{0xffff6c7e};
-inline juce::Colour type(int i) { return i==0 ? teal : i==1 ? amber : purple; }
+inline juce::Colour type(int i) { return i==0 ? teal : i==1 ? amber : i==2 ? purple : juce::Colour(0xff79b8ff); }
 }
 inline juce::Font font(float size, bool bold=false) { return juce::Font(juce::FontOptions("Segoe UI",size,bold ? juce::Font::bold : juce::Font::plain)); }
 inline void label(juce::Graphics& g,const juce::String& s,juce::Rectangle<int> r,float size=14,juce::Colour colour=palette::text,bool bold=false,int align=juce::Justification::centredLeft) {

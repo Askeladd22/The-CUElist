@@ -7,7 +7,7 @@
 
 namespace cuelist {
 namespace {
-juce::String typeName(ColumnType t) { return t==ColumnType::audio ? "AUDIO" : t==ColumnType::midi ? "MIDI" : "OSC"; }
+juce::String typeName(ColumnType t) { return t==ColumnType::audio ? "AUDIO" : t==ColumnType::midi ? "MIDI" : t==ColumnType::osc ? "OSC" : "CONTROL"; }
 juce::String duration(double seconds) {
     int s=(int)seconds; return juce::String(s/60).paddedLeft('0',2)+":"+juce::String(s%60).paddedLeft('0',2);
 }
@@ -98,7 +98,7 @@ MainComponent::MainComponent(bool startAudio) {
     addRowButton.onClick=[this] { if (!applyInspector()) return; addRow(show,{}); selectedRow=nextCue=(int)show.rows.size()-1; changed("Cue added. Playback stopped.",true); };
     addColumnButton.onClick=[this] {
         if (!applyInspector()) return;
-        juce::PopupMenu menu; menu.addItem(1,"Audio"); menu.addItem(2,"MIDI"); menu.addItem(3,"OSC / UDP");
+        juce::PopupMenu menu; menu.addItem(1,"Audio"); menu.addItem(2,"MIDI"); menu.addItem(3,"OSC / UDP"); menu.addItem(4,"Control");
         auto safe=juce::Component::SafePointer<MainComponent>(this);
         menu.showMenuAsync(juce::PopupMenu::Options().withTargetComponent(&addColumnButton),[safe](int choice) {
             if (!safe || choice==0) return; auto type=(ColumnType)(choice-1);
@@ -113,10 +113,19 @@ MainComponent::MainComponent(bool startAudio) {
     importButton.onClick=[this] { importDialog(); };
     playCellButton.onClick=[this] { triggerCell(); }; stopCellButton.onClick=[this] { send(show.rows[selectedRow].cells[selectedColumn].id,false,true); };
     clearButton.onClick=[this] {
-        auto& c=show.rows[selectedRow].cells[selectedColumn]; clips.erase(c.id); c.file.clear(); c.name.clear(); c.midi.reset(); c.osc.reset(); closeOscClip(); changed("Clip removed from cell. Original file retained.",true);
+        auto& c=show.rows[selectedRow].cells[selectedColumn];
+        clips.erase(c.id); c.file.clear(); c.name.clear(); c.midi.reset(); c.osc.reset();
+        if (show.columns[(size_t)selectedColumn].type==ColumnType::control)
+            c.controlSet.reset();
+        closeOscClip();
+        refreshControlSettings(); changed("Cell content removed. Original files retained.",true);
     };
     midiEditButton.onClick=[this] { editMidiClip(); };
-    oscEditButton.onClick=[this] { editOscClip(); };
+    oscEditButton.onClick=[this] {
+        if (show.columns[(size_t)selectedColumn].type==ColumnType::control)
+            editControlSet(selectedRow,selectedColumn);
+        else editOscClip();
+    };
     applyButton.onClick=[this] { applyInspector(); }; tempoButton.onClick=[this] { editTempo(); };
     importButton.setTooltip("Mono/stereo WAV and MP3. Importing stops all playback.");
     applyButton.setTooltip("Apply parameters without stopping playback. Enter confirms names.");
@@ -302,13 +311,24 @@ void MainComponent::refreshInspector() {
     oscEditButton.setVisible(!rowSettings && col.type==ColumnType::osc);
     oscEditButton.setButtonText(c.osc ? "Edit OSC clip" : "Create OSC clip");
     midiEditButton.setButtonText(c.midi ? "Edit piano roll" : "Create MIDI clip");
-    importButton.setVisible(!rowSettings && col.type!=ColumnType::osc);
+    importButton.setVisible(!rowSettings && (audio || midi));
     importButton.setButtonText(midi ? "Import MIDI" : "Import WAV / MP3");
     importButton.setTooltip(midi ? "Files .mid/.midi: import notes using cue tempo." : "Mono or stereo WAV / MP3.");
-    clearButton.setButtonText(col.type==ColumnType::osc ? "Remove OSC" : midi ? "Remove MIDI" : "Remove audio");
+    clearButton.setButtonText(col.type==ColumnType::control ? "Clear set" :
+        col.type==ColumnType::osc ? "Remove OSC" : midi ? "Remove MIDI" : "Remove audio");
+    const bool control=col.type==ColumnType::control;
     const bool loaded=hasClip(selectedRow,selectedColumn);
+    playCellButton.setVisible(!rowSettings && !control);
+    stopCellButton.setVisible(!rowSettings && !control);
+    clearButton.setVisible(!rowSettings && (!control || !col.controlLocked));
+    clearButton.setEnabled(!control && (loaded || c.file.isNotEmpty()) ||
+        control && c.controlSet.has_value() && !col.controlLocked);
     playCellButton.setEnabled(loaded); stopCellButton.setEnabled(loaded);
-    clearButton.setEnabled(loaded || c.file.isNotEmpty());
+    oscEditButton.setVisible(!rowSettings && (col.type==ColumnType::osc || control));
+    if (control) {
+        oscEditButton.setButtonText(col.controlLocked ? "Edit default Control Set" : "Edit Control Set");
+        oscEditButton.setEnabled(true);
+    }
 }
 bool MainComponent::select(int row,int column) {
     if (row<0 || row>=(int)show.rows.size() || column<0 || column>=(int)show.columns.size() || !applyInspector()) return false;
@@ -432,6 +452,9 @@ void MainComponent::goNext() { if (nextCue<(int)show.rows.size()) triggerRow(nex
 void MainComponent::triggerCell() {
     if (!applyInspector()) return;
     auto& c=show.rows[selectedRow].cells[selectedColumn];
+    if (show.columns[selectedColumn].type==ColumnType::control) {
+        editControlSet(selectedRow,selectedColumn); return;
+    }
     if (show.columns[selectedColumn].type==ColumnType::osc && !c.osc) { editOscClip(); return; }
     if (!hasClip(selectedRow,selectedColumn)) { if (show.columns[selectedColumn].type==ColumnType::midi) editMidiClip(); else if (show.columns[selectedColumn].type==ColumnType::osc) editOscClip(); else importDialog(); return; }
     const bool playing=engine.getCellPlayback(c.id).playing;
@@ -689,6 +712,8 @@ bool MainComponent::insertCopiedRowAfter(int index,const Row& source,
         inserted.cells[c].id=candidate.nextId++;
         if (sourceAudio[c]) media[inserted.cells[c].id]=sourceAudio[c];
     }
+    for (auto& cell:inserted.cells) if (cell.controlSet)
+        for (auto& binding:cell.controlSet->bindings) binding.id=candidate.controls.nextId++;
     candidate.rows.insert(candidate.rows.begin()+index+1,std::move(inserted));
     const auto valid=validateShow(candidate);
     if (valid.failed()) { message(valid.getErrorMessage()); return false; }
@@ -696,6 +721,7 @@ bool MainComponent::insertCopiedRowAfter(int index,const Row& source,
     closeMidiClip(); closeOscClip();
     show=std::move(candidate);
     clips=std::move(media);
+    refreshControlSettings();
     selectedRow=nextCue=index+1;
     changed("Cue inserted with new row and cell identities.",true);
     return true;
@@ -737,16 +763,31 @@ void MainComponent::deleteColumn(int index) {
     auto& bindings=show.controls.bindings;
     bindings.erase(std::remove_if(bindings.begin(),bindings.end(),
         [removedId](const ControlBinding& b) {
-            return (b.scope==ControlScope::column || b.target==ControlTarget::columnGain)
+            return (b.scope==ControlScope::column || b.target==ControlTarget::columnGain ||
+                b.target==ControlTarget::midiCc || b.target==ControlTarget::oscFloat)
                     && b.targetColumnId==removedId;
         }),bindings.end());
+    // A deleted target cannot remain in any other Control Set.
+    const auto purge=[removedId](ControlSet& set) {
+        auto& bindings=set.bindings;
+        bindings.erase(std::remove_if(bindings.begin(),bindings.end(),
+            [removedId](const ControlBinding& b){
+                return b.targetColumnId==removedId &&
+                    (b.target==ControlTarget::columnGain ||
+                     b.target==ControlTarget::midiCc || b.target==ControlTarget::oscFloat);
+            }),bindings.end());
+    };
+    for (auto& col:show.columns) purge(col.controlDefaultSet);
+    for (auto& row:show.rows) for (auto& cell:row.cells)
+        if (cell.controlSet) purge(*cell.controlSet);
     refreshControlSettings();
     selectedColumn=std::min(index,(int)show.columns.size()-1); changed("Column deleted. Original files retained.",true);
 }
 void MainComponent::moveClip(int sr,int sc,int tr,int tc) {
     if (!applyInspector()) return;
     auto result=moveCell(show,sr,sc,tr,tc); if (result.failed()) { status=result.getErrorMessage(); repaint(); return; }
-    selectedRow=tr; selectedColumn=tc; nextCue=tr; changed("Cells swapped.",true);
+    selectedRow=tr; selectedColumn=tc; nextCue=tr;
+    refreshControlSettings(); changed("Cells swapped.",true);
 }
 bool MainComponent::copySelectedCell() {
     if (selectedRow<0 || selectedRow>=(int)show.rows.size() ||
@@ -763,7 +804,7 @@ bool MainComponent::pasteSelectedCell() {
     if (!copiedCell || selectedRow<0 || selectedRow>=(int)show.rows.size() ||
         selectedColumn<0 || selectedColumn>=(int)show.columns.size()) return false;
     if (show.columns[(size_t)selectedColumn].type!=copiedType) {
-        message("Copy and paste require columns of the same type (Audio / MIDI / OSC)."); return false;
+        message("Copy and paste require columns of the same type."); return false;
     }
     if (!applyInspector()) return false;
     auto updatedClips=clips;
@@ -778,6 +819,12 @@ bool MainComponent::pasteSelectedCell() {
     target=*copiedCell;
     target.id=id; // Stable destination identity; other cues and telemetry are unaffected.
     clips=std::move(updatedClips);
+    if (copiedType==ColumnType::control) {
+        auto& pasted=show.rows[(size_t)selectedRow].cells[(size_t)selectedColumn];
+        if (pasted.controlSet) for (auto& binding:pasted.controlSet->bindings)
+            binding.id=show.controls.nextId++;
+        refreshControlSettings();
+    }
     changed("Cell content and settings pasted.");
     return true;
 }
