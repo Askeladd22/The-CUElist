@@ -135,7 +135,8 @@ inline juce::Result validateControls(const ControlSettings& s,
         if (b.scope==ControlScope::preset &&
             std::none_of(s.presets.begin(),s.presets.end(),[&](const auto& p){return p.id==b.scopeId;}))
             return juce::Result::fail("Mapping associato a preset inesistente.");
-        if ((b.scope==ControlScope::column || b.target==ControlTarget::columnGain) &&
+        if ((b.scope==ControlScope::column || b.target==ControlTarget::columnGain ||
+             b.target==ControlTarget::midiCc || b.target==ControlTarget::oscFloat) &&
             std::find(columnIds.begin(),columnIds.end(),b.targetColumnId)==columnIds.end())
             return juce::Result::fail("Mapping associato a colonna inesistente.");
         if ((b.target==ControlTarget::masterGain || b.target==ControlTarget::columnGain)
