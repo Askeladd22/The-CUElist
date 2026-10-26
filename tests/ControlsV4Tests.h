@@ -4,7 +4,7 @@ void controlsV4Tests() {
     test("utility routing replaces inspector output and MIDI OSC have no audio controls", [] {
         MainComponent ui(false); addColumn(ui.show,ColumnType::midi,{}); addColumn(ui.show,ColumnType::osc,{});
         auto* utilities=find<ColumnUtilities>(ui); utilities->refresh();
-        check(utilities->getNumChildComponents()==3,"Utility columns absent");
+        check(utilities->getNumChildComponents()==4,"Utility strips or Master audio fader absent");
         for (int c=0;c<3;++c) {
             auto* strip=utilities->getChildComponent(c);
             auto* output=dynamic_cast<juce::ComboBox*>(controlsV3::named(*strip,"columnOutput"));
@@ -45,7 +45,7 @@ void controlsV4Tests() {
         for (int s=0;s<16;++s) clip->samples.setSample(0,s,.2f);
         for (const auto& row : ui.show.rows) ui.clips[row.cells[0].id]=clip;
         ui.engine.publish(makeRenderState(ui.show,ui.clips));
-        auto* grid=find<CueGrid>(ui); const float toggleX=(float)(CueGrid::nameWidth+CueGrid::columnWidth+205);
+        auto* grid=find<CueGrid>(ui); const float toggleX=(float)(CueGrid::nameWidth+CueGrid::columnWidth+132);
         auto sample=[&] { float value=0; float* out[]{&value}; ui.engine.collectRetired(); ui.engine.processBlock(out,1,1,4); return value; };
         ui.goNext(); near(sample(),.2); ui.goNext(); near(sample(),.2);
         check(!ui.engine.getCellPlayback(ui.show.rows[0].cells[0].id).playing,"Prior cue still marked playing");
