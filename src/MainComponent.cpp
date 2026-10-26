@@ -48,8 +48,9 @@ MainComponent::MainComponent(bool startAudio) {
     }
     gain.setName("cellGainDb"); rowGain.setName("rowGainDb");
     masterSlider.setName("masterAudioDb");
-    masterSlider.setSliderStyle(juce::Slider::LinearHorizontal);
-    masterSlider.setTextBoxStyle(juce::Slider::TextBoxRight,false,67,25);
+    masterSlider.setSliderStyle(juce::Slider::LinearVertical);
+    masterSlider.setTextBoxStyle(juce::Slider::TextBoxBelow,false,67,19);
+    utilities.addAndMakeVisible(masterSlider);
     masterSlider.setRange(-60,12,0.1);
     masterSlider.setNumDecimalPlacesToDisplay(1);
     masterSlider.setTextValueSuffix(" dB");
