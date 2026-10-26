@@ -64,6 +64,7 @@ public:
     void refresh();
     void syncScroll(int);
     void refreshRouting();
+    void refreshMeters();
     void resized() override;
     void paint(juce::Graphics&) override;
 private:
@@ -106,6 +107,7 @@ public:
     void stopCellAt(int row,int column);
     void stopRow(int row);
     void setColumnUtilities(int column,float gain,float pan,bool muted,bool inverted);
+    void setMasterAudio(float gain);
     void setColumnOutput(int column,int output);
     void setAutoStop(int row,bool enabled);
     void setCellAutoStop(int row,int column,bool enabled);
@@ -143,6 +145,7 @@ private:
     juce::ToggleButton cellAutoStop{"Arresta al GO della prossima cue"};
     juce::Slider gain;
     juce::Slider rowGain;
+    juce::Slider masterSlider;
     juce::ComboBox rowBehaviour;
     juce::ToggleButton rowMute{"Mute intera cue"},rowLoop{"Loop di tutte le clip"};
     bool rowSettings=false;

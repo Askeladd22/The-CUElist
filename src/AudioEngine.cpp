@@ -187,6 +187,7 @@ void RenderState::releaseMidi(Voice& v,int offset,bool cancelPending) noexcept {
 }
 void RenderState::render(float* const* outputs,int channels,int frames,double sampleRate) noexcept {
     for (int ch=0;ch<channels;++ch) if (outputs[ch]) juce::FloatVectorOperations::clear(outputs[ch],frames);
+    for (auto& meter:columnMeters) if (meter.second) meter.second->peak.store(0.0f,std::memory_order_relaxed);
     if (sampleRate<=0 || !std::isfinite(sampleRate)) return;
     for (auto& row:rows) if (row.playing) row.seconds+=(double)frames/sampleRate;
     for (auto& v:voices) {
@@ -262,6 +263,7 @@ void RenderState::render(float* const* outputs,int channels,int frames,double sa
             : v.gain*v.rowGain*v.columnGain*(v.columnPhaseInverted ? -1.0f : 1.0f);
         const float sideGain[2] {gain*(1.0f-std::max(0.0f,v.columnPan)),
                                  gain*(1.0f+std::min(0.0f,v.columnPan))};
+        float voicePeak=0.0f;
         for (int i=0;i<frames && v.playing;++i) {
             if (v.rowMode && v.delaySeconds>1.0e-12) { v.delaySeconds=std::max(0.0,v.delaySeconds-1.0/sampleRate); continue; }
             v.delaySeconds=0;
@@ -275,13 +277,19 @@ void RenderState::render(float* const* outputs,int channels,int frames,double sa
                 const int output=v.output+side;
                 if (output>=channels || output<0 || !outputs[output]) continue;
                 const float* data=audio.getReadPointer(std::min(side,audio.getNumChannels()-1));
-                outputs[output][i]+=(data[a]+fraction*(data[b]-data[a]))*sideGain[side];
+                const float contribution=(data[a]+fraction*(data[b]-data[a]))*sideGain[side];
+                outputs[output][i]+=contribution;
+                voicePeak=std::max(voicePeak,std::abs(contribution));
             }
             v.position+=step;
             if (v.position>=length) {
                 if (looping) v.position=std::fmod(v.position,(double)length);
                 else { v.position=0; v.playing=false; }
             }
+        }
+        if (v.columnMeter) {
+            const float oldPeak=v.columnMeter->peak.load(std::memory_order_relaxed);
+            v.columnMeter->peak.store(std::max(oldPeak,voicePeak),std::memory_order_relaxed);
         }
     }
     for (auto& row:rows) {
@@ -290,9 +298,12 @@ void RenderState::render(float* const* outputs,int channels,int frames,double sa
         for (const auto& v:voices) if (v.rowId==row.id && v.rowMode && v.playing) { row.playing=true; break; }
         if (wasPlaying && !row.playing) row.ended=true;
     }
-    // Saturation is an emergency bound, not a mastering limiter.
-    for (int ch=0;ch<channels;++ch) if (outputs[ch])
+    // Master is applied after summing PCM, never to MIDI or OSC messages.
+    // Gain precedes emergency saturation to retain headroom when attenuating.
+    for (int ch=0;ch<channels;++ch) if (outputs[ch]) {
+        juce::FloatVectorOperations::multiply(outputs[ch],masterGain,frames);
         juce::FloatVectorOperations::clip(outputs[ch],outputs[ch],-1.0f,1.0f,frames);
+    }
 }
 juce::Result loadClip(const juce::File& file,std::shared_ptr<const AudioClip>& destination) {
     if (!file.existsAsFile()) return juce::Result::fail("File mancante: "+file.getFullPathName());
@@ -315,11 +326,16 @@ juce::Result loadClip(const juce::File& file,std::shared_ptr<const AudioClip>& d
 }
 std::unique_ptr<RenderState> makeRenderState(const Show& show,const ClipMap& clips) {
     auto state=std::make_unique<RenderState>();
+    state->masterGain=show.masterGain;
+    for (const auto& column:show.columns)
+        state->columnMeters.push_back({column.id,
+            column.type==ColumnType::audio ? std::make_shared<ColumnPeakTelemetry>() : nullptr});
     for (const auto& row : show.rows) {
       state->rows.push_back({row.id}); state->rows.back().stopOnNext=row.stopOnNext;
       for (size_t i=0; i<row.cells.size() && i<show.columns.size(); ++i) {
         const auto& c=row.cells[i];
-        Voice v; v.cellId=c.id; v.rowId=row.id; v.output=show.columns[i].output;
+        Voice v; v.cellId=c.id; v.rowId=row.id; v.output=show.columns[i].output; v.columnIndex=(int)i;
+        v.columnMeter=state->columnMeters[i].second;
         if (show.columns[i].type==ColumnType::midi && c.midi) {
             v.isMidi=true; v.midiOutputId=show.columns[i].midiOutputId;
             v.midiDuration=secondsAtBeat(row.tempo,c.midi->lengthBeats);
@@ -383,6 +399,16 @@ juce::String AudioEngine::initialise() {
 void AudioEngine::collectRetired() { delete retired.exchange(nullptr); }
 void AudioEngine::publish(std::unique_ptr<RenderState> state,bool preservePlayback) {
     if (!state) return;
+    std::map<int,std::shared_ptr<ColumnPeakTelemetry>> nextColumnPeaks;
+    for (auto& meter:state->columnMeters) if (meter.second) {
+        const auto it=columnPeaks.find(meter.first);
+        if (it!=columnPeaks.end()) meter.second=it->second;
+        nextColumnPeaks.emplace(meter.first,meter.second);
+    }
+    for (auto& voice:state->voices)
+        if (voice.columnIndex>=0 && (size_t)voice.columnIndex<state->columnMeters.size())
+            voice.columnMeter=state->columnMeters[(size_t)voice.columnIndex].second;
+    columnPeaks=std::move(nextColumnPeaks);
     std::map<int, PlaybackEntry> nextPlayback;
     for (auto& v:state->voices) {
         if (v.isMidi) { v.midiRoute=midiRouter.route(v.midiOutputId); v.midiSink=&midiRouter; v.midiStream=midiRouter.stream(v.cellId,v.midiRoute); }
@@ -408,6 +434,10 @@ void AudioEngine::publish(std::unique_ptr<RenderState> state,bool preservePlayba
     state->preservePlayback=preservePlayback;
     // exchange gives sole ownership of the displaced pending snapshot to the UI.
     delete pending.exchange(state.release());
+}
+float AudioEngine::getColumnPeak(int columnId) const noexcept {
+    const auto it=columnPeaks.find(columnId);
+    return it==columnPeaks.end() ? 0.0f : it->second->peak.load(std::memory_order_relaxed);
 }
 CellPlaybackInfo AudioEngine::getCellPlayback(int cellId) const noexcept {
     const auto found=playback.find(cellId);

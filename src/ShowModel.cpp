@@ -52,6 +52,7 @@ double secondsAtBeat(const std::vector<TempoPoint>& points, double beat) {
 juce::Result validateShow(const Show& show) {
     const auto fail = [](const char* s) { return juce::Result::fail(s); };
     if (show.name.trim().isEmpty() || show.columns.empty() || show.rows.empty()) return fail("Nome, righe o colonne mancanti.");
+    if (!std::isfinite(show.masterGain) || show.masterGain<0 || show.masterGain>4) return fail("Master audio non valido.");
     if (show.columns.size() > 10000 || show.rows.size() > 10000 || show.rows.size()*show.columns.size() > 1000000)
         return fail("Progetto oltre il limite di sicurezza di un milione di celle.");
     std::set<int> ids;
@@ -151,19 +152,20 @@ juce::String encodeShow(const Show& show) {
         rows.add(object({{"id",r.id},{"name",r.name},{"tempo",tempo},{"cells",cells},{"gain",r.gain},
             {"muted",r.muted},{"loop",r.loop},{"overrideBehaviour",r.overrideBehaviour},{"behaviour",(int)r.behaviour},{"stopOnNext",r.stopOnNext}}));
     }
-    return juce::JSON::toString(object({{"format","TheCuelist"},{"version",7},{"name",show.name},{"nextId",show.nextId},{"columns",columns},{"rows",rows}}));
+    return juce::JSON::toString(object({{"format","TheCuelist"},{"version",8},{"name",show.name},{"masterGain",show.masterGain},{"nextId",show.nextId},{"columns",columns},{"rows",rows}}));
 }
 juce::Result decodeShow(const juce::String& text, Show& destination) {
     if (text.length() > 32*1024*1024) return juce::Result::fail("Progetto troppo grande (massimo 32 MB). ");
     try {
         auto root = juce::JSON::parse(text);
         const auto version = integer(root,"version");
-        if (string(root,"format") != "TheCuelist" || version < 1 || version > 7) return juce::Result::fail("Formato o versione progetto non supportati.");
+        if (string(root,"format") != "TheCuelist" || version < 1 || version > 8) return juce::Result::fail("Formato o versione progetto non supportati.");
         const auto activation = [version](int value) {
             if (version < 3 && (value == 1 || value == 4)) return Behaviour::retrigger;
             return (Behaviour)value;
         };
         Show show; show.name = string(root,"name"); show.nextId = integer(root,"nextId");
+        if (version>=8) show.masterGain=(float)number(root,"masterGain");
         for (auto& c : array(root,"columns")) {
             Column column {integer(c,"id"),string(c,"name"),(ColumnType)integer(c,"type"),integer(c,"output")};
             if (version>=5) column.midiOutputId=string(c,"midiOutputId");

@@ -22,8 +22,12 @@ struct CellPlaybackTelemetry {
     CellPlaybackInfo read() const noexcept;
     void write(CellPlaybackInfo) noexcept;
 };
+// Column meter receives post-strip, pre-master peak samples from the audio callback.
+// No allocations, locks, or UI lookups occur on the real-time thread.
+struct ColumnPeakTelemetry { std::atomic<float> peak {0}; };
 struct Voice {
-    int cellId = 0, rowId = 0, output = 0;
+    int cellId = 0, rowId = 0, output = 0, columnIndex = -1;
+    std::shared_ptr<ColumnPeakTelemetry> columnMeter;
     std::shared_ptr<const AudioClip> clip;
     struct NoteEvent { double seconds=0; int status=0, pitch=0, velocity=0; };
     std::vector<NoteEvent> midiEvents;
@@ -69,6 +73,8 @@ struct RowTransport {
     bool stopOnNext = true;
 };
 struct RenderState {
+    float masterGain=1.0f;
+    std::vector<std::pair<int,std::shared_ptr<ColumnPeakTelemetry>>> columnMeters;
     std::vector<Voice> voices;
     std::vector<RowTransport> rows;
     uint64_t revision = 0;
@@ -101,6 +107,7 @@ public:
     void processBlock(float* const*, int channels, int frames, double sampleRate) noexcept;
     // UI-thread only. Unknown or removed cells return an empty value.
     CellPlaybackInfo getCellPlayback(int cellId) const noexcept;
+    float getColumnPeak(int columnId) const noexcept;
     juce::AudioDeviceManager devices;
     std::atomic<float> peak {0};
     std::atomic<int> activeVoices {0};
@@ -117,6 +124,7 @@ private:
         uint64_t midiHash=0, oscHash=0;
     };
     std::map<int, PlaybackEntry> playback; // UI-thread owned; no callback map access
+    std::map<int,std::shared_ptr<ColumnPeakTelemetry>> columnPeaks; // UI-thread owned
     struct Command { int id = 0; bool row = false, stop = false; uint64_t revision = 0, epoch = 0; bool seek = false; double seconds = 0; };
     std::array<Command, 256> commands;
     std::atomic<unsigned> writeIndex {0}, readIndex {0};
