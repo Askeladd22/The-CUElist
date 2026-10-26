@@ -178,17 +178,22 @@ void MainComponent::dispatchControl(const ControlEvent& input) {
     // rather than an arbitrary earlier global binding.
     if (const auto* winner=controlMapping.matched(input)) {
         const auto& b=*winner;
-        if (b.target==ControlTarget::masterGain) {
+        if (b.target==ControlTarget::masterGain || b.target==ControlTarget::masterPan) {
             const float d=b.maximum-b.minimum;
-            if (d>0) current=juce::jlimit(0.0f,1.0f,(show.masterGain-b.minimum)/d);
-        } else if (b.target==ControlTarget::columnGain) {
+            if (d>0) current=juce::jlimit(0.0f,1.0f,
+                ((b.target==ControlTarget::masterPan ? show.masterPan : show.masterGain)-b.minimum)/d);
+        } else if (b.target==ControlTarget::columnGain || b.target==ControlTarget::columnPan) {
             for (const auto& col:show.columns) if (col.id==b.targetColumnId) {
                 const float d=b.maximum-b.minimum;
-                if (d>0) current=juce::jlimit(0.0f,1.0f,(col.gain-b.minimum)/d);
+                if (d>0) current=juce::jlimit(0.0f,1.0f,
+                    ((b.target==ControlTarget::columnPan ? col.pan : col.gain)-b.minimum)/d);
                 break;
             }
         }
-        if (current.has_value() && b.invert) current=1.0f-*current;
+        if (current.has_value()) {
+            current=inverseControlCurve(*current,b.curve);
+            if (b.invert) current=1.0f-*current;
+        }
     }
     const auto action=controlMapping.resolve(input,current);
     if (!action) return;
@@ -204,13 +209,21 @@ void MainComponent::dispatchControl(const ControlEvent& input) {
     if (binding.target==ControlTarget::masterGain) {
         if (std::abs(show.masterGain-action->scaled)>0.005f)
             setMasterAudio(action->scaled);
-    } else if (binding.target==ControlTarget::columnGain) {
+    } else if (binding.target==ControlTarget::masterPan) {
+        if (std::abs(show.masterPan-action->scaled)>0.005f)
+            setMasterPan(action->scaled);
+    } else if (binding.target==ControlTarget::columnGain ||
+               binding.target==ControlTarget::columnPan) {
         for (int i=0;i<(int)show.columns.size();++i)
             if (show.columns[(size_t)i].id==binding.targetColumnId &&
                 show.columns[(size_t)i].type==ColumnType::audio) {
                 const auto& c=show.columns[(size_t)i];
-                if (std::abs(c.gain-action->scaled)>0.005f) {
-                    setColumnUtilities(i,action->scaled,c.pan,c.muted,c.phaseInverted);
+                const float currentValue=binding.target==ControlTarget::columnPan ? c.pan : c.gain;
+                if (std::abs(currentValue-action->scaled)>0.005f) {
+                    setColumnUtilities(i,
+                        binding.target==ControlTarget::columnGain ? action->scaled : c.gain,
+                        binding.target==ControlTarget::columnPan ? action->scaled : c.pan,
+                        c.muted,c.phaseInverted);
                     utilities.refresh();
                 }
                 break;
@@ -264,7 +277,7 @@ public:
         presets.setVisible(!editSet); newPreset.setVisible(!editSet);
         assignPreset.setVisible(!editSet); presetName.setVisible(!editSet);
         target.addItemList({"Master Audio","Audio column gain","GO next cue","PANIC",
-                            "MIDI CC","OSC Float"},1);
+                            "MIDI CC","OSC Float","Audio column pan","Master pan"},1);
         target.setSelectedId(1);
         target.onChange=[this]{ refreshColumns(); };
         outputCc.setName("mappingOutputCc");
@@ -443,7 +456,7 @@ private:
         columnIds.clear();
         const int targetId=target.getSelectedId();
         for (const auto& c:owner->show.columns) {
-            const bool eligible=targetId==2 ? c.type==ColumnType::audio :
+            const bool eligible=(targetId==2 || targetId==7) ? c.type==ColumnType::audio :
                 targetId==5 ? c.type==ColumnType::midi :
                 targetId==6 ? c.type==ColumnType::osc : true;
             if (!eligible) continue;
@@ -467,6 +480,8 @@ private:
             case 4: b.target=ControlTarget::panic; break;
             case 5: b.target=ControlTarget::midiCc; break;
             case 6: b.target=ControlTarget::oscFloat; break;
+            case 7: b.target=ControlTarget::columnPan; break;
+            case 8: b.target=ControlTarget::masterPan; break;
             default: return;
         }
         b.takeover=(ControlTakeover)(takeover.getSelectedId()-1);
@@ -475,6 +490,7 @@ private:
         else if (b.scope==ControlScope::preset)
             b.scopeId=std::max(0,presets.getSelectedId()-1);
         if (b.scope==ControlScope::column || b.target==ControlTarget::columnGain ||
+            b.target==ControlTarget::columnPan ||
             b.target==ControlTarget::midiCc || b.target==ControlTarget::oscFloat) {
             const int i=columns.getSelectedId()-1;
             if (i<0 || i>=(int)columnIds.size()) {
@@ -493,6 +509,9 @@ private:
         } else if (b.target==ControlTarget::oscFloat) {
             b.oscAddress=oscAddress.getText().trim();
             b.minimum=0; b.maximum=1;
+        } else if (b.target==ControlTarget::masterPan ||
+                   b.target==ControlTarget::columnPan) {
+            b.minimum=-1; b.maximum=1;
         } else if (b.target==ControlTarget::masterGain ||
                    b.target==ControlTarget::columnGain) {
             b.minimum=0; b.maximum=1;

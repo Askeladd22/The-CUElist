@@ -131,7 +131,8 @@ juce::Result validateShow(const Show& show) {
     for (const auto& binding:show.controls.bindings) {
         if (binding.target==ControlTarget::midiCc ||
             binding.target==ControlTarget::oscFloat ||
-            binding.target==ControlTarget::columnGain) {
+            binding.target==ControlTarget::columnGain ||
+            binding.target==ControlTarget::columnPan) {
             const auto it=std::find_if(show.columns.begin(),show.columns.end(),
                 [&](const Column& col){return col.id==binding.targetColumnId;});
             if (it==show.columns.end()) return fail("Control Mapping destination does not exist.");
@@ -139,7 +140,8 @@ juce::Result validateShow(const Show& show) {
                 return fail("MIDI CC requires a MIDI column.");
             if (binding.target==ControlTarget::oscFloat && it->type!=ColumnType::osc)
                 return fail("OSC requires an OSC column.");
-            if (binding.target==ControlTarget::columnGain && it->type!=ColumnType::audio)
+            if ((binding.target==ControlTarget::columnGain ||
+                 binding.target==ControlTarget::columnPan) && it->type!=ColumnType::audio)
                 return fail("Gain mapping requires an Audio column.");
         }
     }
@@ -162,11 +164,13 @@ juce::Result validateShow(const Show& show) {
                 return fail("Control Set bindings must be independent of legacy scopes.");
             if (binding.target==ControlTarget::columnGain ||
                 binding.target==ControlTarget::midiCc ||
-                binding.target==ControlTarget::oscFloat) {
+                binding.target==ControlTarget::oscFloat ||
+                binding.target==ControlTarget::columnPan) {
                 const auto destination=std::find_if(show.columns.begin(),show.columns.end(),
                     [&](const Column& col){return col.id==binding.targetColumnId;});
                 if (destination==show.columns.end() ||
-                    (binding.target==ControlTarget::columnGain && destination->type!=ColumnType::audio) ||
+                    ((binding.target==ControlTarget::columnGain ||
+                      binding.target==ControlTarget::columnPan) && destination->type!=ColumnType::audio) ||
                     (binding.target==ControlTarget::midiCc && destination->type!=ColumnType::midi) ||
                     (binding.target==ControlTarget::oscFloat && destination->type!=ColumnType::osc))
                     return fail("Invalid Control Set target column type.");
@@ -226,7 +230,7 @@ juce::var controlSetObject(const ControlSet& set) {
             {"outputNumber",b.outputNumber},{"outputDeviceId",b.outputDeviceId},
             {"oscHost",b.oscHost},{"oscPort",b.oscPort},{"oscAddress",b.oscAddress},
             {"minimum",b.minimum},{"maximum",b.maximum},{"invert",b.invert},
-            {"enabled",b.enabled},{"takeover",(int)b.takeover}}));
+            {"enabled",b.enabled},{"takeover",(int)b.takeover},{"curve",(int)b.curve}}));
     return object({{"bindings",bindings}});
 }
 ControlSet parseControlSet(const juce::var& data) {
@@ -246,6 +250,7 @@ ControlSet parseControlSet(const juce::var& data) {
         b.minimum=(float)number(item,"minimum"); b.maximum=(float)number(item,"maximum");
         b.invert=boolean(item,"invert"); b.enabled=boolean(item,"enabled");
         b.takeover=(ControlTakeover)integer(item,"takeover");
+        if (item.hasProperty("curve")) b.curve=(ControlCurve)integer(item,"curve");
         set.bindings.push_back(std::move(b));
     }
     return set;
@@ -319,7 +324,7 @@ juce::String encodeShow(const Show& show) {
             {"outputNumber",binding.outputNumber},{"outputDeviceId",binding.outputDeviceId},
             {"oscHost",binding.oscHost},{"oscPort",binding.oscPort},{"oscAddress",binding.oscAddress},
             {"minimum",binding.minimum},{"maximum",binding.maximum},{"invert",binding.invert},
-            {"enabled",binding.enabled},{"takeover",(int)binding.takeover}}));
+            {"enabled",binding.enabled},{"takeover",(int)binding.takeover},{"curve",(int)binding.curve}}));
     const auto controls=object({{"midiInputId",show.controls.midiInputId},
         {"nextId",show.controls.nextId},{"presets",presets},{"bindings",bindings}});
     return juce::JSON::toString(object({{"format","TheCuelist"},{"version",10},
@@ -360,6 +365,7 @@ juce::Result decodeShow(const juce::String& text, Show& destination) {
                 b.minimum=(float)number(item,"minimum"); b.maximum=(float)number(item,"maximum");
                 b.invert=boolean(item,"invert"); b.enabled=boolean(item,"enabled");
                 b.takeover=(ControlTakeover)integer(item,"takeover");
+                if (item.hasProperty("curve")) b.curve=(ControlCurve)integer(item,"curve");
                 show.controls.bindings.push_back(std::move(b));
             }
         }

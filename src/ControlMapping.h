@@ -10,8 +10,19 @@
 namespace cuelist {
 enum class ControlKind { cc, note, pitchBend };
 enum class ControlScope { global, column, preset, cue };
-enum class ControlTarget { go, panic, masterGain, columnGain, midiCc, oscFloat };
+enum class ControlTarget { go, panic, masterGain, columnGain, midiCc, oscFloat, columnPan, masterPan };
 enum class ControlTakeover { pickup, jump };
+enum class ControlCurve { linear, easeIn, easeOut };
+inline float applyControlCurve(float v,ControlCurve curve) {
+    v=juce::jlimit(0.0f,1.0f,v);
+    return curve==ControlCurve::easeIn ? v*v :
+        curve==ControlCurve::easeOut ? 1.0f-(1.0f-v)*(1.0f-v) : v;
+}
+inline float inverseControlCurve(float v,ControlCurve curve) {
+    v=juce::jlimit(0.0f,1.0f,v);
+    return curve==ControlCurve::easeIn ? std::sqrt(v) :
+        curve==ControlCurve::easeOut ? 1.0f-std::sqrt(1.0f-v) : v;
+}
 
 struct ControlEvent {
     juce::String deviceId;
@@ -37,6 +48,7 @@ struct ControlBinding {
     float minimum=0,maximum=1;
     bool invert=false, enabled=true;
     ControlTakeover takeover=ControlTakeover::pickup;
+    ControlCurve curve=ControlCurve::linear;
 };
 // A Control Set stores independent physical-to-target mappings. These are
 // inactive until their owning Control Column applies to the current cue.
@@ -123,7 +135,8 @@ public:
         }
         state.previous=raw; state.hasPrevious=true;
         const float scaledRaw=best->invert ? 1.0f-raw : raw;
-        const float value=best->minimum+(best->maximum-best->minimum)*scaledRaw;
+        const float value=best->minimum+(best->maximum-best->minimum)*
+            applyControlCurve(scaledRaw,best->curve);
         return MappedControl{*best,raw,value,raw>=0.5f && !e.isNoteOff};
     }
 private:
@@ -156,7 +169,8 @@ inline juce::Result validateControls(const ControlSettings& s,
     for (const auto& b:s.bindings) {
         if (b.id<1 || b.id>=s.nextId || !ids.insert(b.id).second || b.deviceId.length()>255
             || (int)b.kind<0 || (int)b.kind>2 || (int)b.scope<0 || (int)b.scope>3
-            || (int)b.target<0 || (int)b.target>5 || (int)b.takeover<0 || (int)b.takeover>1
+            || (int)b.target<0 || (int)b.target>7 || (int)b.takeover<0 || (int)b.takeover>1
+            || (int)b.curve<0 || (int)b.curve>2
             || b.channel<1 || b.channel>16 || b.number<0 || b.number>127
             || b.outputChannel<1 || b.outputChannel>16 || b.outputNumber<0 || b.outputNumber>127
             || b.oscPort<1 || b.oscPort>65535 || b.oscHost.isEmpty() || b.oscHost.length()>255
@@ -170,12 +184,16 @@ inline juce::Result validateControls(const ControlSettings& s,
             std::none_of(s.presets.begin(),s.presets.end(),[&](const auto& p){return p.id==b.scopeId;}))
             return juce::Result::fail("Mapping refers to a missing preset.");
         if ((b.scope==ControlScope::column || b.target==ControlTarget::columnGain ||
-             b.target==ControlTarget::midiCc || b.target==ControlTarget::oscFloat) &&
+             b.target==ControlTarget::midiCc || b.target==ControlTarget::oscFloat ||
+             b.target==ControlTarget::columnPan) &&
             std::find(columnIds.begin(),columnIds.end(),b.targetColumnId)==columnIds.end())
             return juce::Result::fail("Mapping refers to a missing column.");
         if ((b.target==ControlTarget::masterGain || b.target==ControlTarget::columnGain)
             && (b.minimum<0 || b.maximum>4))
             return juce::Result::fail("Gain mapping out of range.");
+        if ((b.target==ControlTarget::masterPan || b.target==ControlTarget::columnPan)
+            && (b.minimum< -1 || b.maximum>1))
+            return juce::Result::fail("Pan mapping outside [-1, 1].");
     }
     return juce::Result::ok();
 }
