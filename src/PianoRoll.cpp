@@ -228,13 +228,13 @@ void PianoRollEditor::redo() {
     selected=-1; selectedNotes.clear(); length.setValue(clip.lengthBeats,juce::dontSendNotification);
     selectionChanged(); updateCanvas(); applyChange();
 }
-void PianoRollEditor::setDetached(bool) {}
+
 
 double PianoRollEditor::gridStep() const { return snapEnabled() ? std::pow(.5,std::max(0,snap.getSelectedId()-1)) : .25; }
 bool PianoRollEditor::snapEnabled() const { return snap.getSelectedId()!=5; }
 void PianoRollEditor::updateCanvas() { canvas->setSize(std::max(viewport.getWidth()-14,keysWidth+(int)std::ceil(clip.lengthBeats*pixelsPerBeat)+24),rulerHeight+128*noteHeight); canvas->repaint(); }
 void PianoRollEditor::selectionChanged() {
-    if (selected>=0) { const auto& n=clip.notes[(size_t)selected]; velocity.setValue(n.velocity,juce::dontSendNotification); channel.setSelectedId(n.channel,juce::dontSendNotification);
+    if (selected>=0 && selected<(int)clip.notes.size()) { const auto& n=clip.notes[(size_t)selected]; velocity.setValue(n.velocity,juce::dontSendNotification); channel.setSelectedId(n.channel,juce::dontSendNotification);
         hint=selectedNotes.size()>1 ? juce::String((int)selectedNotes.size())+" note selezionate (trascina, modifica velocity/canale o Canc)"
             : "Nota "+juce::String(n.pitch)+"  |  Beat "+juce::String(n.beat+1,2)+"  |  Durata "+juce::String(n.length,2)+" beat";
     } else hint="Clic: aggiungi  |  Destro+trascina: seleziona  |  Shift+clic: aggiungi  |  Canc: elimina";
