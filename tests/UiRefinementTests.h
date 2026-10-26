@@ -94,14 +94,16 @@ void uiRefinementTests() {
         ui.editOscClip();
         auto* editor=ui.activeOscEditor();
         check(editor!=nullptr,"OSC editor missing");
-        check(controlsV3::named(*editor,"oscAddMessage")!=nullptr,"OSC plus button missing");
+        check(controlsV3::named(*editor,"oscAddAutomation")!=nullptr &&
+              controlsV3::named(*editor,"oscAddMessage")==nullptr,
+              "OSC plus must add a track; the redundant event button must be removed");
         check(controlsV3::named(*editor,"oscClipLength")==nullptr &&
               controlsV3::named(*editor,"oscEventArguments")==nullptr,
               "Legacy OSC field boxes still displayed");
         editor->addEvent();
-        check(ui.show.rows[0].cells[1].osc->events.size()==1,"Plus failed to persist event");
+        check(ui.show.rows[0].cells[1].osc->events.size()==1,"Event creation failed to persist an OSC message");
         auto* modal=juce::ModalComponentManager::getInstance()->getModalComponent(0);
-        check(modal!=nullptr,"OSC plus did not open edit dialog");
+        check(modal!=nullptr,"Explicit OSC event editing did not open its dialog");
         delete modal;
     });
     test("Master audio is within left column utilities and audio strips are compact", [] {
