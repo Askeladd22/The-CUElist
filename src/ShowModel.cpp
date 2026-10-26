@@ -119,6 +119,21 @@ juce::Result validateShow(const Show& show) {
     for (const auto& column:show.columns) columnIds.push_back(column.id);
     if (auto controlResult=validateControls(show.controls,rowIds,columnIds); controlResult.failed())
         return controlResult;
+    for (const auto& binding:show.controls.bindings) {
+        if (binding.target==ControlTarget::midiCc ||
+            binding.target==ControlTarget::oscFloat ||
+            binding.target==ControlTarget::columnGain) {
+            const auto it=std::find_if(show.columns.begin(),show.columns.end(),
+                [&](const Column& col){return col.id==binding.targetColumnId;});
+            if (it==show.columns.end()) return fail("Destinazione Control Mapping inesistente.");
+            if (binding.target==ControlTarget::midiCc && it->type!=ColumnType::midi)
+                return fail("MIDI CC richiede una colonna MIDI.");
+            if (binding.target==ControlTarget::oscFloat && it->type!=ColumnType::osc)
+                return fail("OSC richiede una colonna OSC.");
+            if (binding.target==ControlTarget::columnGain && it->type!=ColumnType::audio)
+                return fail("Gain mapping richiede una colonna Audio.");
+        }
+    }
     return juce::Result::ok();
 }
 namespace {
