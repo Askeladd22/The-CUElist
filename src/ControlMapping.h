@@ -38,6 +38,14 @@ struct ControlBinding {
     bool invert=false, enabled=true;
     ControlTakeover takeover=ControlTakeover::pickup;
 };
+// A Control Set stores independent physical-to-target mappings. These are
+// inactive until their owning Control Column applies to the current cue.
+struct ControlSet { std::vector<ControlBinding> bindings; };
+struct ControlLayer {
+    int columnId=0, cueId=0, priority=1;
+    bool locked=false;
+    ControlSet set;
+};
 struct ControlPreset { int id=0; juce::String name; };
 struct ControlSettings {
     juce::String midiInputId;
@@ -67,6 +75,7 @@ inline int priority(ControlScope s) { return (int)s; }
 class ControlMappingEngine {
 public:
     void setSettings(ControlSettings next) { settings=std::move(next); pickup.clear(); }
+    void setLayers(std::vector<ControlLayer> next) { layers=std::move(next); pickup.clear(); }
     void setActiveCue(int id,int preset) {
         if (id==activeCueId && preset==activePresetId) return;
         activeCueId=id; activePresetId=preset; pickup.clear();
@@ -78,6 +87,17 @@ public:
             && scopeApplies(b,activeCueId,activePresetId)) {
             if (!best || priority(b.scope)>priority(best->scope) ||
                 (priority(b.scope)==priority(best->scope) && b.id<best->id)) best=&b;
+        }
+        // A Control Column takes precedence over legacy global/preset rules
+        // for only the same physical input. Later columns win an exact tie.
+        int winningPriority=0;
+        for (const auto& layer:layers) {
+            if (!layer.locked && (activeCueId<=0 || layer.cueId!=activeCueId)) continue;
+            for (const auto& b:layer.set.bindings) if (samePhysicalInput(b,e)) {
+                if (layer.priority>=winningPriority) {
+                    best=&b; winningPriority=layer.priority;
+                }
+            }
         }
         return best;
     }
@@ -105,6 +125,7 @@ public:
 private:
     struct Pickup { float previous=0; bool hasPrevious=false,captured=false; };
     ControlSettings settings;
+    std::vector<ControlLayer> layers;
     int activeCueId=0,activePresetId=0;
     std::map<int,Pickup> pickup;
 };

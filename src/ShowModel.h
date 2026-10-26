@@ -7,7 +7,7 @@
 #include "ControlMapping.h"
 
 namespace cuelist {
-enum class ColumnType { audio, midi, osc };
+enum class ColumnType { audio, midi, osc, control };
 enum class Behaviour { retrigger, pauseRestart, pauseResume, continuePlaying, stop };
 struct TempoPoint { double beat = 0, bpm = 120; int numerator = 4, denominator = 4; };
 struct Column {
@@ -17,6 +17,9 @@ struct Column {
     juce::String midiOutputId;
     juce::String oscHost="127.0.0.1";
     int oscPort=9000;
+    bool controlLocked=false;
+    int controlPriority=2; // 1=Low (locked), 2=Medium, 3=High, 4=Maximum
+    ControlSet controlDefaultSet;
 };
 struct Cell {
     int id = 0;
@@ -30,6 +33,7 @@ struct Cell {
     Behaviour behaviour = Behaviour::retrigger;
     std::optional<MidiClip> midi;
     std::optional<OscClip> osc;
+    std::optional<ControlSet> controlSet;
 };
 struct Row {
     int id = 0; juce::String name; std::vector<TempoPoint> tempo {{}}; std::vector<Cell> cells;
