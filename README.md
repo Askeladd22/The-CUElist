@@ -11,6 +11,8 @@
 - **MIDI:** importazione e creazione di clip di note, con Piano Roll e selezione dell'uscita MIDI esterna.
 - **OSC:** Clip Editor visivo con eventi OSC e automazioni di argomenti int/float (rampe e curve multipunto), parametri int/float/string/bool, timeline in secondi o beat, Undo/Redo e routing UDP per colonna.
 - **Timeline:** posizionamento delle clip, zoom, ridimensionamento delle clip MIDI/OSC dal bordo destro, griglia BPM visibile/nascosta e magnete indipendente.
+- **Control Mapping (prima integrazione):** ingresso MIDI fisico selezionato manualmente, MIDI Learn per CC, note e Pitch Bend, preset di scena, priorita cue/preset/colonna/globale, Pickup/Jump e destinazioni Master, gain Audio, GO, Panic, MIDI CC e OSC Float.
+- **Branding:** icona trasparente approvata inclusa in `assets/thecuelist_icon.png` e incorporata nella GUI/eseguibile.
 - **Progetti portabili:** salvataggio degli show in formato `.cuelist`, con cartella dei media e backup.
 
-**Stato attuale:** sviluppo **0.6 (rifinitura interfaccia)**, eseguibile ancora identificato come **0.5.0** nel pacchetto Windows x64. OSC su UDP include automazioni lineari, eventi puntuali e tempo in secondi o beat (formato progetto v9); video e timecode non sono ancora disponibili. Prima dell'uso in uno spettacolo reale sono necessarie prove sui dispositivi hardware interessati.
+**Stato attuale:** sviluppo **0.6 (Control & Mapping v10 iniziale)**, eseguibile ancora identificato come **0.5.0**. Il formato degli show e `v10`, compatibile con v1-v9. Le modifiche sono una PR non ancora compilata o verificata su hardware Windows. Video, timecode e feedback MIDI verso controller non sono ancora disponibili. Il sistema Control Mapping resta sperimentale: non utilizzarlo durante uno spettacolo senza prove complete.

@@ -6,7 +6,7 @@ void mixerV8Tests() {
         auto original=makeShow();
         original.masterGain=.37f;
         const auto encoded=encodeShow(original);
-        near((int)juce::JSON::parse(encoded)["version"],9);
+        near((int)juce::JSON::parse(encoded)["version"],10);
         Show saved;
         check(decodeShow(encoded,saved).wasOk(),"v8 master show refused");
         near(saved.masterGain,.37);

@@ -73,7 +73,7 @@ void autoStopV7Tests() {
         original.rows[0].cells[2].stopOnNext=false;
         original.rows[1].cells[1].stopOnNext=false;
         const auto encoded=encodeShow(original);
-        near((int)juce::JSON::parse(encoded)["version"],9);
+        near((int)juce::JSON::parse(encoded)["version"],10);
         Show restored;
         check(decodeShow(encoded,restored).wasOk(),"v7 file rejected");
         check(!restored.rows[0].cells[0].stopOnNext

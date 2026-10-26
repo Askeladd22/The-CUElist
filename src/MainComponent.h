@@ -1,11 +1,14 @@
 #pragma once
 #include "AudioEngine.h"
+#include "MidiInputManager.h"
+#include "ControlOutputRouter.h"
 #include <set>
 #include "Theme.h"
 namespace cuelist {
 class MainComponent;
 class PianoRollEditor;
 class OscClipEditor;
+class ControlPanel;
 class MidiUndoAction;
 class CueGrid final : public juce::Component, public juce::FileDragAndDropTarget {
 public:
@@ -113,6 +116,16 @@ public:
     void stopRow(int row);
     void setColumnUtilities(int column,float gain,float pan,bool muted,bool inverted);
     void setMasterAudio(float gain);
+    void openControlPanel();
+    juce::Result selectControlInput(const juce::String&);
+    bool addMappingBinding(ControlBinding);
+    bool deleteMappingBinding(int);
+    int createMappingPreset(const juce::String&);
+    bool assignMappingPreset(int rowId,int presetId);
+    void armControlLearn() { controlLearnArmed=true; }
+    std::optional<ControlEvent> consumeLearnedInput() { auto result=learnedInput; learnedInput.reset(); return result; }
+    void dispatchControlForTest(const ControlEvent& event) { dispatchControl(event); }
+    int activeCueMappingId() const noexcept { return activeCueId; }
     void setColumnOutput(int column,int output);
     void setAutoStop(int row,bool enabled);
     void setCellAutoStop(int row,int column,bool enabled);
@@ -139,13 +152,13 @@ public:
     int selectedRow=0, selectedColumn=0;
     AudioEngine engine;
 private:
-    friend class CueGrid; friend class Timeline; friend class MidiUndoAction; friend class ColumnUtilities;
+    friend class CueGrid; friend class Timeline; friend class MidiUndoAction; friend class ColumnUtilities; friend class ControlPanel;
     Theme theme;
     juce::TooltipWindow tooltip{this,600};
     CueGrid grid{*this}; Timeline timeline{*this}; juce::Viewport viewport;
     ColumnUtilities utilities{*this};
     juce::TextButton openButton{"Apri"},saveButton{"Salva"},newButton{"Nuovo"},addRowButton{"+ Cue"},addColumnButton{"+ Colonna"};
-    juce::TextButton goButton{"GO  /  SPAZIO"},panicButton{"PANIC  /  ESC"},deviceButton{"Dispositivi audio"};
+    juce::TextButton goButton{"GO  /  SPAZIO"},panicButton{"PANIC  /  ESC"},deviceButton{"Dispositivi audio"},controlButton{"CONTROL MAPPING"};
     juce::TextButton importButton{"Importa WAV / MP3"},playCellButton{"Avvia cella"},stopCellButton{"Ferma"},clearButton{"Rimuovi audio"};
     juce::TextButton midiEditButton{"Crea clip MIDI"};
     juce::TextButton oscEditButton{"Crea clip OSC"};
@@ -170,6 +183,17 @@ private:
     juce::ToggleButton rowMute{"Mute intera cue"},rowLoop{"Loop di tutte le clip"};
     bool rowSettings=false;
     int nextCue=0;
+    MidiInputManager midiInput;
+    ControlMappingEngine controlMapping;
+    ControlOutputRouter controlOutput;
+    int activeCueId=0;
+    bool controlLearnArmed=false;
+    std::optional<ControlEvent> learnedInput;
+    juce::Component::SafePointer<juce::DialogWindow> controlDialog;
+    std::map<juce::String,bool> pressedInputs;
+    void resetActiveMapping();
+    void dispatchControl(const ControlEvent&);
+    void refreshControlSettings();
     std::unique_ptr<juce::FileChooser> chooser;
     juce::Component::SafePointer<juce::DialogWindow> deviceDialog;
     std::unique_ptr<PianoRollEditor> clipEditor;

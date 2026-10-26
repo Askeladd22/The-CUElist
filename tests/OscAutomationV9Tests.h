@@ -24,7 +24,7 @@ void oscAutomationV9Tests() {
         a.points={{0,0.25},{1.5,0.4},{3.5,0.7},{5,1}};
         osc.automations={a}; show.rows[0].cells[1].osc=osc;
         const auto encoded=encodeShow(show);
-        near((int)juce::JSON::parse(encoded)["version"],9);
+        near((int)juce::JSON::parse(encoded)["version"],10);
         Show restored; check(decodeShow(encoded,restored).wasOk(),"v9 OSC decode failed");
         const auto& actual=*restored.rows[0].cells[1].osc;
         check(actual.useBeats && actual.automations.size()==1 && actual.events.size()==1,

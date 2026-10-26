@@ -45,6 +45,16 @@ juce::Result MidiOutputRouter::open(const juce::String& id,bool reconnect) {
     resetTimes.push_back(juce::Time::getMillisecondCounterHiRes());
     return juce::Result::ok();
 }
+bool MidiOutputRouter::queueMappedCc(const juce::String& id,int channel,int cc,int value) {
+    if (id.isEmpty() || channel<1 || channel>16 || cc<0 || cc>127 || value<0 || value>127)
+        return false;
+    if (open(id).failed()) return false;
+    const juce::ScopedLock lock(deviceLock);
+    const auto it=routes.find(id);
+    if (it==routes.end() || mappedCommands.size()>=512) return false;
+    mappedCommands.push_back({it->second,channel,cc,value});
+    return true;
+}
 int MidiOutputRouter::route(const juce::String& id) const {
     const auto it=routes.find(id); return it==routes.end() ? -1 : it->second;
 }
@@ -77,6 +87,7 @@ void MidiOutputRouter::run() {
             if (closing || emergency.exchange(false)) {
                 read.store(write.load(std::memory_order_acquire),std::memory_order_release);
                 pending.clear();
+                mappedCommands.clear();
                 for (auto& counts:sounding) counts.fill(0);
                 for (auto& pair:streams) { pair.second->sounding.fill(0); pair.second->workerEpoch=pair.second->epoch.load(); }
                 for (auto& d:devices) if (d) for (int ch=1;ch<=16;++ch) {
@@ -84,6 +95,12 @@ void MidiOutputRouter::run() {
                     d->sendMessageNow(juce::MidiMessage::allSoundOff(ch));
                 }
             } else {
+                for (const auto& message:mappedCommands)
+                    if (message.route>=0 && (size_t)message.route<devices.size() &&
+                        devices[(size_t)message.route])
+                        devices[(size_t)message.route]->sendMessageNow(
+                            juce::MidiMessage::controllerEvent(message.channel,message.cc,message.value));
+                mappedCommands.clear();
                 for (auto& pair:streams) {
                     auto& s=*pair.second; const auto epoch=s.epoch.load();
                     if (s.workerEpoch==epoch) continue;

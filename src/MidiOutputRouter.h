@@ -3,6 +3,7 @@
 #include <array>
 #include <atomic>
 #include <map>
+#include <deque>
 namespace cuelist {
 struct MidiStream {
     std::atomic<uint64_t> epoch {0};
@@ -21,6 +22,9 @@ public:
     MidiOutputRouter();
     ~MidiOutputRouter() override;
     juce::Result open(const juce::String& identifier, bool reconnect=false);
+    // UI-originated MIDI controller commands use the existing device output
+    // worker, never opening a second handle to the same physical port.
+    bool queueMappedCc(const juce::String& identifier,int channel,int cc,int value);
     void refresh(); // UI thread: invalidate handles for disconnected devices; never choose a substitute.
     int route(const juce::String&) const;
     void emit(int,int,int,int,int) noexcept override;
@@ -35,6 +39,8 @@ private:
     std::atomic<unsigned> read {0},write {0};
     std::atomic<bool> emergency {false};
     juce::CriticalSection deviceLock;
+    struct MappedCc { int route=0,channel=1,cc=0,value=0; };
+    std::deque<MappedCc> mappedCommands;
     std::map<juce::String,int> routes; // UI thread only
     std::vector<std::unique_ptr<juce::MidiOutput>> devices;
     std::vector<std::array<unsigned,2048>> sounding;

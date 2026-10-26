@@ -114,6 +114,7 @@ public:
     bool seekRow(int rowId, double seconds) noexcept;
     void panic() noexcept;
     juce::Result setMidiOutput(const juce::String& identifier, bool reconnect=false);
+    bool sendMappedMidiCc(const juce::String& id,int channel,int number,int value);
     void refreshMidiOutputs();
     void processBlock(float* const*, int channels, int frames, double sampleRate) noexcept;
     // UI-thread only. Unknown or removed cells return an empty value.

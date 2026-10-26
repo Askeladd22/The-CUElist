@@ -4,6 +4,7 @@
 #include <optional>
 #include "MidiClip.h"
 #include "OscClip.h"
+#include "ControlMapping.h"
 
 namespace cuelist {
 enum class ColumnType { audio, midi, osc };
@@ -33,10 +34,11 @@ struct Cell {
 struct Row {
     int id = 0; juce::String name; std::vector<TempoPoint> tempo {{}}; std::vector<Cell> cells;
     float gain = 1.0f;
+    int mappingPresetId=0;
     bool muted = false, loop = false, overrideBehaviour = false, stopOnNext = true;
     Behaviour behaviour = Behaviour::retrigger;
 };
-struct Show { juce::String name = "Show 001"; float masterGain=1.0f; int nextId = 1; std::vector<Column> columns; std::vector<Row> rows; };
+struct Show { juce::String name = "Show 001"; float masterGain=1.0f; int nextId = 1; std::vector<Column> columns; std::vector<Row> rows; ControlSettings controls; };
 Show makeShow();
 void addRow(Show&, const juce::String&);
 void addColumn(Show&, ColumnType, const juce::String&);
