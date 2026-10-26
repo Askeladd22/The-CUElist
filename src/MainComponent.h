@@ -37,10 +37,17 @@ private:
     bool seeking=false;
     double dragStartSeconds=0, dragLength=10, dragViewStart=0, dragPixels=1;
     double zoom=1, viewStart=0;
+    // Visual grid and clip snapping have independent controls and subdivisions.
+    class MagnetToggle final : public juce::TextButton {
+    public:
+        void paintButton(juce::Graphics&,bool hovered,bool pressed) override;
+    };
     juce::ScrollBar horizontalScroll{false};
-    juce::ComboBox snapDivision;
-    juce::TextButton snapToggle{"Magnete ON"};
-    bool snapEnabled=true;
+    juce::ComboBox gridDivision, snapDivision;
+    juce::TextButton gridToggle{"Griglia ON"};
+    MagnetToggle snapToggle;
+    bool gridVisible=true, snapEnabled=true;
+    double gridStepBeats() const;
     double snapStepBeats() const;
     double snapSeconds(double seconds) const;
     double fullLength() const;
