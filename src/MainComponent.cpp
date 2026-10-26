@@ -681,7 +681,8 @@ void MainComponent::setClipDuration(int column,double seconds) {
     }
     dirty=true;
     engine.publish(makeRenderState(show,clips));
-    syncClipEditor(); syncOscEditor();
+    if (cell.midi && clipEditor && clipEditorCellId==cell.id) clipEditor->loadClip(*cell.midi);
+    if (cell.osc && oscEditor && oscEditorCellId==cell.id) oscEditor->loadClip(*cell.osc);
     status="Durata clip aggiornata dalla timeline.";
     timeline.repaint(); grid.repaint(); repaint();
 }
