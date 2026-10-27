@@ -97,7 +97,7 @@ MainComponent::MainComponent(bool startAudio) {
         resized(); repaint();
     };
     clipCloseButton.onClick=[this] { closeMidiClip(); closeOscClip(); };
-    newButton.onClick=[this] { withDiscardConfirmation([this] { closeMidiClip(); closeOscClip(); editHistory.clearUndoHistory(); stopAll(); show=makeShow(); clips.clear(); projectFile={}; selectedRow=selectedColumn=nextCue=0;
+    newButton.onClick=[this] { withDiscardConfirmation([this] { if(projectLoader) projectLoader->cancel(); closeMidiClip(); closeOscClip(); editHistory.clearUndoHistory(); stopAll(); show=makeShow(); clips.clear(); projectFile={}; selectedRow=selectedColumn=nextCue=0;
         resetActiveMapping(); refreshControlSettings();
         dirty=false; if (recoveryEnabled) {
             if (recoveryWriter) recoveryWriter->flush();
@@ -167,6 +167,8 @@ MainComponent::MainComponent(bool startAudio) {
 }
 MainComponent::~MainComponent() {
     stopTimer(); engine.panic(); chooser.reset();
+    // Cancel in-flight background decoding before destroying UI/engine state.
+    projectLoader.reset();
     // Join the writer before touching its destination on clean shutdown.
     recoveryWriter.reset();
     if (recoveryEnabled && !preserveDeferredRecovery)
@@ -404,6 +406,7 @@ bool MainComponent::select(int row,int column) {
     repaint(); grid.repaint(); timeline.repaint(); return true;
 }
 void MainComponent::changed(const juce::String& text,bool stopPlayback) {
+    if (projectLoader) projectLoader->cancel(); // never overwrite newer edits
     if (stopPlayback) { engine.panic(); resetActiveMapping(); }
     engine.publish(makeRenderState(show,clips),!stopPlayback);
     dirty=true; status=text; refresh();
@@ -647,6 +650,17 @@ bool MainComponent::keyPressed(const juce::KeyPress& key) {
 }
 void MainComponent::timerCallback() {
     engine.collectRetired();
+    if (projectLoader) {
+        PreparedProject prepared;
+        if (projectLoader->takeCompleted(prepared)) {
+            if (prepared.status.failed())
+                message(prepared.status.getErrorMessage()+
+                    " The current show has not been replaced.");
+            else
+                commitPreparedProject(std::move(prepared.show),prepared.source,false,
+                                      std::move(prepared.media));
+        }
+    }
     // Checkpoint only the validated in-memory model; never copy media or
     // touch a running audio callback. The update is atomic and recoverable.
     if (recoveryEnabled && ++recoveryTicks>=25*20) {
@@ -713,6 +727,7 @@ void MainComponent::withDiscardConfirmation(std::function<void()> action) {
 }
 void MainComponent::requestQuit() { withDiscardConfirmation([this] { stopAll(); juce::JUCEApplication::getInstance()->quit(); }); }
 void MainComponent::saveProject() {
+    if (projectLoader) projectLoader->cancel();
     if (!applyInspector()) return;
     chooser=std::make_unique<juce::FileChooser>("Save show",projectFile==juce::File{} ? juce::File::getSpecialLocation(juce::File::currentExecutableFile).getParentDirectory().getChildFile("Show.cuelist") : projectFile,"*.cuelist");
     chooser->launchAsync(juce::FileBrowserComponent::saveMode|juce::FileBrowserComponent::canSelectFiles|juce::FileBrowserComponent::warnAboutOverwriting,
@@ -765,8 +780,7 @@ void MainComponent::showDiagnostics() {
         "Diagnostics",details,"Close",this);
 }
 bool MainComponent::activateProject(Show candidate,const juce::File& source,bool recovering) {
-    // PREPARE before committing: an unreadable or oversized new show must
-    // never panic, unload or corrupt the current live show.
+    if (projectLoader) projectLoader->cancel();
     PreparedShowMedia prepared;
     const auto preparedResult=prepareShowMedia(candidate,prepared);
     if(preparedResult.failed()) {
@@ -774,6 +788,12 @@ bool MainComponent::activateProject(Show candidate,const juce::File& source,bool
                 " The current show has not been replaced.");
         return false;
     }
+    return commitPreparedProject(std::move(candidate),source,recovering,std::move(prepared));
+}
+bool MainComponent::commitPreparedProject(Show candidate,const juce::File& source,
+                                           bool recovering,PreparedShowMedia prepared) {
+    // Only the UI thread may interrupt playback or touch the AudioEngine.
+    // Decode and memory-budget checks have already completed transactionally.
     auto loaded=std::move(prepared.clips);
     auto issues=std::move(prepared.issues);
     // Only after all memory checks pass do we stop the previous show.
@@ -835,10 +855,12 @@ void MainComponent::openProject() {
         [safe=juce::Component::SafePointer<MainComponent>(this)](const juce::FileChooser& fc) {
             if(!safe || fc.getResult()==juce::File{}) return;
             const auto file=fc.getResult();
-            Show candidate;
-            const auto result=loadShow(file,candidate);
-            if(result.failed()) {safe->message(result.getErrorMessage());return;}
-            safe->activateProject(std::move(candidate),file,false);
+            if(!safe->projectLoader)
+                safe->projectLoader=std::make_unique<ProjectLoadWorker>();
+            safe->projectLoader->request(file);
+            safe->status="Preparing project in background: "+file.getFileName()+
+                ". Current show stays loaded until preparation succeeds.";
+            safe->repaint();
         });
 }
 void MainComponent::showDevices() {
