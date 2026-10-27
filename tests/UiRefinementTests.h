@@ -138,8 +138,9 @@ void uiRefinementTests() {
               bpm->getWidth()>=260 && cell->getWidth()>=260,
               "Inspector restyling removed or clipped text inputs");
         check(grid && mixer && ruler && master && pan && mute &&
-              mixer->getHeight()>=200 && master->getHeight()>=155,
-              "Mixer/timeline redesign removed audio controls");
+              mixer->getHeight()>=200 && master->getHeight()>=155 &&
+              ruler->getHeight()>=175,
+              "Performance layout clipped the mixer or made the timeline unusable");
         check(controlsV3::named(*ruler,"timelineGridVisibility") &&
               controlsV3::named(*ruler,"timelineSnapToggle"),
               "Grid and snap controls disappeared during restyling");
