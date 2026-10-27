@@ -15,7 +15,7 @@ public:
     static constexpr float minDb=-60.0f, maxDb=6.0f;
     static constexpr float silenceDb=-std::numeric_limits<float>::infinity();
     static float fromLinear(float gain) noexcept { return gain<=0 ? silenceDb : 20.0f*std::log10(gain); }
-    static float toLinear(float db) noexcept { return db==silenceDb ? 0.0f : juce::Decibels::decibelsToGain(db); }
+    static float toLinear(float db) noexcept { return db==silenceDb ? 0.0f : std::pow(10.0f,db/20.0f); }
     float maximumDb() const noexcept {return ceilingDb;}
     void setMaximumDb(int ceiling) { const float next=ceiling==0 ? 0.0f : 6.0f; if (ceilingDb!=next) {ceilingDb=next;repaint();} }
     std::function<void(float)> onGainChanged;
