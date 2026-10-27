@@ -202,10 +202,13 @@ void CueGrid::paint(juce::Graphics& g) {
     }
 }
 
-void CueGrid::showRowMenu(int row,juce::Point<int> screenPoint) {
+void CueGrid::showRowMenu(int row,juce::Point<int> screenPoint,int cellColumn) {
     if (row<0 || row>=(int)owner.show.rows.size()) return;
     const int rowId=owner.show.rows[(size_t)row].id;
-    auto& model=owner.show;
+    const auto& model=owner.show;
+    const int columnId=cellColumn>=0 && cellColumn<(int)model.columns.size() &&
+        !model.columns[(size_t)cellColumn].collapsed ?
+        model.columns[(size_t)cellColumn].id : 0;
     juce::PopupMenu menu;
     menu.addItem(1,"Copy cue");
     menu.addItem(2,"Paste cue below",owner.copiedRow.has_value() &&
@@ -217,20 +220,38 @@ void CueGrid::showRowMenu(int row,juce::Point<int> screenPoint) {
     for (int i=0;i<8;++i)
         colours.addItem(100+i,labels[i],true,model.rows[(size_t)row].colour==i);
     menu.addSubMenu("Cue colour",colours);
+    if (columnId>0) {
+        const auto& col=model.columns[(size_t)cellColumn];
+        const bool locked=col.type==ColumnType::control && col.controlLocked;
+        juce::PopupMenu cell;
+        cell.addItem(21,"Copy cell  Ctrl+C",owner.hasClip(row,cellColumn)&&!locked);
+        cell.addItem(22,"Paste cell  Ctrl+V",owner.copiedCell.has_value() &&
+            owner.copiedType==col.type&&!locked);
+        if (locked) cell.addItem(23,"Edit default Control Set");
+        menu.addSubMenu("Cell actions",cell);
+    }
+    menu.addSeparator();
     menu.addItem(4,"Delete cue");
     auto safe=juce::Component::SafePointer<MainComponent>(&owner);
     menu.showMenuAsync(juce::PopupMenu::Options().withTargetScreenArea(
-        {screenPoint.x,screenPoint.y,1,1}),[safe,rowId](int item) {
+        {screenPoint.x,screenPoint.y,1,1}),[safe,rowId,columnId](int item) {
         if (!safe || item==0) return;
-        for (int index=0;index<(int)safe->show.rows.size();++index)
-            if (safe->show.rows[(size_t)index].id==rowId) {
-                if (item==1) safe->copyRow(index);
-                else if (item==2) safe->pasteRowAfter(index);
-                else if (item==3) safe->duplicateRow(index);
-                else if (item==4) safe->deleteRow(index);
-                else if (item>=100 && item<=107) safe->setRowColour(index,item-100);
-                return;
-            }
+        int r=-1,c=-1;
+        for (int i=0;i<(int)safe->show.rows.size();++i)
+            if (safe->show.rows[(size_t)i].id==rowId) r=i;
+        for (int i=0;i<(int)safe->show.columns.size();++i)
+            if (safe->show.columns[(size_t)i].id==columnId) c=i;
+        if (r<0) return;
+        if (item==1) safe->copyRow(r);
+        else if (item==2) safe->pasteRowAfter(r);
+        else if (item==3) safe->duplicateRow(r);
+        else if (item==4) safe->deleteRow(r);
+        else if (item>=100 && item<=107) safe->setRowColour(r,item-100);
+        else if (item>=21 && item<=23 && c>=0 && safe->select(r,c)) {
+            if (item==21) safe->copySelectedCell();
+            else if (item==22) safe->pasteSelectedCell();
+            else safe->editControlSet(r,c);
+        }
     });
 }
 void CueGrid::mouseDown(const juce::MouseEvent& e) {
@@ -238,40 +259,8 @@ void CueGrid::mouseDown(const juce::MouseEvent& e) {
     const int row=e.y>=headerHeight ? (e.y-headerHeight)/rowHeight : -1;
     const int column=columnAt(e.x);
     if (e.mods.isPopupMenu()) {
-        if (row<0 || row>=(int)owner.show.rows.size()) return;
-        // Keep cue actions available at the exact pointer position. Cell
-        // copy/paste is retained as a submenu rather than replaced.
-        if (column>=0 && !owner.show.columns[(size_t)column].collapsed) {
-            const int rowId=owner.show.rows[(size_t)row].id;
-            const int columnId=owner.show.columns[(size_t)column].id;
-            const auto& col=owner.show.columns[(size_t)column];
-            const bool locked=col.type==ColumnType::control&&col.controlLocked;
-            juce::PopupMenu menu;
-            menu.addItem(1,"Cue actions and colour...");
-            menu.addSeparator();
-            menu.addItem(2,"Copy cell  Ctrl+C",owner.hasClip(row,column)&&!locked);
-            menu.addItem(3,"Paste cell  Ctrl+V",owner.copiedCell.has_value()&&
-                owner.copiedType==col.type&&!locked);
-            if (locked) menu.addItem(4,"Edit default Control Set");
-            auto safe=juce::Component::SafePointer<CueGrid>(this);
-            const auto screen=e.getScreenPosition();
-            menu.showMenuAsync(juce::PopupMenu::Options().withTargetScreenArea(
-                {screen.x,screen.y,1,1}),[safe,rowId,columnId,screen](int item) {
-                if (!safe || item==0) return;
-                auto& main=safe->owner;
-                int r=-1,c=-1;
-                for (int i=0;i<(int)main.show.rows.size();++i)
-                    if (main.show.rows[(size_t)i].id==rowId) r=i;
-                for (int i=0;i<(int)main.show.columns.size();++i)
-                    if (main.show.columns[(size_t)i].id==columnId) c=i;
-                if (r<0 || c<0) return;
-                if (item==1) {safe->showRowMenu(r,screen);return;}
-                if (!main.select(r,c)) return;
-                if (item==2) main.copySelectedCell();
-                else if (item==3) main.pasteSelectedCell();
-                else if (item==4) main.editControlSet(r,c);
-            });
-        } else showRowMenu(row,e.getScreenPosition());
+        if (row>=0 && row<(int)owner.show.rows.size())
+            showRowMenu(row,e.getScreenPosition(),column);
         return;
     }
     if (!e.mods.isLeftButtonDown()) return;

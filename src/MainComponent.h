@@ -20,7 +20,7 @@ public:
     void mouseDoubleClick(const juce::MouseEvent&) override;
     void mouseDrag(const juce::MouseEvent&) override;
     void mouseUp(const juce::MouseEvent&) override;
-    void showRowMenu(int row,juce::Point<int> clickPosition);
+    void showRowMenu(int row,juce::Point<int> clickPosition,int cellColumn=-1);
     int columnX(int index) const;
     int columnWidthAt(int index) const;
     int columnAt(int x) const;
