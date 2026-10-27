@@ -159,10 +159,10 @@ void MainComponent::paint(juce::Graphics& g) {
     g.setColour(palette::teal); g.fillRect(0,0,w,3);
     g.setColour(palette::line); g.drawHorizontalLine(72,0,(float)w);
     g.drawVerticalLine(180,73,(float)h);
-    // Darker sidebar console inset retains all existing navigation controls.
+    // Keep the project card, but remove the redundant static ENGINES panel.
+    // Engine controls, routing and the live audio-status indicator are unchanged.
     g.setColour(palette::background.withAlpha(.30f));
     g.fillRoundedRectangle(10.0f,238.0f,160.0f,143.0f,8.0f);
-    g.fillRoundedRectangle(10.0f,396.0f,160.0f,164.0f,8.0f);
     static const auto appIcon=juce::ImageFileFormat::loadFrom(
         BinaryData::thecuelist_icon_png,BinaryData::thecuelist_icon_pngSize);
     if (appIcon.isValid())
@@ -187,13 +187,6 @@ void MainComponent::paint(juce::Graphics& g) {
     label(g,show.name,{20,268,143,30},17,palette::text,true);
     label(g,juce::String((int)show.rows.size())+" cues / "+juce::String((int)show.columns.size())+" columns",{20,302,150,22},13,palette::muted);
     label(g,hasUnsavedChanges() ? "Unsaved changes" : "No changes",{20,330,153,22},11,hasUnsavedChanges() ? palette::amber : palette::muted);
-    g.setColour(palette::line); g.drawHorizontalLine(383,20,160);
-    label(g,"ENGINES",{20,408,140,18},11,palette::muted,true);
-    label(g,"Audio WAV / MP3",{20,430,140,24},13,palette::teal);
-    label(g,"MIDI / piano roll",{20,455,150,24},13,palette::muted);
-    label(g,"OSC / UDP",{20,480,150,24},13,palette::teal);
-    label(g,"CONTROL MIDI",{20,509,150,22},12,palette::teal);
-    label(g,activeCueId>0 ? "Cue mapping: "+juce::String(activeCueId) : "Global mapping",{20,533,150,20},11,palette::muted);
     g.setColour(palette::amber.withAlpha(.11f));
     g.fillRoundedRectangle(12.0f,(float)h-339,156.0f,51.0f,8.0f);
     label(g,"ON DECK",{20,h-333,145,16},11,palette::amber,true);
