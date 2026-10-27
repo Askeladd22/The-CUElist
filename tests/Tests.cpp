@@ -38,6 +38,7 @@ void test(const char* name, const std::function<void()>& body) {
 #include "UiRefinementTests.h"
 #include "RowActionsUiTests.h"
 #include "ShowEditOperationsTests.h"
+#include "WorkspaceLayoutTests.h"
 #include "ControlMappingV10Tests.h"
 #include "ControlColumnTests.h"
 #include "StabilityV7Tests.h"
@@ -57,6 +58,7 @@ int main() {
     uiRefinementTests();
     rowActionsUiTests();
     showEditOperationsTests();
+    workspaceLayoutTests();
     controlMappingV10Tests();
     controlColumnTests();
     stabilityV7Tests();
