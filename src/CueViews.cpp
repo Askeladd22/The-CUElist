@@ -201,18 +201,26 @@ void CueGrid::paint(juce::Graphics& g) {
         g.drawHorizontalLine(y+rowHeight-1,0,(float)getWidth());
     }
 }
-void CueGrid::showRowMenu(int row) {
+
+void CueGrid::showRowMenu(int row,juce::Point<int> screenPoint) {
     if (row<0 || row>=(int)owner.show.rows.size()) return;
     const int rowId=owner.show.rows[(size_t)row].id;
+    auto& model=owner.show;
     juce::PopupMenu menu;
     menu.addItem(1,"Copy cue");
-    menu.addItem(2,"Paste cue below",owner.copiedRow.has_value()
-        && owner.copiedRow->cells.size()==owner.show.columns.size());
+    menu.addItem(2,"Paste cue below",owner.copiedRow.has_value() &&
+        owner.copiedRow->cells.size()==model.columns.size());
     menu.addItem(3,"Duplicate cue");
     menu.addSeparator();
+    juce::PopupMenu colours;
+    const char* labels[]={"Default","Turquoise","Amber","Red","Purple","Blue","Green","Orange"};
+    for (int i=0;i<8;++i)
+        colours.addItem(100+i,labels[i],true,model.rows[(size_t)row].colour==i);
+    menu.addSubMenu("Cue colour",colours);
     menu.addItem(4,"Delete cue");
     auto safe=juce::Component::SafePointer<MainComponent>(&owner);
-    menu.showMenuAsync(juce::PopupMenu::Options().withTargetComponent(this),[safe,rowId](int item) {
+    menu.showMenuAsync(juce::PopupMenu::Options().withTargetScreenArea(
+        {screenPoint.x,screenPoint.y,1,1}),[safe,rowId](int item) {
         if (!safe || item==0) return;
         for (int index=0;index<(int)safe->show.rows.size();++index)
             if (safe->show.rows[(size_t)index].id==rowId) {
@@ -220,158 +228,226 @@ void CueGrid::showRowMenu(int row) {
                 else if (item==2) safe->pasteRowAfter(index);
                 else if (item==3) safe->duplicateRow(index);
                 else if (item==4) safe->deleteRow(index);
+                else if (item>=100 && item<=107) safe->setRowColour(index,item-100);
                 return;
             }
     });
 }
-
 void CueGrid::mouseDown(const juce::MouseEvent& e) {
-    dragRow=dragColumn=dropRow=dropColumn=-1; dragging=false;
-    if (e.mods.isPopupMenu() && e.x>=nameWidth && e.y>=headerHeight) {
-        const int row=(e.y-headerHeight)/rowHeight,col=(e.x-nameWidth)/columnWidth;
-        if (row>=0 && row<(int)owner.show.rows.size() && col>=0 && col<(int)owner.show.columns.size() && owner.select(row,col)) {
+    dragRow=dragColumn=dropRow=dropColumn=-1;dragging=false;
+    const int row=e.y>=headerHeight ? (e.y-headerHeight)/rowHeight : -1;
+    const int column=columnAt(e.x);
+    if (e.mods.isPopupMenu()) {
+        if (row<0 || row>=(int)owner.show.rows.size()) return;
+        // Keep cue actions available at the exact pointer position. Cell
+        // copy/paste is retained as a submenu rather than replaced.
+        if (column>=0 && !owner.show.columns[(size_t)column].collapsed) {
+            const int rowId=owner.show.rows[(size_t)row].id;
+            const int columnId=owner.show.columns[(size_t)column].id;
+            const auto& col=owner.show.columns[(size_t)column];
+            const bool locked=col.type==ColumnType::control&&col.controlLocked;
             juce::PopupMenu menu;
-            const bool locked=owner.show.columns[(size_t)col].type==ColumnType::control &&
-                owner.show.columns[(size_t)col].controlLocked;
-            if (locked) menu.addItem(3,"Edit default Control Set");
-            menu.addItem(1,"Copy cell  Ctrl+C",owner.hasClip(row,col) && !locked);
-            menu.addItem(2,"Paste cell  Ctrl+V",owner.copiedCell.has_value() &&
-                owner.copiedType==owner.show.columns[(size_t)col].type && !locked);
-            auto safe=juce::Component::SafePointer<MainComponent>(&owner);
-            menu.showMenuAsync(juce::PopupMenu::Options().withTargetComponent(this),[safe](int item) {
-                if (safe) {
-                    if (item==1) safe->copySelectedCell();
-                    else if (item==2) safe->pasteSelectedCell();
-                    else if (item==3) safe->editControlSet(safe->selectedRow,safe->selectedColumn);
-                }
+            menu.addItem(1,"Cue actions and colour...");
+            menu.addSeparator();
+            menu.addItem(2,"Copy cell  Ctrl+C",owner.hasClip(row,column)&&!locked);
+            menu.addItem(3,"Paste cell  Ctrl+V",owner.copiedCell.has_value()&&
+                owner.copiedType==col.type&&!locked);
+            if (locked) menu.addItem(4,"Edit default Control Set");
+            auto safe=juce::Component::SafePointer<CueGrid>(this);
+            const auto screen=e.getScreenPosition();
+            menu.showMenuAsync(juce::PopupMenu::Options().withTargetScreenArea(
+                {screen.x,screen.y,1,1}),[safe,rowId,columnId,screen](int item) {
+                if (!safe || item==0) return;
+                auto& main=safe->owner;
+                int r=-1,c=-1;
+                for (int i=0;i<(int)main.show.rows.size();++i)
+                    if (main.show.rows[(size_t)i].id==rowId) r=i;
+                for (int i=0;i<(int)main.show.columns.size();++i)
+                    if (main.show.columns[(size_t)i].id==columnId) c=i;
+                if (r<0 || c<0) return;
+                if (item==1) {safe->showRowMenu(r,screen);return;}
+                if (!main.select(r,c)) return;
+                if (item==2) main.copySelectedCell();
+                else if (item==3) main.pasteSelectedCell();
+                else if (item==4) main.editControlSet(r,c);
             });
-        }
-        return;
-    }
-    if (e.mods.isPopupMenu() && e.x>=0 && e.x<nameWidth && e.y>=headerHeight) {
-        const int row=(e.y-headerHeight)/rowHeight;
-        if (row>=0 && row<(int)owner.show.rows.size()) showRowMenu(row);
+        } else showRowMenu(row,e.getScreenPosition());
         return;
     }
     if (!e.mods.isLeftButtonDown()) return;
     owner.grabKeyboardFocus();
-    if (e.y<0 || e.x<0) return;
-    const int column=(e.x-nameWidth)/columnWidth;
+    if (e.x<0 || e.y<0) return;
     if (e.y<headerHeight) {
-        if (e.x<nameWidth || column>=(int)owner.show.columns.size()) return;
-        const int local=e.x-nameWidth-column*columnWidth;
-        if (e.y>=11 && e.y<31) {
-            if (e.getNumberOfClicks()>1) return;
-            if (local>=columnWidth-72 && local<columnWidth-52) owner.reorderColumn(column,-1);
-            else if (local>=columnWidth-48 && local<columnWidth-28) owner.reorderColumn(column,1);
-            else if (local>=columnWidth-24 && local<columnWidth-4) owner.deleteColumn(column);
-        } else owner.select(owner.selectedRow,column);
+        if (column<0) return;
+        const auto& col=owner.show.columns[(size_t)column];
+        const int w=columnWidthAt(column),local=e.x-columnX(column);
+        if (col.collapsed) { if (e.getNumberOfClicks()==1) owner.toggleColumnCollapsed(column); return; }
+        if (e.getNumberOfClicks()>1) return;
+        if (e.y>=10 && e.y<29) {
+            if (local>=w-61 && local<w-43) owner.reorderColumn(column,-1);
+            else if (local>=w-41 && local<w-23) owner.reorderColumn(column,1);
+            else if (local>=w-21 && local<w-3) owner.deleteColumn(column);
+            else owner.select(owner.selectedRow,column);
+        } else if (e.y>=38 && e.y<59 && local>=w-26)
+            owner.toggleColumnCollapsed(column);
+        else owner.select(owner.selectedRow,column);
         return;
     }
-    const int row=(e.y-headerHeight)/rowHeight, localY=(e.y-headerHeight)%rowHeight-rowContentInset;
-    if (row>=(int)owner.show.rows.size()) return;
-    const int tail=nameWidth+(int)owner.show.columns.size()*columnWidth;
-    if (e.x>=tail+12 && e.x<tail+96 && localY>=8 && localY<45) {
-        if (e.getNumberOfClicks()==1) owner.editRowBpm(row);
-        return;
-    }
-    if (e.x>=tail+105 && e.x<tail+195 && localY>=6 && localY<30) {
-        if (e.getNumberOfClicks()==1) owner.setAutoStop(row,!owner.show.rows[row].stopOnNext);
-        return;
-    }
-    if (e.x>=tail+115 && e.x<tail+150 && localY>=31 && localY<53) {
-        const int id=owner.show.rows[(size_t)row].id;
-        if (autoStopVisibleRows.count(id)) autoStopVisibleRows.erase(id);
-        else autoStopVisibleRows.insert(id);
-        repaint(); return;
-    }
-    if (e.x>=nameWidth && column>=0 && column<(int)owner.show.columns.size() && localY>=5 && localY<27) {
-        const int localX=(e.x-nameWidth)%columnWidth;
-        if (autoStopVisibleRows.count(owner.show.rows[(size_t)row].id)
-            && localX>=columnWidth-52 && localX<columnWidth-8) {
-            if (e.getNumberOfClicks()==1)
-                owner.setCellAutoStop(row,column,!owner.show.rows[(size_t)row].cells[(size_t)column].stopOnNext);
-            return;
-        }
-    }
-    if (e.x>=nameWidth && column<(int)owner.show.columns.size() && localY>=28 && localY<46) {
-        const int localX=(e.x-nameWidth)%columnWidth;
-        if (owner.show.columns[(size_t)column].type!=ColumnType::control &&
-            ((localX>=columnWidth-54 && localX<columnWidth-33) ||
-             (localX>=columnWidth-29 && localX<columnWidth-8))) {
-            if (e.getNumberOfClicks()==1 && owner.hasClip(row,column)) {
-                if (localX<columnWidth-33) owner.triggerCellAt(row,column); else owner.stopCellAt(row,column);
-            }
-            return;
-        }
-    }
+    if (row<0 || row>=(int)owner.show.rows.size()) return;
+    const int localY=(e.y-headerHeight)%rowHeight-rowContentInset;
     if (e.x<nameWidth) {
-        if (e.x>=nameWidth-36 && e.x<nameWidth-10 && localY>=17 && localY<39) {
-            if (e.getNumberOfClicks()==1) owner.stopRow(row); return;
-        }
-        if (e.x>=nameWidth-70 && e.x<nameWidth-42 && localY>=17 && localY<38) {
-            if (e.getNumberOfClicks()==1) showRowMenu(row);
+        if (localY>=13 && localY<34 && e.x>=nameWidth-34 && e.x<nameWidth-9) {
+            if (e.getNumberOfClicks()==1) owner.stopRow(row);
             return;
         }
-        if (e.x<137 && e.getNumberOfClicks()>1) return;
-        if (localY>=17 && localY<38 && e.x>=6 && e.x<26) owner.reorderRow(row,-1);
-        else if (localY>=17 && localY<38 && e.x>=30 && e.x<50) owner.reorderRow(row,1);
-        else if (localY>=17 && localY<38 && e.x>=54 && e.x<74) owner.deleteRow(row);
-        else if (e.x>=84 && e.x<132 && localY>=12 && localY<45) owner.triggerRow(row);
-        else owner.select(row,owner.selectedColumn);
-    } else if (column<(int)owner.show.columns.size() && owner.select(row,column)) {
-        if (owner.show.columns[(size_t)column].type==ColumnType::control) {
-            if (e.getNumberOfClicks()==1) owner.editControlSet(row,column);
-        } else if (owner.hasClip(row,column)) {
-            dragRow=row; dragColumn=column;
+        if (localY>=13 && localY<33 && e.x>=nameWidth-65 && e.x<nameWidth-40) {
+            if (e.getNumberOfClicks()==1) showRowMenu(row,e.getScreenPosition());
+            return;
         }
+        if (localY>=13 && localY<33 && e.x>=5 && e.x<23) owner.reorderRow(row,-1);
+        else if (localY>=13 && localY<33 && e.x>=26 && e.x<44) owner.reorderRow(row,1);
+        else if (localY>=13 && localY<33 && e.x>=47 && e.x<65) owner.deleteRow(row);
+        else if (e.x>=75 && e.x<118 && localY>=9 && localY<41) owner.triggerRow(row);
+        else owner.select(row,owner.selectedColumn);
+        return;
+    }
+    if (column<0 || owner.show.columns[(size_t)column].collapsed) return;
+    const int localX=e.x-columnX(column),w=columnWidthAt(column);
+    const auto& col=owner.show.columns[(size_t)column];
+    if (autoStopVisibleRows.count(owner.show.rows[(size_t)row].id) &&
+        localY>=4 && localY<20 && localX>=w-41 && localX<w-7) {
+        if (e.getNumberOfClicks()==1)
+            owner.setCellAutoStop(row,column,!owner.show.rows[(size_t)row].cells[(size_t)column].stopOnNext);
+        return;
+    }
+    if (col.type!=ColumnType::control && localY>=25 && localY<43) {
+        if (localX>=w-49 && localX<w-30) {
+            if (e.getNumberOfClicks()==1 && owner.hasClip(row,column)) owner.triggerCellAt(row,column);
+            return;
+        }
+        if (localX>=w-26 && localX<w-7) {
+            if (e.getNumberOfClicks()==1 && owner.hasClip(row,column)) owner.stopCellAt(row,column);
+            return;
+        }
+    }
+    if (!owner.select(row,column)) return;
+    if (col.type==ColumnType::control) {
+        if (e.getNumberOfClicks()==1) owner.editControlSet(row,column);
+    } else if (owner.hasClip(row,column)) {
+        dragRow=row; dragColumn=column;
     }
 }
 void CueGrid::mouseDrag(const juce::MouseEvent& e) {
     if (dragRow<0 || e.getDistanceFromDragStart()<5) return;
-    dragging=true; dropRow=dropColumn=-1;
-    if (e.x>=nameWidth && e.y>=headerHeight) {
-        const int row=(e.y-headerHeight)/rowHeight, col=(e.x-nameWidth)/columnWidth;
-        if (row<(int)owner.show.rows.size() && col<(int)owner.show.columns.size()
-            && owner.show.columns[col].type==owner.show.columns[dragColumn].type) { dropRow=row; dropColumn=col; }
+    dragging=true;dropRow=dropColumn=-1;
+    const int row=e.y>=headerHeight ? (e.y-headerHeight)/rowHeight : -1;
+    const int column=columnAt(e.x);
+    if (row>=0 && row<(int)owner.show.rows.size() &&
+        column>=0 && !owner.show.columns[(size_t)column].collapsed &&
+        owner.show.columns[(size_t)column].type==owner.show.columns[(size_t)dragColumn].type) {
+        dropRow=row;dropColumn=column;
     }
-    setMouseCursor(dropRow>=0 ? juce::MouseCursor::DraggingHandCursor : juce::MouseCursor::NormalCursor); repaint();
+    setMouseCursor(dropRow>=0?juce::MouseCursor::DraggingHandCursor:juce::MouseCursor::NormalCursor);
+    repaint();
 }
 void CueGrid::mouseUp(const juce::MouseEvent&) {
-    if (dragging && dropRow>=0 && (dragRow!=dropRow || dragColumn!=dropColumn)) owner.moveClip(dragRow,dragColumn,dropRow,dropColumn);
-    dragRow=dragColumn=dropRow=dropColumn=-1; dragging=false; setMouseCursor(juce::MouseCursor::NormalCursor); repaint();
+    if (dragging && dropRow>=0 && (dragRow!=dropRow || dragColumn!=dropColumn))
+        owner.moveClip(dragRow,dragColumn,dropRow,dropColumn);
+    dragRow=dragColumn=dropRow=dropColumn=-1;dragging=false;
+    setMouseCursor(juce::MouseCursor::NormalCursor);repaint();
 }
 void CueGrid::mouseDoubleClick(const juce::MouseEvent& e) {
     if (e.mods.isPopupMenu() || e.x<0 || e.y<0) return;
+    const int column=columnAt(e.x);
     if (e.y<headerHeight) {
-        const int column=(e.x-nameWidth)/columnWidth;
-        if (e.x>=nameWidth && column<(int)owner.show.columns.size() && e.y>=34) owner.renameTitle(true,column);
+        if (column>=0 && !owner.show.columns[(size_t)column].collapsed &&
+            e.y>=34 && e.x-columnX(column)<columnWidthAt(column)-28)
+            owner.renameTitle(true,column);
         return;
     }
     const int row=(e.y-headerHeight)/rowHeight;
-    if (row>=(int)owner.show.rows.size()) return;
-    if (e.x>=137 && e.x<nameWidth-40) owner.renameTitle(false,row);
-    else if (e.x>=nameWidth) {
-        const int col=(e.x-nameWidth)/columnWidth;
-        const int localX=(e.x-nameWidth)%columnWidth, localY=(e.y-headerHeight)%rowHeight;
-        if (localY>=28 && localY<46 && localX>=columnWidth-54) return;
-        if (col<(int)owner.show.columns.size() && owner.select(row,col)) {
-            if (owner.show.columns[col].type==ColumnType::midi) owner.editMidiClip();
-            else if (owner.show.columns[col].type==ColumnType::osc) owner.editOscClip();
-            else if (owner.show.columns[col].type==ColumnType::control)
-                owner.editControlSet(row,col);
+    if (row<0 || row>=(int)owner.show.rows.size()) return;
+    if (e.x>=128 && e.x<nameWidth-40) owner.renameTitle(false,row);
+    else if (column>=0 && !owner.show.columns[(size_t)column].collapsed) {
+        const int localX=e.x-columnX(column),localY=(e.y-headerHeight)%rowHeight-rowContentInset;
+        if (localY>=25 && localY<43 && localX>=columnWidthAt(column)-49) return;
+        if (owner.select(row,column)) {
+            const auto type=owner.show.columns[(size_t)column].type;
+            if (type==ColumnType::midi) owner.editMidiClip();
+            else if (type==ColumnType::osc) owner.editOscClip();
+            else if (type==ColumnType::control) owner.editControlSet(row,column);
             else owner.triggerCell();
         }
     }
 }
 bool CueGrid::isInterestedInFileDrag(const juce::StringArray& files) {
-    return files.size()==1 && (files[0].endsWithIgnoreCase(".wav") || files[0].endsWithIgnoreCase(".mp3") || files[0].endsWithIgnoreCase(".mid") || files[0].endsWithIgnoreCase(".midi"));
+    return files.size()==1 && (files[0].endsWithIgnoreCase(".wav") ||
+        files[0].endsWithIgnoreCase(".mp3") || files[0].endsWithIgnoreCase(".mid") ||
+        files[0].endsWithIgnoreCase(".midi"));
 }
 void CueGrid::filesDropped(const juce::StringArray& files,int x,int y) {
-    if (!isInterestedInFileDrag(files) || x<nameWidth || y<headerHeight) return;
-    const int row=(y-headerHeight)/rowHeight, column=(x-nameWidth)/columnWidth;
-    if (row>=(int)owner.show.rows.size() || column>=(int)owner.show.columns.size()) return;
+    if (!isInterestedInFileDrag(files) || y<headerHeight) return;
+    const int row=(y-headerHeight)/rowHeight,column=columnAt(x);
+    if (row<0 || row>=(int)owner.show.rows.size() || column<0 ||
+        owner.show.columns[(size_t)column].collapsed) return;
     if (owner.select(row,column)) owner.importFile(juce::File(files[0]));
 }
-
+void CueMetricsOverlay::paint(juce::Graphics& g) {
+    g.fillAll(palette::raised);
+    g.setColour(palette::teal);g.fillRect(0,0,3,getHeight());
+    label(g,"BPM",{7,18,50,23},11,palette::text,true);
+    label(g,"AUTO STOP",{72,18,76,23},10,palette::text,true);
+    const int scroll=owner.viewport.getViewPositionY();
+    const int first=std::max(0,(scroll-CueGrid::headerHeight)/CueGrid::rowHeight);
+    const int last=std::min((int)owner.show.rows.size(),
+        (scroll+getHeight()-CueGrid::headerHeight)/CueGrid::rowHeight+1);
+    for (int r=first;r<last;++r) {
+        const auto& row=owner.show.rows[(size_t)r];
+        const int y=CueGrid::headerHeight+r*CueGrid::rowHeight-scroll;
+        g.setColour(r==owner.selectedRow?palette::panel:palette::background.withAlpha(.55f));
+        g.fillRect(3,y,getWidth()-3,CueGrid::rowHeight);
+        const auto cueTone=CueGrid::cueColour(row.colour);
+        if (row.colour>0) {
+            g.setColour(cueTone.withAlpha(.14f));g.fillRect(3,y,getWidth()-3,CueGrid::rowHeight);
+        }
+        label(g,juce::String(row.tempo.front().bpm,1),{7,y+14,61,24},14,palette::text,true);
+        g.setColour(row.stopOnNext?palette::teal.withAlpha(.3f):palette::muted.withAlpha(.2f));
+        g.fillRoundedRectangle(77.f,(float)y+12,31.f,19.f,9.f);
+        g.setColour(row.stopOnNext?palette::teal:palette::muted);
+        g.fillEllipse(row.stopOnNext?93.f:80.f,(float)y+15,13.f,13.f);
+        label(g,row.stopOnNext?"ON":"OFF",{111,y+11,34,22},10,
+              row.stopOnNext?palette::teal:palette::muted,true);
+        const bool details=owner.grid.autoStopVisibleRows.count(row.id)>0;
+        label(g,details?"−":"+",
+              {89,y+36,24,20},15,details?palette::amber:palette::muted,true,
+              juce::Justification::centred);
+        g.setColour(palette::line);
+        g.drawHorizontalLine(y+CueGrid::rowHeight-1,0,(float)getWidth());
+    }
+}
+void CueMetricsOverlay::mouseDown(const juce::MouseEvent& e) {
+    if (e.mods.isPopupMenu()) {
+        const int scroll=owner.viewport.getViewPositionY();
+        const int row=(e.y+scroll-CueGrid::headerHeight)/CueGrid::rowHeight;
+        owner.grid.showRowMenu(row,e.getScreenPosition());
+        return;
+    }
+    if (!e.mods.isLeftButtonDown()) return;
+    const int scroll=owner.viewport.getViewPositionY();
+    if (e.y+scroll<CueGrid::headerHeight) return;
+    const int row=(e.y+scroll-CueGrid::headerHeight)/CueGrid::rowHeight;
+    if (row<0 || row>=(int)owner.show.rows.size()) return;
+    const int localY=(e.y+scroll-CueGrid::headerHeight)%CueGrid::rowHeight;
+    if (e.x<69) owner.editRowBpm(row);
+    else if (localY>=32) owner.grid.toggleAutoStopDetails(row);
+    else owner.setAutoStop(row,!owner.show.rows[(size_t)row].stopOnNext);
+    repaint();
+}
+void CueMetricsOverlay::mouseWheelMove(const juce::MouseEvent& e,const juce::MouseWheelDetails& wheel) {
+    const int x=owner.viewport.getViewPositionX(),y=owner.viewport.getViewPositionY();
+    if (e.mods.isShiftDown())
+        owner.viewport.setViewPosition(x-(int)(wheel.deltaY*100),y);
+    else owner.viewport.setViewPosition(x,y-(int)(wheel.deltaY*100));
+    repaint();
+}
 }
