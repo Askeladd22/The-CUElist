@@ -117,6 +117,8 @@ public:
         g.setFont(font(10.0f,true));
         g.drawText("TX",17,0,std::max(1,getWidth()-17),getHeight(),juce::Justification::centredLeft,false);
     }
+private:
+    bool active=false;
 };
 
 inline void configureMixerPan(juce::Slider& pan) {
