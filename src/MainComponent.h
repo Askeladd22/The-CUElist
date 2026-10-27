@@ -23,7 +23,8 @@ public:
     void showRowMenu(int row);
     bool isInterestedInFileDrag(const juce::StringArray&) override;
     void filesDropped(const juce::StringArray&,int,int) override;
-    static constexpr int rowHeight=54, headerHeight=68, nameWidth=310, columnWidth=160;
+    static constexpr int rowHeight=66, headerHeight=68, nameWidth=310, columnWidth=160;
+    static constexpr int rowContentInset=6; // visual padding, used by both paint and hit-testing
 private:
     MainComponent& owner;
     int dragRow=-1, dragColumn=-1, dropRow=-1, dropColumn=-1;

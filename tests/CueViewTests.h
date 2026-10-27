@@ -25,12 +25,12 @@ void cueViewTests() {
         addColumn(ui.show,ColumnType::audio,{}); addColumn(ui.show,ColumnType::audio,{});
         auto* grid=find<CueGrid>(ui); check(grid!=nullptr,"Grid absent");
         const int row=ui.show.rows[1].id, column=ui.show.columns[1].id;
-        click(*grid,16,68+54+27); check(ui.show.rows[0].id==row,"Middle row up arrow did not move one step");
-        click(*grid,40,68+27); check(ui.show.rows[1].id==row,"Row down arrow did not move one step");
-        click(*grid,40,68+54+27,2); check(ui.show.rows[1].id==row,"Second double click reordered again");
-        click(*grid,CueGrid::nameWidth+160+98,21); check(ui.show.columns[0].id==column,"Middle column left arrow did not move one step");
+        click(*grid,16,CueGrid::headerHeight+CueGrid::rowHeight+CueGrid::rowContentInset+27); check(ui.show.rows[0].id==row,"Middle row up arrow did not move one step");
+        click(*grid,40,CueGrid::headerHeight+CueGrid::rowContentInset+27); check(ui.show.rows[1].id==row,"Row down arrow did not move one step");
+        click(*grid,40,CueGrid::headerHeight+CueGrid::rowHeight+CueGrid::rowContentInset+27,2); check(ui.show.rows[1].id==row,"Second double click reordered again");
+        click(*grid,CueGrid::nameWidth+CueGrid::columnWidth+98,21); check(ui.show.columns[0].id==column,"Middle column left arrow did not move one step");
         click(*grid,CueGrid::nameWidth+122,21); check(ui.show.columns[1].id==column,"Column right arrow did not move one step");
-        click(*grid,CueGrid::nameWidth+160+122,21,2); check(ui.show.columns[1].id==column,"Second double click moved column");
+        click(*grid,CueGrid::nameWidth+CueGrid::columnWidth+122,21,2); check(ui.show.columns[1].id==column,"Second double click moved column");
     });
     test("grid clip drag swaps real identities and retains loaded audio", [] {
         MainComponent ui(false); addRow(ui.show,{}); addColumn(ui.show,ColumnType::audio,{});
