@@ -1,5 +1,6 @@
 #pragma once
 #include "ControlLayerBuilder.h"
+#include "ShowEditOperations.h"
 
 void controlRuntimeTests() {
     test("pure Control Layer builder preserves locked defaults and cue-scoped overrides",[] {
