@@ -266,7 +266,7 @@ void MainComponent::paint(juce::Graphics& g) {
     label(g,"CELL  /  "+col.name,{x,489,inspectorInner,20},14,palette::teal,true);
     label(g,"Cell name",{x,520,inspectorInner,18},12,palette::text,true);
     if(col.type==ColumnType::audio)
-        label(g,"Clip gain",{x,592,inspectorInner,18},12,palette::muted,true);
+        label(g,"Gain",{x,598,48,18},12,palette::muted,true);
     if(col.type==ColumnType::osc)
         label(g,"UDP destination in column Utility",{x,711,inspectorInner,18},10,palette::muted);
     g.restoreState();
