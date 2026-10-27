@@ -393,7 +393,7 @@ void RenderState::render(float* const* outputs,int channels,int frames,double sa
             // Current gain reduction, not a latched historical clip light.
             // The last processed sample owns the indicator; it goes dark
             // immediately when the bus ceases to exceed threshold.
-            limiterReduction=desired<0.9999f ? 1.0f-limiterGain : 0.0f;
+            limiterReduction=absolutePeak>0.00001f ? 1.0f-limiterGain : 0.0f;
             limiterReducing=limiterReduction>0.0001f;
             left*=limiterGain;
             right*=limiterGain;

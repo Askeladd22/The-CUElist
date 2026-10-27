@@ -117,8 +117,10 @@ public:
         g.setColour(active ? palette::teal : palette::raised);g.fillEllipse(dot);
         g.setColour(active ? palette::teal : palette::line);g.drawEllipse(dot,1.0f);
         g.setColour(active ? palette::text : palette::muted);
-        g.setFont(font(10.0f,true));
-        g.drawText("TX",17,0,std::max(1,getWidth()-17),getHeight(),juce::Justification::centredLeft,false);
+        if(getWidth()>=35) {
+            g.setFont(font(10.0f,true));
+            g.drawText("TX",17,0,std::max(1,getWidth()-17),getHeight(),juce::Justification::centredLeft,false);
+        }
     }
 private:
     bool active=false;
