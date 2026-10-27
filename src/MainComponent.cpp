@@ -1,6 +1,7 @@
 #include "MainComponent.h"
 #include "ProjectSafety.h"
 #include "ProjectMediaLoader.h"
+#include "DeviceIdentity.h"
 #include "PianoRoll.h"
 #include "OscEditor.h"
 #include "MidiClip.h"
@@ -688,10 +689,8 @@ void MainComponent::timerCallback() {
         // controller Windows happens to enumerate first. No playback or GO
         // is triggered by reconnecting.
         if (!midiInput.connected() && show.controls.midiInputId.isNotEmpty()) {
-            bool present=false;
-            for (const auto& port:juce::MidiInput::getAvailableDevices())
-                if (port.identifier==show.controls.midiInputId) {present=true;break;}
-            if (present) {
+            if (hasExactMidiIdentifier(juce::MidiInput::getAvailableDevices(),
+                                       show.controls.midiInputId)) {
                 ++midiInputReconnectAttempts;
                 const auto restored=midiInput.connect(show.controls.midiInputId);
                 if (restored.wasOk()) {

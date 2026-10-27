@@ -1,5 +1,6 @@
 #pragma once
 #include "ControlMapping.h"
+#include "DeviceIdentity.h"
 #include <juce_audio_devices/juce_audio_devices.h>
 #include <array>
 #include <atomic>
@@ -14,10 +15,8 @@ public:
     juce::Result connect(const juce::String& identifier) {
         disconnect();
         if (identifier.isEmpty()) return juce::Result::ok();
-        bool found=false;
-        for (const auto& d:juce::MidiInput::getAvailableDevices())
-            if (d.identifier==identifier) { found=true; break; }
-        if (!found) return juce::Result::fail("MIDI controller not connected.");
+        if (!hasExactMidiIdentifier(juce::MidiInput::getAvailableDevices(),identifier))
+            return juce::Result::fail("MIDI controller not connected.");
         auto port=juce::MidiInput::openDevice(identifier,this);
         if (!port) return juce::Result::fail("Could not open MIDI input.");
         deviceId=identifier;
@@ -33,9 +32,7 @@ public:
     const juce::String& identifier() const { return deviceId; }
     bool stillAvailable() const {
         if (deviceId.isEmpty()) return false;
-        for (const auto& d:juce::MidiInput::getAvailableDevices())
-            if (d.identifier==deviceId) return true;
-        return false;
+        return hasExactMidiIdentifier(juce::MidiInput::getAvailableDevices(),deviceId);
     }
     int droppedCount() const noexcept { return dropped.load(); }
     bool poll(ControlEvent& result) {

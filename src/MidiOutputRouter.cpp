@@ -1,5 +1,6 @@
 #include "MidiOutputRouter.h"
 #include "TransportTiming.h"
+#include "DeviceIdentity.h"
 namespace cuelist {
 MidiOutputRouter::MidiOutputRouter():Thread("MIDI output dispatcher"),queue(std::make_unique<std::array<Packet,capacity>>()) { startThread(); }
 MidiOutputRouter::~MidiOutputRouter() { signalThreadShouldExit(); stopThread(-1); }
@@ -19,7 +20,7 @@ void MidiOutputRouter::refresh() {
     const auto available=juce::MidiOutput::getAvailableDevices();
     const juce::ScopedLock lock(deviceLock);
     for (const auto& route:routes) {
-        bool found=false; for (const auto& d:available) if (d.identifier==route.first) { found=true; break; }
+        const bool found=hasExactMidiIdentifier(available,route.first);
         const int index=route.second;
         if (!found && devices[(size_t)index]) closeRoute(index);
         else if (found && !devices[(size_t)index]) {
@@ -38,7 +39,7 @@ void MidiOutputRouter::refresh() {
 }
 juce::Result MidiOutputRouter::open(const juce::String& id,bool reconnect) {
     if (id.isEmpty()) return juce::Result::ok();
-    bool available=false; for (const auto& d:juce::MidiOutput::getAvailableDevices()) if (d.identifier==id) available=true;
+    const bool available=hasExactMidiIdentifier(juce::MidiOutput::getAvailableDevices(),id);
     const juce::ScopedLock lock(deviceLock);
     const auto found=routes.find(id);
     if (!available) {
