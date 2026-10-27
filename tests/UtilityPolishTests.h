@@ -122,4 +122,37 @@ void utilityPolishTests() {
         check(ui.engine.getMidiColumnSent(ui.show.columns[1].id)==0,
               "MIDI output activity counted messages without device dispatch");
     });
+
+    test("Expanded Audio utility restores the calibrated 92px fader and original Pan geometry",[] {
+        MainComponent ui(false);ui.setSize(1440,900);
+        auto* utility=cueViewFixtures::find<ColumnUtilities>(ui);
+        check(utility,"Utility container missing");
+        auto* first=utility->getChildComponent(0)->getChildComponent(0);
+        auto* fader=dynamic_cast<GainMeterFader*>(
+            controlsV3::named(*first,"columnGainDb"));
+        auto* pan=controlsV3::named(*first,"columnPan");
+        auto* mute=controlsV3::named(*first,"columnMute");
+        check(fader && pan && mute,"Expanded Audio strip controls missing");
+        check(CueGrid::columnWidth==152 && first->getWidth()==152 &&
+              fader->getX()==7 && fader->getWidth()==92 &&
+              pan->getWidth()==49 && pan->getX()==92 &&
+              mute->getX()==75 && mute->getRight()<=first->getWidth(),
+              "The original safe spacing of fader, meter, Pan and Mute was not restored");
+        check(mute->getX()>=fader->getX()+fader->getWidth()-24,
+              "Audio Mute unexpectedly moved behind the calibrated meter region");
+    });
+    test("Compact Master Mute is centred below Pan and not over its label",[] {
+        MainComponent ui(false);ui.setSize(1440,900);
+        auto* util=cueViewFixtures::find<ColumnUtilities>(ui);
+        auto* masterPan=controlsV3::named(*util,"masterPan");
+        auto* masterMute=controlsV3::named(*util,"masterMute");
+        auto* output=controlsV3::named(*util,"masterMainOutput");
+        check(masterPan && masterMute && output,"Master Audio controls missing");
+        check(std::abs(masterPan->getCentreX()-masterMute->getCentreX())<=2 &&
+              masterMute->getY()>=masterPan->getBottom()+55 &&
+              masterMute->getRight()<CueGrid::nameWidth &&
+              output->getRight()<masterPan->getX(),
+              "Master Audio Mute is not centered beneath Pan or overlaps output");
+    });
+
 }
