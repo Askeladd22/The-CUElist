@@ -25,7 +25,7 @@ public:
     void selectStream(OscStream* s) noexcept override { selected=s; }
     void emit(int route,const uint8_t* data,unsigned size,int sampleOffset) noexcept override;
     void emergencyStop() noexcept;
-    std::atomic<unsigned> dropped {0},sent {0};
+    std::atomic<unsigned> dropped {0},sent {0},lateOver10ms {0};
 private:
     static constexpr unsigned capacity=2048;
     struct Packet {

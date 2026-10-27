@@ -136,14 +136,16 @@ public:
     std::atomic<bool> rowPlaying {false};
     struct Diagnostics {
         unsigned audioCommandsDropped=0, midiOutputDropped=0, midiOutputSent=0,
-                 oscDropped=0, oscSent=0;
+                 oscDropped=0, oscSent=0, midiLateOver10ms=0, oscLateOver10ms=0;
     };
     Diagnostics diagnostics() const noexcept {
         return {commandDrops.load(std::memory_order_relaxed),
                 midiRouter.dropped.load(std::memory_order_relaxed),
                 midiRouter.sent.load(std::memory_order_relaxed),
                 oscRouter.dropped.load(std::memory_order_relaxed),
-                oscRouter.sent.load(std::memory_order_relaxed)};
+                oscRouter.sent.load(std::memory_order_relaxed),
+                midiRouter.lateOver10ms.load(std::memory_order_relaxed),
+                oscRouter.lateOver10ms.load(std::memory_order_relaxed)};
     }
 private:
     MidiOutputRouter midiRouter;

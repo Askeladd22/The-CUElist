@@ -29,7 +29,7 @@ public:
     int route(const juce::String&) const;
     void emit(int,int,int,int,int) noexcept override;
     void emergencyStop() noexcept;
-    std::atomic<unsigned> dropped{0}, sent{0};
+    std::atomic<unsigned> dropped{0}, sent{0}, lateOver10ms{0};
     std::shared_ptr<MidiStream> stream(int cellId,int route);
     void selectStream(MidiStream* value) noexcept override { selected=value; }
     void beginBlock(double rate,double sharedOriginMs=-1) noexcept;

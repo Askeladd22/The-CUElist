@@ -147,6 +147,8 @@ void MidiOutputRouter::run() {
                     const auto& p=*end++;
                     if (p.route<0 || (size_t)p.route>=devices.size() || !devices[(size_t)p.route]
                         || p.blockOrigin<=resetTimes[(size_t)p.route] || (p.stream && p.stream->epoch.load()!=p.epoch)) continue;
+                    if (juce::Time::getMillisecondCounterHiRes()-p.due>10.0)
+                        lateOver10ms.fetch_add(1,std::memory_order_relaxed);
                     const size_t key=(size_t)((p.status&15)*128+p.a); auto& total=sounding[(size_t)p.route][key];
                     if ((p.status&0xf0)==0x90) {
                         ++total; if (p.stream) ++p.stream->sounding[key];

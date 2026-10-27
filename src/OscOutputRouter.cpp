@@ -69,6 +69,8 @@ void OscOutputRouter::run() {
                     if (p.route<0 || (size_t)p.route>=routes.size() || (p.stream && p.stream->epoch.load()!=p.epoch)) continue;
                     const auto& route=routes[(size_t)p.route];
                     if (route.host.isEmpty() || route.port<1 || route.port>65535) continue;
+                    if (juce::Time::getMillisecondCounterHiRes()-p.due>10.0)
+                        lateOver10ms.fetch_add(1,std::memory_order_relaxed);
                     if (socket.write(route.host,route.port,p.bytes.data(),(int)p.size)==(int)p.size) sent.fetch_add(1);
                     else dropped.fetch_add(1);
                 }

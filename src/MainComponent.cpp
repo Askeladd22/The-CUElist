@@ -725,8 +725,10 @@ void MainComponent::showDiagnostics() {
     details+="\nMIDI input messages dropped: "+juce::String(midiInput.droppedCount());
     details+="\nMIDI output messages sent: "+juce::String(stats.midiOutputSent);
     details+="\nMIDI output messages dropped: "+juce::String(stats.midiOutputDropped);
+    details+="\nMIDI dispatches >10 ms late: "+juce::String(stats.midiLateOver10ms);
     details+="\nOSC UDP packets sent: "+juce::String(stats.oscSent);
     details+="\nOSC UDP packets dropped / send failures: "+juce::String(stats.oscDropped);
+    details+="\nOSC dispatches >10 ms late: "+juce::String(stats.oscLateOver10ms);
     details+="\n\nThese counters are local to the current process. UDP sent does not prove receiver delivery.";
     juce::AlertWindow::showMessageBoxAsync(juce::MessageBoxIconType::InfoIcon,
         "Diagnostics",details,"Close",this);
