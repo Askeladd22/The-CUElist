@@ -264,7 +264,7 @@ void MainComponent::dispatchControl(const ControlEvent& input) {
     // binding, never an Inspector-selected or lower-priority destination.
     std::optional<float> current;
     if (const auto* winner=controlMapping.matched(input))
-        current=mappedPickupTarget(show,*winner);
+        current=mappedPickupTarget(show,*winner,audioFaderCeilingDb());
     const auto action=controlMapping.resolve(input,current);
     if (!action) return;
     const auto& binding=action->binding;
@@ -277,8 +277,7 @@ void MainComponent::dispatchControl(const ControlEvent& input) {
         return;
     }
     if (binding.target==ControlTarget::masterGain) {
-        const float ceiling=juce::Decibels::decibelsToGain((float)audioFaderCeilingDb());
-        const float bounded=std::min(action->scaled,ceiling);
+        const float bounded=mappedFaderGain(*action,audioFaderCeilingDb());
         if (shouldApplyMappedValue(show.masterGain,bounded))
             setMasterAudio(bounded);
     } else if (binding.target==ControlTarget::masterPan) {
@@ -290,9 +289,8 @@ void MainComponent::dispatchControl(const ControlEvent& input) {
         if (i>=0) {
                 const auto& c=show.columns[(size_t)i];
                 const float currentValue=binding.target==ControlTarget::columnPan ? c.pan : c.gain;
-                const float ceiling=juce::Decibels::decibelsToGain((float)audioFaderCeilingDb());
                 const float bounded=binding.target==ControlTarget::columnGain ?
-                    std::min(action->scaled,ceiling) : action->scaled;
+                    mappedFaderGain(*action,audioFaderCeilingDb()) : action->scaled;
                 if (shouldApplyMappedValue(currentValue,bounded)) {
                     setColumnUtilities(i,
                         binding.target==ControlTarget::columnGain ? bounded : c.gain,
