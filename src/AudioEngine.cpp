@@ -168,6 +168,27 @@ void RenderState::trigger(int id,bool row,bool stop) noexcept {
         if (active || stopClock) clock.ended=false;
     }
 }
+void RenderState::toggleRowPause(int id) noexcept {
+    bool hasPlaying=false,hasPaused=false;
+    for(const auto& v:voices) if(v.rowId==id && v.followsRow && v.rowMode) {
+        hasPlaying=hasPlaying||v.playing;
+        hasPaused=hasPaused||v.paused;
+    }
+    if(!hasPlaying && !hasPaused) {trigger(id,true,false);return;}
+    const bool resume=!hasPlaying;
+    for(auto& v:voices) if(v.rowId==id && v.followsRow && v.rowMode && (v.playing||v.paused)) {
+        if(!resume) releaseMidi(v);
+        else {
+            if(v.isMidi) v.midiNeedsSync=true;
+            if(v.isOsc) v.oscNeedsSync=true;
+        }
+        v.playing=resume;v.paused=!resume;
+    }
+    for(auto& row:rows) if(row.id==id) {
+        row.playing=resume;
+        row.ended=false;
+    }
+}
 void RenderState::panic() noexcept {
     for (auto& v:voices) { releaseMidi(v); v.playing=false; v.paused=false; v.position=0; v.delaySeconds=0; v.pendingSeek=false; v.rowMode=false; }
     for (auto& row:rows) { row.seconds=0; row.playing=false; row.pendingSeek=false; row.ended=false; }
@@ -190,6 +211,7 @@ void RenderState::render(float* const* outputs,int channels,int frames,double sa
     for (int ch=0;ch<channels;++ch) if (outputs[ch]) juce::FloatVectorOperations::clear(outputs[ch],frames);
     preLimiterPeakLeft=preLimiterPeakRight=0;
     limiterReducing=false;
+    limiterReduction=0.0f;
     // The stereo bus is accumulated independently of all physical outputs.
     // No heap allocation or lock occurs in the audio callback.
     const auto busSamples=std::min((size_t)std::max(0,frames),masterMix[0].size());
@@ -368,7 +390,11 @@ void RenderState::render(float* const* outputs,int channels,int frames,double sa
             const float absolutePeak=std::max(std::abs(left),std::abs(right));
             const float desired=absolutePeak>threshold ? threshold/absolutePeak : 1.0f;
             limiterGain=std::min(desired,1.0f+(limiterGain-1.0f)*release);
-            if(limiterGain<0.9999f) limiterReducing=true;
+            // Current gain reduction, not a latched historical clip light.
+            // The last processed sample owns the indicator; it goes dark
+            // immediately when the bus ceases to exceed threshold.
+            limiterReduction=desired<0.9999f ? 1.0f-limiterGain : 0.0f;
+            limiterReducing=limiterReduction>0.0001f;
             left*=limiterGain;
             right*=limiterGain;
         } else limiterGain=1.0f;
@@ -561,6 +587,16 @@ bool AudioEngine::send(int id,bool row,bool stop) noexcept {
     commands[w]={id,row,stop,revision,panicEpoch.load()};
     writeIndex.store(next,std::memory_order_release); return true;
 }
+bool AudioEngine::sendRowPauseToggle(int id) noexcept {
+    const unsigned w=writeIndex.load(std::memory_order_relaxed);
+    const unsigned next=(w+1)%commands.size();
+    if(next==readIndex.load(std::memory_order_acquire)) {
+        commandDrops.fetch_add(1,std::memory_order_relaxed);return false;
+    }
+    commands[w]={id,true,false,revision,panicEpoch.load(),false,0.0,true};
+    writeIndex.store(next,std::memory_order_release);
+    return true;
+}
 bool AudioEngine::seekRow(int id,double seconds) noexcept {
     if (!std::isfinite(seconds)) return false;
     const unsigned w=writeIndex.load(std::memory_order_relaxed);
@@ -641,6 +677,7 @@ void AudioEngine::processBlock(float* const* outputs,int channels,int frames,dou
         if (command.epoch==epoch && (!current || command.revision>current->revision)) break;
         if (current && command.revision>=current->minimumCommandRevision && command.epoch==epoch) {
             if (command.seek) current->seekRow(command.id,command.seconds);
+            else if (command.pauseToggle) current->toggleRowPause(command.id);
             else {
                 current->trigger(command.id,command.row,command.stop);
                 if (command.row && !command.stop) {
@@ -656,10 +693,12 @@ void AudioEngine::processBlock(float* const* outputs,int channels,int frames,dou
     if (current) current->render(outputs,channels,frames,sampleRate);
     else for (int ch=0; ch<channels; ++ch) if (outputs[ch]) juce::FloatVectorOperations::clear(outputs[ch],frames);
     limiterActive.store(current && current->limiterReducing,std::memory_order_relaxed);
+    limiterReduction.store(current ? current->limiterReduction : 0.0f,std::memory_order_relaxed);
     const bool emergencyStop=panicEpoch.load()!=epoch;
     if (emergencyStop) {
         acknowledgedCueId.store(0,std::memory_order_release);
         limiterActive.store(false,std::memory_order_relaxed);
+        limiterReduction.store(0.0f,std::memory_order_relaxed);
         if (current) current->panic();
         for (int ch=0; ch<channels; ++ch) if (outputs[ch]) juce::FloatVectorOperations::clear(outputs[ch],frames);
     }

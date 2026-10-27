@@ -82,19 +82,22 @@ public:
 class LimiterToggle final : public juce::ToggleButton {
 public:
     LimiterToggle() {setButtonText("Limit");}
-    void setReducing(bool value) {
-        if(reducing!=value) {reducing=value;repaint();}
+    void setGainReduction(float amount) {
+        amount=juce::jlimit(0.0f,1.0f,amount);
+        if(std::abs(amount-reduction)>0.002f) {reduction=amount;repaint();}
     }
-    bool isReducing() const noexcept {return reducing;}
+    void setReducing(bool value) {setGainReduction(value ? .5f : 0.0f);}
+    bool isReducing() const noexcept {return reduction>0.0001f;}
+    float getGainReduction() const noexcept {return reduction;}
     void paintButton(juce::Graphics& g,bool hover,bool down) override {
         const bool on=getToggleState();
         const auto bounds=getLocalBounds().toFloat();
         const auto dot=juce::Rectangle<float>(13.0f,13.0f).withCentre({bounds.getX()+11.0f,bounds.getCentreY()});
-        g.setColour(!on ? palette::raised : reducing ? palette::red : palette::red.withAlpha(.27f));
+        g.setColour(!on || reduction<=0.0001f ? palette::raised : palette::red.withAlpha(.16f+.84f*std::sqrt(reduction)));
         g.fillEllipse(dot);
-        g.setColour(!on ? palette::muted : reducing ? palette::red : palette::red.withAlpha(.75f));
-        g.drawEllipse(dot,reducing && on ? 2.3f : 1.2f);
-        if(on && reducing) {
+        g.setColour(!on ? palette::muted : reduction>0.0001f ? palette::red.withAlpha(.45f+.55f*std::sqrt(reduction)) : palette::red.withAlpha(.52f));
+        g.drawEllipse(dot,reduction>0.0001f && on ? 2.3f : 1.2f);
+        if(on && reduction>.06f) {
             g.setColour(palette::red.withAlpha(.25f));
             g.drawEllipse(dot.expanded(3.0f),1.6f);
         }
@@ -103,7 +106,7 @@ public:
         g.drawText("Limit",23,0,std::max(1,getWidth()-23),getHeight(),juce::Justification::centredLeft,false);
     }
 private:
-    bool reducing=false;
+    float reduction=0;
 };
 class MidiActivityLed final : public juce::Component {
 public:

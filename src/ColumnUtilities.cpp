@@ -8,7 +8,10 @@ struct ColumnUtilities::Strip final : juce::Component {
     GainMeterFader gain;
     juce::Slider pan;
     UtilityIcon mute{false},phase{true},dataMute{false};
-    MidiActivityLed midiActivity;
+    MidiActivityLed midiActivity,oscActivity;
+    uint64_t lastOscSent=0;
+    bool oscActivityInitialized=false;
+    double oscActivityUntil=0;
     uint64_t lastMidiSent=0;
     bool midiActivityInitialized=false;
     double activityUntil=0;
@@ -40,6 +43,7 @@ struct ColumnUtilities::Strip final : juce::Component {
         dataMute.setWantsKeyboardFocus(false);
         dataMute.onClick=[this] {owner.setDataOutputMuted(index,dataMute.getToggleState());};
         addAndMakeVisible(midiActivity); midiActivity.setName("columnMidiOutputLed");
+        addAndMakeVisible(oscActivity); oscActivity.setName("columnOscOutputLed");
         addAndMakeVisible(masterSend); masterSend.setName("columnMasterSend");
         masterSend.setTooltip("L/R: post-fader stereo send to Master Bus (independent of Direct Out).");
         masterSend.setWantsKeyboardFocus(false);
@@ -128,8 +132,9 @@ struct ColumnUtilities::Strip final : juce::Component {
         pan.setVisible(col.type==ColumnType::audio && !col.collapsed);
         phase.setVisible(col.type==ColumnType::audio && !col.collapsed);
         masterSend.setVisible(col.type==ColumnType::audio && !col.collapsed);
-        dataMute.setVisible(!col.collapsed && (col.type==ColumnType::midi || col.type==ColumnType::osc));
-        midiActivity.setVisible(!col.collapsed && col.type==ColumnType::midi);
+        dataMute.setVisible(col.type==ColumnType::midi || col.type==ColumnType::osc);
+        midiActivity.setVisible(col.type==ColumnType::midi);
+        oscActivity.setVisible(col.type==ColumnType::osc);
         directMode.setVisible(col.type==ColumnType::audio && !col.collapsed);
         oscDestination.setVisible(col.type==ColumnType::osc && !col.collapsed);
         output.setVisible(!col.collapsed && (col.type==ColumnType::audio || col.type==ColumnType::midi));
@@ -208,6 +213,17 @@ struct ColumnUtilities::Strip final : juce::Component {
             midiActivity.setActive(now<activityUntil);
             return;
         }
+        if(owner.show.columns[(size_t)index].type==ColumnType::osc) {
+            const auto sent=owner.engine.getOscColumnSent(id);
+            const auto now=juce::Time::getMillisecondCounterHiRes();
+            if(!oscActivityInitialized) {lastOscSent=sent;oscActivityInitialized=true;}
+            else if(sent!=lastOscSent) {
+                if(sent>lastOscSent) oscActivityUntil=now+180.0;
+                lastOscSent=sent;
+            }
+            oscActivity.setActive(now<oscActivityUntil);
+            return;
+        }
         if (owner.show.columns[(size_t)index].type!=ColumnType::audio) return;
         const auto stereo=owner.engine.connected.load(std::memory_order_relaxed)
             ? owner.engine.getColumnStereoPeak(id) : std::array<float,2>{{0.0f,0.0f}};
@@ -229,8 +245,11 @@ struct ColumnUtilities::Strip final : juce::Component {
         mute.setBounds(collapsed ? (w-30)/2 : w-77,h-36,
                        collapsed ? 30 : 32,29);
         phase.setBounds(w-42,h-36,32,29);
-        dataMute.setBounds(w-45,h-45,32,29);
-        midiActivity.setBounds(12,42,46,17);
+        dataMute.setBounds(collapsed ? (w-30)/2 : (w-32)/2,h-39,30,29);
+        midiActivity.setBounds(collapsed ? (w-22)/2 : 12,collapsed ? 40 : 42,
+                                collapsed ? 23 : 46,17);
+        oscActivity.setBounds(collapsed ? (w-22)/2 : 12,collapsed ? 40 : 42,
+                               collapsed ? 23 : 46,17);
         controlLock.setBounds(6,5,65,29);
         controlPriority.setBounds(75,5,w-81,29);
         controlEdit.setBounds(8,44,w-16,32);
@@ -262,7 +281,9 @@ struct ColumnUtilities::Strip final : juce::Component {
             return;
         }
         if(colType==ColumnType::midi || colType==ColumnType::osc) {
-            label(g,"OUTPUT MUTE",{7,getHeight()-65,getWidth()-14,17},10,palette::muted,true);
+            if(!col.collapsed)
+                label(g,"MUTE",{7,getHeight()-63,getWidth()-14,17},10,palette::muted,true,
+                      juce::Justification::centred);
             return;
         }
         if(colType!=ColumnType::audio) return;
@@ -321,9 +342,9 @@ void ColumnUtilities::refreshMeters() {
     owner.masterSlider.setStereoPeaks(
         connected ? owner.engine.masterPeakLeft.load(std::memory_order_relaxed) : 0.0f,
         connected ? owner.engine.masterPeakRight.load(std::memory_order_relaxed) : 0.0f);
-    owner.safetyLimiter.setReducing(
-        connected && owner.show.safetyLimiterEnabled &&
-        owner.engine.limiterActive.load(std::memory_order_relaxed));
+    owner.safetyLimiter.setGainReduction(
+        connected && owner.show.safetyLimiterEnabled
+        ? owner.engine.limiterReduction.load(std::memory_order_relaxed) : 0.0f);
 }
 void ColumnUtilities::resized() {
     owner.masterSlider.setBounds(21-scrollX,34,92,std::max(92,getHeight()-37));

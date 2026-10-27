@@ -91,6 +91,7 @@ struct RenderState {
     bool safetyLimiterEnabled=true;
     float limiterGain=1.0f;
     bool limiterReducing=false;
+    float limiterReduction=0.0f;
     float preLimiterPeakLeft=0.0f, preLimiterPeakRight=0.0f;
     static constexpr int maxMixerFrames=65536;
     // Allocated before publication, never on the audio callback.
@@ -103,6 +104,7 @@ struct RenderState {
     uint64_t minimumCommandRevision = 0;
     bool preservePlayback = true;
     void trigger(int id, bool row, bool stop = false) noexcept;
+    void toggleRowPause(int rowId) noexcept;
     void seekRow(int rowId, double seconds) noexcept;
     void inheritPlayback(const RenderState&) noexcept;
     void panic() noexcept;
@@ -122,6 +124,7 @@ public:
     void publish(std::unique_ptr<RenderState>, bool preservePlayback = true);
     void collectRetired();
     bool send(int id, bool row, bool stop = false) noexcept;
+    bool sendRowPauseToggle(int rowId) noexcept;
     bool seekRow(int rowId, double seconds) noexcept;
     void panic() noexcept;
     juce::Result setMidiOutput(const juce::String& identifier, bool reconnect=false);
@@ -134,7 +137,9 @@ public:
     // Returns post-cell/row/strip, pre-master L/R peaks (linear amplitude).
     std::array<float,2> getColumnStereoPeak(int columnId) const noexcept;
     uint64_t getMidiColumnSent(int columnId) {return midiRouter.getColumnSent(columnId);}
+    uint64_t getOscColumnSent(int columnId) {return oscRouter.getColumnSent(columnId);}
     std::atomic<bool> limiterActive{false};
+    std::atomic<float> limiterReduction{0.0f};
     juce::AudioDeviceManager devices;
     std::atomic<float> peak {0};
     std::atomic<float> masterPeakLeft {0}, masterPeakRight {0};
@@ -169,7 +174,7 @@ private:
     };
     std::map<int, PlaybackEntry> playback; // UI-thread owned; no callback map access
     std::map<int,std::shared_ptr<ColumnPeakTelemetry>> columnPeaks; // UI-thread owned
-    struct Command { int id = 0; bool row = false, stop = false; uint64_t revision = 0, epoch = 0; bool seek = false; double seconds = 0; };
+    struct Command { int id = 0; bool row = false, stop = false; uint64_t revision = 0, epoch = 0; bool seek = false; double seconds = 0; bool pauseToggle=false; };
     std::array<Command, 256> commands;
     std::atomic<unsigned> writeIndex {0}, readIndex {0};
     std::atomic<RenderState*> pending {nullptr}, retired {nullptr};

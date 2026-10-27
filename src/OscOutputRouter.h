@@ -8,7 +8,11 @@
 #include <cstdint>
 
 namespace cuelist {
-struct OscStream { std::atomic<uint64_t> epoch {0}; int route=-1; };
+struct OscStream {
+    std::atomic<uint64_t> epoch{0};
+    int route=-1;
+    std::shared_ptr<std::atomic<uint64_t>> columnSent;
+};
 struct OscEventSink {
     virtual ~OscEventSink()=default;
     virtual void emit(int route,const uint8_t* data,unsigned size,int sampleOffset) noexcept=0;
@@ -21,6 +25,7 @@ public:
     // UI thread only: route identity belongs to column, not to individual events.
     int configure(int columnId,const juce::String& host,int port);
     std::shared_ptr<OscStream> stream(int cellId,int route);
+    uint64_t getColumnSent(int columnId);
     void beginBlock(double sampleRate,double sharedOriginMs=-1) noexcept;
     void selectStream(OscStream* s) noexcept override { selected=s; }
     void emit(int route,const uint8_t* data,unsigned size,int sampleOffset) noexcept override;
@@ -43,6 +48,7 @@ private:
     juce::CriticalSection mutex;
     std::vector<Route> routes;  // only accessed with mutex except callback indices
     std::map<int,std::shared_ptr<OscStream>> streams;
+    std::map<int,std::shared_ptr<std::atomic<uint64_t>>> sentByColumn;
     OscStream* selected=nullptr;
     double blockTime=0,msPerSample=0;
     void run() override;
