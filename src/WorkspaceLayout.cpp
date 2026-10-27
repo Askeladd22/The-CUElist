@@ -44,18 +44,25 @@ WorkspaceLayout calculateWorkspaceLayout(const WorkspaceLayoutInput& input) {
     // Fit it below the minimum cue-list region and above a 75px timeline.
     const int maximumDockHeight=std::max(0,input.height-
         (dockBaseY+minimumGridHeight+minimumTimelineHeight+statusFooterGap));
-    result.effectiveDockHeight=std::clamp(input.activeDockHeight,0,maximumDockHeight);
+    const int baseDockHeight=std::clamp(input.activeDockHeight,0,maximumDockHeight);
     const int baseGridHeight=std::max(minimumGridHeight,
-        input.height-400-result.effectiveDockHeight);
+        input.height-400-baseDockHeight);
     const int baseTimelineHeight=std::max(minimumTimelineHeight,
-        input.height-baseGridHeight-result.effectiveDockHeight-215);
-    // The upper workspace and the lower Timeline have separate resize
-    // budgets. Dragging the Timeline redistributes height without changing
-    // the cue header, scrolling behaviour, or audio editor's dock height.
+        input.height-baseGridHeight-baseDockHeight-215);
+    // Growing the Timeline first borrows unused height from the cue viewport.
+    // If the cue viewport is already at minimum, an expanded dock may yield
+    // space down to 130px; the 36px collapsed dock remains unchanged.
+    // Neither horizontal clipping nor the pinned header is affected.
+    const int minimumDockHeight=baseDockHeight<=36 ? baseDockHeight : 130;
+    const int gridBudget=baseGridHeight-minimumGridHeight;
+    const int dockBudget=baseDockHeight-minimumDockHeight;
     result.effectiveTimelineAdjustment=std::clamp(input.timelineHeightAdjustment,
-        -(baseTimelineHeight-minimumTimelineHeight),
-        baseGridHeight-minimumGridHeight);
-    const int gridHeight=baseGridHeight-result.effectiveTimelineAdjustment;
+        -(baseTimelineHeight-minimumTimelineHeight),gridBudget+dockBudget);
+    const int requestIncrease=std::max(0,result.effectiveTimelineAdjustment);
+    const int gridDecrease=std::min(requestIncrease,gridBudget);
+    result.effectiveDockHeight=baseDockHeight-(requestIncrease-gridDecrease);
+    const int gridHeight=baseGridHeight-gridDecrease+
+        std::max(0,-result.effectiveTimelineAdjustment);
     const int utilityHeight=input.height<800 ? 180 : 208;
     // The fixed BPM/Auto Stop band is OUTSIDE the scrollable column region.
     const int lowerWidth=result.editorX-cueRightGap-cueLeft;
