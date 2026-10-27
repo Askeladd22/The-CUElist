@@ -36,10 +36,10 @@ MainComponent::MainComponent(bool startAudio) {
     for (juce::Component* c : std::initializer_list<juce::Component*>{&openButton,&saveButton,&newButton,&addRowButton,&addColumnButton,
          &goButton,&panicButton,&deviceButton,&controlButton,&dockResize,&importButton,&midiEditButton,&oscEditButton,&playCellButton,&stopCellButton,&clearButton,&tempoButton,&applyButton,
          &cellTab,&rowTab,&rowGain,&rowBehaviour,&rowMute,&rowLoop,&rowName,&cellName,&bpm,&behaviour,&follow,&loop,&cellAutoStop,&gain,&viewport,&timeline,&utilities,
-         &clipCollapseButton,&clipCloseButton,&cueMetrics,&preflightButton,&diagnosticsButton}) addAndMakeVisible(c);
+         &clipCollapseButton,&clipCloseButton,&cueMetrics,&preflightButton,&diagnosticsButton,&preferencesButton,&projectNameLabel}) addAndMakeVisible(c);
     for (auto* b : {&openButton,&saveButton,&newButton,&addRowButton,&addColumnButton,&goButton,&panicButton,&deviceButton,&controlButton,
                     &importButton,&midiEditButton,&oscEditButton,&playCellButton,&stopCellButton,&clearButton,&tempoButton,&applyButton,
-                    &preflightButton,&diagnosticsButton}) b->setWantsKeyboardFocus(false);
+                    &preflightButton,&diagnosticsButton,&preferencesButton}) b->setWantsKeyboardFocus(false);
     viewport.setViewedComponent(&grid,false); viewport.setScrollBarsShown(true,true);
     goButton.setColour(juce::TextButton::buttonColourId,juce::Colour(0xff097b70));
     goButton.setColour(juce::TextButton::textColourOffId,palette::text);
@@ -111,6 +111,33 @@ MainComponent::MainComponent(bool startAudio) {
         resized(); repaint();
     };
     clipCloseButton.onClick=[this] { closeMidiClip(); closeOscClip(); };
+    projectNameLabel.setName("projectName");
+    projectNameLabel.setEditable(false,true,false);
+    projectNameLabel.setColour(juce::Label::textColourId,palette::text);
+    projectNameLabel.setFont(font(16.0f,true));
+    projectNameLabel.setTooltip("Double-click to rename the project. The file path is unchanged.");
+    projectNameLabel.onTextChange=[this] {
+        const auto name=projectNameLabel.getText().trim();
+        if(name.isEmpty() || name.length()>120) {
+            projectNameLabel.setText(show.name,juce::dontSendNotification);
+            return;
+        }
+        if(name!=show.name) {
+            show.name=name; dirty=true; status="Project renamed (save to persist)."; repaint();
+        }
+    };
+    preferencesButton.setName("projectPreferences");
+    preferencesButton.setTooltip("Pre-flight checks and live diagnostics.");
+    preferencesButton.onClick=[this] {
+        juce::PopupMenu menu;
+        menu.addItem(1,"Pre-flight"); menu.addItem(2,"Diagnostics");
+        auto safe=juce::Component::SafePointer<MainComponent>(this);
+        menu.showMenuAsync(juce::PopupMenu::Options().withTargetComponent(&preferencesButton),[safe](int choice) {
+            if (!safe) return;
+            if(choice==1) safe->showPreflight();
+            else if(choice==2) safe->showDiagnostics();
+        });
+    };
     newButton.onClick=[this] { withDiscardConfirmation([this] { if(projectLoader) projectLoader->cancel(); closeMidiClip(); closeOscClip(); editHistory.clearUndoHistory(); stopAll(); show=makeShow(); clips.clear(); projectFile={}; selectedRow=selectedColumn=nextCue=0;
         resetActiveMapping(); refreshControlSettings();
         dirty=false; if (recoveryEnabled) {
@@ -127,17 +154,8 @@ MainComponent::MainComponent(bool startAudio) {
     preflightButton.onClick=[this] { showPreflight(); };
     diagnosticsButton.onClick=[this] { showDiagnostics(); };
     saveButton.onClick=[this] { saveProject(); };
-    addRowButton.onClick=[this] { if (!applyInspector()) return; addRow(show,{}); selectedRow=nextCue=(int)show.rows.size()-1; changed("Cue added. Playback stopped.",true); };
-    addColumnButton.onClick=[this] {
-        if (!applyInspector()) return;
-        juce::PopupMenu menu; menu.addItem(1,"Audio"); menu.addItem(2,"MIDI"); menu.addItem(3,"OSC / UDP"); menu.addItem(4,"Control");
-        auto safe=juce::Component::SafePointer<MainComponent>(this);
-        menu.showMenuAsync(juce::PopupMenu::Options().withTargetComponent(&addColumnButton),[safe](int choice) {
-            if (!safe || choice==0) return; auto type=(ColumnType)(choice-1);
-            addColumn(safe->show,type,{});
-            safe->selectedColumn=(int)safe->show.columns.size()-1; safe->changed("Column added. Playback stopped.",true);
-        });
-    };
+    addRowButton.onClick=[this] { addCue(); };
+    addColumnButton.onClick=[this] { showColumnMenu(addColumnButton.getScreenBounds().getCentre()); };
     goButton.onClick=[this] { goNext(); }; panicButton.onClick=[this] { stopAll(); };
     deviceButton.onClick=[this] { showDevices(); };
     controlButton.setTooltip("MIDI input, MIDI Learn, and global/per-cue mappings.");
@@ -165,7 +183,8 @@ MainComponent::MainComponent(bool startAudio) {
     applyButton.onClick=[this] { applyInspector(); }; tempoButton.onClick=[this] { editTempo(); };
     importButton.setTooltip("Mono/stereo WAV and MP3. Importing stops all playback.");
     applyButton.setTooltip("Apply parameters without stopping playback. Enter confirms names.");
-    addColumnButton.setTooltip("Add columns. Double-click a title to rename; use arrows to reorder.");
+    addColumnButton.setTooltip("Add a column.");
+    addRowButton.setTooltip("Add a cue.");
     if (startAudio) { auto error=engine.initialise(); if (error.isNotEmpty()) status="Audio unavailable: "+error; }
     else status="Offline mode: audio device not opened.";
     refreshControlSettings();
@@ -205,7 +224,7 @@ void MainComponent::paint(juce::Graphics& g) {
     // Keep the project card, but remove the redundant static ENGINES panel.
     // Engine controls, routing and the live audio-status indicator are unchanged.
     g.setColour(palette::background.withAlpha(.30f));
-    g.fillRoundedRectangle(10.0f,238.0f,160.0f,143.0f,8.0f);
+    g.fillRoundedRectangle(10.0f,284.0f,160.0f,114.0f,8.0f);
     static const auto appIcon=juce::ImageFileFormat::loadFrom(
         BinaryData::thecuelist_icon_png,BinaryData::thecuelist_icon_pngSize);
     if (appIcon.isValid())
@@ -216,20 +235,29 @@ void MainComponent::paint(juce::Graphics& g) {
     }
     label(g,"The Cuelist",{60,14,165,32},24,palette::text,true);
     label(g,"SHOW CONTROL",{61,45,130,16},11,palette::muted,true);
-    label(g,"SESSION",{232,25,100,22},12,palette::teal,true);
     g.setColour(palette::teal); g.fillRect(232,69,65,3);
     label(g,"CONTROL / MAPPING v10",{334,25,210,22},12,palette::muted);
 
-    g.setColour(engine.connected.load() ? palette::teal : palette::red); g.fillEllipse((float)w-377,31,9,9);
-    label(g,engine.connected.load() ? "Audio available" : "Audio unavailable",{w-359,22,172,25},12,palette::muted);
-    label(g,"WORKSPACE",{20,99,140,18},11,palette::muted,true);
+    g.setColour(engine.connected.load() ? palette::teal : palette::red);
+    g.fillEllipse((float)w-195,23,9,9);
+    label(g,engine.connected.load() ? "Audio Available" : "Audio Unavailable",{w-180,14,173,26},12,palette::muted);
+    const double now=juce::Time::getMillisecondCounterHiRes();
+    const auto activity=[&](int x,const juce::String& title,bool active) {
+        g.setColour(active ? palette::teal : palette::line);
+        g.fillEllipse((float)x,52.0f,7.0f,7.0f);
+        label(g,title,{x+12,44,77,24},10,active ? palette::text : palette::muted,true);
+    };
+    activity(w-412,"MIDI RX",now<midiRxUntil);
+    activity(w-309,"MIDI TX",now<midiTxUntil);
+    activity(w-206,"OSC RX",false); // No OSC input endpoint currently exists.
+    activity(w-103,"OSC TX",now<oscTxUntil);
+    label(g,"WORKSPACE",{20,118,140,17},11,palette::muted,true);
     g.setColour(palette::teal.withAlpha(0.19f)); g.fillRoundedRectangle(12,131,156,45,8);
     g.setColour(palette::teal); g.fillRoundedRectangle(12,137,4,34,2);
-    label(g,"Cuelist",{28,138,125,30},16,palette::text,true);
-    label(g,"PROJECT",{20,242,140,18},11,palette::muted,true);
-    label(g,show.name,{20,268,143,30},17,palette::text,true);
-    label(g,juce::String((int)show.rows.size())+" cues / "+juce::String((int)show.columns.size())+" columns",{20,302,150,22},13,palette::muted);
-    label(g,hasUnsavedChanges() ? "Unsaved changes" : "No changes",{20,330,153,22},11,hasUnsavedChanges() ? palette::amber : palette::muted);
+    // The editable project title is a JUCE Label over this card.
+    label(g,"PROJECT",{20,294,140,18},11,palette::muted,true);
+    label(g,juce::String((int)show.rows.size())+" cues / "+juce::String((int)show.columns.size())+" columns",{20,321,150,22},13,palette::muted);
+    label(g,hasUnsavedChanges() ? "Unsaved changes" : "No changes",{20,352,153,22},11,hasUnsavedChanges() ? palette::amber : palette::muted);
     g.setColour(palette::amber.withAlpha(.11f));
     g.fillRoundedRectangle(12.0f,(float)h-339,156.0f,51.0f,8.0f);
     label(g,"ON DECK",{20,h-333,145,16},11,palette::amber,true);
@@ -240,7 +268,7 @@ void MainComponent::paint(juce::Graphics& g) {
     label(g,"SPACE   Next cue",{20,h-84,150,20},12,palette::muted);
     label(g,"ESC          Panic",{20,h-61,150,20},12,palette::muted);
     g.setColour(palette::teal); g.fillRoundedRectangle(204.0f,88.0f,4.0f,45.0f,2.0f);
-    label(g,"SESSION / CUE CONTROL",{219,89,390,32},25,palette::text,true);
+    label(g,"CUE LIST",{219,89,390,32},25,palette::text,true);
     label(g,"SHOW WORKSPACE   •   AUDIO  /  MIDI  /  OSC  /  CONTROL",{219,124,510,20},12,palette::muted,true);
 
     constexpr int inspectorWidth=288, inspectorInner=236;
@@ -259,11 +287,12 @@ void MainComponent::paint(juce::Graphics& g) {
     g.saveState();
     { const float factor=juce::jlimit(0.72f,0.92f,(float)(h-232)/730.0f);
       g.addTransform(juce::AffineTransform(1,0,0,0,factor,226*(1-factor))); }
-    label(g,"ENTIRE Q",{x,239,inspectorInner,20},14,palette::teal,true);
+    label(g,"ENTIRE CUE",{x+3,239,inspectorInner-6,20},14,palette::teal,true);
     label(g,"Cue name",{x,270,inspectorInner,18},12,palette::text,true);
     label(g,"Initial BPM",{x,338,inspectorInner,18},12,palette::text,true);
     g.setColour(palette::line);g.drawHorizontalLine(473,(float)x,(float)x+inspectorInner);
-    label(g,"CELL  /  "+col.name,{x,489,inspectorInner,20},14,palette::teal,true);
+    label(g,"CELL",{x+3,489,59,20},14,palette::teal,true);
+    label(g,"/  "+col.name,{x+62,489,inspectorInner-68,20},13,palette::text,true);
     label(g,"Cell name",{x,520,inspectorInner,18},12,palette::text,true);
     if(col.type==ColumnType::audio)
         label(g,"Gain",{x,598,48,18},12,palette::muted,true);
@@ -274,13 +303,14 @@ void MainComponent::paint(juce::Graphics& g) {
 }
 void MainComponent::resized() {
     const int w=getWidth(),h=getHeight(); editorX=w-288;
-    newButton.setBounds(w-190,23,68,29); openButton.setBounds(w-116,23,46,29); saveButton.setBounds(w-64,23,52,29);
+    newButton.setBounds(13,86,49,29); openButton.setBounds(67,86,49,29); saveButton.setBounds(121,86,49,29);
+    projectNameLabel.setBounds(28,138,132,30);
     deviceButton.setBounds(20,188,140,33);
+    preferencesButton.setBounds(20,227,140,31);
     controlButton.setBounds(std::max(506,w-666),22,144,30);
 
-    preflightButton.setBounds(editorX-431,98,105,33);
-    diagnosticsButton.setBounds(editorX-316,98,117,33);
-    addRowButton.setBounds(editorX-188,98,76,33); addColumnButton.setBounds(editorX-104,98,92,33);
+    preflightButton.setVisible(false); diagnosticsButton.setVisible(false);
+    addRowButton.setVisible(false); addColumnButton.setVisible(false);
     const bool docked=(clipEditor && !clipWindow) || (oscEditor && !oscWindow);
     const int activeDockHeight=docked ? (clipCollapsed ? 36 : this->dockHeight) : 0;
     // Prioritise the running cue list on show-sized desktops while preserving
@@ -350,6 +380,8 @@ void MainComponent::refresh() {
     selectedRow=juce::jlimit(0,(int)show.rows.size()-1,selectedRow);
     selectedColumn=juce::jlimit(0,(int)show.columns.size()-1,selectedColumn);
     syncClipEditor(); syncOscEditor(); refreshInspector(); utilities.refresh(); resized();
+    if (!projectNameLabel.isBeingEdited() && projectNameLabel.getText()!=show.name)
+        projectNameLabel.setText(show.name,juce::dontSendNotification);
     repaint(); grid.repaint(); timeline.repaint(); cueMetrics.repaint();
 }
 void MainComponent::refreshInspector() {
@@ -788,9 +820,42 @@ void MainComponent::timerCallback() {
             }
         }
     }
+    // Compare monotonic counters; LEDs reflect actual RX/TX, not queued timeline events.
+    const auto diag=engine.diagnostics();
+    const uint64_t rx=midiInput.receivedCount();
+    const uint64_t tx=diag.midiOutputSent;
+    const uint64_t oscTx=static_cast<uint64_t>(diag.oscSent)+controlOutput.sentCount();
+    const double now=juce::Time::getMillisecondCounterHiRes();
+    if(activityInitialized) {
+        if(rx>lastMidiRx) midiRxUntil=now+170.0;
+        if(tx>lastMidiTx) midiTxUntil=now+170.0;
+        if(oscTx>lastOscTx) oscTxUntil=now+170.0;
+    }
+    lastMidiRx=rx; lastMidiTx=tx; lastOscTx=oscTx;
+    activityInitialized=true;
     utilities.syncScroll(viewport.getViewPositionX()); utilities.refreshRouting(); grid.repaint();
     displayPeak=std::max(engine.peak.load(),displayPeak*.88f);
     utilities.refreshMeters(); repaint(); timeline.repaint(); cueMetrics.repaint();
+}
+void MainComponent::addCue() {
+    if (!applyInspector()) return;
+    addRow(show,{});
+    selectedRow=nextCue=(int)show.rows.size()-1;
+    changed("Cue added. Playback stopped.",true);
+}
+void MainComponent::showColumnMenu(juce::Point<int> screenPoint) {
+    if (!applyInspector()) return;
+    juce::PopupMenu menu;
+    menu.addItem(1,"Audio"); menu.addItem(2,"MIDI");
+    menu.addItem(3,"OSC / UDP"); menu.addItem(4,"Control");
+    auto safe=juce::Component::SafePointer<MainComponent>(this);
+    menu.showMenuAsync(juce::PopupMenu::Options().withTargetScreenArea(
+        {screenPoint.x,screenPoint.y,1,1}),[safe](int choice) {
+        if (!safe || choice==0) return;
+        addColumn(safe->show,(ColumnType)(choice-1),{});
+        safe->selectedColumn=(int)safe->show.columns.size()-1;
+        safe->changed("Column added. Playback stopped.",true);
+    });
 }
 void MainComponent::withDiscardConfirmation(std::function<void()> action) {
     if (!hasUnsavedChanges()) { action(); return; }
