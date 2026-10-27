@@ -100,7 +100,7 @@ void GainMeterFader::mouseDrag(const juce::MouseEvent& e) { setFromMouse(e.posit
 bool GainMeterFader::keyPressed(const juce::KeyPress& key) {
     const int k=key.getKeyCode();
     if (k==juce::KeyPress::upKey || k==juce::KeyPress::rightKey) {
-        setGainDb(gainDb+(key.getModifiers().isShiftDown() ? 1.0f : 0.1f),true); return true;
+        setGainDb((gainDb==silenceDb ? minDb : gainDb)+(key.getModifiers().isShiftDown() ? 1.0f : 0.1f),true); return true;
     }
     if (k==juce::KeyPress::downKey || k==juce::KeyPress::leftKey) {
         setGainDb(gainDb-(key.getModifiers().isShiftDown() ? 1.0f : 0.1f),true); return true;
