@@ -1,4 +1,6 @@
 #include "MainComponent.h"
+#include "PianoRoll.h"
+#include "OscEditor.h"
 #include <algorithm>
 #include <cmath>
 
