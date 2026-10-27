@@ -84,7 +84,11 @@ public:
     LimiterToggle() {setButtonText("Limit");}
     void setGainReduction(float amount) {
         amount=juce::jlimit(0.0f,1.0f,amount);
-        if(std::abs(amount-reduction)>0.002f) {reduction=amount;repaint();}
+        if(amount<0.002f) amount=0.0f;
+        // Always clear a previous glow at zero, even if the last delta is
+        // smaller than the repaint threshold. Never latch a historical hit.
+        if((amount==0.0f && reduction!=0.0f) ||
+           std::abs(amount-reduction)>0.001f) {reduction=amount;repaint();}
     }
     void setReducing(bool value) {setGainReduction(value ? .5f : 0.0f);}
     bool isReducing() const noexcept {return reduction>0.0001f;}
