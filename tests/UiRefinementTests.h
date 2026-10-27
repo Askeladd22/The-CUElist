@@ -157,4 +157,66 @@ void uiRefinementTests() {
               "Compact-height window clipped important Inspector fields");
     });
 
+
+    test("Compressed columns are visual-only, read-only and roundtrip in v10",[] {
+        MainComponent ui(false);addColumn(ui.show,ColumnType::midi,"Playback MIDI");
+        const int original=ui.show.rows[0].cells[0].id;
+        auto* grid=cueViewFixtures::find<CueGrid>(ui);
+        const int expanded=grid->columnWidthAt(0);
+        check(expanded==CueGrid::columnWidth,"Unexpected expanded column size");
+        ui.toggleColumnCollapsed(0);
+        check(ui.show.columns[0].collapsed &&
+              grid->columnWidthAt(0)==CueGrid::compressedWidth &&
+              grid->columnX(1)==CueGrid::nameWidth+CueGrid::compressedWidth,
+              "Column did not collapse or adjacent position remained unchanged");
+        check(ui.show.rows[0].cells[0].id==original &&
+              !ui.select(0,0),"Collapsed column is still editable or lost cell identity");
+        auto* utilities=cueViewFixtures::find<ColumnUtilities>(ui);
+        auto* fader=controlsV3::named(*utilities,"columnGainDb");
+        check(fader && !fader->isVisible(),"Collapsed column still exposes editable mixer controls");
+        Show loaded;
+        check(decodeShow(encodeShow(ui.show),loaded).wasOk() &&
+              loaded.columns[0].collapsed && !loaded.columns[1].collapsed,
+              "Visual compression state did not survive project save");
+        ui.toggleColumnCollapsed(0);
+        check(!ui.show.columns[0].collapsed && grid->columnWidthAt(0)==expanded &&
+              ui.select(0,0),"Column could not be expanded and edited again");
+    });
+    test("Cue colours persist independently from engine and legacy documents",[] {
+        MainComponent ui(false);
+        const auto cells=ui.show.rows[0].cells;
+        ui.setRowColour(0,4);
+        check(ui.show.rows[0].colour==4 && ui.hasUnsavedChanges() &&
+              ui.show.rows[0].cells[0].id==cells[0].id,"Cue colouring changed media identity");
+        Show loaded;
+        check(decodeShow(encodeShow(ui.show),loaded).wasOk() &&
+              loaded.rows[0].colour==4,"Cue colour was not persisted");
+        auto legacy=juce::JSON::parse(encodeShow(ui.show));
+        legacy["rows"].getArray()->getReference(0).getDynamicObject()->removeProperty("colour");
+        check(decodeShow(juce::JSON::toString(legacy),loaded).wasOk() &&
+              loaded.rows[0].colour==0,"Older documents no longer default to uncoloured cues");
+        ui.show.rows[0].colour=8;
+        check(validateShow(ui.show).failed(),"Invalid cue palette value was accepted");
+    });
+    test("BPM and Auto Stop remain pinned while cue columns scroll horizontally",[] {
+        MainComponent ui(false);
+        for (int i=0;i<7;++i) addColumn(ui.show,ColumnType::audio,"Extra");
+        ui.setSize(1250,900);
+        auto* overlay=cueViewFixtures::find<CueMetricsOverlay>(ui);
+        auto* view=cueViewFixtures::find<juce::Viewport>(ui);
+        auto* grid=cueViewFixtures::find<CueGrid>(ui);
+        check(overlay && view && grid,"Fixed cue controls or grid missing");
+        const int pinnedX=overlay->getX();
+        check(overlay->getWidth()==CueMetricsOverlay::width &&
+              pinnedX==view->getRight()-CueMetricsOverlay::width,
+              "BPM and Auto Stop are not anchored to the viewport edge");
+        view->setViewPosition(180,0);
+        check(overlay->getX()==pinnedX,"Cue metrics moved with horizontally scrolled columns");
+        const auto stop=ui.show.rows[0].stopOnNext;
+        cueViewFixtures::click(*overlay,118,CueGrid::headerHeight+16);
+        check(ui.show.rows[0].stopOnNext!=stop,"Fixed Auto Stop control was not clickable");
+        check(grid->totalColumnsWidth()==(int)ui.show.columns.size()*CueGrid::columnWidth,
+              "Expanded column positions are inconsistent");
+    });
+
 }
