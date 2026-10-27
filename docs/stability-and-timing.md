@@ -1,6 +1,6 @@
 # The Cuelist — Stabilization (0.7) and transport foundations (0.8)
 
-**Current development version:** 0.9.0-beta.1, **show format:** v10. A successful build is not certification for unattended or safety-critical show operation.
+**Current development version:** 0.9.0-beta.2, **show format:** v10. A successful build is not certification for unattended or safety-critical show operation.
 
 ## Implemented in the stabilization preview
 
@@ -54,3 +54,7 @@ For the actual Windows show computer run `powershell -ExecutionPolicy Bypass -Fi
 ## 0.9 beta — loading and recovery
 
 Opening a show from the Open dialog now uses a single reusable worker to decode the project and audio. A newer request or subsequent editing cancels the preceding result. Only a fully prepared project is committed on the message thread, after which old playback is stopped. A failed load preserves the current show. This does not yet move individual WAV/MP3 imports or portable Save (media copying) off the UI thread. The worker checks cancellation between media files; a single synchronous decoder call can still take time to finish on shutdown. Checkpoint JSON serialization is now on the recovery worker; model validation and snapshot copying remain synchronous. See [0.9 release checklist](0.9-release-checklist.md).
+
+## Beta.2 Master Bus
+
+Audio Columns now offer independent Master (always POST strip) and Direct (PRE/POST) stereo sends. Master Bus is mixed separately from device output buffers, processed by its independent Master Gain/Pan/Mute and fixed -1 dBFS peak limiter (immediate reduction, 150 ms release) before being summed to the selected Main Out. Master meter is pre-limiter; a separate red LED shows limiting. Direct output bypasses the Master processing. Physical channel overlap with a direct output can clip after the Master limiter and is flagged by preflight; the device output is still hard-clamped. Mixer bus scratch space is preallocated for up to 65536 frames per callback. Only hardware rehearsal can certify routing on multichannel devices.
