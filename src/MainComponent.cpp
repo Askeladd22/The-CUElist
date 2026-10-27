@@ -359,6 +359,7 @@ void MainComponent::refreshInspector() {
     masterSlider.setGainDb(juce::Decibels::gainToDecibels(show.masterGain,-60.0f));
     masterPan.setValue(show.masterPan,juce::dontSendNotification);
     masterMute.setToggleState(show.masterMuted,juce::dontSendNotification);
+    safetyLimiter.setToggleState(show.safetyLimiterEnabled,juce::dontSendNotification);
     engine.monitoredRowId.store(row.id);
     rowName.setTextToShowWhenEmpty("Cue name",palette::muted);
     rowName.setText(row.name,false); cellName.setText(c.name,false); cellName.setTextToShowWhenEmpty("Cell name",palette::muted);
