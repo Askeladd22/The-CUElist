@@ -38,7 +38,10 @@ void cueViewTests() {
         const int source=ui.show.rows[0].cells[0].id, target=ui.show.rows[1].cells[1].id;
         ui.clips[source]=clip;
         auto* grid=find<CueGrid>(ui); check(grid!=nullptr,"Grid absent");
-        const juce::Point<float> from{340,90}, to{500,144};
+        const juce::Point<float> from{(float)CueGrid::nameWidth+10,
+                                      (float)CueGrid::headerHeight+CueGrid::rowContentInset+20};
+        const juce::Point<float> to{(float)CueGrid::nameWidth+CueGrid::columnWidth+10,
+                                    (float)CueGrid::headerHeight+CueGrid::rowHeight+CueGrid::rowContentInset+20};
         grid->mouseDown(event(*grid,from,from)); grid->mouseDrag(event(*grid,to,from,1,true)); grid->mouseUp(event(*grid,to,from,1,true));
         check(ui.show.rows[1].cells[1].id==source && ui.show.rows[0].cells[0].id==target,"Grid drag did not swap");
         check(ui.clips.at(source)==clip && ui.selectedRow==1 && ui.selectedColumn==1,"Dragged clip identity or selection lost");
@@ -60,7 +63,7 @@ void cueViewTests() {
     test("last cue and column delete hitboxes reset to blank usable show", [] {
         MainComponent ui(false); auto* grid=find<CueGrid>(ui); check(grid!=nullptr,"Grid absent");
         const auto rowId=ui.show.rows[0].id, columnId=ui.show.columns[0].id;
-        click(*grid,64,95); check(ui.show.rows.size()==1 && ui.show.rows[0].id!=rowId,"Last cue delete was disabled");
+        click(*grid,64,CueGrid::headerHeight+CueGrid::rowContentInset+27); check(ui.show.rows.size()==1 && ui.show.rows[0].id!=rowId,"Last cue delete was disabled");
         click(*grid,CueGrid::nameWidth+146,21); check(ui.show.columns.size()==1 && ui.show.columns[0].id!=columnId,"Last column delete was disabled");
         check(validateShow(ui.show).wasOk(),"Delete hitboxes left invalid show");
     });
