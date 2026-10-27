@@ -104,9 +104,13 @@ void workspaceLayoutTests() {
             check(layout.dockEditor.getHeight()==layout.effectiveDockHeight &&
                   layout.dockEditor.getBottom()==layout.timeline.getY(),
                   "Dock does not meet timeline after fitting");
+            // The upper Utility panel and the dock now deliberately share
+            // a border. The old strict inequality expected a black spacer,
+            // which was removed in the gap-free workspace layout.
             check(layout.viewport.getHeight()>=170 &&
-                  layout.utilities.getBottom()<layout.dockEditor.getY(),
-                  "Dock enlargement concealed the cue grid or mixer");
+                  layout.utilities.getHeight()==208 &&
+                  layout.utilities.getBottom()==layout.dockEditor.getY(),
+                  "Expanded dock caused a gap, overlap or clipped upper mixer");
             check(layout.timeline.getHeight()>=75 &&
                   layout.timeline.getBottom()<=size.y-47,
                   "Oversized dock clipped the timeline into the status/footer area");
