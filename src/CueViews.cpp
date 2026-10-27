@@ -463,7 +463,7 @@ void CueMetricsOverlay::paint(juce::Graphics& g) {
         g.fillRect(3,y,getWidth()-3,CueGrid::rowHeight);
         const auto cueTone=CueGrid::cueColour(row.colour);
         if (row.colour>0) {
-            g.setColour(cueTone.withAlpha(.20f));g.fillRect(3,y,getWidth()-3,CueGrid::rowHeight);
+            g.setColour(cueTone.withAlpha(.28f));g.fillRect(3,y,getWidth()-3,CueGrid::rowHeight);
         }
         label(g,juce::String(row.tempo.front().bpm,1),{7,y+14,61,24},14,palette::text,true);
         g.setColour(row.stopOnNext?palette::teal.withAlpha(.3f):palette::muted.withAlpha(.2f));
@@ -473,7 +473,7 @@ void CueMetricsOverlay::paint(juce::Graphics& g) {
         label(g,row.stopOnNext?"ON":"OFF",{111,y+11,34,22},10,
               row.stopOnNext?palette::teal:palette::muted,true);
         const bool details=owner.grid.autoStopDetailsVisible(row.id);
-        label(g,details?"−":"+",
+        label(g,details?"-":"+",
               {89,y+36,24,20},15,details?palette::amber:palette::muted,true,
               juce::Justification::centred);
         g.setColour(palette::line);
