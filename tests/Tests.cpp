@@ -40,6 +40,7 @@ void test(const char* name, const std::function<void()>& body) {
 #include "ShowEditOperationsTests.h"
 #include "WorkspaceLayoutTests.h"
 #include "ControlMappingV10Tests.h"
+#include "ControlRuntimeTests.h"
 #include "ControlColumnTests.h"
 #include "StabilityV7Tests.h"
 #include "ArchitectureV8Tests.h"
