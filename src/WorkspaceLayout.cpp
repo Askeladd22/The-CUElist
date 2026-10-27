@@ -52,7 +52,7 @@ WorkspaceLayout calculateWorkspaceLayout(const WorkspaceLayoutInput& input) {
     const int baseGridHeight=std::max(minimumGridHeight,
         input.height-400-baseDockHeight);
     const int baseTimelineHeight=std::max(minimumTimelineHeight,
-        input.height-baseGridHeight-baseDockHeight-215);
+        input.height-baseGridHeight-baseDockHeight-201);
     // Growing the Timeline first borrows unused height from the cue viewport.
     // If the cue viewport is already at minimum, an expanded dock may yield
     // space down to 130px; the 36px collapsed dock remains unchanged.
