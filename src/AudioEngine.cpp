@@ -652,8 +652,10 @@ void AudioEngine::processBlock(float* const* outputs,int channels,int frames,dou
     if (current) current->render(outputs,channels,frames,sampleRate);
     else for (int ch=0; ch<channels; ++ch) if (outputs[ch]) juce::FloatVectorOperations::clear(outputs[ch],frames);
     limiterActive.store(current && current->limiterReducing,std::memory_order_relaxed);
-    if (panicEpoch.load()!=epoch) {
+    const bool emergencyStop=panicEpoch.load()!=epoch;
+    if (emergencyStop) {
         acknowledgedCueId.store(0,std::memory_order_release);
+        limiterActive.store(false,std::memory_order_relaxed);
         if (current) current->panic();
         for (int ch=0; ch<channels; ++ch) if (outputs[ch]) juce::FloatVectorOperations::clear(outputs[ch],frames);
     }
@@ -667,8 +669,8 @@ void AudioEngine::processBlock(float* const* outputs,int channels,int frames,dou
         }
     if (current) for (const auto& v : current->voices) if (v.playing) ++active;
     peak.store(level); activeVoices.store(active);
-    masterPeakLeft.store(current ? current->preLimiterPeakLeft : 0.0f,std::memory_order_relaxed);
-    masterPeakRight.store(current ? current->preLimiterPeakRight : 0.0f,std::memory_order_relaxed);
+    masterPeakLeft.store(current && !emergencyStop ? current->preLimiterPeakLeft : 0.0f,std::memory_order_relaxed);
+    masterPeakRight.store(current && !emergencyStop ? current->preLimiterPeakRight : 0.0f,std::memory_order_relaxed);
     const int monitored=monitoredRowId.load();
     double seconds=0; bool playing=false;
     if (current) for (const auto& row:current->rows) if (row.id==monitored) {

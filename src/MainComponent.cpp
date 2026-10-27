@@ -630,7 +630,7 @@ void MainComponent::setColumnDirectEnabled(int column,bool enabled) {
     show.columns[(size_t)column].directOutputEnabled=enabled;
     dirty=true; engine.publish(makeRenderState(show,clips));
     status=enabled ? "Direct Output enabled." : "Direct Output off (L/R unchanged).";
-    utilities.refreshRouting(); repaint();
+    utilities.refresh(); repaint();
 }
 void MainComponent::setColumnUtilities(int column,float level,float pan,bool muted,bool inverted) {
     if (column<0 || column>=(int)show.columns.size() || !std::isfinite(level) || !std::isfinite(pan)) return;
@@ -646,7 +646,7 @@ void MainComponent::setColumnOutput(int column,int outputIndex) {
     show.columns[column].output=outputIndex;
     show.columns[column].directOutputEnabled=true; dirty=true;
     engine.publish(makeRenderState(show,clips));
-    status="Column audio output updated."; repaint();
+    status="Column audio output updated."; utilities.refresh(); repaint();
 }
 void MainComponent::setRowColour(int row,int colour) {
     if (row<0 || row>=(int)show.rows.size() || colour<0 || colour>7) return;

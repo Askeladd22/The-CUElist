@@ -43,7 +43,9 @@ void addColumn(Show& show, ColumnType type, const juce::String& name) {
         };
         while (taken(label)) label=prefix+" "+juce::String(++ordinal);
     }
-    show.columns.push_back({show.nextId++, label, type, 0});
+    Column created{show.nextId++, label, type, 0};
+    created.masterSend=(type==ColumnType::audio);
+    show.columns.push_back(std::move(created));
     for (auto& row : show.rows) { Cell c; c.id = show.nextId++; row.cells.push_back(c); }
 }
 Show makeShow() {
@@ -406,7 +408,7 @@ juce::Result decodeShow(const juce::String& text, Show& destination) {
             // v1-v10 legacy audio projects had no separate Master Send.
             // Default outputs 1/2 are sent to Master; explicitly routed
             // higher pairs remain direct. Preserve their audible destination.
-            column.masterSend=(column.output==0);
+            column.masterSend=(column.type==ColumnType::audio && column.output==0);
             column.directOutputEnabled=(column.output!=0);
             if (auto* fields=c.getDynamicObject()) {
                 if (fields->hasProperty("masterSend"))
