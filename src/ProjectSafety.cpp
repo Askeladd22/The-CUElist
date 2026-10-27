@@ -103,7 +103,11 @@ juce::Result ProjectRecovery::checkpoint(const Show& show,const juce::File& dir)
     return writeRecoverySnapshot(encodeShow(show),dir);
 }
 RecoveryCheckpointWriter::RecoveryCheckpointWriter(juce::File directory)
-    :dir(std::move(directory)),worker([this] {run();}) {}
+    :dir(std::move(directory)) {
+    // Start only after every member (including pending and state flags) is
+    // fully constructed; starting in a member initializer is a race.
+    worker=std::thread([this] {run();});
+}
 RecoveryCheckpointWriter::~RecoveryCheckpointWriter() {
     flush();
     {
