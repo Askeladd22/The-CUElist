@@ -1,4 +1,5 @@
 #include "MainComponent.h"
+#include "ShowEditOperations.h"
 #include <algorithm>
 #include <sstream>
 
@@ -125,14 +126,18 @@ void MainComponent::renameTitle(bool column,int index) {
 void MainComponent::reorderRow(int index,int delta) {
     int target=index+delta;
     if (index<0 || index>=(int)show.rows.size() || target<0 || target>=(int)show.rows.size() || !applyInspector()) return;
-    std::swap(show.rows[index],show.rows[target]); selectedRow=nextCue=target; changed("Cue order updated.",true);
+    if (auto result=swapCueRows(show,index,target);result.failed()) {
+        message(result.getErrorMessage()); return;
+    }
+    selectedRow=nextCue=target; changed("Cue order updated.",true);
 }
 
 void MainComponent::reorderColumn(int index,int delta) {
     int target=index+delta;
     if (index<0 || index>=(int)show.columns.size() || target<0 || target>=(int)show.columns.size() || !applyInspector()) return;
-    std::swap(show.columns[index],show.columns[target]);
-    for (auto& row : show.rows) std::swap(row.cells[index],row.cells[target]);
+    if (auto result=swapCueColumns(show,index,target);result.failed()) {
+        message(result.getErrorMessage()); return;
+    }
     selectedColumn=target;
     // Equal-priority Control Column conflicts are resolved by visible order.
     // Rebuild the layered mapping immediately when the columns are reordered.
@@ -160,22 +165,13 @@ bool MainComponent::insertCopiedRowAfter(int index,const Row& source,
     if (index<0 || index>=(int)show.rows.size() || !applyInspector()
         || source.cells.size()!=show.columns.size() || sourceAudio.size()!=source.cells.size())
         return false;
-    if ((int64_t)show.nextId+1+(int64_t)source.cells.size()>=1000000000) {
-        message("Show identifier limit reached."); return false;
-    }
-    auto candidate=show;
-    auto media=clips;
-    Row inserted=source;
-    inserted.id=candidate.nextId++;
-    for (size_t c=0;c<inserted.cells.size();++c) {
-        inserted.cells[c].id=candidate.nextId++;
-        if (sourceAudio[c]) media[inserted.cells[c].id]=sourceAudio[c];
-    }
-    for (auto& cell:inserted.cells) if (cell.controlSet)
-        for (auto& binding:cell.controlSet->bindings) binding.id=candidate.controls.nextId++;
-    candidate.rows.insert(candidate.rows.begin()+index+1,std::move(inserted));
-    const auto valid=validateShow(candidate);
+    Show candidate;
+    const auto valid=prepareInsertedCueCopy(show,index,source,candidate);
     if (valid.failed()) { message(valid.getErrorMessage()); return false; }
+    auto media=clips;
+    const auto& inserted=candidate.rows[(size_t)index+1];
+    for (size_t c=0;c<inserted.cells.size();++c)
+        if (sourceAudio[c]) media[inserted.cells[c].id]=sourceAudio[c];
     if (!memoryFits(media)) { message("Show PCM memory limit reached."); return false; }
     closeMidiClip(); closeOscClip();
     show=std::move(candidate);
