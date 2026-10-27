@@ -8,12 +8,16 @@ constexpr int inspectorInnerWidth=236;
 constexpr int inspectorScaleOriginY=160;
 constexpr int cueLeft=182;
 constexpr int cueTop=74;
-constexpr int cueRightGap=8;
+// These panels share a real boundary with the Inspector, not a blank gutter.
+constexpr int workspaceSeparation=0;
 constexpr int cueGridTail=44;
 constexpr int minimumGridHeight=310;
 constexpr int minimumTimelineHeight=75;
 constexpr int statusFooterGap=47;
-constexpr int dockBaseY=168;
+// The dock/timeline begins exactly where the upper Utility panel ends.
+constexpr int dockBaseY=154;
+// Preserve the tested maximum dock heights when resizing a compact window.
+constexpr int originalDockBudgetY=168;
 }
 
 juce::AffineTransform WorkspaceLayout::inspectorTransform() const noexcept {
@@ -43,12 +47,12 @@ WorkspaceLayout calculateWorkspaceLayout(const WorkspaceLayoutInput& input) {
     // otherwise push the entire Timeline below the usable window.
     // Fit it below the minimum cue-list region and above a 75px timeline.
     const int maximumDockHeight=std::max(0,input.height-
-        (dockBaseY+minimumGridHeight+minimumTimelineHeight+statusFooterGap));
+        (originalDockBudgetY+minimumGridHeight+minimumTimelineHeight+statusFooterGap));
     const int baseDockHeight=std::clamp(input.activeDockHeight,0,maximumDockHeight);
     const int baseGridHeight=std::max(minimumGridHeight,
         input.height-400-baseDockHeight);
     const int baseTimelineHeight=std::max(minimumTimelineHeight,
-        input.height-baseGridHeight-baseDockHeight-215);
+        input.height-baseGridHeight-baseDockHeight-201);
     // Growing the Timeline first borrows unused height from the cue viewport.
     // If the cue viewport is already at minimum, an expanded dock may yield
     // space down to 130px; the 36px collapsed dock remains unchanged.
@@ -65,7 +69,7 @@ WorkspaceLayout calculateWorkspaceLayout(const WorkspaceLayoutInput& input) {
         std::max(0,-result.effectiveTimelineAdjustment);
     const int utilityHeight=input.height<800 ? 180 : 208;
     // The fixed BPM/Auto Stop band is OUTSIDE the scrollable column region.
-    const int lowerWidth=result.editorX-cueRightGap-cueLeft;
+    const int lowerWidth=result.editorX-workspaceSeparation-cueLeft;
     const int cueWidth=lowerWidth-input.pinnedMetricsWidth;
     const int utilityY=154+gridHeight-utilityHeight;
     result.viewport={cueLeft,cueTop,cueWidth,utilityY-cueTop};
@@ -77,7 +81,7 @@ WorkspaceLayout calculateWorkspaceLayout(const WorkspaceLayoutInput& input) {
     result.dockClose={615,result.dockY+4,82,26};
     result.dockEditor={cueLeft,result.dockY,lowerWidth,result.effectiveDockHeight};
     result.timeline={cueLeft,result.dockY+result.effectiveDockHeight,lowerWidth,
-        std::max(minimumTimelineHeight,input.height-gridHeight-result.effectiveDockHeight-215)};
+        std::max(minimumTimelineHeight,input.height-gridHeight-result.effectiveDockHeight-201)};
 
     result.timelineResize={cueLeft+(lowerWidth-104)/2,
         result.timeline.getY()-7,104,12};

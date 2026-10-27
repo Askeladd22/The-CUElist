@@ -4,6 +4,10 @@
 namespace cuelist {
 namespace {
 constexpr int timelineStart=140, tracksTop=82, trackHeight=42;
+// The small Timeline cannot fit its toolbar, ruler, tracks and footer at
+// once. These visibility thresholds match the actual content's space budget.
+constexpr int detailedToolbarHeight=120;
+constexpr int completeTimelineHeight=170;
 // Invert the monotonic tempo map to place grid lines in musical time,
 // including cues with multiple BPM changes.
 double beatAtSeconds(const std::vector<TempoPoint>& tempo,double seconds) {
@@ -85,7 +89,17 @@ Timeline::Timeline(MainComponent& p) : owner(p) {
     snapDivision.onChange=[this] { repaint(); };
 }
 void Timeline::resized() {
-    horizontalScroll.setBounds(timelineStart,std::max(0,getHeight()-43),std::max(0,getWidth()-timelineStart-20),12);
+    // JUCE normally clips children to their parent bounds, but a short
+    // Timeline cannot physically fit its footer/scrollbar and ruler together.
+    // Hide those controls rather than placing them over tracks or the header.
+    const bool showToolbar=getHeight()>=detailedToolbarHeight;
+    const bool showFooter=getHeight()>=completeTimelineHeight;
+    for (auto* c:std::initializer_list<juce::Component*>{
+         &gridToggle,&gridDivision,&snapToggle,&snapDivision})
+        c->setVisible(showToolbar);
+    horizontalScroll.setVisible(showFooter);
+    horizontalScroll.setBounds(timelineStart,std::max(0,getHeight()-43),
+                               std::max(0,getWidth()-timelineStart-20),12);
     gridToggle.setBounds(196,10,76,25);
     gridDivision.setBounds(278,10,80,25);
     snapToggle.setBounds(408,10,41,25);
@@ -138,6 +152,9 @@ void Timeline::changeZoom(double factor,double anchor) {
     viewStart=point-anchor*visibleLength(); syncViewport(); repaint();
 }
 void Timeline::paint(juce::Graphics& g) {
+    // All ruler, track and footer artwork belongs strictly to this component.
+    // Explicitly clip it even during repeated splitter drags and repainting.
+    g.reduceClipRegion(getLocalBounds());
     syncViewport();g.fillAll(palette::panel);
     g.setColour(palette::raised.withAlpha(.68f));
     g.fillRect(0,0,getWidth(),45);
@@ -145,22 +162,34 @@ void Timeline::paint(juce::Graphics& g) {
     if (owner.selectedRow<0 || owner.selectedRow>=(int)owner.show.rows.size()) return;
     const auto& row=owner.show.rows[owner.selectedRow];
     label(g,"TIMELINE",{20,11,110,23},14,palette::text,true);
-    label(g,"GRID",{143,11,52,23},11,palette::muted,true);
-    label(g,"SNAP",{370,11,35,23},11,palette::muted,true);
-    for (int i=0;i<3;++i) {
+    if (getHeight()>=detailedToolbarHeight) {
+        label(g,"GRID",{143,11,52,23},11,palette::muted,true);
+        label(g,"SNAP",{370,11,35,23},11,palette::muted,true);
+    }
+    if (getHeight()>=detailedToolbarHeight) for (int i=0;i<3;++i) {
         const auto box=zoomButton(getWidth(),i);
         g.setColour(palette::raised); g.fillRoundedRectangle(box.toFloat(),3);
         label(g,i==0 ? "-" : i==1 ? "+" : "Fit",box,12,palette::text,true,juce::Justification::centred);
     }
     g.setColour(palette::line); g.drawHorizontalLine(45,0,(float)getWidth());
+    // At minimum height even the ruler is outside the supported content
+    // viewport. In the intermediate state show the ruler but not overlapping
+    // playback lanes, scrollbar or bottom status/player caption.
+    if (getHeight()<detailedToolbarHeight) return;
     const double length=visibleLength(); const int area=std::max(1,getWidth()-timelineStart-20), bottom=getHeight()-48;
     const int audioTracks=(int)owner.show.columns.size();
     trackScroll=juce::jlimit(0,std::max(0,audioTracks*trackHeight-std::max(1,bottom-tracksTop)),trackScroll);
     for (int i=0;i<=4;++i) {
         const int x=timelineStart+area*i/4;
         label(g,timeText(viewStart+length*i/4),{x-10,53,75,20},12,palette::muted);
-        g.setColour(palette::line.withAlpha(.8f)); g.drawVerticalLine(x,76,(float)bottom);
+        // A short ruler has no track area below y=76; avoid a reversed or
+        // negative-height vertical line on 120-124px Timeline windows.
+        if (bottom>76) {
+            g.setColour(palette::line.withAlpha(.8f));
+            g.drawVerticalLine(x,76,(float)bottom);
+        }
     }
+    if (getHeight()<completeTimelineHeight) return;
     // Musical grid follows secondsAtBeat across all tempo changes, but its
     // visibility/resolution never changes how clip dragging is quantized.
     if (gridVisible) {
@@ -288,7 +317,9 @@ void Timeline::mouseDown(const juce::MouseEvent& e) {
     if (!e.mods.isLeftButtonDown()) return;
     syncViewport();
     owner.grabKeyboardFocus(); dragColumn=-1; seeking=false; resizingClip=false;
-    for (int i=0;i<3;++i) if (zoomButton(getWidth(),i).contains(e.getPosition())) {
+    if (getHeight()<completeTimelineHeight && e.y>=45) return;
+    for (int i=0;i<3 && getHeight()>=detailedToolbarHeight;++i)
+        if (zoomButton(getWidth(),i).contains(e.getPosition())) {
         if (i==2) { zoom=1; viewStart=0; syncViewport(); repaint(); }
         else changeZoom(i==0 ? .5 : 2,.5);
         return;
