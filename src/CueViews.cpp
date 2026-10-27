@@ -232,7 +232,7 @@ void CueGrid::showCellMenu(int row,int column,juce::Point<int> screenPoint) {
     menu.showMenuAsync(juce::PopupMenu::Options().withTargetScreenArea(
         {screenPoint.x,screenPoint.y,1,1}),[safe,rowId,columnId](int choice) {
         if(!safe || choice==0) return;
-        int r=-1;
+        int r=-1,c=-1;
         for(int i=0;i<(int)safe->show.rows.size();++i)
             if(safe->show.rows[(size_t)i].id==rowId) r=i;
         for(int i=0;i<(int)safe->show.columns.size();++i)
