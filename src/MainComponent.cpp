@@ -7,7 +7,6 @@
 #include "MidiClip.h"
 #include "BinaryData.h"
 #include <sstream>
-#include <cstdlib>
 #include <cmath>
 
 namespace cuelist {
@@ -15,16 +14,6 @@ namespace {
 juce::String typeName(ColumnType t) { return t==ColumnType::audio ? "AUDIO" : t==ColumnType::midi ? "MIDI" : t==ColumnType::osc ? "OSC" : "CONTROL"; }
 juce::String duration(double seconds) {
     int s=(int)seconds; return juce::String(s/60).paddedLeft('0',2)+":"+juce::String(s%60).paddedLeft('0',2);
-}
-bool parseGainDb(const juce::String& input, double& value) {
-    const auto trimmed=input.trim().toStdString();
-    if (trimmed.empty()) return false;
-    char* end=nullptr;
-    const double parsed=std::strtod(trimmed.c_str(),&end);
-    if (end==trimmed.c_str() || *end!='\0' || !std::isfinite(parsed)
-        || parsed < -60.0 || parsed > 12.0) return false;
-    value=parsed;
-    return true;
 }
 void prompt(juce::Component* parent,const juce::String& title,const juce::String& hint,const juce::String& initial,
             bool multiline,std::function<void(juce::String)> result) {
@@ -416,52 +405,6 @@ void MainComponent::refresh() {
         projectNameLabel.setText(show.name,juce::dontSendNotification);
     repaint(); grid.repaint(); timeline.repaint(); cueMetrics.repaint();
 }
-void MainComponent::refreshInspector() {
-    const auto& row=show.rows[selectedRow]; const auto& c=row.cells[selectedColumn]; const auto& col=show.columns[selectedColumn];
-    masterSlider.setGainDb(juce::Decibels::gainToDecibels(show.masterGain,-60.0f));
-    masterPan.setValue(show.masterPan,juce::dontSendNotification);
-    masterMute.setToggleState(show.masterMuted,juce::dontSendNotification);
-    safetyLimiter.setToggleState(show.safetyLimiterEnabled,juce::dontSendNotification);
-    engine.monitoredRowId.store(row.id);
-    rowName.setTextToShowWhenEmpty("Cue name",palette::muted);
-    rowName.setText(row.name,false); cellName.setText(c.name,false); cellName.setTextToShowWhenEmpty("Cell name",palette::muted);
-    bpm.setText(juce::String(row.tempo.front().bpm,1),false);
-    behaviour.setSelectedId((int)c.behaviour+1,juce::dontSendNotification);
-    follow.setToggleState(c.followsRow,juce::dontSendNotification); loop.setToggleState(c.loop,juce::dontSendNotification);
-    cellAutoStop.setToggleState(c.stopOnNext,juce::dontSendNotification);
-    cellAutoStop.setTooltip(row.stopOnNext ? "ON: participates in Auto Stop. OFF: continues after the next GO."
-        : "Cue Auto Stop is OFF: this cell option applies when the cue is set to ON.");
-    gainDb.setText(juce::String(juce::Decibels::gainToDecibels(c.gain,-60.0f),1),false);
-    rowGain.setValue(juce::Decibels::gainToDecibels(row.gain,-60.0f),juce::dontSendNotification);
-    rowMute.setToggleState(row.muted,juce::dontSendNotification); rowLoop.setToggleState(row.loop,juce::dontSendNotification);
-    rowBehaviour.setSelectedId(row.overrideBehaviour ? (int)row.behaviour+2 : 1,juce::dontSendNotification);
-    // The Entire Q controls and Cell controls are visible together, with no
-    // redundant transport, behavioural presets or manual Apply button.
-    rowSettings=false;
-    for(juce::Component* component:std::initializer_list<juce::Component*>{
-         &cellTab,&rowTab,&rowGain,&rowMute,&rowBehaviour,&behaviour,&cellAutoStop,
-         &playCellButton,&stopCellButton,&clearButton,&applyButton})
-        component->setVisible(false);
-    for(juce::Component* component:std::initializer_list<juce::Component*>{
-         &rowName,&bpm,&tempoButton,&rowLoop,&cellName,&follow,&loop})
-        component->setVisible(true);
-    const bool audio=col.type==ColumnType::audio;
-    const bool midi=col.type==ColumnType::midi;
-    const bool osc=col.type==ColumnType::osc;
-    const bool control=col.type==ColumnType::control;
-    gainDb.setVisible(audio);
-    midiEditButton.setVisible(midi);
-    oscEditButton.setVisible(osc || control);
-    oscEditButton.setButtonText(control ? (col.controlLocked?"Edit default Control Set":"Edit Control Set")
-                                      : c.osc ? "Edit OSC clip" : "Create OSC clip");
-    midiEditButton.setButtonText(c.midi ? "Edit piano roll" : "Create MIDI clip");
-    importButton.setVisible(audio || midi);
-    importButton.setButtonText(midi?"Import MIDI":"Import WAV / MP3");
-    importButton.setTooltip(midi?"Import notes from .mid/.midi.":"Import WAV/MP3.");
-    for(juce::Component* component:std::initializer_list<juce::Component*>{
-        &cellName,&follow,&loop,&gainDb,&importButton,&midiEditButton,&oscEditButton})
-        component->setEnabled(!col.collapsed && !(control && col.controlLocked && component!=&oscEditButton));
-}
 bool MainComponent::select(int row,int column) {
     if (row<0 || row>=(int)show.rows.size() || column<0 || column>=(int)show.columns.size() || !applyInspector()) return false;
     // Collapsed cells remain selectable as cues, but not editable.
@@ -477,42 +420,6 @@ void MainComponent::changed(const juce::String& text,bool stopPlayback) {
     if (stopPlayback) { engine.panic(); resetActiveMapping(); }
     engine.publish(makeRenderState(show,clips),!stopPlayback);
     dirty=true; status=text; refresh();
-}
-bool MainComponent::inspectorDiffers() const {
-    const auto& row=show.rows[selectedRow]; const auto& cell=row.cells[selectedColumn];
-    if (rowName.getText().trim()!=row.name || bpm.getText()!=juce::String(row.tempo.front().bpm,1)) return true;
-    if(rowLoop.getToggleState()!=row.loop) return true;
-    if (show.columns[selectedColumn].collapsed) return false;
-    if (show.columns[selectedColumn].type==ColumnType::audio) {
-        double value=0;
-        if (!parseGainDb(gainDb.getText(),value) ||
-            std::abs(value-juce::Decibels::gainToDecibels(cell.gain,-60.0f))>0.051)
-            return true;
-    }
-    return cellName.getText().trim()!=cell.name ||
-           follow.getToggleState()!=cell.followsRow || loop.getToggleState()!=cell.loop;
-}
-bool MainComponent::applyInspector() {
-    if (!inspectorDiffers()) return true;
-    auto candidate=show; auto& row=candidate.rows[selectedRow]; auto& cell=row.cells[selectedColumn];
-    row.name=rowName.getText().trim();
-    row.loop=rowLoop.getToggleState();
-    if (bpm.getText()!=juce::String(row.tempo.front().bpm,1)) row.tempo.front().bpm=bpm.getText().getDoubleValue();
-    if (!candidate.columns[(size_t)selectedColumn].collapsed) {
-        cell.name=cellName.getText().trim();
-        cell.followsRow=follow.getToggleState(); cell.loop=loop.getToggleState();
-        if (candidate.columns[selectedColumn].type==ColumnType::audio) {
-            double value=0;
-            if (!parseGainDb(gainDb.getText(),value)) {
-                message("Cell Gain must be a number from -60.0 to +12.0 dB.");
-                return false;
-            }
-            cell.gain=juce::Decibels::decibelsToGain((float)value,-60.0f);
-        }
-    }
-    auto result=validateShow(candidate); if (result.failed()) { message(result.getErrorMessage()); return false; }
-    show=std::move(candidate); changed("Settings applied. BPM does not change audio playback speed.");
-    return true;
 }
 void MainComponent::message(const juce::String& text) { status=text; repaint(); juce::AlertWindow::showMessageBoxAsync(juce::MessageBoxIconType::WarningIcon,"The Cuelist",text,"OK",this); }
 bool MainComponent::memoryFits(const ClipMap& collection) const {
@@ -898,151 +805,6 @@ void MainComponent::showColumnMenu(juce::Point<int> screenPoint) {
         safe->selectedColumn=(int)safe->show.columns.size()-1;
         safe->changed("Column added. Playback stopped.",true);
     });
-}
-void MainComponent::withDiscardConfirmation(std::function<void()> action) {
-    if (!hasUnsavedChanges()) { action(); return; }
-    juce::AlertWindow::showAsync(juce::MessageBoxOptions().withIconType(juce::MessageBoxIconType::QuestionIcon)
-        .withTitle("Unsaved changes").withMessage("Continuing will discard unsaved changes. To save them, cancel and click Save.")
-        .withButton("Discard and continue").withButton("Cancel").withAssociatedComponent(this),
-        [safe=juce::Component::SafePointer<MainComponent>(this),action](int result) { if (safe && result==1) action(); });
-}
-void MainComponent::requestQuit() { withDiscardConfirmation([this] { stopAll(); juce::JUCEApplication::getInstance()->quit(); }); }
-void MainComponent::saveProject() {
-    if (projectLoader) projectLoader->cancel();
-    if (!applyInspector()) return;
-    chooser=std::make_unique<juce::FileChooser>("Save show",projectFile==juce::File{} ? juce::File::getSpecialLocation(juce::File::currentExecutableFile).getParentDirectory().getChildFile("Show.cuelist") : projectFile,"*.cuelist");
-    chooser->launchAsync(juce::FileBrowserComponent::saveMode|juce::FileBrowserComponent::canSelectFiles|juce::FileBrowserComponent::warnAboutOverwriting,
-        [safe=juce::Component::SafePointer<MainComponent>(this)](const juce::FileChooser& fc) {
-            if (!safe || fc.getResult()==juce::File{}) return;
-            auto file=fc.getResult(); auto result=saveShow(safe->show,file);
-            if (result.failed()) { safe->message(result.getErrorMessage()); return; }
-            Show portable; if (loadShow(file,portable).wasOk()) safe->show=std::move(portable);
-            safe->projectFile=file; safe->dirty=false; safe->status="Saved: "+file.getFullPathName();
-            if (safe->recoveryEnabled) {
-                if (safe->recoveryWriter) safe->recoveryWriter->flush();
-                ProjectRecovery::discard(ProjectRecovery::defaultDirectory());
-                safe->preserveDeferredRecovery=false;
-            }
-            safe->repaint();
-        });
-}
-void MainComponent::showPreflight() {
-    juce::StringArray outputs;
-    for(const auto& d:juce::MidiOutput::getAvailableDevices()) outputs.add(d.identifier);
-    const auto report=preflightShow(show,engine.connected.load(),outputs,midiInput.connected());
-    const auto icon=report.criticalCount()>0 ? juce::MessageBoxIconType::WarningIcon :
-        report.warningCount()>0 ? juce::MessageBoxIconType::InfoIcon :
-        juce::MessageBoxIconType::NoIcon;
-    juce::AlertWindow::showMessageBoxAsync(icon,"Show preflight",report.describe(),"Close",this);
-    status=report.criticalCount()>0 ? "Preflight: critical problems detected." :
-           report.warningCount()>0 ? "Preflight: warnings to review." :
-           "Preflight complete: no critical project errors.";
-    repaint();
-}
-void MainComponent::showDiagnostics() {
-    const auto stats=engine.diagnostics();
-    juce::String details="ENGINE DIAGNOSTICS\n";
-    details+="Audio device: "+juce::String(engine.connected.load()?"ONLINE":"OFFLINE");
-    details+="\nActive audio/MIDI/OSC cells: "+juce::String(engine.activeVoices.load());
-    details+="\nAudio callback commands dropped: "+juce::String(stats.audioCommandsDropped);
-    details+="\nMIDI input: "+juce::String(midiInput.connected()?"CONNECTED":"DISCONNECTED");
-    details+="\nMIDI input messages dropped: "+juce::String(midiInput.droppedCount());
-    details+="\nMIDI input reconnect attempts: "+juce::String(midiInputReconnectAttempts);
-    details+="\nMIDI output messages sent: "+juce::String(stats.midiOutputSent);
-    details+="\nMIDI output messages dropped: "+juce::String(stats.midiOutputDropped);
-    details+="\nMIDI dispatches >10 ms late: "+juce::String(stats.midiLateOver10ms);
-    details+="\nOSC UDP packets sent: "+juce::String(stats.oscSent);
-    details+="\nOSC UDP packets dropped / send failures: "+juce::String(stats.oscDropped);
-    details+="\nOSC dispatches >10 ms late: "+juce::String(stats.oscLateOver10ms);
-    details+="\nRecovery I/O failures: "+juce::String(
-        recoveryWriter ? recoveryWriter->failedWrites() : 0u);
-    details+="\n\nThese counters are local to the current process. UDP sent does not prove receiver delivery.";
-    juce::AlertWindow::showMessageBoxAsync(juce::MessageBoxIconType::InfoIcon,
-        "Diagnostics",details,"Close",this);
-}
-bool MainComponent::activateProject(Show candidate,const juce::File& source,bool recovering) {
-    if (projectLoader) projectLoader->cancel();
-    PreparedShowMedia prepared;
-    const auto preparedResult=prepareShowMedia(candidate,prepared);
-    if(preparedResult.failed()) {
-        message(preparedResult.getErrorMessage()+
-                " The current show has not been replaced.");
-        return false;
-    }
-    return commitPreparedProject(std::move(candidate),source,recovering,std::move(prepared));
-}
-bool MainComponent::commitPreparedProject(Show candidate,const juce::File& source,
-                                           bool recovering,PreparedShowMedia prepared) {
-    // Only the UI thread may interrupt playback or touch the AudioEngine.
-    // Decode and memory-budget checks have already completed transactionally.
-    auto loaded=std::move(prepared.clips);
-    auto issues=std::move(prepared.issues);
-    // Only after all memory checks pass do we stop the previous show.
-    engine.panic();
-    for(const auto& column:candidate.columns)
-        if(column.type==ColumnType::midi && column.midiOutputId.isNotEmpty()) {
-            const auto opened=engine.setMidiOutput(column.midiOutputId);
-            if(opened.failed()) issues.add(opened.getErrorMessage());
-        }
-    closeMidiClip();closeOscClip();editHistory.clearUndoHistory();
-    show=std::move(candidate);clips=std::move(loaded);
-    projectFile=recovering ? juce::File{} : source;dirty=recovering;
-    selectedRow=selectedColumn=nextCue=0;
-    resetActiveMapping();refreshControlSettings();
-    engine.publish(makeRenderState(show,clips));refresh();
-    status=recovering ? "Recovered unsaved show. Use Save to choose a project filename." :
-                        "Project opened: "+source.getFileName();
-    if(!recovering && recoveryEnabled) {
-        if (recoveryWriter) recoveryWriter->flush();
-        ProjectRecovery::discard(ProjectRecovery::defaultDirectory());
-        preserveDeferredRecovery=false;
-    }
-    if(!issues.isEmpty())
-        message(juce::String(issues.size())+" missing media or MIDI output issues.\n\n"+
-                issues.joinIntoString("\n").substring(0,1500));
-    return true;
-}
-void MainComponent::offerCrashRecovery() {
-    if(!ProjectRecovery::exists(ProjectRecovery::defaultDirectory())) return;
-    auto safe=juce::Component::SafePointer<MainComponent>(this);
-    juce::AlertWindow::showAsync(
-        juce::MessageBoxOptions().withIconType(juce::MessageBoxIconType::QuestionIcon)
-            .withTitle("Recover an unsaved show?")
-            .withMessage("A recovery checkpoint from an interrupted session was found. "
-                         "Restoring does not overwrite the original project or any media. "
-                         "Playback will not start automatically.")
-            .withButton("Restore").withButton("Discard checkpoint").withButton("Later")
-            .withAssociatedComponent(this),[safe](int answer) {
-        if(!safe) return;
-        if(answer==1) {
-            Show candidate;
-            const auto result=ProjectRecovery::restore(ProjectRecovery::defaultDirectory(),candidate);
-            if(result.failed()) safe->message(result.getErrorMessage());
-            else safe->activateProject(std::move(candidate),{},true);
-        } else if(answer==2) {
-            if (safe->recoveryWriter) safe->recoveryWriter->flush();
-            ProjectRecovery::discard(ProjectRecovery::defaultDirectory());
-        }
-        else {
-            safe->preserveDeferredRecovery=true;
-            safe->status="Recovery deferred: previous checkpoint preserved until you decide.";
-            safe->repaint();
-        }
-    });
-}
-void MainComponent::openProject() {
-    chooser=std::make_unique<juce::FileChooser>("Open show",projectFile,"*.cuelist;*.json;*.bak");
-    chooser->launchAsync(juce::FileBrowserComponent::openMode|juce::FileBrowserComponent::canSelectFiles,
-        [safe=juce::Component::SafePointer<MainComponent>(this)](const juce::FileChooser& fc) {
-            if(!safe || fc.getResult()==juce::File{}) return;
-            const auto file=fc.getResult();
-            if(!safe->projectLoader)
-                safe->projectLoader=std::make_unique<ProjectLoadWorker>();
-            safe->projectLoader->request(file);
-            safe->status="Preparing project in background: "+file.getFileName()+
-                ". Current show stays loaded until preparation succeeds.";
-            safe->repaint();
-        });
 }
 void MainComponent::showDevices() {
     if (deviceDialog) { deviceDialog->toFront(true); return; }
