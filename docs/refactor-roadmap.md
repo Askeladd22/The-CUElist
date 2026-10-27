@@ -74,7 +74,7 @@ No existing audio callback, playback state inheritance, project schema or media-
 
 ## Phase 4 — Control Mapping boundaries
 
-**Phase 4a (current PR; CI verification pending):** isolate mapping/device business logic from the Control Panel dialog without changing runtime behavior.
+**Phase 4a (merged into feat/desktop-foundation; CI must still be verified):** isolate mapping/device business logic from the Control Panel dialog without changing runtime behavior.
 
 - `src/ControlUI.cpp` retains `ControlPanel`, `openControlPanel` and `editControlSet`: presentation, operator controls and the MIDI Learn interface.
 - `src/ControlRuntime.cpp` contains runtime mapping initialization, MIDI input selection, binding edits, presets, Control Set lock/priority/templates, and the original `dispatchControl`. The code still executes on the JUCE UI thread; the audio callback remains unchanged.
@@ -82,7 +82,15 @@ No existing audio callback, playback state inheritance, project schema or media-
 - Tests cover locked vs cue-local mappings, equal-priority reordering, acknowledged-cue presets, malformed in-memory grids and physical GO press/release debounce. Existing MIDI Learn, Control Set, mapping validation, pickup, MIDI/OSC routing and project v10 tests are preserved.
 - No GUI geometry or audio callback changes. Windows build and complete automated tests required before merging.
 
-**Phase 4b (later, separate PR):** after phase 4a CI and manual MIDI/OSC acceptance, introduce a narrowly scoped control-dispatch test seam if needed to isolate the physical-edge logic and output sinks further; do not risk a sweeping dispatch rewrite before show-control hardware testing.
+**Phase 4b (current PR; device-neutral dispatch policy):**
+
+- `src/ControlDispatchPolicy.h/.cpp` in `CuelistCore` owns deterministic physical MIDI button-edge tracking (`PhysicalControlEdges`), current-target normalization for pickup, stable column-ID/type selection, fader deadband and MIDI CC output quantization. These do not invoke audio callbacks or send to hardware.
+- `src/MainComponent.h` keeps a `PhysicalControlEdges` member rather than a raw held-input map. Project MIDI input changes, disconnect and reconnect still clear the physical state before new events are accepted.
+- `src/ControlRuntime.cpp` delegates only the *same* decisions to the core helpers. GO/PANIC continues to be triggered solely from a new physical edge on the UI thread. MIDI and OSC send functions are unchanged.
+- Five new tests cover device/channel/input independence, unmatched releases across cue switches, reverse pickup curves and inversion, output type and ID after column reorder, and CC rounding/deadband.
+- Full app/UI regressions and Windows release CI are required before merging; physical controller and MIDI/OSC output acceptance remains separate.
+
+**Later:** if live hardware tests reveal a need, inject dedicated MIDI/OSC output sinks for deterministic end-to-end routing tests in a separate PR. Do not casually alter MIDI/OSC queues, GO acknowledgment timing or audio callback behavior.
 
 Hardware acceptance is mandatory before release.
 
