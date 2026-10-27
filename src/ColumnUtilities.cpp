@@ -2,6 +2,36 @@
 #include "GainMeterFader.h"
 
 namespace cuelist {
+// Scalable lock drawn with JUCE primitives instead of OS-dependent glyphs.
+class ControlLockButton final : public juce::Button {
+public:
+    ControlLockButton() : juce::Button("controlColumnLock") {}
+    void paintButton(juce::Graphics& g,bool hovered,bool pressed) override {
+        const auto area=getLocalBounds().toFloat().reduced(1.0f);
+        const auto ink=getToggleState()?palette::amber:palette::teal;
+        g.setColour(palette::raised.withMultipliedBrightness(pressed?0.8f:hovered?1.18f:1.0f));
+        g.fillRoundedRectangle(area,5.0f);
+        g.setColour(ink.withAlpha(.8f));
+        g.drawRoundedRectangle(area,5.0f,1.1f);
+        const float cx=area.getCentreX(),cy=area.getCentreY();
+        juce::Path shackle;
+        if(getToggleState()) {
+            shackle.startNewSubPath(cx-6.0f,cy);
+            shackle.lineTo(cx-6.0f,cy-5.0f);
+            shackle.cubicTo(cx-6.0f,cy-14.0f,cx+6.0f,cy-14.0f,cx+6.0f,cy-5.0f);
+            shackle.lineTo(cx+6.0f,cy);
+        } else {
+            shackle.startNewSubPath(cx-6.0f,cy);
+            shackle.lineTo(cx-6.0f,cy-5.0f);
+            shackle.cubicTo(cx-6.0f,cy-14.0f,cx+6.0f,cy-14.0f,cx+6.0f,cy-5.0f);
+        }
+        g.setColour(ink);
+        g.strokePath(shackle,juce::PathStrokeType(1.8f));
+        g.fillRoundedRectangle(cx-9.0f,cy-1.0f,18.0f,12.0f,2.5f);
+        g.setColour(palette::background);
+        g.fillEllipse(cx-1.5f,cy+3.0f,3.0f,3.0f);
+    }
+};
 struct ColumnUtilities::Strip final : juce::Component {
     MainComponent& owner;
     int id, index;
@@ -19,7 +49,8 @@ struct ColumnUtilities::Strip final : juce::Component {
     juce::TextButton directMode{"POST"};
     MasterSendButton masterSend;
     juce::TextButton oscDestination{"OSC / destination"};
-    juce::TextButton controlLock{"Lock"},controlPriority{"Medium"},controlEdit{"Edit set"};
+    ControlLockButton controlLock;
+    juce::TextButton controlPriority{"Medium"},controlEdit{"Edit set"};
     int routingChannels=-1, routingOutput=-1;
     bool routingDirect=false;
     ColumnType routingType=ColumnType::audio;
@@ -139,11 +170,13 @@ struct ColumnUtilities::Strip final : juce::Component {
         oscDestination.setVisible(col.type==ColumnType::osc && !col.collapsed);
         output.setVisible(!col.collapsed && (col.type==ColumnType::audio || col.type==ColumnType::midi));
         const bool control=col.type==ColumnType::control;
-        controlLock.setVisible(control && !col.collapsed);
+        controlLock.setVisible(control);
         controlPriority.setVisible(control && !col.collapsed);
         controlEdit.setVisible(control && !col.collapsed);
         if (control) {
-            controlLock.setButtonText(col.controlLocked ? "Unlock" : "Lock");
+            controlLock.setToggleState(col.controlLocked,juce::dontSendNotification);
+            controlLock.setTooltip(col.controlLocked ? "Locked: click to unlock this Control Column." :
+                "Unlocked: click to lock this Control Column.");
             controlPriority.setButtonText(col.controlLocked ? "Low" :
                 col.controlPriority==4 ? "Maximum" :
                 col.controlPriority==3 ? "High" : "Medium");
@@ -187,7 +220,7 @@ struct ColumnUtilities::Strip final : juce::Component {
         routingDirect=col.directOutputEnabled; routingType=col.type;
         output.clear(juce::dontSendNotification); output.setEnabled(col.type==ColumnType::audio);
         if (col.type!=ColumnType::audio) {
-            output.addItem(col.type==ColumnType::midi ? "MIDI – planned" : "OSC – planned",1);
+            output.addItem(col.type==ColumnType::midi ? "MIDI - planned" : "OSC - planned",1);
             output.setSelectedId(1,juce::dontSendNotification); return;
         }
         output.addItem("Direct Off",1);
@@ -250,8 +283,8 @@ struct ColumnUtilities::Strip final : juce::Component {
                                 collapsed ? 23 : 46,17);
         oscActivity.setBounds(collapsed ? (w-22)/2 : 12,collapsed ? 40 : 42,
                                collapsed ? 23 : 46,17);
-        controlLock.setBounds(6,5,65,29);
-        controlPriority.setBounds(75,5,w-81,29);
+        controlLock.setBounds(6,collapsed ? 30 : 5,34,29);
+        controlPriority.setBounds(44,5,std::max(1,w-50),29);
         controlEdit.setBounds(8,44,w-16,32);
     }
     void paint(juce::Graphics& g) override {

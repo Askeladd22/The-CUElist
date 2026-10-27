@@ -35,6 +35,7 @@ public:
         return hasExactMidiIdentifier(juce::MidiInput::getAvailableDevices(),deviceId);
     }
     int droppedCount() const noexcept { return dropped.load(); }
+    uint64_t receivedCount() const noexcept { return received.load(std::memory_order_relaxed); }
     bool poll(ControlEvent& result) {
         const auto r=read.load(std::memory_order_relaxed);
         if (r==write.load(std::memory_order_acquire)) return false;
@@ -55,9 +56,13 @@ private:
     std::array<Packet,capacity> queue{};
     std::atomic<unsigned> read{0},write{0};
     std::atomic<int> dropped{0};
+    std::atomic<uint64_t> received{0};
     juce::String deviceId;
     std::unique_ptr<juce::MidiInput> input;
     void handleIncomingMidiMessage(juce::MidiInput*,const juce::MidiMessage& message) override {
+        // RX reflects every actual incoming MIDI packet, including unsupported
+        // mapping types (clock, SysEx, program changes), not just queued CCs.
+        received.fetch_add(1,std::memory_order_relaxed);
         Packet p;
         p.channel=message.getChannel();
         if (message.isController()) {

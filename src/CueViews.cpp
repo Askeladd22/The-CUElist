@@ -16,6 +16,21 @@ void smallButton(juce::Graphics& g, const juce::String& text, juce::Rectangle<in
     g.drawRoundedRectangle(box.toFloat().reduced(.5f),5,1);
     label(g,text,box,12,colour.withAlpha(enabled ? 1.0f : .45f),true,juce::Justification::centred);
 }
+// Draw the loop glyph as vector geometry: never rely on a missing Unicode glyph.
+void drawLoopIcon(juce::Graphics& g,juce::Rectangle<int> bounds,juce::Colour colour) {
+    const auto centre=bounds.toFloat().getCentre();
+    const float radius=std::min(bounds.getWidth(),bounds.getHeight())*.32f;
+    const float start=-2.35f,end=2.35f;
+    juce::Path loopPath;
+    loopPath.addCentredArc(centre.x,centre.y,radius,radius,0.0f,start,end,true);
+    g.setColour(colour);
+    g.strokePath(loopPath,juce::PathStrokeType(1.7f));
+    const float ax=centre.x+radius*std::cos(end);
+    const float ay=centre.y+radius*std::sin(end);
+    juce::Path arrow;
+    arrow.addTriangle(ax-3.0f,ay-3.1f,ax+3.8f,ay-2.0f,ax+1.0f,ay+3.5f);
+    g.fillPath(arrow);
+}
 void transportButton(juce::Graphics& g,juce::Rectangle<int> box,bool stop,bool enabled) {
     g.setColour((stop ? palette::red : palette::teal).withAlpha(enabled ? .16f : .06f));
     g.fillRoundedRectangle(box.toFloat(),5);
@@ -95,10 +110,13 @@ void CueGrid::paint(juce::Graphics& g) {
                 col.type==ColumnType::midi ? "MIDI" : col.type==ColumnType::osc ? "OSC" : "Control";
             const auto name=col.name.isEmpty()? juce::String(defaultName)+" "+juce::String(ordinal) : col.name;
             label(g,name,{x+8,35,w-38,25},13,palette::text,true);
-            smallButton(g,"−",{x+w-26,38,19,20},true);
+            smallButton(g,"-",{x+w-26,38,19,20},true);
         }
         g.setColour(palette::line);g.drawVerticalLine(x,0,(float)getHeight());
     }
+    // Contextual add-column control follows the rightmost column, including
+    // after reordering or when all preceding columns are compressed.
+    smallButton(g,"+",{columnX((int)show.columns.size())+6,16,31,31},true);
     const auto clip=g.getClipBounds();
     const int first=std::max(0,(clip.getY()-headerHeight)/rowHeight);
     const int last=std::min((int)show.rows.size(),(clip.getBottom()-headerHeight)/rowHeight+1);
@@ -116,7 +134,7 @@ void CueGrid::paint(juce::Graphics& g) {
                     : next ? palette::amber.withAlpha(.12f) : palette::panel);
         g.fillRect(0,y,getWidth(),rowHeight);
         if (row.colour>0) {
-            g.setColour(custom.withAlpha(.18f));
+            g.setColour(custom.withAlpha(.28f));
             g.fillRect(0,y,getWidth(),rowHeight);
         }
         if (next||playing||selected||row.colour>0) {
@@ -151,9 +169,9 @@ void CueGrid::paint(juce::Graphics& g) {
                 g.setColour(tone.withAlpha(.85f));
                 g.drawRoundedRectangle((float)x+5,(float)y+7,(float)w-10,39.f,5.f,1.f);
                 if (loaded) g.fillEllipse((float)x+w/2-4,(float)y+21,8.f,8.f);
-                else label(g,"—",{x+8,y+13,w-16,20},12,palette::muted,true,juce::Justification::centred);
+                else label(g,"-",{x+8,y+13,w-16,20},12,palette::muted,true,juce::Justification::centred);
                 if(!cell.followsRow) {g.setColour(palette::red);g.fillEllipse((float)x+6,(float)y+8,3.f,3.f);}
-                if(cell.loop) label(g,"↻",{x+w-19,y+8,12,15},12,palette::amber,true);
+                if(cell.loop) drawLoopIcon(g,{x+w-19,y+8,13,15},palette::amber);
                 continue;
             }
             const auto box=juce::Rectangle<float>((float)x+4,(float)y+3,(float)w-8,49.f);
@@ -191,8 +209,8 @@ void CueGrid::paint(juce::Graphics& g) {
                 g.setColour(palette::red);g.fillEllipse((float)x+7,(float)y+6,3.f,3.f);
             }
             if(cell.loop)
-                label(g,"↻",{autoStopVisibleRows.count(row.id) ? x+w-59 : x+w-19,
-                    y+5,15,15},13,palette::amber,true);
+                drawLoopIcon(g,{autoStopVisibleRows.count(row.id) ? x+w-59 : x+w-19,
+                    y+5,15,15},palette::amber);
             if (autoStopVisibleRows.count(row.id)) {
                 const bool active=row.stopOnNext&&cell.stopOnNext;
                 g.setColour(active?palette::teal.withAlpha(.27f):palette::amber.withAlpha(.16f));
@@ -209,6 +227,8 @@ void CueGrid::paint(juce::Graphics& g) {
         g.setColour(palette::line.withAlpha(.66f));
         g.drawHorizontalLine(y+rowHeight-1,0,(float)getWidth());
     }
+    // The add-cue button is part of the scrolled grid and is always last.
+    smallButton(g,"+",{nameWidth/2-18,headerHeight+(int)show.rows.size()*rowHeight+7,36,29},true);
 }
 
 void CueGrid::showCellMenu(int row,int column,juce::Point<int> screenPoint) {
@@ -296,6 +316,17 @@ void CueGrid::mouseDown(const juce::MouseEvent& e) {
     if (!e.mods.isLeftButtonDown()) return;
     owner.grabKeyboardFocus();
     if (e.x<0 || e.y<0) return;
+    const int addColumnX=columnX((int)owner.show.columns.size())+6;
+    if (e.y>=16 && e.y<47 && e.x>=addColumnX && e.x<addColumnX+31) {
+        owner.showColumnMenu(e.getScreenPosition());
+        return;
+    }
+    const int addCueY=headerHeight+(int)owner.show.rows.size()*rowHeight+7;
+    if (e.y>=addCueY && e.y<addCueY+29 &&
+        e.x>=nameWidth/2-18 && e.x<nameWidth/2+18) {
+        owner.addCue();
+        return;
+    }
     if (e.y<headerHeight) {
         if (column<0) return;
         const auto& col=owner.show.columns[(size_t)column];
@@ -420,7 +451,7 @@ void CueMetricsOverlay::paint(juce::Graphics& g) {
     g.fillAll(palette::raised);
     g.setColour(palette::teal);g.fillRect(0,0,3,getHeight());
     label(g,"BPM",{7,18,50,23},11,palette::text,true);
-    label(g,"AUTO STOP",{72,18,76,23},10,palette::text,true);
+    label(g,"AUTO STOP",{80,18,78,23},10,palette::text,true);
     const int scroll=owner.viewport.getViewPositionY();
     const int first=std::max(0,(scroll-CueGrid::headerHeight)/CueGrid::rowHeight);
     const int last=std::min((int)owner.show.rows.size(),
@@ -432,18 +463,18 @@ void CueMetricsOverlay::paint(juce::Graphics& g) {
         g.fillRect(3,y,getWidth()-3,CueGrid::rowHeight);
         const auto cueTone=CueGrid::cueColour(row.colour);
         if (row.colour>0) {
-            g.setColour(cueTone.withAlpha(.20f));g.fillRect(3,y,getWidth()-3,CueGrid::rowHeight);
+            g.setColour(cueTone.withAlpha(.28f));g.fillRect(3,y,getWidth()-3,CueGrid::rowHeight);
         }
         label(g,juce::String(row.tempo.front().bpm,1),{7,y+14,61,24},14,palette::text,true);
         g.setColour(row.stopOnNext?palette::teal.withAlpha(.3f):palette::muted.withAlpha(.2f));
-        g.fillRoundedRectangle(77.f,(float)y+12,31.f,19.f,9.f);
+        g.fillRoundedRectangle(85.f,(float)y+12,31.f,19.f,9.f);
         g.setColour(row.stopOnNext?palette::teal:palette::muted);
-        g.fillEllipse(row.stopOnNext?93.f:80.f,(float)y+15,13.f,13.f);
-        label(g,row.stopOnNext?"ON":"OFF",{111,y+11,34,22},10,
+        g.fillEllipse(row.stopOnNext?101.f:88.f,(float)y+15,13.f,13.f);
+        label(g,row.stopOnNext?"ON":"OFF",{119,y+11,34,22},10,
               row.stopOnNext?palette::teal:palette::muted,true);
         const bool details=owner.grid.autoStopDetailsVisible(row.id);
-        label(g,details?"−":"+",
-              {89,y+36,24,20},15,details?palette::amber:palette::muted,true,
+        label(g,details?"-":"+",
+              {97,y+36,24,20},15,details?palette::amber:palette::muted,true,
               juce::Justification::centred);
         g.setColour(palette::line);
         g.drawHorizontalLine(y+CueGrid::rowHeight-1,0,(float)getWidth());
