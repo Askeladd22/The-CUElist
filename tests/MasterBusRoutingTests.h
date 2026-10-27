@@ -156,7 +156,7 @@ void masterBusRoutingTests() {
         addColumn(ui.show,ColumnType::osc,"OSC");
         auto* utility=cueViewFixtures::find<ColumnUtilities>(ui);
         utility->refresh();ui.resized();
-        auto* first=utility->getChildComponent(0);
+        auto* first=utility->getChildComponent(0)->getChildComponent(0);
         check(dynamic_cast<MasterSendButton*>(controlsV3::named(*first,"columnMasterSend"))!=nullptr,
               "Circular L/R control missing");
         check(dynamic_cast<juce::TextButton*>(controlsV3::named(*first,"columnDirectPrePost"))!=nullptr,
@@ -174,9 +174,9 @@ void masterBusRoutingTests() {
         check(!ui.show.columns[0].masterSend && ui.show.columns[0].directOutputEnabled &&
               !ui.show.columns[0].directPostFader && ui.show.masterOutput==4 &&
               !ui.show.safetyLimiterEnabled,"Routing controls did not update the model");
-        check(!controlsV3::named(*utility->getChildComponent(1),"columnGainDb")->isVisible(),
+        check(!controlsV3::named(*utility->getChildComponent(0)->getChildComponent(1),"columnGainDb")->isVisible(),
               "Audio changes made MIDI strip visible");
-        check(!controlsV3::named(*utility->getChildComponent(2),"columnGainDb")->isVisible(),
+        check(!controlsV3::named(*utility->getChildComponent(0)->getChildComponent(2),"columnGainDb")->isVisible(),
               "Audio changes made OSC strip visible");
     });
 }
