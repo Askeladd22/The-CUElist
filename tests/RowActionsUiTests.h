@@ -138,6 +138,28 @@ void rowActionsUiTests() {
         check(!ui.pasteRowAfter(0),"Incompatible row paste unexpectedly succeeded");
         check(encodeShow(ui.show)==before,"Invalid paste mutated show state");
     });
+    test("UI column removal evicts deleted audio without losing other decoded PCM",[] {
+        MainComponent ui(false);
+        addColumn(ui.show,ColumnType::audio,"Second audio");
+        const int removedCellId=ui.show.rows[0].cells[0].id;
+        const int retainedCellId=ui.show.rows[0].cells[1].id;
+        const int retainedColumnId=ui.show.columns[1].id;
+        auto removed=std::make_shared<AudioClip>();
+        removed->sampleRate=48000; removed->samples.setSize(1,64); removed->samples.clear();
+        auto retained=std::make_shared<AudioClip>();
+        retained->sampleRate=48000; retained->samples.setSize(1,64); retained->samples.clear();
+        ui.clips[removedCellId]=removed;
+        ui.clips[retainedCellId]=retained;
+        ui.deleteColumn(0);
+        check(ui.show.columns.size()==1 && ui.show.columns[0].id==retainedColumnId,
+              "UI removed the wrong audio column");
+        check(ui.show.rows[0].cells[0].id==retainedCellId,
+              "UI column removal changed identity of the surviving cell");
+        check(ui.clips.count(removedCellId)==0 && ui.clips.count(retainedCellId)==1 &&
+              ui.clips.at(retainedCellId)==retained,
+              "Deletion corrupted the PCM cache of retained cells");
+        check(validateShow(ui.show).wasOk(),"UI removed a column but retained an invalid show");
+    });
     test("removing last row preserves usable show with its default column name",[] {
         MainComponent ui(false);
         ui.deleteRow(0);
