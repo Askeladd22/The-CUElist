@@ -48,7 +48,7 @@ void workspaceLayoutTests() {
         const auto wide=calculateWorkspaceLayout({1647,895,0,467,1,72,62,184});
         check(wide.gridSize.x<=wide.viewport.getWidth(),
               "Roomy one-column show acquired unwanted horizontal scroll");
-        const auto many=calculateWorkspaceLayout({1180,820,0,290+9*136,25,72,62,184});
+        const auto many=calculateWorkspaceLayout({1180,820,0,290+9*152,25,72,62,184});
         check(many.gridSize.x>many.viewport.getWidth() &&
               many.gridSize.y>=72+25*62+44,
               "Long cue list failed to reserve scrolling space");
