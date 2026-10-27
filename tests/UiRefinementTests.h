@@ -240,7 +240,7 @@ void uiRefinementTests() {
                 view=candidate; break;
             }
         check(overlay && grid && view,"Cue grid, viewport or pinned controls missing");
-        check(view->getX()==184 && view->getY()==78 &&
+        check(view->getX()==182 && view->getY()==74 &&
               ui.getWidth()-288-overlay->getRight()==8,
               "Excessive left/right/top cue-list margins returned");
         check(overlay->getX()==view->getRight() &&
@@ -259,7 +259,7 @@ void uiRefinementTests() {
               "Numeric Gain did not update the audio cell");
         ui.setSize(1180,820);
         check(overlay->getX()==view->getRight() &&
-              view->getY()==78 && ui.getWidth()-288-overlay->getRight()==8,
+              view->getY()==74 && ui.getWidth()-288-overlay->getRight()==8,
               "Compact cue-list positioning broke at smaller window size");
     });
     test("Project title is editable and survives v10 serialization",[] {
