@@ -254,6 +254,13 @@ void MainComponent::paint(juce::Graphics& g) {
     g.fillAll(palette::background);
     g.setColour(palette::raised); g.fillRect(0,0,w,72);
     g.setColour(palette::panel); g.fillRect(0,73,180,h-73);
+    // A collapsed MIDI/OSC editor retains a 36px docking region while
+    // its editor component is hidden. Paint the reserved panel background
+    // so the Timeline splitter borders a real panel, not a black stripe.
+    if (geometry.dockEditor.getHeight()>0) {
+        g.setColour(palette::panel);
+        g.fillRect(geometry.dockEditor);
+    }
     g.setColour(palette::teal); g.fillRect(0,0,w,3);
     g.setColour(palette::line); g.drawHorizontalLine(72,0,(float)w);
     g.drawVerticalLine(180,73,(float)h);
