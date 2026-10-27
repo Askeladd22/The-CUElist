@@ -218,7 +218,7 @@ void uiRefinementTests() {
         check(overlay && view && grid,"Fixed cue controls or grid missing");
         const int pinnedX=overlay->getX();
         check(overlay->getWidth()==CueMetricsOverlay::width &&
-              pinnedX==view->getRight()-CueMetricsOverlay::width,
+              pinnedX==view->getRight(),
               "BPM and Auto Stop are not anchored to the viewport edge");
         view->setViewPosition(180,0);
         check(overlay->getX()==pinnedX,"Cue metrics moved with horizontally scrolled columns");
@@ -240,10 +240,10 @@ void uiRefinementTests() {
                 view=candidate; break;
             }
         check(overlay && grid && view,"Cue grid, viewport or pinned controls missing");
-        check(view->getX()==192 && view->getY()==86 &&
-              ui.getWidth()-288-view->getRight()==8,
+        check(view->getX()==184 && view->getY()==78 &&
+              ui.getWidth()-288-overlay->getRight()==8,
               "Excessive left/right/top cue-list margins returned");
-        check(overlay->getRight()==view->getRight() &&
+        check(overlay->getX()==view->getRight() &&
               overlay->getWidth()==CueMetricsOverlay::width &&
               CueMetricsOverlay::width>=180,
               "BPM/Auto Stop column lost its padded fixed position");
@@ -258,8 +258,8 @@ void uiRefinementTests() {
         check(std::abs(juce::Decibels::gainToDecibels(ui.show.rows[0].cells[0].gain,-60.0f)-5.5f)<0.06f,
               "Numeric Gain did not update the audio cell");
         ui.setSize(1180,820);
-        check(overlay->getRight()==view->getRight() &&
-              view->getY()==86 && ui.getWidth()-288-view->getRight()==8,
+        check(overlay->getX()==view->getRight() &&
+              view->getY()==78 && ui.getWidth()-288-overlay->getRight()==8,
               "Compact cue-list positioning broke at smaller window size");
     });
     test("Project title is editable and survives v10 serialization",[] {
