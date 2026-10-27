@@ -20,7 +20,7 @@ juce::String duration(double seconds) {
 MainComponent::MainComponent(bool startAudio) {
     setLookAndFeel(&theme); setWantsKeyboardFocus(true); setSize(1440,900);
     for (juce::Component* c : std::initializer_list<juce::Component*>{&openButton,&saveButton,&newButton,&addRowButton,&addColumnButton,
-         &goButton,&panicButton,&deviceButton,&controlButton,&dockResize,&importButton,&midiEditButton,&oscEditButton,&playCellButton,&stopCellButton,&clearButton,&tempoButton,&applyButton,
+         &goButton,&panicButton,&deviceButton,&controlButton,&dockResize,&timelineResize,&importButton,&midiEditButton,&oscEditButton,&playCellButton,&stopCellButton,&clearButton,&tempoButton,&applyButton,
          &cellTab,&rowTab,&rowGain,&rowBehaviour,&rowMute,&rowLoop,&rowName,&cellName,&bpm,&behaviour,&follow,&loop,&cellAutoStop,&gainDb,&viewport,&timeline,&utilities,
          &clipCollapseButton,&clipCloseButton,&cueHeaders,&cueMetrics,&preflightButton,&diagnosticsButton,&preferencesButton,&projectNameLabel}) addAndMakeVisible(c);
     for (auto* b : {&openButton,&saveButton,&newButton,&addRowButton,&addColumnButton,&goButton,&panicButton,&deviceButton,&controlButton,
@@ -244,7 +244,8 @@ WorkspaceLayout MainComponent::workspaceLayout() const {
     const int activeDockHeight=docked ? (clipCollapsed ? 36 : dockHeight) : 0;
     return calculateWorkspaceLayout({getWidth(),getHeight(),activeDockHeight,
         grid.columnX((int)show.columns.size()),(int)show.rows.size(),
-        CueGrid::headerHeight,CueGrid::rowHeight,CueMetricsOverlay::width});
+        CueGrid::headerHeight,CueGrid::rowHeight,CueMetricsOverlay::width,
+        CueGrid::nameWidth,timelineHeightAdjustment});
 }
 
 void MainComponent::paint(juce::Graphics& g) {
@@ -382,6 +383,8 @@ void MainComponent::resized() {
         }
     }
     timeline.setBounds(geometry.timeline);
+    timelineResize.setBounds(geometry.timelineResize);
+    timelineResize.toFront(false);
     const int x=geometry.inspectorLeft, inner=geometry.inspectorInnerWidth;
     cellTab.setVisible(false);rowTab.setVisible(false);
     rowBehaviour.setVisible(false);rowMute.setVisible(false);rowGain.setVisible(false);

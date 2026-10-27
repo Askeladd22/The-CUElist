@@ -15,6 +15,7 @@ struct WorkspaceLayoutInput {
     int rowHeight=62;
     int pinnedMetricsWidth=184;
     int pinnedHeaderWidth=290;
+    int timelineHeightAdjustment=0; // user drag, positive enlarges Timeline
 };
 
 struct WorkspaceLayout {
@@ -23,12 +24,14 @@ struct WorkspaceLayout {
     int inspectorInnerWidth=236;
     int dockY=0;
     int effectiveDockHeight=0; // the visible dock size after fitting the window
+    int effectiveTimelineAdjustment=0;
     float inspectorScale=1.0f;
 
     juce::Rectangle<int> viewport;
     juce::Rectangle<int> utilities;
     juce::Rectangle<int> timeline;
     juce::Rectangle<int> dockEditor;
+    juce::Rectangle<int> timelineResize;
     juce::Rectangle<int> dockResize;
     juce::Rectangle<int> dockCollapse;
     juce::Rectangle<int> dockClose;

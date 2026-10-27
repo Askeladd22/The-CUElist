@@ -36,7 +36,7 @@ public:
     static juce::Colour cueColour(int id);
     bool isInterestedInFileDrag(const juce::StringArray&) override;
     void filesDropped(const juce::StringArray&,int,int) override;
-    static constexpr int rowHeight=62, headerHeight=72, nameWidth=290, columnWidth=136, compressedWidth=48;
+    static constexpr int rowHeight=62, headerHeight=72, nameWidth=290, columnWidth=152, compressedWidth=48;
     static constexpr int rowContentInset=4; // visual padding, used by both paint and hit-testing
 private:
     MainComponent& owner;
@@ -251,6 +251,29 @@ private:
     UtilityIcon masterMute{false};
     juce::ComboBox masterOutput;
     LimiterToggle safetyLimiter;
+    struct TimelineResizeHandle : juce::Component, juce::SettableTooltipClient {
+        explicit TimelineResizeHandle(MainComponent& p) : owner(p) {
+            setName("timelineResizeHandle");
+            setTooltip("Drag vertically to resize the Timeline");
+            setMouseCursor(juce::MouseCursor::UpDownResizeCursor);
+        }
+        void paint(juce::Graphics& g) override {
+            g.setColour(palette::muted);
+            g.fillRoundedRectangle(getLocalBounds().toFloat()
+                .withSizeKeepingCentre(86,3),1.5f);
+        }
+        void mouseDown(const juce::MouseEvent&) override {
+            original=owner.workspaceLayout().effectiveTimelineAdjustment;
+        }
+        void mouseDrag(const juce::MouseEvent& e) override {
+            owner.timelineHeightAdjustment=juce::jlimit(-600,400,
+                original-e.getDistanceFromDragStartY());
+            owner.resized();
+            owner.repaint();
+        }
+        MainComponent& owner;
+        int original=0;
+    } timelineResize{*this};
     struct DockResizeHandle : juce::Component, juce::SettableTooltipClient {
         explicit DockResizeHandle(MainComponent& p) : owner(p) { setMouseCursor(juce::MouseCursor::UpDownResizeCursor); }
         void paint(juce::Graphics& g) override { g.setColour(palette::muted); g.fillRoundedRectangle(getLocalBounds().toFloat().withSizeKeepingCentre(76,3),1.5f); }
@@ -288,6 +311,7 @@ private:
     int clipEditorCellId=-1;
     bool clipCollapsed=false;
     int dockHeight=208;
+    int timelineHeightAdjustment=0;
     std::optional<Row> copiedRow;
     std::vector<std::shared_ptr<const AudioClip>> copiedRowAudio;
     bool insertCopiedRowAfter(int index, const Row&, const std::vector<std::shared_ptr<const AudioClip>>&);
