@@ -3,8 +3,8 @@
 namespace cuelist {
 namespace palette {
 // Midnight Console: deliberate luminance steps keep adjacent dark surfaces legible.
-inline const juce::Colour background{0xff0a111b}, panel{0xff121f2d}, raised{0xff1a2b3c}, line{0xff314354};
-inline const juce::Colour text{0xffedf3f8}, muted{0xffa9b9c9}, teal{0xff2dd4bf}, amber{0xfff2c16b}, purple{0xffa78bfa}, red{0xfff87171};
+inline const juce::Colour background{0xff09131f}, panel{0xff16283a}, raised{0xff253d54}, line{0xff3a536a};
+inline const juce::Colour text{0xfff1f6fa}, muted{0xffb1c4d4}, teal{0xff30ead2}, amber{0xffffc96d}, purple{0xffb399f4}, red{0xffff7881};
 inline juce::Colour type(int i) { return i==0 ? teal : i==1 ? amber : i==2 ? purple : juce::Colour(0xff79b8ff); }
 }
 // Segoe UI is shipped with supported Windows versions, with JUCE fallback.
@@ -41,9 +41,9 @@ public:
         setColour(juce::ScrollBar::thumbColourId,palette::line.brighter(0.3f));
     }
     juce::Font getTextButtonFont(juce::TextButton&,int height) override {
-        return font(height<26 ? 12.0f : 14.0f,true);
+        return font(height<26 ? 12.5f : 15.0f,true);
     }
-    juce::Font getComboBoxFont(juce::ComboBox&) override { return font(13.5f); }
+    juce::Font getComboBoxFont(juce::ComboBox&) override { return font(14.5f); }
     void drawButtonBackground(juce::Graphics& g,juce::Button& b,const juce::Colour& colour,bool over,bool down) override {
         const auto r=b.getLocalBounds().toFloat().reduced(0.8f);
         const auto fill=colour.withMultipliedBrightness(down ? 0.87f : over ? 1.14f : 1.0f);
