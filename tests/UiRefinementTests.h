@@ -390,12 +390,14 @@ void uiRefinementTests() {
         check(ui.addMappingBinding(gain),"Could not assign gain fader to controller");
         ui.setAudioFaderCeilingDb(0);
         ui.dispatchControlForTest({"controller",ControlKind::cc,1,27,64,false});
-        near(ui.show.masterGain,64.0/127.0,0.0002);
+        check(std::abs(ui.show.masterGain-64.0/127.0)<0.0002,
+              "Intermediate MIDI CC did not span the full 0 dB fader range");
         ui.dispatchControlForTest({"controller",ControlKind::cc,1,27,127,false});
         near(ui.show.masterGain,1.0);
         ui.setAudioFaderCeilingDb(6);
         ui.dispatchControlForTest({"controller",ControlKind::cc,1,27,127,false});
-        near(ui.show.masterGain,std::pow(10.0,6.0/20.0),0.0002);
+        check(std::abs(ui.show.masterGain-std::pow(10.0,6.0/20.0))<0.0002,
+              "Full MIDI CC value did not reach the +6 dB ceiling");
         ui.setAudioFaderCeilingDb(prior);
     });
 
