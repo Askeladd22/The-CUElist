@@ -138,10 +138,13 @@ void Timeline::changeZoom(double factor,double anchor) {
     viewStart=point-anchor*visibleLength(); syncViewport(); repaint();
 }
 void Timeline::paint(juce::Graphics& g) {
-    syncViewport(); g.fillAll(palette::panel);
+    syncViewport();g.fillAll(palette::panel);
+    g.setColour(palette::raised.withAlpha(.68f));
+    g.fillRect(0,0,getWidth(),45);
+    g.setColour(palette::teal);g.fillRoundedRectangle(9.0f,9.0f,3.0f,27.0f,1.5f);
     if (owner.selectedRow<0 || owner.selectedRow>=(int)owner.show.rows.size()) return;
     const auto& row=owner.show.rows[owner.selectedRow];
-    label(g,"TIMELINE",{16,11,110,23},13,palette::teal,true);
+    label(g,"TIMELINE",{20,11,110,23},14,palette::text,true);
     label(g,"GRID",{143,11,52,23},11,palette::muted,true);
     label(g,"SNAP",{370,11,35,23},11,palette::muted,true);
     for (int i=0;i<3;++i) {
@@ -219,9 +222,10 @@ void Timeline::paint(juce::Graphics& g) {
         const auto colour=palette::type((int)owner.show.columns[c].type);
         const float x=(float)(timelineStart+area*(cell.startSeconds-viewStart)/length), width=std::max(4.0f,(float)(area*seconds/length));
         g.saveState(); g.reduceClipRegion(timelineStart,tracksTop,area,std::max(0,bottom-tracksTop));
-        g.setColour(colour.withAlpha(c==owner.selectedColumn ? .22f : .12f)); g.fillRoundedRectangle(x,(float)y,width,31,4);
-        g.setColour(colour.withAlpha(.6f)); g.drawRoundedRectangle(x,(float)y,width,31,4,1);
-        g.setColour(colour.withAlpha(.4f));
+        g.setColour(colour.withAlpha(c==owner.selectedColumn ? .45f : .28f));
+        g.fillRoundedRectangle(x,(float)y,width,31,5);
+        g.setColour(colour.withAlpha(.86f)); g.drawRoundedRectangle(x,(float)y,width,31,5,1.2f);
+        g.setColour(colour.withAlpha(.66f));
         if (cell.osc) {
             for (const auto& event:cell.osc->events) {
                 const double moment=cell.osc->useBeats ? secondsAtBeat(row.tempo,event.time) : event.time;
