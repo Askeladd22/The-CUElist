@@ -17,7 +17,8 @@ void gainMeterFaderTests() {
         near(GainMeterFader::yForDb(0,top,bottom,0),top);
         near(GainMeterFader::toLinear(GainMeterFader::silenceDb),0);
         near(GainMeterFader::toLinear(0),1);
-        near(GainMeterFader::toLinear(6),std::pow(10.0,6.0/20.0),0.0001);
+        check(std::abs(GainMeterFader::toLinear(6)-std::pow(10.0,6.0/20.0))<0.0001,
+              "6 dB ceiling has incorrect linear gain");
         check(GainMeterFader::yForDb(6,top,bottom)<GainMeterFader::yForDb(0,top,bottom),
               "Positive gain drawn below unity on the +6 dB scale");
     });
