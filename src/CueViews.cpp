@@ -417,7 +417,7 @@ void CueMetricsOverlay::paint(juce::Graphics& g) {
         g.fillEllipse(row.stopOnNext?93.f:80.f,(float)y+15,13.f,13.f);
         label(g,row.stopOnNext?"ON":"OFF",{111,y+11,34,22},10,
               row.stopOnNext?palette::teal:palette::muted,true);
-        const bool details=owner.grid.autoStopVisibleRows.count(row.id)>0;
+        const bool details=owner.grid.autoStopDetailsVisible(row.id);
         label(g,details?"−":"+",
               {89,y+36,24,20},15,details?palette::amber:palette::muted,true,
               juce::Justification::centred);

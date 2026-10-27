@@ -583,7 +583,7 @@ void MainComponent::setAutoStop(int row,bool enabled) {
     if (row<0 || row>=(int)show.rows.size()) return;
     show.rows[row].stopOnNext=enabled; dirty=true; engine.publish(makeRenderState(show,clips));
     status=enabled ? "The row will stop on another cue's GO." : "The row will continue after another cue's GO.";
-    grid.repaint(); repaint();
+    grid.repaint(); cueMetrics.repaint(); repaint();
 }
 void MainComponent::setCellAutoStop(int row,int column,bool enabled) {
     if (row<0 || row>=(int)show.rows.size() || column<0 || column>=(int)show.columns.size()) return;
@@ -640,7 +640,7 @@ void MainComponent::timerCallback() {
     }
     utilities.syncScroll(viewport.getViewPositionX()); utilities.refreshRouting(); grid.repaint();
     displayPeak=std::max(engine.peak.load(),displayPeak*.88f);
-    utilities.refreshMeters(); repaint(); timeline.repaint();
+    utilities.refreshMeters(); repaint(); timeline.repaint(); cueMetrics.repaint();
 }
 void MainComponent::withDiscardConfirmation(std::function<void()> action) {
     if (!hasUnsavedChanges()) { action(); return; }

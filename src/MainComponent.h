@@ -26,6 +26,7 @@ public:
     int columnAt(int x) const;
     int totalColumnsWidth() const;
     void toggleAutoStopDetails(int row);
+    bool autoStopDetailsVisible(int rowId) const { return autoStopVisibleRows.count(rowId)>0; }
     static juce::Colour cueColour(int id);
     bool isInterestedInFileDrag(const juce::StringArray&) override;
     void filesDropped(const juce::StringArray&,int,int) override;

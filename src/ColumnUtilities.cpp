@@ -96,12 +96,13 @@ struct ColumnUtilities::Strip final : juce::Component {
         gain.setGainDb(juce::Decibels::gainToDecibels(col.gain,-60.0f));
         pan.setValue(col.pan,juce::dontSendNotification); mute.setToggleState(col.muted,juce::dontSendNotification);
         phase.setToggleState(col.phaseInverted,juce::dontSendNotification);
-        for (juce::Component* control : std::initializer_list<juce::Component*>{&gain,&pan,&mute,&phase}) control->setVisible(col.type==ColumnType::audio);
-        oscDestination.setVisible(col.type==ColumnType::osc);
-        output.setVisible(col.type==ColumnType::audio || col.type==ColumnType::midi);
+        for (juce::Component* control : std::initializer_list<juce::Component*>{&gain,&pan,&mute,&phase}) control->setVisible(col.type==ColumnType::audio && !col.collapsed);
+        oscDestination.setVisible(col.type==ColumnType::osc && !col.collapsed);
+        output.setVisible(!col.collapsed && (col.type==ColumnType::audio || col.type==ColumnType::midi));
         const bool control=col.type==ColumnType::control;
-        controlLock.setVisible(control);controlPriority.setVisible(control);
-        controlEdit.setVisible(control);
+        controlLock.setVisible(control && !col.collapsed);
+        controlPriority.setVisible(control && !col.collapsed);
+        controlEdit.setVisible(control && !col.collapsed);
         if (control) {
             controlLock.setButtonText(col.controlLocked ? "Unlock" : "Lock");
             controlPriority.setButtonText(col.controlLocked ? "Low" :
@@ -171,7 +172,8 @@ struct ColumnUtilities::Strip final : juce::Component {
         controlEdit.setBounds(8,44,w-16,32);
     }
     void paint(juce::Graphics& g) override {
-        const auto colType=owner.show.columns[(size_t)index].type;
+        const auto& col=owner.show.columns[(size_t)index];
+        const auto colType=col.type;
         const auto inset=juce::Rectangle<float>(4.0f,4.0f,
             (float)std::max(1,getWidth()-8),(float)std::max(1,getHeight()-8));
         g.setColour(palette::raised.withAlpha(.58f));g.fillRoundedRectangle(inset,8.0f);
@@ -179,7 +181,14 @@ struct ColumnUtilities::Strip final : juce::Component {
         g.setColour(palette::type((int)colType));
         g.fillRoundedRectangle(9.0f,3.0f,(float)std::max(1,getWidth()-18),3.0f,1.5f);
         g.setColour(palette::line); g.drawVerticalLine(0,0,(float)getHeight());
-        if (owner.show.columns[(size_t)index].type==ColumnType::control) {
+        if (col.collapsed) {
+            label(g,colType==ColumnType::audio ? "A" : colType==ColumnType::midi ? "M" :
+                  colType==ColumnType::osc ? "O" : "C",
+                  {5,30,std::max(1,getWidth()-10),26},13,palette::type((int)colType),
+                  true,juce::Justification::centred);
+            return;
+        }
+        if (colType==ColumnType::control) {
             const auto& col=owner.show.columns[(size_t)index];
             label(g,col.controlLocked ? "DEFAULT / ALL CUES" : "CUE-SPECIFIC",
                   {7,91,getWidth()-14,22},11,palette::teal,true);
@@ -230,7 +239,8 @@ void ColumnUtilities::resized() {
     owner.masterPan.setBounds(214-scrollX,38,49,49);
     owner.masterMute.setBounds(222-scrollX,130,37,33);
     for (size_t i=0;i<strips.size();++i)
-        strips[i]->setBounds(CueGrid::nameWidth+(int)i*CueGrid::columnWidth-scrollX,1,CueGrid::columnWidth,getHeight()-2);
+        strips[i]->setBounds(owner.grid.columnX((int)i)-scrollX,1,
+                              owner.grid.columnWidthAt((int)i),getHeight()-2);
 }
 void ColumnUtilities::paint(juce::Graphics& g) {
     g.fillAll(palette::panel);

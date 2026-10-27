@@ -304,6 +304,7 @@ void Timeline::mouseDown(const juce::MouseEvent& e) {
     const auto& row=owner.show.rows[owner.selectedRow];
     for (int c=0;c<(int)row.cells.size();++c) {
         if (track++!=wanted) continue;
+        if (owner.show.columns[c].collapsed) return;
         if (owner.show.columns[c].type==ColumnType::control) {
             owner.editControlSet(owner.selectedRow,c); return;
         }
@@ -335,6 +336,7 @@ void Timeline::mouseDoubleClick(const juce::MouseEvent& e) {
     const double position=viewStart+(e.x-timelineStart)*visibleLength()/area;
     for (int c=0;c<(int)row.cells.size();++c) {
         if (track++!=wanted) continue;
+        if (owner.show.columns[c].collapsed) return;
         const auto& cell=row.cells[(size_t)c];
         if (owner.show.columns[c].type==ColumnType::control) {
             owner.editControlSet(owner.selectedRow,c); return;
