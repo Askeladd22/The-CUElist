@@ -25,7 +25,7 @@ void workspaceLayoutTests() {
                  {1180,820},{1440,900},{1647,895},{1920,1080}}) {
             const auto g=calculateWorkspaceLayout({dimensions.x,dimensions.y,0,467,3,72,62,184});
             check(g.viewport.getX()==182 && g.viewport.getY()==74 &&
-                  g.editorX-g.metrics.getRight()==8,
+                  g.editorX-g.metrics.getRight()==0,
                   "Cue-list gutters changed on window resizing");
             check(g.metrics.getX()==g.viewport.getRight() &&
                   g.metrics.getY()==g.viewport.getY() &&
