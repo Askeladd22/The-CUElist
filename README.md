@@ -1,4 +1,4 @@
-# The Cuelist
+# The CUElist
 
 **The Cuelist** is a Windows desktop application for **controlling audio and MIDI cues in theatre productions, concerts, and live events**. It lets operators arrange, start, stop, and overlap sound cues from a single interface.
 
