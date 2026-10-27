@@ -19,7 +19,20 @@ void MidiOutputRouter::refresh() {
     const juce::ScopedLock lock(deviceLock);
     for (const auto& route:routes) {
         bool found=false; for (const auto& d:available) if (d.identifier==route.first) { found=true; break; }
-        if (!found && devices[(size_t)route.second]) closeRoute(route.second);
+        const int index=route.second;
+        if (!found && devices[(size_t)index]) closeRoute(index);
+        else if (found && !devices[(size_t)index]) {
+            // Reconnect ONLY the operator-configured device ID. Never silently
+            // substitute another MIDI port. Old packets are invalidated by
+            // resetTimes and stream epochs.
+            devices[(size_t)index]=juce::MidiOutput::openDevice(route.first);
+            if (devices[(size_t)index]) {
+                resetTimes[(size_t)index]=juce::Time::getMillisecondCounterHiRes();
+                for (auto& pair:streams) if (pair.second->route==index) {
+                    pair.second->epoch.fetch_add(1,std::memory_order_release);
+                }
+            }
+        }
     }
 }
 juce::Result MidiOutputRouter::open(const juce::String& id,bool reconnect) {
@@ -51,7 +64,9 @@ bool MidiOutputRouter::queueMappedCc(const juce::String& id,int channel,int cc,i
     if (open(id).failed()) return false;
     const juce::ScopedLock lock(deviceLock);
     const auto it=routes.find(id);
-    if (it==routes.end() || mappedCommands.size()>=512) return false;
+    if (it==routes.end() || mappedCommands.size()>=512) {
+        dropped.fetch_add(1,std::memory_order_relaxed); return false;
+    }
     mappedCommands.push_back({it->second,channel,cc,value});
     return true;
 }
@@ -74,7 +89,10 @@ void MidiOutputRouter::emit(int route,int status,int a,int b,int offset) noexcep
     if (route<0 || emergency.load(std::memory_order_relaxed)) return;
     const auto w=write.load(std::memory_order_relaxed);
     const auto next=(w+1)%capacity;
-    if (next==read.load(std::memory_order_acquire)) { emergency.store(true); return; }
+    if (next==read.load(std::memory_order_acquire)) {
+        dropped.fetch_add(1,std::memory_order_relaxed);
+        emergency.store(true); return;
+    }
     (*queue)[w]={route,status,a,b,blockTime+offset*sampleMillis,selected,selected ? selected->epoch.load() : 0,blockTime}; write.store(next,std::memory_order_release);
 }
 void MidiOutputRouter::emergencyStop() noexcept { emergency.store(true); }
@@ -98,8 +116,11 @@ void MidiOutputRouter::run() {
                 for (const auto& message:mappedCommands)
                     if (message.route>=0 && (size_t)message.route<devices.size() &&
                         devices[(size_t)message.route])
-                        devices[(size_t)message.route]->sendMessageNow(
-                            juce::MidiMessage::controllerEvent(message.channel,message.cc,message.value));
+                        {
+                            devices[(size_t)message.route]->sendMessageNow(
+                                juce::MidiMessage::controllerEvent(message.channel,message.cc,message.value));
+                            sent.fetch_add(1,std::memory_order_relaxed);
+                        }
                 mappedCommands.clear();
                 for (auto& pair:streams) {
                     auto& s=*pair.second; const auto epoch=s.epoch.load();
@@ -112,7 +133,8 @@ void MidiOutputRouter::run() {
                 }
                 auto r=read.load(std::memory_order_relaxed); const auto w=write.load(std::memory_order_acquire);
                 while (r!=w) {
-                    if (pending.size()<capacity) pending.push_back((*queue)[r]); else emergency.store(true);
+                    if (pending.size()<capacity) pending.push_back((*queue)[r]);
+                    else {dropped.fetch_add(1,std::memory_order_relaxed);emergency.store(true);}
                     r=(r+1)%capacity;
                 }
                 read.store(r,std::memory_order_release);
@@ -127,9 +149,13 @@ void MidiOutputRouter::run() {
                     if ((p.status&0xf0)==0x90) {
                         ++total; if (p.stream) ++p.stream->sounding[key];
                         devices[(size_t)p.route]->sendMessageNow(juce::MidiMessage(p.status,p.a,p.b));
+                        sent.fetch_add(1,std::memory_order_relaxed);
                     } else if (p.stream && p.stream->sounding[key]) {
                         total-=std::min(total,(unsigned)p.stream->sounding[key]); p.stream->sounding[key]=0;
-                        if (!total) devices[(size_t)p.route]->sendMessageNow(juce::MidiMessage(p.status,p.a,p.b));
+                        if (!total) {
+                            devices[(size_t)p.route]->sendMessageNow(juce::MidiMessage(p.status,p.a,p.b));
+                            sent.fetch_add(1,std::memory_order_relaxed);
+                        }
                     }
                 }
                 pending.erase(pending.begin(),end);

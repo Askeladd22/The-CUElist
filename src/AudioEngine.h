@@ -134,6 +134,17 @@ public:
     std::atomic<int> monitoredRowId {0};
     std::atomic<double> playheadSeconds {0};
     std::atomic<bool> rowPlaying {false};
+    struct Diagnostics {
+        unsigned audioCommandsDropped=0, midiOutputDropped=0, midiOutputSent=0,
+                 oscDropped=0, oscSent=0;
+    };
+    Diagnostics diagnostics() const noexcept {
+        return {commandDrops.load(std::memory_order_relaxed),
+                midiRouter.dropped.load(std::memory_order_relaxed),
+                midiRouter.sent.load(std::memory_order_relaxed),
+                oscRouter.dropped.load(std::memory_order_relaxed),
+                oscRouter.sent.load(std::memory_order_relaxed)};
+    }
 private:
     MidiOutputRouter midiRouter;
     OscOutputRouter oscRouter;
@@ -151,6 +162,7 @@ private:
     RenderState* current = nullptr; // accessed only by audio callback, then destructor after removal
     uint64_t revision = 0, handledEpoch = 0, structuralRevision = 0;
     std::atomic<uint64_t> panicEpoch {0};
+    std::atomic<unsigned> commandDrops {0};
     double deviceSampleRate = 48000;
     void audioDeviceIOCallbackWithContext(const float* const*, int, float* const*, int, int,
                                          const juce::AudioIODeviceCallbackContext&) override;

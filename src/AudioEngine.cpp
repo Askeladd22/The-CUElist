@@ -507,7 +507,9 @@ CellPlaybackInfo AudioEngine::getCellPlayback(int cellId) const noexcept {
 bool AudioEngine::send(int id,bool row,bool stop) noexcept {
     const unsigned w=writeIndex.load(std::memory_order_relaxed);
     const unsigned next=(w+1)%commands.size();
-    if (next==readIndex.load(std::memory_order_acquire)) return false;
+    if (next==readIndex.load(std::memory_order_acquire)) {
+        commandDrops.fetch_add(1,std::memory_order_relaxed);return false;
+    }
     commands[w]={id,row,stop,revision,panicEpoch.load()};
     writeIndex.store(next,std::memory_order_release); return true;
 }
@@ -515,7 +517,9 @@ bool AudioEngine::seekRow(int id,double seconds) noexcept {
     if (!std::isfinite(seconds)) return false;
     const unsigned w=writeIndex.load(std::memory_order_relaxed);
     const unsigned next=(w+1)%commands.size();
-    if (next==readIndex.load(std::memory_order_acquire)) return false;
+    if (next==readIndex.load(std::memory_order_acquire)) {
+        commandDrops.fetch_add(1,std::memory_order_relaxed);return false;
+    }
     commands[w]={id,true,false,revision,panicEpoch.load(),true,std::max(0.0,seconds)};
     writeIndex.store(next,std::memory_order_release); return true;
 }
