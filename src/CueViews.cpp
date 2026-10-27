@@ -18,17 +18,32 @@ void smallButton(juce::Graphics& g, const juce::String& text, juce::Rectangle<in
 }
 // Draw the loop glyph as vector geometry: never rely on a missing Unicode glyph.
 void drawLoopIcon(juce::Graphics& g,juce::Rectangle<int> bounds,juce::Colour colour) {
+    // JUCE arc angles are clockwise from 12 o'clock, not the conventional
+    // cos(x)/sin(y) coordinate system. The arrow must use the same convention
+    // and follow the tangent at the arc endpoint to remain aligned at 13-15 px.
     const auto centre=bounds.toFloat().getCentre();
-    const float radius=std::min(bounds.getWidth(),bounds.getHeight())*.32f;
-    const float start=-2.35f,end=2.35f;
-    juce::Path loopPath;
-    loopPath.addCentredArc(centre.x,centre.y,radius,radius,0.0f,start,end,true);
+    const float side=(float)std::min(bounds.getWidth(),bounds.getHeight());
+    const float radius=side*0.33f;
+    constexpr float from=1.92f;
+    const float to=juce::MathConstants<float>::twoPi+0.64f;
+    juce::Path circle;
+    circle.addCentredArc(centre.x,centre.y,radius,radius,0.0f,from,to,true);
     g.setColour(colour);
-    g.strokePath(loopPath,juce::PathStrokeType(1.7f));
-    const float ax=centre.x+radius*std::cos(end);
-    const float ay=centre.y+radius*std::sin(end);
+    g.strokePath(circle,juce::PathStrokeType(1.55f,juce::PathStrokeType::curved,
+                                           juce::PathStrokeType::rounded));
+
+    const juce::Point<float> end{centre.x+radius*std::sin(to),
+                                 centre.y-radius*std::cos(to)};
+    const juce::Point<float> tangent{std::cos(to),std::sin(to)};
+    const juce::Point<float> normal{-tangent.y,tangent.x};
+    const float headLength=side*0.26f;
+    const float halfWidth=side*0.14f;
+    const auto tip=end+tangent*(headLength*0.48f);
+    const auto base=end-tangent*(headLength*0.52f);
     juce::Path arrow;
-    arrow.addTriangle(ax-3.0f,ay-3.1f,ax+3.8f,ay-2.0f,ax+1.0f,ay+3.5f);
+    const auto left=base+normal*halfWidth;
+    const auto right=base-normal*halfWidth;
+    arrow.addTriangle(tip.x,tip.y,left.x,left.y,right.x,right.y);
     g.fillPath(arrow);
 }
 void transportButton(juce::Graphics& g,juce::Rectangle<int> box,bool stop,bool enabled) {
