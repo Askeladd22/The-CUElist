@@ -5,16 +5,16 @@ void workspaceLayoutTests() {
     test("Workspace geometry preserves the 0.9 desktop cue/mixer/timeline arrangement",[] {
         const auto geometry=calculateWorkspaceLayout({1647,895,0,467,1,72,62,184});
         check(geometry.editorX==1359 &&
-              geometry.viewport==juce::Rectangle<int>(192,86,1159,355),
+              geometry.viewport==juce::Rectangle<int>(184,78,983,363),
               "Desktop viewport changed the agreed cue-list gutters");
-        check(geometry.utilities==juce::Rectangle<int>(192,441,1159,208) &&
+        check(geometry.utilities==juce::Rectangle<int>(184,441,983,208) &&
               geometry.utilities.getY()==geometry.viewport.getBottom(),
               "Utility mixer no longer meets the cue-list viewport");
-        check(geometry.timeline==juce::Rectangle<int>(192,663,1159,185),
+        check(geometry.timeline==juce::Rectangle<int>(184,663,983,185),
               "Timeline position changed without a layout request");
-        check(geometry.metrics==juce::Rectangle<int>(1167,86,184,355),
+        check(geometry.metrics==juce::Rectangle<int>(1167,78,184,363),
               "BPM/Auto Stop is no longer pinned to the viewport edge");
-        check(geometry.inspectorPanel==juce::Rectangle<int>(1359,154,268,694),
+        check(geometry.inspectorPanel==juce::Rectangle<int>(1359,84,268,763),
               "Inspector outer card moved");
         check(geometry.gridSize.x<=geometry.viewport.getWidth(),
               "Single-column show acquired unwanted horizontal scrolling");
@@ -24,10 +24,10 @@ void workspaceLayoutTests() {
         for (const auto& dimensions:std::initializer_list<juce::Point<int>>{
                  {1180,820},{1440,900},{1647,895},{1920,1080}}) {
             const auto g=calculateWorkspaceLayout({dimensions.x,dimensions.y,0,467,3,72,62,184});
-            check(g.viewport.getX()==192 && g.viewport.getY()==86 &&
-                  g.editorX-g.viewport.getRight()==8,
+            check(g.viewport.getX()==184 && g.viewport.getY()==78 &&
+                  g.editorX-g.metrics.getRight()==8,
                   "Cue-list gutters changed on window resizing");
-            check(g.metrics.getRight()==g.viewport.getRight() &&
+            check(g.metrics.getX()==g.viewport.getRight() &&
                   g.metrics.getY()==g.viewport.getY() &&
                   g.metrics.getHeight()==g.viewport.getHeight(),
                   "Pinned metrics drifted when window dimensions changed");
@@ -41,20 +41,18 @@ void workspaceLayoutTests() {
 
     test("Scrollable cue columns reserve pinned BPM/Auto Stop clearance",[] {
         const auto compact=calculateWorkspaceLayout({1180,820,0,467,1,72,62,184});
-        // The contextual add-column '+' extends 37px beyond columnEndX.
-        // At the minimum window width its right edge is behind the fixed
-        // 184px BPM/Auto Stop overlay. That narrow-window scroll is needed
-        // to reach the control and must not be mistaken for phantom space.
-        check(compact.gridSize.x>compact.viewport.getWidth(),
-              "Compact grid must scroll to expose its add-column control");
+        // BPM/Auto Stop is outside the viewport. A one-column show no
+        // longer pays a phantom right-overlay scrolling penalty.
+        check(compact.gridSize.x<=compact.viewport.getWidth(),
+              "Single-column grid should not acquire phantom horizontal scrolling");
         const auto wide=calculateWorkspaceLayout({1647,895,0,467,1,72,62,184});
         check(wide.gridSize.x<=wide.viewport.getWidth(),
               "Roomy one-column show acquired unwanted horizontal scroll");
-        const auto many=calculateWorkspaceLayout({1180,820,0,315+9*152,25,72,62,184});
+        const auto many=calculateWorkspaceLayout({1180,820,0,290+9*136,25,72,62,184});
         check(many.gridSize.x>many.viewport.getWidth() &&
               many.gridSize.y>=72+25*62+44,
               "Long cue list failed to reserve scrolling space");
-        check(many.metrics.getRight()==compact.metrics.getRight(),
+        check(many.metrics.getX()==compact.metrics.getX(),
               "Pinned BPM location changed with column count");
     });
 
@@ -132,7 +130,7 @@ void workspaceLayoutTests() {
               collapsed.effectiveDockHeight==36 &&
               closed.effectiveDockHeight==0,
               "Previously fitting dock states must remain unchanged");
-        check(normal.viewport.getY()==86 && normal.viewport.getHeight()==170 &&
+        check(normal.viewport.getY()==78 && normal.viewport.getHeight()==178 &&
               normal.timeline.getBottom()==773,
               "Default compact layout geometry unexpectedly changed");
         check(collapsed.timeline.getBottom()==773 &&
