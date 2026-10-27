@@ -86,6 +86,13 @@ juce::Result prepareDeletedCue(const Show& current, int index,
 
     prepared.rows.erase(prepared.rows.begin()+index);
     if (prepared.rows.empty()) addRow(prepared,{});
+    // A locked Control Column can remember which cue supplied its default
+    // mapping. After that cue is deleted, unlocking already uses a safe
+    // surviving-cue fallback; clear the stale source identity explicitly.
+    for (auto& column:prepared.columns)
+        if (column.type==ColumnType::control &&
+            column.controlDefaultSourceRowId==removedId)
+            column.controlDefaultSourceRowId=0;
 
     auto& bindings=prepared.controls.bindings;
     bindings.erase(std::remove_if(bindings.begin(),bindings.end(),
