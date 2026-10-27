@@ -7,7 +7,7 @@
 - Crash-recovery snapshots: validated, atomic, reference original media rather than duplicating it; after an interrupted process the operator chooses whether to restore. The current saved show and its backup are never overwritten by recovery.
 - Application-level Preflight: checks model validity, media existence/emptiness, audio device status, configured MIDI output IDs, MIDI controller presence and OSC endpoint configuration. It intentionally does not claim OSC delivery.
 - Preparation before activation: when opening a show, decode, load media and check the memory budget before interrupting playback. MIDI output handles are selected after those checks.
-- Transport telemetry: counters for local audio command overflow, MIDI input drops, MIDI output sent/dropped messages and OSC UDP sent/dropped packets; a visible Diagnostics report.
+- Transport telemetry: counters for local audio command overflow, MIDI input drops, MIDI output sent/dropped messages, OSC UDP sent/dropped packets and output-worker dispatches exceeding 10 ms past their scheduled timestamp; a visible Diagnostics report. The 10 ms counters describe local scheduling delays, not measured physical-interface or network-receiver latency.
 - Compiler cleanliness: shadowed `cursor` and `dockHeight` locals renamed.
 - Tests: recovery atomicity/corruption, preflight failures and no false positive OSC reachability, offline audio callback stress, sample timestamp consistency at common rates. Windows CI also extracts and smoke-launches the portable program.
 
