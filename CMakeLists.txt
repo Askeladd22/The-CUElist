@@ -28,4 +28,4 @@ target_sources(TheCuelist PRIVATE src/ControlUI.cpp src/Main.cpp src/MainCompone
 target_link_libraries(TheCuelist PRIVATE CuelistCore CuelistAssets)
 
 # Product version and distributable name are derived from VERSION.txt.
-target_compile_definitions(TheCuelist PRIVATE THE_CUELIST_VERSION="${THE_CUELIST_DISPLAY_VERSION}")
+target_compile_definitions(TheCuelist PRIVATE THE_CUELIST_VERSION=\"${THE_CUELIST_DISPLAY_VERSION}\")
