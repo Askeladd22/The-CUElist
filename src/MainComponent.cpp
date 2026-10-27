@@ -33,7 +33,7 @@ MainComponent::MainComponent(bool startAudio) {
     for (juce::Component* c : std::initializer_list<juce::Component*>{&openButton,&saveButton,&newButton,&addRowButton,&addColumnButton,
          &goButton,&panicButton,&deviceButton,&controlButton,&dockResize,&importButton,&midiEditButton,&oscEditButton,&playCellButton,&stopCellButton,&clearButton,&tempoButton,&applyButton,
          &cellTab,&rowTab,&rowGain,&rowBehaviour,&rowMute,&rowLoop,&rowName,&cellName,&bpm,&behaviour,&follow,&loop,&cellAutoStop,&gain,&viewport,&timeline,&utilities,
-         &clipCollapseButton,&clipCloseButton}) addAndMakeVisible(c);
+         &clipCollapseButton,&clipCloseButton,&cueMetrics}) addAndMakeVisible(c);
     for (auto* b : {&openButton,&saveButton,&newButton,&addRowButton,&addColumnButton,&goButton,&panicButton,&deviceButton,&controlButton,
                     &importButton,&midiEditButton,&oscEditButton,&playCellButton,&stopCellButton,&clearButton,&tempoButton,&applyButton}) b->setWantsKeyboardFocus(false);
     viewport.setViewedComponent(&grid,false); viewport.setScrollBarsShown(true,true);
@@ -192,17 +192,15 @@ void MainComponent::paint(juce::Graphics& g) {
     label(g,"ON DECK",{20,h-333,145,16},11,palette::amber,true);
     label(g,nextCue<(int)show.rows.size() ? "NEXT  /  "+juce::String(nextCue+1).paddedLeft('0',2) :
           "END OF SHOW",{20,h-314,148,24},17,palette::text,true);
-    label(g,"OUTPUT",{20,h-172,130,18},11,palette::muted,true);
-    g.setColour(palette::raised); g.fillRoundedRectangle(20.0f,(float)h-145,138,7,3);
-    g.setColour(displayPeak>.97f ? palette::red : palette::teal); g.fillRoundedRectangle(20.0f,(float)h-145,138*displayPeak,7,3);
-    label(g,juce::String(engine.activeVoices.load())+" playing cells",{20,h-128,150,22},11,palette::muted);
+    // Output meter removed from the sidebar; audio peak telemetry remains
+    // available in the Master and channel meters.
     label(g,"SPACE   Next cue",{20,h-84,150,20},12,palette::muted);
     label(g,"ESC          Panic",{20,h-61,150,20},12,palette::muted);
     g.setColour(palette::teal); g.fillRoundedRectangle(204.0f,88.0f,4.0f,45.0f,2.0f);
     label(g,"SESSION / CUE CONTROL",{219,89,390,32},25,palette::text,true);
     label(g,"SHOW WORKSPACE   •   AUDIO  /  MIDI  /  OSC  /  CONTROL",{219,124,510,20},12,palette::muted,true);
 
-    constexpr int inspectorWidth=360, inspectorInner=308;
+    constexpr int inspectorWidth=288, inspectorInner=236;
     auto panel=juce::Rectangle<int>(editorX,154,inspectorWidth-20,h-201);
     g.setColour(palette::panel); g.fillRoundedRectangle(panel.toFloat(),9);
     g.setColour(palette::line); g.drawRoundedRectangle(panel.toFloat(),9,1.25f);
@@ -215,9 +213,10 @@ void MainComponent::paint(juce::Graphics& g) {
     label(g,"INSPECTOR",{x+10,169,200,19},13,palette::teal,true);
     const auto& col=show.columns[selectedColumn];
     label(g,"CUE "+juce::String(selectedRow+1).paddedLeft('0',2),{x+10,195,140,28},22,palette::text,true);
-    label(g,typeName(col.type),{x+185,200,112,21},13,palette::type((int)col.type),true,juce::Justification::centredRight);
+    label(g,typeName(col.type),{x+131,200,98,21},11,palette::type((int)col.type),true,juce::Justification::centredRight);
     g.saveState();
-    if (h<890) { const float factor=juce::jlimit(0.70f,1.0f,(float)(h-232)/658.0f); g.addTransform(juce::AffineTransform(1,0,0,0,factor,226*(1-factor))); }
+    { const float factor=juce::jlimit(0.72f,0.92f,(float)(h-232)/730.0f);
+      g.addTransform(juce::AffineTransform(1,0,0,0,factor,226*(1-factor))); }
     label(g,"Cue name",{x,235,inspectorInner,18},13,palette::text,true);
     label(g,"Initial BPM",{x,303,inspectorInner,18},13,palette::text,true);
     g.setColour(palette::line); g.drawHorizontalLine(405,(float)x,(float)x+inspectorInner);
@@ -237,7 +236,7 @@ void MainComponent::paint(juce::Graphics& g) {
     label(g,status,{204,h-35,std::max(1,editorX-218),25},12,palette::muted);
 }
 void MainComponent::resized() {
-    const int w=getWidth(),h=getHeight(); editorX=w-360;
+    const int w=getWidth(),h=getHeight(); editorX=w-288;
     newButton.setBounds(w-190,23,68,29); openButton.setBounds(w-116,23,46,29); saveButton.setBounds(w-64,23,52,29);
     deviceButton.setBounds(20,188,140,33);
     controlButton.setBounds(std::max(506,w-666),22,144,30);
@@ -276,8 +275,8 @@ void MainComponent::resized() {
         }
     }
     timeline.setBounds(204,dockY+dockHeight,editorX-220,std::max(75,h-gridHeight-dockHeight-215));
-    const int x=editorX+16, inner=308;
-    cellTab.setBounds(x,198,148,31); rowTab.setBounds(x+156,198,152,31);
+    const int x=editorX+16, inner=236;
+    cellTab.setBounds(x,198,112,30); rowTab.setBounds(x+118,198,118,30);
     rowBehaviour.setBounds(x,479,inner,33); rowMute.setBounds(x,527,inner,24);
     rowLoop.setBounds(x,553,inner,24); rowGain.setBounds(x,610,inner,29);
     rowName.setBounds(x,258,inner,35); bpm.setBounds(x,326,inner,35);
@@ -289,25 +288,28 @@ void MainComponent::resized() {
     midiEditButton.setBounds(x,673,inner,34);
     oscEditButton.setBounds(x,673,inner,34);
     importButton.setBounds(x,722,inner,35);
-    playCellButton.setBounds(x,765,176,33); stopCellButton.setBounds(x+184,765,inner-184,33);
-    clearButton.setBounds(x,804,140,31); applyButton.setBounds(x+148,804,inner-148,31);
+    playCellButton.setBounds(x,765,132,33); stopCellButton.setBounds(x+138,765,inner-138,33);
+    clearButton.setBounds(x,804,105,31); applyButton.setBounds(x+111,804,inner-111,31);
     // Compact inspector on smaller displays, keeping all actions reachable.
-    if (h<890) {
-        const float factor=juce::jlimit(0.70f,1.0f,(float)(h-232)/658.0f);
+    {
+        const float factor=juce::jlimit(0.72f,0.92f,(float)(h-232)/730.0f);
         for (juce::Component* c : std::initializer_list<juce::Component*>{&rowBehaviour,&rowMute,&rowLoop,&rowGain,&rowName,&bpm,&tempoButton,&cellName,&behaviour,&follow,&loop,&cellAutoStop,&gain,&importButton,&midiEditButton,&oscEditButton,&playCellButton,&stopCellButton,&clearButton,&applyButton}) {
             auto b=c->getBounds(); b.setY(226+(int)((b.getY()-226)*factor)); b.setHeight(std::max(22,(int)(b.getHeight()*factor))); c->setBounds(b);
         }
     }
     goButton.setBounds(14,h-282,152,48);
     panicButton.setBounds(14,h-228,152,48);
-    grid.setSize(std::max(viewport.getWidth()-14,CueGrid::nameWidth+(int)show.columns.size()*CueGrid::columnWidth+205),
+    grid.setSize(std::max(viewport.getWidth()-14,grid.columnX((int)show.columns.size())+CueMetricsOverlay::width),
                  std::max(viewport.getHeight()-14,CueGrid::headerHeight+(int)show.rows.size()*CueGrid::rowHeight));
+    cueMetrics.setBounds(viewport.getRight()-CueMetricsOverlay::width,viewport.getY(),
+                         CueMetricsOverlay::width,viewport.getHeight());
+    cueMetrics.toFront(false);
 }
 void MainComponent::refresh() {
     selectedRow=juce::jlimit(0,(int)show.rows.size()-1,selectedRow);
     selectedColumn=juce::jlimit(0,(int)show.columns.size()-1,selectedColumn);
     syncClipEditor(); syncOscEditor(); refreshInspector(); utilities.refresh(); resized();
-    repaint(); grid.repaint(); timeline.repaint();
+    repaint(); grid.repaint(); timeline.repaint(); cueMetrics.repaint();
 }
 void MainComponent::refreshInspector() {
     const auto& row=show.rows[selectedRow]; const auto& c=row.cells[selectedColumn]; const auto& col=show.columns[selectedColumn];
@@ -355,9 +357,16 @@ void MainComponent::refreshInspector() {
         oscEditButton.setButtonText(col.controlLocked ? "Edit default Control Set" : "Edit Control Set");
         oscEditButton.setEnabled(true);
     }
+    if (col.collapsed && !rowSettings)
+        for (juce::Component* component : std::initializer_list<juce::Component*>{
+             &cellName,&behaviour,&follow,&loop,&gain,&cellAutoStop,
+             &importButton,&midiEditButton,&oscEditButton,
+             &playCellButton,&stopCellButton,&clearButton})
+            component->setEnabled(false);
 }
 bool MainComponent::select(int row,int column) {
     if (row<0 || row>=(int)show.rows.size() || column<0 || column>=(int)show.columns.size() || !applyInspector()) return false;
+    if (show.columns[(size_t)column].collapsed) return false;
     nextCue=row; selectedRow=row; selectedColumn=column; syncClipEditor(); syncOscEditor(); refreshInspector();
     const int top=CueGrid::headerHeight+row*CueGrid::rowHeight, bottom=top+CueGrid::rowHeight;
     int viewY=viewport.getViewPositionY();
