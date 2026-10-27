@@ -199,12 +199,12 @@ void MainComponent::paint(juce::Graphics& g) {
     label(g,"ON DECK",{20,h-333,145,16},11,palette::amber,true);
     label(g,nextCue<(int)show.rows.size() ? "NEXT  /  "+juce::String(nextCue+1).paddedLeft('0',2) :
           "END OF SHOW",{20,h-314,148,24},17,palette::text,true);
-    label(g,"OUTPUT",{20,h-198,130,18},11,palette::muted,true);
-    g.setColour(palette::raised); g.fillRoundedRectangle(20.0f,(float)h-164,138,7,3);
-    g.setColour(displayPeak>.97f ? palette::red : palette::teal); g.fillRoundedRectangle(20.0f,(float)h-164,138*displayPeak,7,3);
-    label(g,juce::String(engine.activeVoices.load())+" playing cells",{20,h-146,150,22},11,palette::muted);
-    label(g,"SPACE   Next cue",{20,h-92,150,20},12,palette::muted);
-    label(g,"ESC          Panic",{20,h-70,150,20},12,palette::muted);
+    label(g,"OUTPUT",{20,h-172,130,18},11,palette::muted,true);
+    g.setColour(palette::raised); g.fillRoundedRectangle(20.0f,(float)h-145,138,7,3);
+    g.setColour(displayPeak>.97f ? palette::red : palette::teal); g.fillRoundedRectangle(20.0f,(float)h-145,138*displayPeak,7,3);
+    label(g,juce::String(engine.activeVoices.load())+" playing cells",{20,h-128,150,22},11,palette::muted);
+    label(g,"SPACE   Next cue",{20,h-84,150,20},12,palette::muted);
+    label(g,"ESC          Panic",{20,h-61,150,20},12,palette::muted);
     g.setColour(palette::teal); g.fillRoundedRectangle(204.0f,88.0f,4.0f,45.0f,2.0f);
     label(g,"SESSION / CUE CONTROL",{219,89,390,32},25,palette::text,true);
     label(g,"SHOW WORKSPACE   •   AUDIO  /  MIDI  /  OSC  /  CONTROL",{219,124,510,20},12,palette::muted,true);
