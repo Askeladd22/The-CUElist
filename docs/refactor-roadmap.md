@@ -10,7 +10,7 @@
 - Build and run the Windows CTest suite before merging each phase. Physical interface rehearsal remains a separate acceptance gate.
 - The portable release/package workflow remains manual.
 
-## Phase 1 — completed in the refactor branch
+## Phase 1 — merged into feat/desktop-foundation
 
 **Goal:** isolate responsibilities without changing runtime behavior or data ownership.
 
@@ -21,11 +21,19 @@
 
 **Important limit:** phase 1 separates source boundaries, **not** model ownership. These methods are still `MainComponent` members. This is intentional: moving ownership or changing event ordering before regression tests would make this first step substantially riskier.
 
-## Phase 2 — cue editing boundaries (separate PR)
+## Phase 2 — cue editing boundaries (current PR)
 
-- Characterize row/cell copy, paste, duplicate, delete, selection and dependent Control Set bindings with focused tests.
-- Move cue and column editing operations into a dedicated compilation unit and, once characterized, a tested model-operation layer with explicit inputs/outputs.
-- Do not touch playback state inheritance or IDs except where a pure, regression-covered helper is introduced.
+**Phase 2a (implemented; awaiting CI):** split existing UI-owned editing commands by their responsibility, without changing logic, IDs, event ordering or ownership.
+
+- `src/CueOperations.cpp`: row colour/Auto Stop, add/rename/reorder/copy/duplicate/paste/delete cue, column add/reorder/delete/collapse, tempo/BPM edits and the transient editing dialogs.
+- `src/CellOperations.cpp`: cell swap/copy/paste/cut/delete, loop/follows-row toggles, clip timing and timeline seek.
+- `src/MainComponent.cpp`: retains transport, mixer/routing, event coordination, device handling and visual layout; moving method definitions into separate translation units keeps all existing caller contracts.
+- `CMakeLists.txt`: compile both modules in the application and tests.
+- Extend automated tests with row/column identity, typed-cell associations and cached PCM ownership while preserving existing copy/paste and row duplication test coverage.
+
+**Phase 2b (future separate PR):** after characterization and CI, factor selected *pure* show-model editing operations behind explicit inputs and outputs, preserving stable IDs and atomic failure semantics. This is deliberately not folded into the code-motion step.
+
+No existing audio callback, playback state inheritance, project schema or media-cache ownership changes are made in phase 2a.
 
 ## Phase 3 — workspace layout boundaries (separate PR)
 
