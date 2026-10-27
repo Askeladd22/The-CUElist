@@ -14,6 +14,7 @@ public:
     bool sendOscFloat(const juce::String& host,int port,const juce::String& address,float value);
     void clear();
     int droppedCount() const noexcept { return dropped.load(); }
+    uint64_t sentCount() const noexcept { return sent.load(std::memory_order_relaxed); }
 private:
     struct Packet {
         juce::String host,address;
@@ -23,6 +24,7 @@ private:
     juce::CriticalSection queueLock;
     std::deque<Packet> queue;
     std::atomic<int> dropped{0};
+    std::atomic<uint64_t> sent{0};
     static constexpr size_t maxQueue=512;
     void run() override;
 };
