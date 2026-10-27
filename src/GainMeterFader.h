@@ -3,6 +3,7 @@
 #include <array>
 #include <functional>
 #include <cmath>
+#include <limits>
 
 namespace cuelist {
 
@@ -11,7 +12,12 @@ namespace cuelist {
 // Fader numbers are relative gain (dB); meter bars represent pre-master dBFS.
 class GainMeterFader final : public juce::Component, public juce::SettableTooltipClient {
 public:
-    static constexpr float minDb=-60.0f, maxDb=12.0f;
+    static constexpr float minDb=-60.0f, maxDb=6.0f;
+    static constexpr float silenceDb=-std::numeric_limits<float>::infinity();
+    static float fromLinear(float gain) noexcept { return gain<=0 ? silenceDb : 20.0f*std::log10(gain); }
+    static float toLinear(float db) noexcept { return db==silenceDb ? 0.0f : juce::Decibels::decibelsToGain(db); }
+    float maximumDb() const noexcept {return ceilingDb;}
+    void setMaximumDb(int ceiling) { const float next=ceiling==0 ? 0.0f : 6.0f; if (ceilingDb!=next) {ceilingDb=next;repaint();} }
     std::function<void(float)> onGainChanged;
 
     GainMeterFader() {
@@ -24,24 +30,26 @@ public:
     // Calibrated logarithmic taper: unity sits around 75% of the travel.
     // Both meter marks and the thumb use the same invertible transformation.
     // Saved values remain unchanged dB, converted to linear gain only for PCM.
-    static float yForDb(float db,float top,float bottom) noexcept {
+    static float yForDb(float db,float top,float bottom,float ceilingDb=maxDb) noexcept {
         if (bottom<=top) return top;
-        const double fraction=(juce::jlimit(minDb,maxDb,db)-minDb)/(maxDb-minDb);
+        const double fraction=(juce::jlimit(minDb,ceilingDb,db)-minDb)/(ceilingDb-minDb);
         const double position=std::expm1(fraction*std::log(3.0))/2.0;
         return bottom-(float)position*(bottom-top);
     }
-    static float dbForY(float y,float top,float bottom) noexcept {
+    static float dbForY(float y,float top,float bottom,float ceilingDb=maxDb) noexcept {
         if (bottom<=top) return minDb;
         const double position=juce::jlimit(0.0,1.0,(double)(bottom-y)/(bottom-top));
-        return (float)(minDb+(maxDb-minDb)*std::log1p(2.0*position)/std::log(3.0));
+        if (position<=0.0) return silenceDb;
+        return (float)(minDb+(ceilingDb-minDb)*std::log1p(2.0*position)/std::log(3.0));
     }
     bool isCompact() const noexcept {return compact;}
     void setCompact(bool value) {if(compact!=value){compact=value;repaint();}}
     float getGainDb() const noexcept { return gainDb; }
     void setGainDb(float value,bool notify=false) {
-        if (!std::isfinite(value)) return;
-        const auto next=juce::jlimit(minDb,maxDb,std::round(value*10.0f)*0.1f);
-        if (std::abs(next-gainDb)<0.001f) return;
+        if (std::isnan(value) || value==std::numeric_limits<float>::infinity()) return;
+        // Incoming project gain is never modified merely by changing range.
+        const auto next=value==silenceDb ? silenceDb : std::round(value*10.0f)*0.1f;
+        if (next==gainDb || (std::isfinite(next) && std::isfinite(gainDb) && std::abs(next-gainDb)<0.001f)) return;
         gainDb=next; repaint();
         if (notify && onGainChanged) onGainChanged(gainDb);
     }
@@ -75,10 +83,12 @@ private:
     std::array<Peak,2> peaks {};
     float gainDb=0.0f;
     bool compact=false;
+    float ceilingDb=6.0f;
     float topY() const noexcept { return compact ? 7.0f : 12.0f; }
     float bottomY() const noexcept { return (float)std::max(15,getHeight()-(compact ? 19 : 35)); }
     void setFromMouse(float y) {
-        const auto db=std::round(dbForY(y,topY(),bottomY())*10.0f)*0.1f;
+        const auto raw=dbForY(y,topY(),bottomY(),ceilingDb);
+        const auto db=raw==silenceDb ? raw : std::round(raw*10.0f)*0.1f;
         setGainDb(db,true);
     }
 };
