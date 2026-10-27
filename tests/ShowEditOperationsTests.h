@@ -141,6 +141,36 @@ void showEditOperationsTests() {
               "Removing the final column failed to create a usable Audio column");
         check(validateShow(columnResult).wasOk(),"Final-column fallback is invalid");
     });
+    test("deleting locked Control Set source cue clears only stale source reference",[] {
+        auto source=makeShow();
+        addColumn(source,ColumnType::control,"Lighting");
+        addRow(source,"Surviving cue");
+        auto& control=source.columns[1];
+        const int removedRowId=source.rows[0].id;
+        control.controlLocked=true;
+        control.controlPriority=1;
+        control.controlDefaultSourceRowId=removedRowId;
+        ControlBinding defaultBinding;
+        defaultBinding.id=source.controls.nextId++;
+        defaultBinding.deviceId="lighting";
+        defaultBinding.number=41;
+        defaultBinding.target=ControlTarget::go;
+        control.controlDefaultSet.bindings.push_back(defaultBinding);
+        check(validateShow(source).wasOk(),"Locked default source fixture invalid");
+
+        Show output;
+        std::vector<int> removed;
+        check(prepareDeletedCue(source,0,output,removed).wasOk(),
+              "Cannot delete the cue originally supplying a locked default");
+        check(output.columns[1].controlDefaultSourceRowId==0 &&
+              output.columns[1].controlLocked &&
+              output.columns[1].controlDefaultSet.bindings.size()==1 &&
+              output.columns[1].controlDefaultSet.bindings[0].id==defaultBinding.id,
+              "Deleted source cue left an orphan reference or dropped the locked default");
+        check(source.columns[1].controlDefaultSourceRowId==removedRowId,
+              "Preparing deletion altered the original locked source cue");
+        check(validateShow(output).wasOk(),"Deleting locked default source produced invalid show");
+    });
     test("deleted audio column cleans global gain/pan mappings and every Control Set layer",[] {
         auto source=makeShow();
         addColumn(source,ColumnType::audio,"Remaining audio");
