@@ -1,5 +1,6 @@
 #pragma once
 #include "ProjectSafety.h"
+#include "TransportTiming.h"
 
 void stabilityV7Tests() {
     test("Preflight flags missing files, unavailable MIDI outputs and unverifiable OSC",[] {
@@ -87,4 +88,19 @@ void stabilityV7Tests() {
         check(engine.activeVoices.load()==0,
               "Panic left voices running after offline stress");
     });
+    test("MIDI/OSC block timestamps agree to sample precision at 44.1 and 48 kHz",[] {
+        const double blockOrigin=123456.75;
+        for(const double rate:{44100.0,48000.0,96000.0}) {
+            const double msPerSample=1000.0/rate;
+            near(scheduleOutputMillis(blockOrigin,0,msPerSample),blockOrigin);
+            near(scheduleOutputMillis(blockOrigin,441,msPerSample),
+                 blockOrigin+441.0*1000.0/rate);
+            near(scheduleOutputMillis(blockOrigin,-10,msPerSample),blockOrigin);
+            check(scheduleOutputMillis(blockOrigin,512,msPerSample)>
+                  scheduleOutputMillis(blockOrigin,256,msPerSample),
+                  "Non-monotonic output event order");
+        }
+        near(scheduleOutputMillis(blockOrigin,10,0),blockOrigin);
+    });
+
 }
