@@ -52,7 +52,8 @@ void cueTransportUXTests() {
             controlsV3::named(*midi,"columnDataOutputMute"));
         auto* oscMute=dynamic_cast<juce::ToggleButton*>(
             controlsV3::named(*osc,"columnDataOutputMute"));
-        midiMute->triggerClick();oscMute->triggerClick();
+        cueViewFixtures::click(*midiMute,midiMute->getWidth()*.5f,midiMute->getHeight()*.5f);
+        cueViewFixtures::click(*oscMute,oscMute->getWidth()*.5f,oscMute->getHeight()*.5f);
         check(ui.show.columns[1].muted && ui.show.columns[2].muted,
               "Collapsed MIDI/OSC mute is not functional");
         check(ui.engine.getOscColumnSent(ui.show.columns[2].id)==0,
