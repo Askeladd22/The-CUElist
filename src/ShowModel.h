@@ -17,6 +17,7 @@ struct Column {
     juce::String midiOutputId;
     juce::String oscHost="127.0.0.1";
     int oscPort=9000;
+    bool collapsed=false; // visual-only: all clips and routes stay intact
     bool controlLocked=false;
     int controlPriority=2; // 1=Low (locked), 2=Medium, 3=High, 4=Maximum
     ControlSet controlDefaultSet;
@@ -40,6 +41,7 @@ struct Row {
     int id = 0; juce::String name; std::vector<TempoPoint> tempo {{}}; std::vector<Cell> cells;
     float gain = 1.0f;
     int mappingPresetId=0;
+    int colour=0; // 0=automatic; 1..7 are operator cue colours
     bool muted = false, loop = false, overrideBehaviour = false, stopOnNext = true;
     Behaviour behaviour = Behaviour::retrigger;
 };

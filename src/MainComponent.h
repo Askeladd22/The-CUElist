@@ -20,16 +20,32 @@ public:
     void mouseDoubleClick(const juce::MouseEvent&) override;
     void mouseDrag(const juce::MouseEvent&) override;
     void mouseUp(const juce::MouseEvent&) override;
-    void showRowMenu(int row);
+    void showRowMenu(int row,juce::Point<int> clickPosition);
+    int columnX(int index) const;
+    int columnWidthAt(int index) const;
+    int columnAt(int x) const;
+    int totalColumnsWidth() const;
+    void toggleAutoStopDetails(int row);
+    static juce::Colour cueColour(int id);
     bool isInterestedInFileDrag(const juce::StringArray&) override;
     void filesDropped(const juce::StringArray&,int,int) override;
-    static constexpr int rowHeight=86, headerHeight=72, nameWidth=370, columnWidth=192;
-    static constexpr int rowContentInset=16; // visual padding, used by both paint and hit-testing
+    static constexpr int rowHeight=62, headerHeight=72, nameWidth=315, columnWidth=152, compressedWidth=48;
+    static constexpr int rowContentInset=4; // visual padding, used by both paint and hit-testing
 private:
     MainComponent& owner;
     int dragRow=-1, dragColumn=-1, dropRow=-1, dropColumn=-1;
     std::set<int> autoStopVisibleRows;
     bool dragging=false;
+};
+class CueMetricsOverlay final : public juce::Component {
+public:
+    explicit CueMetricsOverlay(MainComponent& parent):owner(parent) {}
+    void paint(juce::Graphics&) override;
+    void mouseDown(const juce::MouseEvent&) override;
+    void mouseWheelMove(const juce::MouseEvent&,const juce::MouseWheelDetails&) override;
+    static constexpr int width=148;
+private:
+    MainComponent& owner;
 };
 class Timeline final : public juce::Component, private juce::ScrollBar::Listener {
 public:
@@ -147,6 +163,8 @@ public:
     int activeCueMappingId() const noexcept { return activeCueId; }
     void setColumnOutput(int column,int output);
     void setAutoStop(int row,bool enabled);
+    void setRowColour(int row,int colour);
+    void toggleColumnCollapsed(int column);
     void setCellAutoStop(int row,int column,bool enabled);
     void renameTitle(bool column,int index);
     void reorderRow(int index,int delta);
@@ -171,10 +189,10 @@ public:
     int selectedRow=0, selectedColumn=0;
     AudioEngine engine;
 private:
-    friend class CueGrid; friend class Timeline; friend class MidiUndoAction; friend class ColumnUtilities; friend class ControlPanel;
+    friend class CueGrid; friend class CueMetricsOverlay; friend class Timeline; friend class MidiUndoAction; friend class ColumnUtilities; friend class ControlPanel;
     Theme theme;
     juce::TooltipWindow tooltip{this,600};
-    CueGrid grid{*this}; Timeline timeline{*this}; juce::Viewport viewport;
+    CueGrid grid{*this}; CueMetricsOverlay cueMetrics{*this}; Timeline timeline{*this}; juce::Viewport viewport;
     ColumnUtilities utilities{*this};
     juce::TextButton openButton{"Open"},saveButton{"Save"},newButton{"New"},addRowButton{"+ Cue"},addColumnButton{"+ Column"};
     juce::TextButton goButton{"GO  /  SPACE"},panicButton{"PANIC  /  ESC"},deviceButton{"Audio devices"},controlButton{"CONTROL MAPPING"};

@@ -86,7 +86,7 @@ juce::Result validateShow(const Show& show) {
     }
     for (const auto& row : show.rows) {
         if (!unique(row.id) || row.cells.size()!=show.columns.size() || row.tempo.empty()
-            || !std::isfinite(row.gain) || row.gain < 0 || row.gain > 4 || (int)row.behaviour < 0 || (int)row.behaviour > 3) return fail("Invalid row.");
+            || row.colour<0 || row.colour>7 || !std::isfinite(row.gain) || row.gain < 0 || row.gain > 4 || (int)row.behaviour < 0 || (int)row.behaviour > 3) return fail("Invalid row.");
         double previous = -1;
         for (const auto& p : row.tempo) {
             if (!std::isfinite(p.beat) || p.beat < 0 || p.beat <= previous || (previous < 0 && p.beat != 0)
@@ -265,7 +265,7 @@ juce::String encodeShow(const Show& show) {
     juce::Array<juce::var> columns, rows;
     for (const auto& c : show.columns) columns.add(object({{"id",c.id},{"name",c.name},{"type",(int)c.type},{"output",c.output},
         {"gain",c.gain},{"pan",c.pan},{"muted",c.muted},{"phaseInverted",c.phaseInverted},{"midiOutputId",c.midiOutputId},{"oscHost",c.oscHost},{"oscPort",c.oscPort},
-        {"controlLocked",c.controlLocked},{"controlPriority",c.controlPriority},
+        {"collapsed",c.collapsed},{"controlLocked",c.controlLocked},{"controlPriority",c.controlPriority},
         {"controlDefaultSourceRowId",c.controlDefaultSourceRowId},
         {"controlDefaultSet",controlSetObject(c.controlDefaultSet)}}));
     for (const auto& r : show.rows) {
@@ -318,7 +318,7 @@ juce::String encodeShow(const Show& show) {
         }
         rows.add(object({{"id",r.id},{"name",r.name},{"tempo",tempo},{"cells",cells},{"gain",r.gain},
             {"muted",r.muted},{"loop",r.loop},{"overrideBehaviour",r.overrideBehaviour},{"behaviour",(int)r.behaviour},{"stopOnNext",r.stopOnNext},
-            {"mappingPresetId",r.mappingPresetId}}));
+            {"mappingPresetId",r.mappingPresetId},{"colour",r.colour}}));
     }
     juce::Array<juce::var> presets,bindings;
     for (const auto& preset:show.controls.presets)
@@ -402,6 +402,7 @@ juce::Result decodeShow(const juce::String& text, Show& destination) {
                 column.muted=boolean(c,"muted"); column.phaseInverted=boolean(c,"phaseInverted");
             }
             if (auto* obj=c.getDynamicObject()) {
+                if (obj->hasProperty("collapsed")) column.collapsed=boolean(c,"collapsed");
                 if (obj->hasProperty("controlLocked")) column.controlLocked=boolean(c,"controlLocked");
                 if (obj->hasProperty("controlPriority")) column.controlPriority=integer(c,"controlPriority");
                 if (obj->hasProperty("controlDefaultSourceRowId"))
