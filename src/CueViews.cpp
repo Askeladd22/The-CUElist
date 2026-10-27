@@ -42,9 +42,9 @@ void CueGrid::paint(juce::Graphics& g) {
         g.setColour(colour.withAlpha(.09f));
         g.fillRect(x,5,columnWidth-1,headerHeight-6);
         label(g,columnTypeName(show.columns[c].type),{x+10,11,78,20},12,colour,true);
-        smallButton(g,"<",{x+88,11,20,20},c>0);
-        smallButton(g,">",{x+112,11,20,20},c+1<(int)show.columns.size());
-        smallButton(g,"x",{x+136,11,20,20},true,true);
+        smallButton(g,"<",{x+columnWidth-72,11,20,20},c>0);
+        smallButton(g,">",{x+columnWidth-48,11,20,20},c+1<(int)show.columns.size());
+        smallButton(g,"x",{x+columnWidth-24,11,20,20},true,true);
         // Older projects may still contain unnamed columns: show meaningful
         // type-specific numbering without rewriting their saved metadata.
         int ordinal=0;
@@ -91,12 +91,12 @@ void CueGrid::paint(juce::Graphics& g) {
         g.fillRoundedRectangle(84.0f,(float)y+12,48,33,5);
         label(g,"GO",{84,y+12,48,33},15,palette::background,true,juce::Justification::centred);
         label(g,row.name.isEmpty() ? "Untitled cue" : row.name,
-              {142,y+5,nameWidth-250,28},17,palette::text,true);
+              {142,y+5,nameWidth-215,28},17,palette::text,true);
         const juce::String cueState=playing ? "PLAYING" : paused ? "PAUSED" :
                                     next ? "NEXT CUE" : row.muted ? "MUTED" : "STANDBY";
         const auto stateColour=playing ? palette::teal : next || paused ? palette::amber : palette::muted;
         label(g,juce::String(r+1).paddedLeft('0',2)+"  /  "+cueState,
-              {142,y+32,nameWidth-248,19},12,stateColour,true);
+              {142,y+32,nameWidth-215,19},12,stateColour,true);
         transportButton(g,{nameWidth-36,y+17,26,22},true,true);
         for (int c=0;c<(int)show.columns.size();++c) {
             const int x=nameWidth+c*columnWidth; const auto& cell=row.cells[c];
@@ -230,9 +230,9 @@ void CueGrid::mouseDown(const juce::MouseEvent& e) {
         const int local=e.x-nameWidth-column*columnWidth;
         if (e.y>=11 && e.y<31) {
             if (e.getNumberOfClicks()>1) return;
-            if (local>=88 && local<108) owner.reorderColumn(column,-1);
-            else if (local>=112 && local<132) owner.reorderColumn(column,1);
-            else if (local>=136 && local<156) owner.deleteColumn(column);
+            if (local>=columnWidth-72 && local<columnWidth-52) owner.reorderColumn(column,-1);
+            else if (local>=columnWidth-48 && local<columnWidth-28) owner.reorderColumn(column,1);
+            else if (local>=columnWidth-24 && local<columnWidth-4) owner.deleteColumn(column);
         } else owner.select(owner.selectedRow,column);
         return;
     }
