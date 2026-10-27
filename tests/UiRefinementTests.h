@@ -47,7 +47,7 @@ void uiRefinementTests() {
         MainComponent ui(false);
         auto* grid=find<CueGrid>(ui);
         const int x=CueGrid::nameWidth+(int)ui.show.columns.size()*CueGrid::columnWidth+40;
-        click(*grid,(float)x,(float)CueGrid::headerHeight+17);
+        click(*grid,(float)x,(float)CueGrid::headerHeight+CueGrid::rowContentInset+17);
         auto* modal=dynamic_cast<juce::AlertWindow*>(juce::ModalComponentManager::getInstance()->getModalComponent(0));
         check(modal!=nullptr && modal->getTextEditor("value")!=nullptr,"BPM row label did not open editor");
         check(modal->getTextEditor("value")->getText().contains("120"),"BPM dialog initial value incorrect");
