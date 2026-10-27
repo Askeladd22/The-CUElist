@@ -5,9 +5,9 @@ namespace cuelist {
 namespace {
 constexpr int inspectorWidth=288;
 constexpr int inspectorInnerWidth=236;
-constexpr int inspectorScaleOriginY=226;
-constexpr int cueLeft=192;
-constexpr int cueTop=86;
+constexpr int inspectorScaleOriginY=160;
+constexpr int cueLeft=184;
+constexpr int cueTop=78;
 constexpr int cueRightGap=8;
 constexpr int cueGridTail=44;
 constexpr int minimumGridHeight=310;
@@ -47,7 +47,8 @@ WorkspaceLayout calculateWorkspaceLayout(const WorkspaceLayoutInput& input) {
     result.effectiveDockHeight=std::clamp(input.activeDockHeight,0,maximumDockHeight);
     const int gridHeight=std::max(minimumGridHeight,input.height-400-result.effectiveDockHeight);
     const int utilityHeight=input.height<800 ? 180 : 208;
-    const int cueWidth=result.editorX-cueRightGap-cueLeft;
+    // The fixed BPM/Auto Stop band is OUTSIDE the scrollable column region.
+    const int cueWidth=result.editorX-cueRightGap-cueLeft-input.pinnedMetricsWidth;
     const int utilityY=154+gridHeight-utilityHeight;
     result.viewport={cueLeft,cueTop,cueWidth,utilityY-cueTop};
     result.utilities={cueLeft,utilityY,cueWidth,utilityHeight};
@@ -60,18 +61,19 @@ WorkspaceLayout calculateWorkspaceLayout(const WorkspaceLayoutInput& input) {
     result.timeline={cueLeft,result.dockY+result.effectiveDockHeight,cueWidth,
         std::max(minimumTimelineHeight,input.height-gridHeight-result.effectiveDockHeight-215)};
 
-    result.metrics={result.viewport.getRight()-input.pinnedMetricsWidth,
-        result.viewport.getY(),input.pinnedMetricsWidth,result.viewport.getHeight()};
+    result.metrics={result.viewport.getRight(),result.viewport.getY(),
+        input.pinnedMetricsWidth,result.viewport.getHeight()};
+    result.cueHeaders={result.viewport.getX(),result.viewport.getY(),
+        input.pinnedHeaderWidth,result.viewport.getHeight()};
 
-    result.inspectorPanel={result.editorX,154,inspectorWidth-20,input.height-201};
-    result.inspectorCueCard={result.inspectorLeft-7,228,inspectorInnerWidth+14,245};
-    result.inspectorCellCard={result.inspectorLeft-7,478,inspectorInnerWidth+14,337};
+    result.inspectorPanel={result.editorX,84,inspectorWidth-20,input.height-132};
+    result.inspectorCueCard={result.inspectorLeft-7,162,inspectorInnerWidth+14,245};
+    result.inspectorCellCard={result.inspectorLeft-7,412,inspectorInnerWidth+14,337};
 
     // Reserve metrics clearance only when columns exceed the usable area.
     // A small show must not gain a fake horizontal scrollbar.
     const int cueContent=input.columnEndX+cueGridTail;
-    const int clearWidth=result.viewport.getWidth()-input.pinnedMetricsWidth-14;
-    const int scrollWidth=cueContent+(cueContent>clearWidth ? input.pinnedMetricsWidth : 0);
+    const int scrollWidth=cueContent; // The fixed right band never needs scroll clearance.
     result.gridSize={
         std::max(result.viewport.getWidth()-14,scrollWidth),
         std::max(result.viewport.getHeight()-14,
