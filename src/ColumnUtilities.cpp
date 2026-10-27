@@ -189,7 +189,6 @@ struct ColumnUtilities::Strip final : juce::Component {
             return;
         }
         if (colType==ColumnType::control) {
-            const auto& col=owner.show.columns[(size_t)index];
             label(g,col.controlLocked ? "DEFAULT / ALL CUES" : "CUE-SPECIFIC",
                   {7,91,getWidth()-14,22},11,palette::teal,true);
             label(g,col.controlLocked ? "Priority: LOW" :
