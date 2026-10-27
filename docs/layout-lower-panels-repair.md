@@ -14,6 +14,8 @@ The **lower** region contains the Timeline and docked MIDI/OSC editor. It now us
 
 A discreet draggable horizontal handle lives at the top edge of the Timeline, across both docked and undocked states. A drag upward enlarges the Timeline; downward shrinks it. The geometry helper applies a bounded adjustment to the available upper-grid height, keeps the fixed cue header top unchanged and preserves the minimum 310 px upper grid allocation and 75 px Timeline. The existing docked-editor height preference and its separate resize handle are maintained.
 
+When the upper grid is already at its minimum, an **expanded** dock can yield vertical space to an enlarged Timeline, but never below 130 px. A 36 px collapsed dock is kept intact. This resizing only changes the dock's visible height while preserving the preferred height for later layout changes.
+
 The Timeline detaching feature is **not** part of this change (optional in the request).
 
 ## Column and Master restoration
