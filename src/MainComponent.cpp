@@ -269,7 +269,7 @@ void MainComponent::paint(juce::Graphics& g) {
     label(g,"ESC          Panic",{20,h-61,150,20},12,palette::muted);
     g.setColour(palette::teal); g.fillRoundedRectangle(204.0f,88.0f,4.0f,45.0f,2.0f);
     label(g,"CUE LIST",{219,89,390,32},25,palette::text,true);
-    label(g,"SHOW WORKSPACE   •   AUDIO  /  MIDI  /  OSC  /  CONTROL",{219,124,510,20},12,palette::muted,true);
+    label(g,"SHOW WORKSPACE   /   AUDIO  /  MIDI  /  OSC  /  CONTROL",{219,124,510,20},12,palette::muted,true);
 
     constexpr int inspectorWidth=288, inspectorInner=236;
     auto panel=juce::Rectangle<int>(editorX,154,inspectorWidth-20,h-201);
