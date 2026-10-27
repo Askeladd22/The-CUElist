@@ -169,7 +169,7 @@ void CueGrid::paint(juce::Graphics& g) {
                 g.setColour(tone.withAlpha(.85f));
                 g.drawRoundedRectangle((float)x+5,(float)y+7,(float)w-10,39.f,5.f,1.f);
                 if (loaded) g.fillEllipse((float)x+w/2-4,(float)y+21,8.f,8.f);
-                else label(g,"—",{x+8,y+13,w-16,20},12,palette::muted,true,juce::Justification::centred);
+                else label(g,"-",{x+8,y+13,w-16,20},12,palette::muted,true,juce::Justification::centred);
                 if(!cell.followsRow) {g.setColour(palette::red);g.fillEllipse((float)x+6,(float)y+8,3.f,3.f);}
                 if(cell.loop) drawLoopIcon(g,{x+w-19,y+8,13,15},palette::amber);
                 continue;
