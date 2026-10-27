@@ -61,6 +61,7 @@ int main() {
     showEditOperationsTests();
     workspaceLayoutTests();
     controlMappingV10Tests();
+    controlRuntimeTests();
     controlColumnTests();
     stabilityV7Tests();
     architectureV8Tests();
