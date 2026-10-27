@@ -389,6 +389,8 @@ void uiRefinementTests() {
         gain.takeover=ControlTakeover::jump;gain.minimum=0;gain.maximum=4;
         check(ui.addMappingBinding(gain),"Could not assign gain fader to controller");
         ui.setAudioFaderCeilingDb(0);
+        ui.dispatchControlForTest({"controller",ControlKind::cc,1,27,64,false});
+        near(ui.show.masterGain,64.0/127.0,0.0002);
         ui.dispatchControlForTest({"controller",ControlKind::cc,1,27,127,false});
         near(ui.show.masterGain,1.0);
         ui.setAudioFaderCeilingDb(6);
