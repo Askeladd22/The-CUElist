@@ -22,6 +22,10 @@ struct Column {
     int controlPriority=2; // 1=Low (locked), 2=Medium, 3=High, 4=Maximum
     ControlSet controlDefaultSet;
     int controlDefaultSourceRowId=0; // original cue for lossless unlock
+    // Audio-only routing; independent from the physical direct output pair.
+    bool masterSend=true;
+    bool directOutputEnabled=false;
+    bool directPostFader=true;
 };
 struct Cell {
     int id = 0;
@@ -45,7 +49,7 @@ struct Row {
     bool muted = false, loop = false, overrideBehaviour = false, stopOnNext = true;
     Behaviour behaviour = Behaviour::retrigger;
 };
-struct Show { juce::String name = "Show 001"; float masterGain=1.0f, masterPan=0.0f; bool masterMuted=false; int nextId = 1; std::vector<Column> columns; std::vector<Row> rows; ControlSettings controls; };
+struct Show { juce::String name = "Show 001"; float masterGain=1.0f, masterPan=0.0f; bool masterMuted=false; int masterOutput=0; bool safetyLimiterEnabled=true; int nextId = 1; std::vector<Column> columns; std::vector<Row> rows; ControlSettings controls; };
 Show makeShow();
 void addRow(Show&, const juce::String&);
 void addColumn(Show&, ColumnType, const juce::String&);

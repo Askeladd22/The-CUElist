@@ -73,6 +73,7 @@ struct Voice {
     float rowGain = 1;
     float columnGain = 1, columnPan = 0;
     bool columnMuted = false, columnPhaseInverted = false;
+    bool masterSend=false, directOutputEnabled=true, directPostFader=true;
     bool rowMuted = false, rowLoop = false, overrideBehaviour = false;
     Behaviour rowBehaviour = Behaviour::retrigger;
     bool rowMode = false, pendingSeek = false;
@@ -86,6 +87,15 @@ struct RowTransport {
 struct RenderState {
     float masterGain=1.0f, masterPan=0.0f;
     bool masterMuted=false;
+    int masterOutput=0;
+    bool safetyLimiterEnabled=true;
+    float limiterGain=1.0f;
+    bool limiterReducing=false;
+    float preLimiterPeakLeft=0.0f, preLimiterPeakRight=0.0f;
+    static constexpr int maxMixerFrames=65536;
+    // Allocated before publication, never on the audio callback.
+    std::array<std::vector<float>,2> masterMix;
+    RenderState() {for(auto& channel:masterMix) channel.resize(maxMixerFrames,0.0f);}
     std::vector<std::pair<int,std::shared_ptr<ColumnPeakTelemetry>>> columnMeters;
     std::vector<Voice> voices;
     std::vector<RowTransport> rows;
@@ -123,6 +133,7 @@ public:
     float getColumnPeak(int columnId) const noexcept;
     // Returns post-cell/row/strip, pre-master L/R peaks (linear amplitude).
     std::array<float,2> getColumnStereoPeak(int columnId) const noexcept;
+    std::atomic<bool> limiterActive{false};
     juce::AudioDeviceManager devices;
     std::atomic<float> peak {0};
     std::atomic<float> masterPeakLeft {0}, masterPeakRight {0};

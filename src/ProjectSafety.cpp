@@ -32,6 +32,13 @@ PreflightReport preflightShow(const Show& show,bool audioAvailable,
         result.issues.push_back({PreflightLevel::critical,"Project",check.getErrorMessage()});
     if(!audioAvailable)
         result.issues.push_back({PreflightLevel::warning,"Audio","No running audio device was detected."});
+    // Simultaneous Master + Direct to the same physical stereo pair can
+    // exceed 0 dBFS after the Master limiter. Flag this as a routing risk.
+    for(const auto& column:show.columns)
+        if(column.type==ColumnType::audio && column.masterSend &&
+           column.directOutputEnabled && column.output==show.masterOutput)
+            result.issues.push_back({PreflightLevel::warning,"Audio routing",
+                column.name+": Direct Out shares Main Out; summed signal can clip after limiter."});
     std::set<juce::String> checked;
     for(const auto& col:show.columns) {
         if(col.type==ColumnType::midi && col.midiOutputId.isNotEmpty() &&

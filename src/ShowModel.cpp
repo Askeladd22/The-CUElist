@@ -69,6 +69,8 @@ juce::Result validateShow(const Show& show) {
     if (!std::isfinite(show.masterGain) || show.masterGain<0 || show.masterGain>4) return fail("Invalid master audio gain.");
     if (!std::isfinite(show.masterPan) || show.masterPan < -1 || show.masterPan > 1)
         return fail("Invalid master pan.");
+    if (show.masterOutput<0 || show.masterOutput>1022 || show.masterOutput%2!=0)
+        return fail("Invalid stereo Master main output.");
     if (show.columns.size() > 10000 || show.rows.size() > 10000 || show.rows.size()*show.columns.size() > 1000000)
         return fail("Project exceeds the safety limit of one million cells.");
     std::set<int> ids;
@@ -266,6 +268,8 @@ juce::String encodeShow(const Show& show) {
     for (const auto& c : show.columns) columns.add(object({{"id",c.id},{"name",c.name},{"type",(int)c.type},{"output",c.output},
         {"gain",c.gain},{"pan",c.pan},{"muted",c.muted},{"phaseInverted",c.phaseInverted},{"midiOutputId",c.midiOutputId},{"oscHost",c.oscHost},{"oscPort",c.oscPort},
         {"collapsed",c.collapsed},{"controlLocked",c.controlLocked},{"controlPriority",c.controlPriority},
+        {"masterSend",c.masterSend},{"directOutputEnabled",c.directOutputEnabled},
+        {"directPostFader",c.directPostFader},
         {"controlDefaultSourceRowId",c.controlDefaultSourceRowId},
         {"controlDefaultSet",controlSetObject(c.controlDefaultSet)}}));
     for (const auto& r : show.rows) {
@@ -341,7 +345,8 @@ juce::String encodeShow(const Show& show) {
         {"bindings",bindings},{"templates",templates}});
     return juce::JSON::toString(object({{"format","TheCuelist"},{"version",10},
         {"name",show.name},{"masterGain",show.masterGain},{"masterPan",show.masterPan},
-        {"masterMuted",show.masterMuted},{"nextId",show.nextId},
+        {"masterMuted",show.masterMuted},{"masterOutput",show.masterOutput},
+        {"safetyLimiterEnabled",show.safetyLimiterEnabled},{"nextId",show.nextId},
         {"columns",columns},{"rows",rows},{"controls",controls}}));
 }
 juce::Result decodeShow(const juce::String& text, Show& destination) {
@@ -392,9 +397,25 @@ juce::Result decodeShow(const juce::String& text, Show& destination) {
         if (auto* obj=root.getDynamicObject()) {
             if (obj->hasProperty("masterPan")) show.masterPan=(float)number(root,"masterPan");
             if (obj->hasProperty("masterMuted")) show.masterMuted=boolean(root,"masterMuted");
+            if (obj->hasProperty("masterOutput")) show.masterOutput=integer(root,"masterOutput");
+            if (obj->hasProperty("safetyLimiterEnabled"))
+                show.safetyLimiterEnabled=boolean(root,"safetyLimiterEnabled");
         }
         for (auto& c : array(root,"columns")) {
             Column column {integer(c,"id"),string(c,"name"),(ColumnType)integer(c,"type"),integer(c,"output")};
+            // v1-v10 legacy audio projects had no separate Master Send.
+            // Default outputs 1/2 are sent to Master; explicitly routed
+            // higher pairs remain direct. Preserve their audible destination.
+            column.masterSend=(column.output==0);
+            column.directOutputEnabled=(column.output!=0);
+            if (auto* fields=c.getDynamicObject()) {
+                if (fields->hasProperty("masterSend"))
+                    column.masterSend=boolean(c,"masterSend");
+                if (fields->hasProperty("directOutputEnabled"))
+                    column.directOutputEnabled=boolean(c,"directOutputEnabled");
+                if (fields->hasProperty("directPostFader"))
+                    column.directPostFader=boolean(c,"directPostFader");
+            }
             if (version>=5) column.midiOutputId=string(c,"midiOutputId");
             if (version>=6) { column.oscHost=string(c,"oscHost"); column.oscPort=integer(c,"oscPort"); }
             if (version >= 3) {

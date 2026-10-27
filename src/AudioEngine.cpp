@@ -52,6 +52,7 @@ void placeOnTimeline(Voice& v, double seconds) noexcept {
 }
 }
 void RenderState::inheritPlayback(const RenderState& previous) noexcept {
+    limiterGain=previous.limiterGain;
     // Copy only scalar runtime state. Shared media ownership stays entirely on the UI thread.
     for (auto& v:voices) for (const auto& old:previous.voices)
         if (v.cellId==old.cellId && v.clip.get()==old.clip.get() && v.isMidi==old.isMidi && v.isOsc==old.isOsc
@@ -187,6 +188,12 @@ void RenderState::releaseMidi(Voice& v,int offset,bool cancelPending) noexcept {
 }
 void RenderState::render(float* const* outputs,int channels,int frames,double sampleRate) noexcept {
     for (int ch=0;ch<channels;++ch) if (outputs[ch]) juce::FloatVectorOperations::clear(outputs[ch],frames);
+    preLimiterPeakLeft=preLimiterPeakRight=0;
+    limiterReducing=false;
+    // The stereo bus is accumulated independently of all physical outputs.
+    // No heap allocation or lock occurs in the audio callback.
+    const auto busSamples=std::min((size_t)std::max(0,frames),masterMix[0].size());
+    for(auto& channel:masterMix) std::fill_n(channel.begin(),busSamples,0.0f);
     // Reset preallocated stereo mix buffers. Per-voice contributions are
     // accumulated into each column separately, even if multiple columns
     // share a physical output pair. No heap activity on the audio thread.
@@ -280,10 +287,18 @@ void RenderState::render(float* const* outputs,int channels,int frames,double sa
         if (length==0 || audio.getNumChannels()==0) { v.playing=false; v.paused=false; continue; }
         const bool looping=v.loop || v.rowLoop;
         const double step=v.clip->sampleRate/sampleRate;
-        const float gain=(v.rowMuted || v.columnMuted) ? 0
-            : v.gain*v.rowGain*v.columnGain*(v.columnPhaseInverted ? -1.0f : 1.0f);
-        const float sideGain[2] {gain*(1.0f-std::max(0.0f,v.columnPan)),
-                                 gain*(1.0f+std::min(0.0f,v.columnPan))};
+        // PRE direct out bypasses only the column fader. It retains clip/row
+        // gain, strip pan, polarity and mute. Master Send is always POST.
+        const float base=(v.rowMuted || v.columnMuted) ? 0
+            : v.gain*v.rowGain*(v.columnPhaseInverted ? -1.0f : 1.0f);
+        const float postGain[2] {
+            base*v.columnGain*(1.0f-std::max(0.0f,v.columnPan)),
+            base*v.columnGain*(1.0f+std::min(0.0f,v.columnPan))
+        };
+        const float directGain[2] {
+            base*(v.directPostFader ? v.columnGain : 1.0f)*(1.0f-std::max(0.0f,v.columnPan)),
+            base*(v.directPostFader ? v.columnGain : 1.0f)*(1.0f+std::min(0.0f,v.columnPan))
+        };
         for (int i=0;i<frames && v.playing;++i) {
             if (v.rowMode && v.delaySeconds>1.0e-12) { v.delaySeconds=std::max(0.0,v.delaySeconds-1.0/sampleRate); continue; }
             v.delaySeconds=0;
@@ -294,18 +309,23 @@ void RenderState::render(float* const* outputs,int channels,int frames,double sa
             const int a=(int)v.position, b=a+1<length ? a+1 : (looping ? 0 : a);
             const float fraction=(float)(v.position-a);
             for (int side=0;side<2;++side) {
-                const int output=v.output+side;
-                if (output>=channels || output<0 || !outputs[output]) continue;
                 const float* data=audio.getReadPointer(std::min(side,audio.getNumChannels()-1));
-                const float contribution=(data[a]+fraction*(data[b]-data[a]))*sideGain[side];
-                outputs[output][i]+=contribution;
+                const float sample=data[a]+fraction*(data[b]-data[a]);
+                const float post=sample*postGain[side];
+                if (v.masterSend && (size_t)i<busSamples)
+                    masterMix[(size_t)side][(size_t)i]+=post;
+                if (v.directOutputEnabled) {
+                    const int output=v.output+side;
+                    if (output>=0 && output<channels && outputs[output])
+                        outputs[output][i]+=sample*directGain[side];
+                }
                 if (v.columnMeter) {
                     auto& telemetry=*v.columnMeter;
                     if ((size_t)i<telemetry.mix[(size_t)side].size())
-                        telemetry.mix[(size_t)side][(size_t)i]+=contribution;
+                        telemetry.mix[(size_t)side][(size_t)i]+=post;
                     else
                         telemetry.oversizeVoicePeak[(size_t)side]=std::max(
-                            telemetry.oversizeVoicePeak[(size_t)side],std::abs(contribution));
+                            telemetry.oversizeVoicePeak[(size_t)side],std::abs(post));
                 }
             }
             v.position+=step;
@@ -332,15 +352,36 @@ void RenderState::render(float* const* outputs,int channels,int frames,double sa
         for (const auto& v:voices) if (v.rowId==row.id && v.rowMode && v.playing) { row.playing=true; break; }
         if (wasPlaying && !row.playing) row.ended=true;
     }
-    // Post-sum master PCM gain, mute and stereo balance. MIDI/OSC bypass.
-    // Apply each stereo pair's balance before final saturation.
-    for (int ch=0;ch<channels;++ch) if (outputs[ch]) {
-        const float balance=ch%2==0 ? 1.0f-std::max(0.0f,masterPan)
-                                     : 1.0f+std::min(0.0f,masterPan);
-        juce::FloatVectorOperations::multiply(outputs[ch],
-            masterMuted ? 0.0f : masterGain*balance,frames);
-        juce::FloatVectorOperations::clip(outputs[ch],outputs[ch],-1.0f,1.0f,frames);
+    // Dedicated stereo Master Bus: gain/pan/mute only affect L/R sends.
+    // A fixed -1 dBFS peak safety limiter uses instantaneous attack and a
+    // 150 ms exponential release, with linked L/R gain to preserve imaging.
+    // This is a transparent peak guard, not a loudness maximizer.
+    constexpr float threshold=0.89125094f; // -1 dBFS
+    const float release=std::exp(-1.0f/(0.150f*(float)sampleRate));
+    for(size_t i=0;i<busSamples;++i) {
+        float left=masterMuted ? 0.0f : masterMix[0][i]*masterGain*(1.0f-std::max(0.0f,masterPan));
+        float right=masterMuted ? 0.0f : masterMix[1][i]*masterGain*(1.0f+std::min(0.0f,masterPan));
+        preLimiterPeakLeft=std::max(preLimiterPeakLeft,std::abs(left));
+        preLimiterPeakRight=std::max(preLimiterPeakRight,std::abs(right));
+        if(safetyLimiterEnabled) {
+            const float absolutePeak=std::max(std::abs(left),std::abs(right));
+            const float desired=absolutePeak>threshold ? threshold/absolutePeak : 1.0f;
+            limiterGain=std::min(desired,1.0f+(limiterGain-1.0f)*release);
+            if(limiterGain<0.9999f) limiterReducing=true;
+            left*=limiterGain;
+            right*=limiterGain;
+        } else limiterGain=1.0f;
+        const int physicalLeft=masterOutput;
+        if(physicalLeft>=0 && physicalLeft<channels && outputs[physicalLeft])
+            outputs[physicalLeft][i]+=left;
+        if(physicalLeft+1>=0 && physicalLeft+1<channels && outputs[physicalLeft+1])
+            outputs[physicalLeft+1][i]+=right;
     }
+    // Final inter-pair safety clamp. When a direct output shares the physical
+    // Master pair, their sum may exceed the separately limited Master Bus.
+    // Preflight reports that collision instead of suggesting limiter immunity.
+    for(int ch=0;ch<channels;++ch) if(outputs[ch])
+        juce::FloatVectorOperations::clip(outputs[ch],outputs[ch],-1.0f,1.0f,frames);
 }
 juce::Result loadClip(const juce::File& file,std::shared_ptr<const AudioClip>& destination) {
     if (!file.existsAsFile()) return juce::Result::fail("File missing: "+file.getFullPathName());
@@ -366,6 +407,8 @@ std::unique_ptr<RenderState> makeRenderState(const Show& show,const ClipMap& cli
     state->masterGain=show.masterGain;
     state->masterPan=show.masterPan;
     state->masterMuted=show.masterMuted;
+    state->masterOutput=show.masterOutput;
+    state->safetyLimiterEnabled=show.safetyLimiterEnabled;
     for (const auto& column:show.columns)
         state->columnMeters.push_back({column.id,
             column.type==ColumnType::audio ? std::make_shared<ColumnPeakTelemetry>() : nullptr});
@@ -433,6 +476,9 @@ std::unique_ptr<RenderState> makeRenderState(const Show& show,const ClipMap& cli
         v.stopOnNext=row.stopOnNext && c.stopOnNext;
         v.columnGain=show.columns[i].gain; v.columnPan=show.columns[i].pan;
         v.columnMuted=show.columns[i].muted; v.columnPhaseInverted=show.columns[i].phaseInverted;
+        v.masterSend=show.columns[i].masterSend;
+        v.directOutputEnabled=show.columns[i].directOutputEnabled;
+        v.directPostFader=show.columns[i].directPostFader;
         v.rowLoop=row.loop; v.overrideBehaviour=row.overrideBehaviour; v.rowBehaviour=row.behaviour;
         state->voices.push_back(std::move(v));
       }
@@ -605,6 +651,7 @@ void AudioEngine::processBlock(float* const* outputs,int channels,int frames,dou
     readIndex.store(r,std::memory_order_release);
     if (current) current->render(outputs,channels,frames,sampleRate);
     else for (int ch=0; ch<channels; ++ch) if (outputs[ch]) juce::FloatVectorOperations::clear(outputs[ch],frames);
+    limiterActive.store(current && current->limiterReducing,std::memory_order_relaxed);
     if (panicEpoch.load()!=epoch) {
         acknowledgedCueId.store(0,std::memory_order_release);
         if (current) current->panic();
@@ -620,8 +667,8 @@ void AudioEngine::processBlock(float* const* outputs,int channels,int frames,dou
         }
     if (current) for (const auto& v : current->voices) if (v.playing) ++active;
     peak.store(level); activeVoices.store(active);
-    masterPeakLeft.store(stereo[0],std::memory_order_relaxed);
-    masterPeakRight.store(channels==1 ? stereo[0] : stereo[1],std::memory_order_relaxed);
+    masterPeakLeft.store(current ? current->preLimiterPeakLeft : 0.0f,std::memory_order_relaxed);
+    masterPeakRight.store(current ? current->preLimiterPeakRight : 0.0f,std::memory_order_relaxed);
     const int monitored=monitoredRowId.load();
     double seconds=0; bool playing=false;
     if (current) for (const auto& row:current->rows) if (row.id==monitored) {
