@@ -18,6 +18,6 @@ if ($LASTEXITCODE) { throw 'CMake configuration failed.' }
 if ($TestOnly) { & $cmake --build build --config Release --target CuelistTests --parallel 4 }
 else { & $cmake --build build --config Release --parallel 4 }
 if ($LASTEXITCODE) { throw 'Compilation failed.' }
-& $ctest --test-dir build -C Release --output-on-failure
+& $ctest --test-dir build -C Release --output-on-failure --output-size-failed 1000000
 if ($LASTEXITCODE) { throw 'Tests failed.' }
 if ($Run) { Start-Process -FilePath (Join-Path $repo 'build\TheCuelist_artefacts\Release\The Cuelist.exe') }
