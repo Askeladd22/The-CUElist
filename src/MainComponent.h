@@ -47,7 +47,7 @@ public:
     void paint(juce::Graphics&) override;
     void mouseDown(const juce::MouseEvent&) override;
     void mouseWheelMove(const juce::MouseEvent&,const juce::MouseWheelDetails&) override;
-    static constexpr int width=164;
+    static constexpr int width=184;
 private:
     MainComponent& owner;
 };
@@ -224,7 +224,7 @@ private:
     juce::ComboBox behaviour;
     juce::ToggleButton follow{"Include in row GO"},loop{"Loop playback"};
     juce::ToggleButton cellAutoStop{"Stop on next cue GO"};
-    juce::Slider gain;
+    juce::TextEditor gainDb;
     juce::Slider rowGain;
     GainMeterFader masterSlider;
     juce::Slider masterPan;
