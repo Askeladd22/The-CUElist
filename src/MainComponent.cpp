@@ -366,7 +366,7 @@ void MainComponent::refreshInspector() {
 }
 bool MainComponent::select(int row,int column) {
     if (row<0 || row>=(int)show.rows.size() || column<0 || column>=(int)show.columns.size() || !applyInspector()) return false;
-    if (show.columns[(size_t)column].collapsed) return false;
+    // Collapsed cells remain selectable as cues, but not editable.
     nextCue=row; selectedRow=row; selectedColumn=column; syncClipEditor(); syncOscEditor(); refreshInspector();
     const int top=CueGrid::headerHeight+row*CueGrid::rowHeight, bottom=top+CueGrid::rowHeight;
     int viewY=viewport.getViewPositionY();
@@ -385,6 +385,7 @@ bool MainComponent::inspectorDiffers() const {
     if (rowMute.getToggleState()!=row.muted || rowLoop.getToggleState()!=row.loop
         || rowBehaviour.getSelectedId()!=(row.overrideBehaviour ? (int)row.behaviour+2 : 1)
         || std::abs(rowGain.getValue()-juce::Decibels::gainToDecibels(row.gain,-60.0f))>0.051) return true;
+    if (show.columns[selectedColumn].collapsed) return false;
     if (show.columns[selectedColumn].type==ColumnType::osc)
         return cellName.getText().trim()!=cell.name || behaviour.getSelectedId()!=(int)cell.behaviour+1
             || follow.getToggleState()!=cell.followsRow || loop.getToggleState()!=cell.loop;
@@ -400,10 +401,12 @@ bool MainComponent::applyInspector() {
     if (row.overrideBehaviour) row.behaviour=(Behaviour)(rowBehaviour.getSelectedId()-2);
     row.gain=juce::Decibels::decibelsToGain((float)rowGain.getValue(),-60.0f);
     if (bpm.getText()!=juce::String(row.tempo.front().bpm,1)) row.tempo.front().bpm=bpm.getText().getDoubleValue();
-    cell.name=cellName.getText().trim(); cell.behaviour=(Behaviour)(behaviour.getSelectedId()-1);
-    cell.followsRow=follow.getToggleState(); cell.loop=loop.getToggleState();
-    if (candidate.columns[selectedColumn].type!=ColumnType::osc)
-        cell.gain=juce::Decibels::decibelsToGain((float)gain.getValue(),-60.0f);
+    if (!candidate.columns[(size_t)selectedColumn].collapsed) {
+        cell.name=cellName.getText().trim(); cell.behaviour=(Behaviour)(behaviour.getSelectedId()-1);
+        cell.followsRow=follow.getToggleState(); cell.loop=loop.getToggleState();
+        if (candidate.columns[selectedColumn].type!=ColumnType::osc)
+            cell.gain=juce::Decibels::decibelsToGain((float)gain.getValue(),-60.0f);
+    }
     auto result=validateShow(candidate); if (result.failed()) { message(result.getErrorMessage()); return false; }
     show=std::move(candidate); changed("Settings applied. BPM does not change audio playback speed.");
     return true;
@@ -419,7 +422,8 @@ bool MainComponent::memoryFits(const ClipMap& collection) const {
     return bytes<=512LL*1024*1024;
 }
 void MainComponent::importDialog() {
-    if (show.columns[selectedColumn].type==ColumnType::osc) return;
+    if (show.columns[selectedColumn].type==ColumnType::osc ||
+        show.columns[selectedColumn].collapsed) return;
     if (!applyInspector()) return;
     const int cellId=show.rows[selectedRow].cells[selectedColumn].id;
     const bool midi=show.columns[selectedColumn].type==ColumnType::midi;
@@ -432,6 +436,7 @@ void MainComponent::importDialog() {
         });
 }
 void MainComponent::importFile(const juce::File& file) {
+    if (show.columns[(size_t)selectedColumn].collapsed) return;
     if (show.columns[selectedColumn].type==ColumnType::midi) {
         if (!applyInspector()) return;
         MidiClip imported; juce::String warning;
@@ -847,6 +852,9 @@ void MainComponent::deleteColumn(int index) {
     selectedColumn=std::min(index,(int)show.columns.size()-1); changed("Column deleted. Original files retained.",true);
 }
 void MainComponent::moveClip(int sr,int sc,int tr,int tc) {
+    if (sc>=0 && tc>=0 && sc<(int)show.columns.size() && tc<(int)show.columns.size() &&
+        (show.columns[(size_t)sc].collapsed || show.columns[(size_t)tc].collapsed))
+        return;
     if (sc>=0 && sc<(int)show.columns.size() && tr>=0 && tr<(int)show.rows.size() &&
         tc>=0 && tc<(int)show.columns.size() &&
         ((show.columns[(size_t)sc].type==ColumnType::control &&
@@ -878,6 +886,8 @@ bool MainComponent::copySelectedCell() {
     return true;
 }
 bool MainComponent::pasteSelectedCell() {
+    if (selectedColumn>=0 && selectedColumn<(int)show.columns.size() &&
+        show.columns[(size_t)selectedColumn].collapsed) return false;
     if (!copiedCell || selectedRow<0 || selectedRow>=(int)show.rows.size() ||
         selectedColumn<0 || selectedColumn>=(int)show.columns.size()) return false;
     if (show.columns[(size_t)selectedColumn].type==ColumnType::control &&
