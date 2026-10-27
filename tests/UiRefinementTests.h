@@ -229,4 +229,58 @@ void uiRefinementTests() {
               "Expanded column positions are inconsistent");
     });
 
+    test("Project title is editable and survives v10 serialization",[] {
+        MainComponent ui(false);
+        auto* title=dynamic_cast<juce::Label*>(controlsV3::named(ui,"projectName"));
+        check(title && title->isVisible(),"Editable project title is missing");
+        title->setText("Teatro - Autunno",juce::sendNotification);
+        check(ui.show.name=="Teatro - Autunno" && ui.hasUnsavedChanges(),
+              "Renaming project failed to update persisted model");
+        Show loaded;
+        check(decodeShow(encodeShow(ui.show),loaded).wasOk() &&
+              loaded.name=="Teatro - Autunno","Renamed title was not serialized");
+        auto* preferences=controlsV3::named(ui,"projectPreferences");
+        auto* diagnostics=controlsV3::named(ui,"showDiagnostics");
+        check(preferences && preferences->isVisible() &&
+              preferences->getX()<180 && diagnostics && !diagnostics->isVisible(),
+              "Preferences menu did not replace toolbar diagnostics");
+    });
+    test("Contextual plus adds a cue below the existing sequence",[] {
+        MainComponent ui(false);
+        auto* grid=cueViewFixtures::find<CueGrid>(ui);
+        check(grid!=nullptr,"Cue grid is unavailable");
+        const int old=(int)ui.show.rows.size();
+        const int plusY=CueGrid::headerHeight+old*CueGrid::rowHeight+19;
+        check(grid->getHeight()>plusY,"Add-cue button is outside scrollable grid");
+        cueViewFixtures::click(*grid,CueGrid::nameWidth/2.0f,(float)plusY);
+        check((int)ui.show.rows.size()==old+1 && ui.selectedRow==old,
+              "Contextual add-cue button did not create a new cue");
+    });
+    test("Control lock icon follows actual priority and lock model",[] {
+        MainComponent ui(false);addColumn(ui.show,ColumnType::control,"Control");
+        auto* utility=cueViewFixtures::find<ColumnUtilities>(ui);
+        utility->refresh();
+        auto* strip=utility->getChildComponent(1);
+        auto* lock=dynamic_cast<juce::Button*>(controlsV3::named(*strip,"controlColumnLock"));
+        check(lock && lock->isVisible() && !lock->getToggleState(),
+              "Unlocked icon state missing");
+        check(ui.setControlColumnLocked(1,true,0),"Could not lock Control Column");
+        utility->refresh();
+        check(lock->getToggleState() && ui.show.columns[1].controlPriority==1,
+              "Closed-lock icon and model disagreed");
+        check(ui.setControlColumnLocked(1,false,0),"Could not unlock Control Column");
+        utility->refresh();
+        check(!lock->getToggleState(),"Opened-lock icon did not update");
+    });
+    test("MIDI RX activity counts accepted physical input callbacks, not connections",[] {
+        MidiInputManager input;
+        check(input.receivedCount()==0,"MIDI RX counter started nonzero");
+        input.ingestForTest(juce::MidiMessage::controllerEvent(1,21,72));
+        check(input.receivedCount()==1 && !input.connected(),
+              "MIDI RX activity should count accepted messages without requiring a port");
+        ControlEvent event;
+        check(input.poll(event) && event.number==21 && event.value==72,
+              "MIDI RX activity diverged from queued controller message");
+    });
+
 }
