@@ -15,4 +15,13 @@ juce::Result swapCueColumns(Show& show, int source, int destination);
 // playback or PCM memory ownership is changed here.
 juce::Result prepareInsertedCueCopy(const Show& current, int afterIndex,
                                     const Row& source, Show& destination);
+// Transactional deletion: prepare a valid replacement Show and collect every
+// removed cell identity so the UI can evict only that media from its cache.
+// On failure, neither destination nor removedCellIds is changed.
+// A deleted final row/column is replaced by an empty usable one.
+juce::Result prepareDeletedCue(const Show& current, int index,
+                               Show& destination, std::vector<int>& removedCellIds);
+juce::Result prepareDeletedColumn(const Show& current, int index,
+                                  Show& destination, std::vector<int>& removedCellIds);
+
 } // namespace cuelist
