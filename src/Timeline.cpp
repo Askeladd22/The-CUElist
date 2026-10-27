@@ -187,10 +187,14 @@ void Timeline::paint(juce::Graphics& g) {
         const int y=tracksTop+track++*trackHeight-trackScroll;
         const bool present=owner.hasClip(owner.selectedRow,c); if (present) ++loaded;
         if (y+32<tracksTop || y>=bottom) continue;
-        g.setColour(c==owner.selectedColumn ? palette::raised.withAlpha(.48f)
-                                            : (c%2==0 ? palette::background.withAlpha(.28f)
-                                                      : palette::panel));
+        // A subtle translucent lane wash preserves the musical grid underneath.
+        g.setColour(c==owner.selectedColumn ? palette::teal.withAlpha(.085f) :
+                    palette::text.withAlpha(c%2==0 ? .018f : .005f));
         g.fillRect(0,y,getWidth(),trackHeight-1);
+        if (c==owner.selectedColumn) {
+            g.setColour(palette::teal);
+            g.fillRect(0,y,3,trackHeight-1);
+        }
         const auto& name=owner.show.columns[c].name;
         label(g,name.isEmpty() ? (owner.show.columns[c].type==ColumnType::midi ? "MIDI " :
             owner.show.columns[c].type==ColumnType::control ? "Control " :

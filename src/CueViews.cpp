@@ -55,7 +55,9 @@ void CueGrid::paint(juce::Graphics& g) {
     for (int r=first;r<last;++r) {
         const int y=headerHeight+r*rowHeight; const bool selected=r==owner.selectedRow, next=r==owner.nextCueIndex();
         const auto& row=show.rows[r];
-        g.setColour(selected ? palette::teal.withAlpha(.07f) : r%2 ? palette::background.withAlpha(.4f) : palette::panel);
+        g.setColour(selected ? palette::teal.withAlpha(.11f) :
+                    next ? palette::amber.withAlpha(.045f) :
+                    r%2 ? palette::background.withAlpha(.32f) : palette::panel);
         g.fillRect(0,y,getWidth(),rowHeight);
         if (selected || next) { g.setColour(next ? palette::amber : palette::teal); g.fillRect(0,y,3,rowHeight); }
         g.saveState();
@@ -100,7 +102,10 @@ void CueGrid::paint(juce::Graphics& g) {
                 g.setColour(palette::line); g.fillRect(x+8,y+rowHeight-11,columnWidth-16,3);
                 g.setColour(playback.paused || playback.waiting ? palette::amber : colour);
                 g.fillRect((float)x+8,(float)y+rowHeight-11,(float)((columnWidth-16)*progress),3.0f);
-                if (playback.playing || playback.paused) g.fillEllipse((float)x+columnWidth-19,(float)y+13,6,6);
+                if (playback.playing || playback.paused) {
+                    g.setColour(playback.paused ? palette::amber : palette::teal);
+                    g.fillEllipse((float)x+columnWidth-19,(float)y+13,8,8);
+                }
             } else label(g,missing ? "! File unavailable" : show.columns[c].type==ColumnType::audio ? "+ WAV / MP3" : show.columns[c].type==ColumnType::midi ? "+ MIDI / Piano Roll" : "+ OSC / messages",
                          {x+10,y+8,columnWidth-20,24},12,missing ? palette::red : palette::muted,false,juce::Justification::centred);
             // Auto Stop is a per-cell choice. The row's switch remains the
