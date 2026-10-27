@@ -261,8 +261,7 @@ void Timeline::paint(juce::Graphics& g) {
         g.restoreState();
     }
     g.restoreState();
-    if (loaded==0 && std::none_of(owner.show.columns.begin(),owner.show.columns.end(),
-        [](const Column& col){return col.type==ColumnType::control;}))
+    if (loaded==0)
         label(g,"Import audio or create a MIDI clip to see it here.",
               {timelineStart,83,getWidth()-160,32},13,palette::muted);
     if (owner.engine.monitoredRowId.load()==row.id) {
