@@ -39,7 +39,7 @@
 - `CueOperations.cpp` keeps existing operator/transport sequencing but delegates these three model edits; the GUI still owns media-cache association and checks PCM memory limits **before** adopting a newly prepared show.
 - New model-only regression tests cover stable IDs, clip/type association, correct Control Set identity cloning, range failures and project nonmutation.
 
-**Phase 2c (current PR, transactional deletion):**
+**Phase 2c (merged into feat/desktop-foundation):**
 
 - `prepareDeletedCue` and `prepareDeletedColumn` build a replacement Show and gather the deleted cell IDs without touching the current model, PCM cache, GUI or devices. Neither output changes on failure.
 - Cue deletion removes legacy mappings scoped to that cue ID and clears stale locked-Control default-source cue IDs without discarding their settings; column deletion removes references to its ID from legacy mappings, locked Control Column defaults, cue-specific sets, and reusable templates.
@@ -52,11 +52,17 @@ The next stage is Phase 3: extracting testable workspace layout geometry from pa
 
 No existing audio callback, playback state inheritance, project schema or media-cache ownership changes are made in phase 2a.
 
-## Phase 3 — workspace layout boundaries (separate PR)
+## Phase 3 — workspace layout boundaries (current PR)
 
-- Unify geometry for Cue Grid, Inspector cards, pinned BPM / Auto Stop, mixer strips and Timeline.
-- Extract a layout calculation separate from JUCE painting, so 1180x820, 1440x900 and wider desktop sizes can be tested without screenshot-only assumptions.
-- Keep user-visible positions unchanged initially; future spacing adjustments require independent UI review.
+**Phase 3a (implemented; CI verification pending):** centralize the screenshot-approved workspace geometry in the deterministic `WorkspaceLayout.h/.cpp` calculator.
+
+- `calculateWorkspaceLayout` owns rectangular bounds for the cue viewport, mixer utilities, timeline, docked clip editor and drag/close/collapse handles, pinned BPM / Auto Stop area, inspector outer panel and both section cards, plus virtual cue grid dimensions.
+- `WorkspaceLayout::inspectorTransform` and `scaleInspectorControl` share the identical vertical scaling formula previously duplicated between painting and `resized()`. The Inspector card background and CELL heading remain aligned across window sizes.
+- `MainComponent::workspaceLayout()` adapts current window size, cue/column dimensions and active dock height into a geometry input. `paint()` and `resized()` consume the same result, while `MainComponent` continues to own component lifetime, visibility and event routing.
+- Regression tests verify 1180×820, 1440×900, 1647×895 and 1920×1080, scrolling/pinned controls, collapsed/expanded clip dock, the shared Inspector transform and actual JUCE component bounds.
+- No visual reflow or spacing change in this phase; it is a structural extraction with the exact existing baseline coordinates and control sizes.
+
+**Phase 3b (later, separate PR):** once the geometry helper is proven, address narrower display constraints or improve layout responsiveness with deliberate visual change review, rather than silently changing the approved layout.
 
 ## Phase 4 — Control Mapping boundaries (separate PR)
 

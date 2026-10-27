@@ -4,6 +4,7 @@
 #include "ProjectMediaLoader.h"
 #include "GainMeterFader.h"
 #include "MixerControls.h"
+#include "WorkspaceLayout.h"
 #include "MidiInputManager.h"
 #include "ControlOutputRouter.h"
 #include <set>
@@ -275,6 +276,7 @@ private:
     juce::File projectFile;
     juce::String status="Ready. Select an Audio cell and import a WAV file.";
     bool dirty=false;
+    WorkspaceLayout workspaceLayout() const;
     int editorX=0;
     float displayPeak=0;
     int midiRefreshTicks=0;
