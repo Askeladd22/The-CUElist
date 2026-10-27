@@ -40,7 +40,9 @@ faders without causing `onGainChanged` callbacks.
   preference changes; when an operator moves the fader they select a level
   within the newly selected range.
 - MIDI control mappings aimed at the Master or a column **gain** also respect
-  the active fader ceiling, including custom mappings above unity. Pan,
+  the active fader ceiling, including custom mappings above unity. A saved
+  wider mapping range is rescaled across the full 0–127 MIDI travel (including
+  pickup), avoiding early saturation at a quarter of the fader travel. Pan,
   mute, sends, routing and output control mappings are not capped.
 - Both stereo meter channels remain independent of one another.
 
