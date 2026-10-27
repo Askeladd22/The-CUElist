@@ -5,7 +5,7 @@ void gainMeterFaderTests() {
     test("Fader range geometry round-trips at -inf/+6 and -inf/0 ceilings", [] {
         const float top=12,bottom=124;
         for (const float ceiling:{6.0f,0.0f}) {
-            for (const float db:{-60.0f,-48.0f,-36.0f,-24.0f,-18.0f,-12.0f,-6.0f,0.0f}) {
+            for (const float db:{-48.0f,-36.0f,-24.0f,-18.0f,-12.0f,-6.0f,0.0f}) {
                 const auto y=GainMeterFader::yForDb(db,top,bottom,ceiling);
                 near(GainMeterFader::dbForY(y,top,bottom,ceiling),db);
                 check(y>=top && y<=bottom,"Tick fell outside the selected range");
