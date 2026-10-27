@@ -42,6 +42,7 @@ void test(const char* name, const std::function<void()>& body) {
 #include "ControlMappingV10Tests.h"
 #include "ControlRuntimeTests.h"
 #include "ControlDispatchPolicyTests.h"
+#include "MidiSessionPolicyTests.h"
 #include "ControlColumnTests.h"
 #include "StabilityV7Tests.h"
 #include "ArchitectureV8Tests.h"
@@ -64,6 +65,7 @@ int main() {
     controlMappingV10Tests();
     controlRuntimeTests();
     controlDispatchPolicyTests();
+    midiSessionPolicyTests();
     controlColumnTests();
     stabilityV7Tests();
     architectureV8Tests();
