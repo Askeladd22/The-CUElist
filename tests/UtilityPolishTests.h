@@ -148,7 +148,8 @@ void utilityPolishTests() {
         auto* masterMute=controlsV3::named(*util,"masterMute");
         auto* output=controlsV3::named(*util,"masterMainOutput");
         check(masterPan && masterMute && output,"Master Audio controls missing");
-        check(std::abs(masterPan->getCentreX()-masterMute->getCentreX())<=2 &&
+        check(std::abs(masterPan->getBounds().getCentreX()-
+                       masterMute->getBounds().getCentreX())<=2 &&
               masterMute->getY()>=masterPan->getBottom()+55 &&
               masterMute->getRight()<CueGrid::nameWidth &&
               output->getRight()<masterPan->getX(),
