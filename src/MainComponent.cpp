@@ -69,6 +69,21 @@ MainComponent::MainComponent(bool startAudio) {
     masterMute.setWantsKeyboardFocus(false);
     utilities.addAndMakeVisible(masterMute);
     masterMute.onClick=[this] { setMasterMute(masterMute.getToggleState()); };
+    masterOutput.setName("masterMainOutput");
+    masterOutput.setTooltip("Stereo physical output for the Master Bus only. Direct outputs are unaffected.");
+    masterOutput.onChange=[this] {
+        if(masterOutput.getSelectedId()>0) setMasterOutput(masterOutput.getSelectedId()-1);
+    };
+    utilities.addAndMakeVisible(masterOutput);
+    safetyLimiter.setName("masterSafetyLimiter");
+    safetyLimiter.setTooltip("Fixed transparent -1 dBFS peak limiter (instant attack, 150 ms release). Master Bus only.");
+    safetyLimiter.setToggleState(show.safetyLimiterEnabled,juce::dontSendNotification);
+    safetyLimiter.setWantsKeyboardFocus(false);
+    safetyLimiter.onClick=[this] {setSafetyLimiter(safetyLimiter.getToggleState());};
+    utilities.addAndMakeVisible(safetyLimiter);
+    limiterIndicator.setName("masterLimiterIndicator");
+    limiterIndicator.setTooltip("Red while the Master Bus limiter is reducing gain.");
+    utilities.addAndMakeVisible(limiterIndicator);
     rowBehaviour.addItemList({"Use cell settings","Retrigger","Pause / Restart","Pause / Resume","Continue"},1);
     cellTab.setWantsKeyboardFocus(false); rowTab.setWantsKeyboardFocus(false);
     cellTab.onClick=[this] { if (applyInspector()) { rowSettings=false; refresh(); } };
@@ -575,6 +590,48 @@ void MainComponent::setMasterMute(bool muted) {
     status=muted ? "PCM MASTER muted." : "PCM MASTER unmuted.";
     utilities.repaint(); repaint();
 }
+void MainComponent::setMasterOutput(int channel) {
+    if(channel<0 || channel>1022 || channel%2!=0 || show.masterOutput==channel) return;
+    show.masterOutput=channel; dirty=true;
+    engine.publish(makeRenderState(show,clips));
+    status="Master Bus Main Out set to "+juce::String(channel+1)+"/"+juce::String(channel+2)+".";
+    utilities.refreshRouting(); repaint();
+}
+void MainComponent::setSafetyLimiter(bool enabled) {
+    if(show.safetyLimiterEnabled==enabled) return;
+    show.safetyLimiterEnabled=enabled; dirty=true;
+    engine.publish(makeRenderState(show,clips));
+    status=enabled ? "Master Safety Limiter enabled." : "Master Safety Limiter bypassed.";
+    safetyLimiter.setToggleState(enabled,juce::dontSendNotification);
+    repaint();
+}
+void MainComponent::setColumnMasterSend(int column,bool enabled) {
+    if(column<0 || column>=(int)show.columns.size() ||
+       show.columns[(size_t)column].type!=ColumnType::audio ||
+       show.columns[(size_t)column].masterSend==enabled) return;
+    show.columns[(size_t)column].masterSend=enabled;
+    dirty=true; engine.publish(makeRenderState(show,clips));
+    status=enabled ? "L/R: column sent to stereo Master Bus." : "L/R: column removed from Master Bus.";
+    utilities.refresh(); repaint();
+}
+void MainComponent::setColumnDirectPostFader(int column,bool post) {
+    if(column<0 || column>=(int)show.columns.size() ||
+       show.columns[(size_t)column].type!=ColumnType::audio ||
+       show.columns[(size_t)column].directPostFader==post) return;
+    show.columns[(size_t)column].directPostFader=post;
+    dirty=true; engine.publish(makeRenderState(show,clips));
+    status=post ? "Direct Out: POST column fader." : "Direct Out: PRE column fader.";
+    utilities.refresh(); repaint();
+}
+void MainComponent::setColumnDirectEnabled(int column,bool enabled) {
+    if(column<0 || column>=(int)show.columns.size() ||
+       show.columns[(size_t)column].type!=ColumnType::audio ||
+       show.columns[(size_t)column].directOutputEnabled==enabled) return;
+    show.columns[(size_t)column].directOutputEnabled=enabled;
+    dirty=true; engine.publish(makeRenderState(show,clips));
+    status=enabled ? "Direct Output enabled." : "Direct Output off (L/R unchanged).";
+    utilities.refreshRouting(); repaint();
+}
 void MainComponent::setColumnUtilities(int column,float level,float pan,bool muted,bool inverted) {
     if (column<0 || column>=(int)show.columns.size() || !std::isfinite(level) || !std::isfinite(pan)) return;
     auto& col=show.columns[column];
@@ -586,7 +643,8 @@ void MainComponent::setColumnUtilities(int column,float level,float pan,bool mut
 void MainComponent::setColumnOutput(int column,int outputIndex) {
     if (column<0 || column>=(int)show.columns.size() || show.columns[column].type!=ColumnType::audio
         || outputIndex<0 || outputIndex>1022) return;
-    show.columns[column].output=outputIndex; dirty=true;
+    show.columns[column].output=outputIndex;
+    show.columns[column].directOutputEnabled=true; dirty=true;
     engine.publish(makeRenderState(show,clips));
     status="Column audio output updated."; repaint();
 }

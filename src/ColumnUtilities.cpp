@@ -9,9 +9,12 @@ struct ColumnUtilities::Strip final : juce::Component {
     juce::Slider pan;
     UtilityIcon mute{false},phase{true};
     juce::ComboBox output;
+    juce::TextButton directMode{"POST"};
+    MasterSendButton masterSend;
     juce::TextButton oscDestination{"OSC / destination"};
     juce::TextButton controlLock{"Lock"},controlPriority{"Medium"},controlEdit{"Edit set"};
     int routingChannels=-1, routingOutput=-1;
+    bool routingDirect=false;
     ColumnType routingType=ColumnType::audio;
     juce::String midiSignature;
     juce::StringArray midiIds;
@@ -23,6 +26,15 @@ struct ColumnUtilities::Strip final : juce::Component {
         configureMixerPan(pan);
         gain.setName("columnGainDb"); pan.setName("columnPan"); mute.setName("columnMute"); phase.setName("columnPhase");
         addAndMakeVisible(output); output.setName("columnOutput");
+        addAndMakeVisible(directMode); directMode.setName("columnDirectPrePost");
+        directMode.setTooltip("Direct Output only: PRE bypasses column fader, POST follows it. Master L/R stays POST.");
+        directMode.onClick=[this] {
+            owner.setColumnDirectPostFader(index,!owner.show.columns[(size_t)index].directPostFader);
+        };
+        addAndMakeVisible(masterSend); masterSend.setName("columnMasterSend");
+        masterSend.setTooltip("L/R: post-fader stereo send to Master Bus (independent of Direct Out).");
+        masterSend.setWantsKeyboardFocus(false);
+        masterSend.onClick=[this] {owner.setColumnMasterSend(index,masterSend.getToggleState());};
         addAndMakeVisible(oscDestination); oscDestination.setName("columnOscDestination");
         addAndMakeVisible(controlLock); addAndMakeVisible(controlPriority);
         addAndMakeVisible(controlEdit);
@@ -74,7 +86,8 @@ struct ColumnUtilities::Strip final : juce::Component {
             if (owner.show.columns[index].type==ColumnType::midi) {
                 const int selected=output.getSelectedId()-1;
                 if (selected>=0 && selected<midiIds.size()) owner.setMidiOutput(index,midiIds[selected]);
-            } else if (output.getSelectedId()>0) owner.setColumnOutput(index,output.getSelectedId()-1);
+            } else if(output.getSelectedId()==1) owner.setColumnDirectEnabled(index,false);
+            else if (output.getSelectedId()>1) owner.setColumnOutput(index,output.getSelectedId()-2);
         };
         gain.setTooltip("Gain for all clips in this column. Double-click: 0 dB.");
         pan.setTooltip("Stereo pan/balance. Double-click: center.");
@@ -96,7 +109,12 @@ struct ColumnUtilities::Strip final : juce::Component {
         gain.setGainDb(juce::Decibels::gainToDecibels(col.gain,-60.0f));
         pan.setValue(col.pan,juce::dontSendNotification); mute.setToggleState(col.muted,juce::dontSendNotification);
         phase.setToggleState(col.phaseInverted,juce::dontSendNotification);
-        for (juce::Component* control : std::initializer_list<juce::Component*>{&gain,&pan,&mute,&phase}) control->setVisible(col.type==ColumnType::audio && !col.collapsed);
+        masterSend.setToggleState(col.masterSend,juce::dontSendNotification);
+        directMode.setButtonText(col.directPostFader ? "POST" : "PRE");
+        directMode.setEnabled(col.directOutputEnabled);
+        for (juce::Component* control : std::initializer_list<juce::Component*>{&gain,&pan,&mute,&phase,&masterSend})
+            control->setVisible(col.type==ColumnType::audio && !col.collapsed);
+        directMode.setVisible(col.type==ColumnType::audio && !col.collapsed);
         oscDestination.setVisible(col.type==ColumnType::osc && !col.collapsed);
         output.setVisible(!col.collapsed && (col.type==ColumnType::audio || col.type==ColumnType::midi));
         const bool control=col.type==ColumnType::control;
@@ -142,16 +160,21 @@ struct ColumnUtilities::Strip final : juce::Component {
             output.setSelectedId(selected,juce::dontSendNotification); return;
         }
         if (auto* device=owner.engine.devices.getCurrentAudioDevice()) channels=std::max(1,device->getActiveOutputChannels().countNumberOfSetBits());
-        if (routingChannels==channels && routingOutput==col.output && routingType==col.type) return;
-        routingChannels=channels; routingOutput=col.output; routingType=col.type;
+        if (routingChannels==channels && routingOutput==col.output &&
+            routingDirect==col.directOutputEnabled && routingType==col.type) return;
+        routingChannels=channels; routingOutput=col.output;
+        routingDirect=col.directOutputEnabled; routingType=col.type;
         output.clear(juce::dontSendNotification); output.setEnabled(col.type==ColumnType::audio);
         if (col.type!=ColumnType::audio) {
             output.addItem(col.type==ColumnType::midi ? "MIDI – planned" : "OSC – planned",1);
             output.setSelectedId(1,juce::dontSendNotification); return;
         }
-        for (int i=0;i<channels;i+=2) output.addItem("Out "+juce::String(i+1)+(i+1<channels ? " / "+juce::String(i+2) : " (mono)"),i+1);
-        if (col.output>=channels || col.output%2!=0) output.addItem("Out "+juce::String(col.output+1)+" / "+juce::String(col.output+2)+" (missing)",col.output+1);
-        output.setSelectedId(col.output+1,juce::dontSendNotification);
+        output.addItem("Direct Off",1);
+        for (int i=0;i<channels;i+=2)
+            output.addItem("Out "+juce::String(i+1)+(i+1<channels ? " / "+juce::String(i+2) : " (mono)"),i+2);
+        if (col.output>=channels || col.output%2!=0)
+            output.addItem("Out "+juce::String(col.output+1)+" / "+juce::String(col.output+2)+" (missing)",col.output+2);
+        output.setSelectedId(col.directOutputEnabled ? col.output+2 : 1,juce::dontSendNotification);
     }
     void updateMeter() {
         if (owner.show.columns[(size_t)index].type!=ColumnType::audio) return;
@@ -161,10 +184,12 @@ struct ColumnUtilities::Strip final : juce::Component {
     }
     void resized() override {
         const int w=getWidth(),h=getHeight();
-        output.setBounds(6,4,w-12,25);
+        output.setBounds(6,4,w-67,25);
+        directMode.setBounds(w-56,4,50,25);
         oscDestination.setBounds(6,4,w-12,28);
         gain.setBounds(7,33,92,std::max(98,h-36));
         pan.setBounds(w-60,34,49,49);
+        masterSend.setBounds(w-52,127,33,33);
         mute.setBounds(w-77,h-36,32,29);
         phase.setBounds(w-42,h-36,32,29);
         controlLock.setBounds(6,5,65,29);
@@ -222,21 +247,45 @@ void ColumnUtilities::refresh() {
     owner.masterSlider.toFront(false);
     owner.masterPan.toFront(false);
     owner.masterMute.toFront(false);
+    owner.masterOutput.toFront(false);
+    owner.safetyLimiter.toFront(false);
+    owner.limiterIndicator.toFront(false);
     resized(); repaint();
 }
 void ColumnUtilities::syncScroll(int x) { if (scrollX!=x) { scrollX=x; resized(); repaint(); } }
-void ColumnUtilities::refreshRouting() { for (auto& strip : strips) strip->syncRouting(); }
+void ColumnUtilities::refreshRouting() {
+    for (auto& strip : strips) strip->syncRouting();
+    int channels=2;
+    if(auto* device=owner.engine.devices.getCurrentAudioDevice())
+        channels=std::max(1,device->getActiveOutputChannels().countNumberOfSetBits());
+    if(masterRoutingChannels!=channels || masterRoutingOutput!=owner.show.masterOutput) {
+        masterRoutingChannels=channels; masterRoutingOutput=owner.show.masterOutput;
+        owner.masterOutput.clear(juce::dontSendNotification);
+        for(int i=0;i<channels;i+=2)
+            owner.masterOutput.addItem(juce::String(i+1)+"/"+
+                juce::String(i+2<=channels ? i+2 : i+1),i+1);
+        if(owner.show.masterOutput>=channels)
+            owner.masterOutput.addItem(juce::String(owner.show.masterOutput+1)+"/"+
+                juce::String(owner.show.masterOutput+2)+" (missing)",owner.show.masterOutput+1);
+        owner.masterOutput.setSelectedId(owner.show.masterOutput+1,juce::dontSendNotification);
+    }
+}
 void ColumnUtilities::refreshMeters() {
     for (auto& strip : strips) strip->updateMeter();
     const auto connected=owner.engine.connected.load(std::memory_order_relaxed);
     owner.masterSlider.setStereoPeaks(
         connected ? owner.engine.masterPeakLeft.load(std::memory_order_relaxed) : 0.0f,
         connected ? owner.engine.masterPeakRight.load(std::memory_order_relaxed) : 0.0f);
+    owner.limiterIndicator.setActive(
+        connected && owner.engine.limiterActive.load(std::memory_order_relaxed));
 }
 void ColumnUtilities::resized() {
     owner.masterSlider.setBounds(21-scrollX,34,92,std::max(92,getHeight()-37));
     owner.masterPan.setBounds(214-scrollX,38,49,49);
     owner.masterMute.setBounds(222-scrollX,130,37,33);
+    owner.masterOutput.setBounds(121-scrollX,59,90,25);
+    owner.safetyLimiter.setBounds(121-scrollX,126,67,30);
+    owner.limiterIndicator.setBounds(193-scrollX,130,23,23);
     for (size_t i=0;i<strips.size();++i)
         strips[i]->setBounds(owner.grid.columnX((int)i)-scrollX,1,
                               owner.grid.columnWidthAt((int)i),getHeight()-2);
@@ -256,7 +305,9 @@ void ColumnUtilities::paint(juce::Graphics& g) {
         +juce::String((int)std::round(std::abs(pan)*100)),
         {210-scrollX,108,62,18},11,palette::text,false,juce::Justification::centred);
     label(g,"MUTE",{262-scrollX,137,47,20},11,palette::muted,true);
-    label(g,"PCM audio only",{122-scrollX,17,167,17},11,palette::muted);
+    label(g,"MAIN OUT",{123-scrollX,40,88,16},10,palette::muted,true);
+    label(g,"LIMITER",{123-scrollX,106,99,16},10,palette::muted,true);
+    label(g,"PRE-LIMIT L/R",{121-scrollX,17,175,17},10,palette::muted);
     label(g,"MIDI and OSC unaffected",{122-scrollX,179,180,18},11,palette::muted);
 }
 }

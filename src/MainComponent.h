@@ -101,6 +101,7 @@ private:
     MainComponent& owner;
     std::vector<std::unique_ptr<Strip>> strips;
     int scrollX=0;
+    int masterRoutingChannels=-1, masterRoutingOutput=-1;
 };
 class MainComponent final : public juce::Component, private juce::Timer {
 public:
@@ -137,9 +138,14 @@ public:
     void stopCellAt(int row,int column);
     void stopRow(int row);
     void setColumnUtilities(int column,float gain,float pan,bool muted,bool inverted);
+    void setColumnMasterSend(int column,bool enabled);
+    void setColumnDirectPostFader(int column,bool post);
+    void setColumnDirectEnabled(int column,bool enabled);
     void setMasterAudio(float gain);
     void setMasterPan(float pan);
     void setMasterMute(bool muted);
+    void setMasterOutput(int channel);
+    void setSafetyLimiter(bool enabled);
     void openControlPanel(bool editSet=false);
     void editControlSet(int row,int column);
     bool addControlSetBinding(int row,int column,ControlBinding);
@@ -214,6 +220,9 @@ private:
     GainMeterFader masterSlider;
     juce::Slider masterPan;
     UtilityIcon masterMute{false};
+    juce::ComboBox masterOutput;
+    juce::ToggleButton safetyLimiter{"LIMIT"};
+    LimiterIndicator limiterIndicator;
     struct DockResizeHandle : juce::Component, juce::SettableTooltipClient {
         explicit DockResizeHandle(MainComponent& p) : owner(p) { setMouseCursor(juce::MouseCursor::UpDownResizeCursor); }
         void paint(juce::Graphics& g) override { g.setColour(palette::muted); g.fillRoundedRectangle(getLocalBounds().toFloat().withSizeKeepingCentre(76,3),1.5f); }
