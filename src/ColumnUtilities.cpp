@@ -208,11 +208,7 @@ struct ColumnUtilities::Strip final : juce::Component {
             midiActivity.setActive(now<activityUntil);
             return;
         }
-        if(colType==ColumnType::midi || colType==ColumnType::osc) {
-            label(g,"OUTPUT MUTE",{7,getHeight()-65,getWidth()-14,17},10,palette::muted,true);
-            return;
-        }
-        if (colType!=ColumnType::audio) return;
+        if (owner.show.columns[(size_t)index].type!=ColumnType::audio) return;
         const auto stereo=owner.engine.connected.load(std::memory_order_relaxed)
             ? owner.engine.getColumnStereoPeak(id) : std::array<float,2>{{0.0f,0.0f}};
         gain.setStereoPeaks(stereo[0],stereo[1]);
@@ -265,7 +261,11 @@ struct ColumnUtilities::Strip final : juce::Component {
                   {7,120,getWidth()-14,20},10,palette::muted);
             return;
         }
-        if (owner.show.columns[(size_t)index].type!=ColumnType::audio) return;
+        if(colType==ColumnType::midi || colType==ColumnType::osc) {
+            label(g,"OUTPUT MUTE",{7,getHeight()-65,getWidth()-14,17},10,palette::muted,true);
+            return;
+        }
+        if(colType!=ColumnType::audio) return;
         const int h=getHeight(),w=getWidth();
         label(g,"MUTE",{w-86,h-53,42,16},10,palette::muted,true,juce::Justification::centred);
         label(g,"PHASE",{w-47,h-53,46,16},10,palette::muted,true,juce::Justification::centred);
