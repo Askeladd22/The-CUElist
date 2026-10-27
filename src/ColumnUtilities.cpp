@@ -134,13 +134,14 @@ struct ColumnUtilities::Strip final : juce::Component {
             else if (output.getSelectedId()>1) owner.setColumnOutput(index,output.getSelectedId()-2);
         };
         gain.setTooltip("Gain for all clips in this column. Double-click: 0 dB.");
+        gain.setMaximumDb(owner.audioFaderCeilingDb());
         pan.setTooltip("Stereo pan/balance. Double-click: center.");
         phase.setTooltip("Invert the polarity of both column channels."); mute.setTooltip("Mute the entire column without stopping clips.");
         addAndMakeVisible(mute); addAndMakeVisible(phase); mute.setWantsKeyboardFocus(false); phase.setWantsKeyboardFocus(false);
         auto update=[this](int control) {
             const auto col=owner.show.columns[index];
             owner.setColumnUtilities(index,
-                control==0 ? juce::Decibels::decibelsToGain(gain.getGainDb(),-60.0f) : col.gain,
+                control==0 ? GainMeterFader::toLinear(gain.getGainDb()) : col.gain,
                 control==1 ? (float)pan.getValue() : col.pan,
                 control==2 ? mute.getToggleState() : col.muted,
                 control==3 ? phase.getToggleState() : col.phaseInverted);
@@ -150,7 +151,8 @@ struct ColumnUtilities::Strip final : juce::Component {
     }
     void sync() {
         const auto& col=owner.show.columns[index];
-        gain.setGainDb(juce::Decibels::gainToDecibels(col.gain,-60.0f));
+        gain.setMaximumDb(owner.audioFaderCeilingDb());
+        gain.setGainDb(GainMeterFader::fromLinear(col.gain));
         pan.setValue(col.pan,juce::dontSendNotification); mute.setToggleState(col.muted,juce::dontSendNotification);
         phase.setToggleState(col.phaseInverted,juce::dontSendNotification);
         dataMute.setToggleState(col.muted,juce::dontSendNotification);
@@ -270,15 +272,15 @@ struct ColumnUtilities::Strip final : juce::Component {
                          type==ColumnType::audio ? w-67 : w-12,25);
         directMode.setBounds(w-56,8,50,25);
         oscDestination.setBounds(6,4,w-12,28);
-        gain.setBounds(collapsed ? (w-34)/2 : 7,collapsed ? 23 : 33,
-                       collapsed ? 34 : 92,
+        gain.setBounds(collapsed ? (w-34)/2 : 4,collapsed ? 23 : 33,
+                       collapsed ? 34 : 84,
                        collapsed ? std::max(45,h-103) : std::max(98,h-36));
-        pan.setBounds(w-60,34,49,49);
-        masterSend.setBounds(w-48,117,26,26);
+        pan.setBounds(w-49,34,43,43);
+        masterSend.setBounds(w-45,113,26,26);
         mute.setBounds(collapsed ? (w-30)/2 : w-77,h-36,
                        collapsed ? 30 : 32,29);
         phase.setBounds(w-42,h-36,32,29);
-        dataMute.setBounds(collapsed ? (w-30)/2 : (w-32)/2,h-39,30,29);
+        dataMute.setBounds(collapsed ? (w-30)/2 : (w-32)/2,h-36,30,29);
         midiActivity.setBounds(collapsed ? (w-22)/2 : 12,collapsed ? 40 : 42,
                                 collapsed ? 23 : 46,17);
         oscActivity.setBounds(collapsed ? (w-22)/2 : 12,collapsed ? 40 : 42,
@@ -323,20 +325,20 @@ struct ColumnUtilities::Strip final : juce::Component {
         const int h=getHeight(),w=getWidth();
         label(g,"MUTE",{w-86,h-53,42,16},10,palette::muted,true,juce::Justification::centred);
         label(g,"PHASE",{w-47,h-53,46,16},10,palette::muted,true,juce::Justification::centred);
-        label(g,"PAN",{w-63,86,56,16},11,palette::muted,true,juce::Justification::centred);
+        label(g,"PAN",{w-56,80,50,16},11,palette::muted,true,juce::Justification::centred);
         const double v=owner.show.columns[(size_t)index].pan;
         const juce::String panText=std::abs(v)<.005 ? "C" : juce::String(v<0?"L ":"R ")+juce::String((int)std::round(std::abs(v)*100));
-        label(g,panText,{w-63,103,58,18},11,palette::text,false,juce::Justification::centred);
+        label(g,panText,{w-56,98,50,18},11,palette::text,false,juce::Justification::centred);
     }
 };
-ColumnUtilities::ColumnUtilities(MainComponent& p) : owner(p) {}
+ColumnUtilities::ColumnUtilities(MainComponent& p) : owner(p) { addAndMakeVisible(scrollableStrips); }
 ColumnUtilities::~ColumnUtilities()=default;
 void ColumnUtilities::refresh() {
     bool rebuild=strips.size()!=owner.show.columns.size();
     if (!rebuild) for (size_t i=0;i<strips.size();++i) if (strips[i]->id!=owner.show.columns[i].id) rebuild=true;
     if (rebuild) {
         strips.clear();
-        for (int i=0;i<(int)owner.show.columns.size();++i) { auto strip=std::make_unique<Strip>(owner,i); addAndMakeVisible(*strip); strips.push_back(std::move(strip)); }
+        for (int i=0;i<(int)owner.show.columns.size();++i) { auto strip=std::make_unique<Strip>(owner,i); scrollableStrips.addAndMakeVisible(*strip); strips.push_back(std::move(strip)); }
     }
     for (auto& strip : strips) strip->sync();
     // Populate the Master output menu immediately, not only on the next timer.
@@ -380,32 +382,37 @@ void ColumnUtilities::refreshMeters() {
         ? owner.engine.limiterReduction.load(std::memory_order_relaxed) : 0.0f);
 }
 void ColumnUtilities::resized() {
-    owner.masterSlider.setBounds(21-scrollX,34,92,std::max(92,getHeight()-37));
-    owner.masterPan.setBounds(214-scrollX,38,49,49);
-    owner.masterMute.setBounds(222-scrollX,130,37,33);
-    owner.masterOutput.setBounds(121-scrollX,59,90,25);
-    owner.safetyLimiter.setBounds(124-scrollX,127,89,30);
+    // A dedicated child clips scrolling strips to the centre of the mixer.
+    // The Master is pinned at the left; neither area can obscure the other.
+    const int masterWidth=CueGrid::nameWidth;
+    scrollableStrips.setBounds(masterWidth,0,
+        std::max(0,getWidth()-masterWidth),getHeight());
+    owner.masterSlider.setBounds(13,34,78,std::max(92,getHeight()-37));
+    owner.masterPan.setBounds(193,38,43,43);
+    owner.masterMute.setBounds(239,130,34,33);
+    owner.masterOutput.setBounds(104,59,85,25);
+    owner.safetyLimiter.setBounds(104,127,86,30);
     for (size_t i=0;i<strips.size();++i)
-        strips[i]->setBounds(owner.grid.columnX((int)i)-scrollX,1,
+        strips[i]->setBounds(owner.grid.columnX((int)i)-masterWidth-scrollX,1,
                               owner.grid.columnWidthAt((int)i),getHeight()-2);
 }
 void ColumnUtilities::paint(juce::Graphics& g) {
     g.fillAll(palette::panel);
     g.setColour(palette::line); g.drawHorizontalLine(0,0,(float)getWidth());
-    const auto card=juce::Rectangle<float>((float)8-scrollX,4.0f,
+    const auto card=juce::Rectangle<float>(8.0f,4.0f,
         (float)CueGrid::nameWidth-16,(float)std::max(1,getHeight()-8));
     g.setColour(palette::raised.withAlpha(.55f)); g.fillRoundedRectangle(card,8.0f);
     g.setColour(palette::line);g.drawRoundedRectangle(card,8.0f,1.0f);
-    g.setColour(palette::teal);g.fillRoundedRectangle((float)14-scrollX,4.0f,95.0f,3.0f,1.5f);
-    label(g,"MASTER AUDIO",{14-scrollX,10,CueGrid::nameWidth-28,20},13,palette::teal,true);
-    label(g,"PAN",{213-scrollX,91,55,16},11,palette::muted,true,juce::Justification::centred);
+    g.setColour(palette::teal);g.fillRoundedRectangle(14.0f,4.0f,95.0f,3.0f,1.5f);
+    label(g,"MASTER AUDIO",{14,10,CueGrid::nameWidth-28,20},13,palette::teal,true);
+    label(g,"PAN",{188,87,55,16},11,palette::muted,true,juce::Justification::centred);
     const auto pan=owner.show.masterPan;
     label(g,std::abs(pan)<.005f ? juce::String("C") : juce::String(pan<0?"L ":"R ")
         +juce::String((int)std::round(std::abs(pan)*100)),
-        {210-scrollX,108,62,18},11,palette::text,false,juce::Justification::centred);
-    label(g,"MUTE",{262-scrollX,137,47,20},11,palette::muted,true);
-    label(g,"MAIN OUT",{123-scrollX,40,88,16},10,palette::muted,true);
-    label(g,"PRE-LIMIT L/R",{121-scrollX,17,175,17},10,palette::muted);
-    label(g,"MIDI and OSC unaffected",{122-scrollX,179,180,18},11,palette::muted);
+        {186,102,62,18},11,palette::text,false,juce::Justification::centred);
+    label(g,"MUTE",{233,137,47,20},11,palette::muted,true);
+    label(g,"MAIN OUT",{103,40,88,16},10,palette::muted,true);
+    label(g,"PRE-LIMIT L/R",{102,17,160,17},10,palette::muted);
+    label(g,"MIDI and OSC unaffected",{102,179,175,18},11,palette::muted);
 }
 }
