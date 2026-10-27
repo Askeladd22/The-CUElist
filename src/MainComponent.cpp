@@ -236,7 +236,7 @@ void MainComponent::paint(juce::Graphics& g) {
     label(g,"The Cuelist",{60,14,165,32},24,palette::text,true);
     label(g,"SHOW CONTROL",{61,45,130,16},11,palette::muted,true);
     g.setColour(palette::teal); g.fillRect(232,69,65,3);
-    label(g,"CONTROL / MAPPING v10",{334,25,210,22},12,palette::muted);
+    label(g,"CONTROL / MAPPING v10",{310,25,185,22},12,palette::muted);
 
     g.setColour(engine.connected.load() ? palette::teal : palette::red);
     g.fillEllipse((float)w-195,23,9,9);
