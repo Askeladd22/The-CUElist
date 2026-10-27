@@ -23,6 +23,11 @@ enable_testing()
 add_executable(CuelistTests tests/Tests.cpp src/ControlUI.cpp src/MainComponent.cpp src/CueViews.cpp src/Timeline.cpp src/ColumnUtilities.cpp src/GainMeterFader.cpp src/PianoRoll.cpp src/MidiUI.cpp src/OscEditor.cpp src/OscUI.cpp)
 target_link_libraries(CuelistTests PRIVATE CuelistCore CuelistAssets)
 add_test(NAME CuelistTests COMMAND CuelistTests)
+# Optional operator-side hardware inventory and OSC 127.0.0.1 self-test.
+# Never run physical I/O tests automatically on cloud CI hardware.
+add_executable(CuelistHardwareProbe tests/HardwareProbe.cpp)
+target_link_libraries(CuelistHardwareProbe PRIVATE CuelistCore)
+
 juce_add_gui_app(TheCuelist PRODUCT_NAME "The Cuelist" COMPANY_NAME "The Cuelist" BUNDLE_ID "app.thecuelist.desktop" ICON_BIG "${CMAKE_CURRENT_SOURCE_DIR}/assets/thecuelist_icon.png")
 target_sources(TheCuelist PRIVATE src/ControlUI.cpp src/Main.cpp src/MainComponent.cpp src/CueViews.cpp src/Timeline.cpp src/ColumnUtilities.cpp src/GainMeterFader.cpp src/PianoRoll.cpp src/MidiUI.cpp src/OscEditor.cpp src/OscUI.cpp)
 target_link_libraries(TheCuelist PRIVATE CuelistCore CuelistAssets)
