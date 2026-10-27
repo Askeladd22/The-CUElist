@@ -158,7 +158,7 @@ void uiRefinementTests() {
     });
 
 
-    test("Compressed columns are visual-only, read-only and roundtrip in v10",[] {
+    test("Compressed columns retain a compact audio fader and mute and roundtrip in v10",[] {
         MainComponent ui(false);addColumn(ui.show,ColumnType::midi,"Playback MIDI");
         const int original=ui.show.rows[0].cells[0].id;
         auto* grid=cueViewFixtures::find<CueGrid>(ui);
@@ -172,8 +172,12 @@ void uiRefinementTests() {
         check(ui.show.rows[0].cells[0].id==original && ui.select(0,0),
               "Collapsed column lost its cue selection or cell identity");
         auto* utilities=cueViewFixtures::find<ColumnUtilities>(ui);
-        auto* fader=controlsV3::named(*utilities,"columnGainDb");
-        check(fader && !fader->isVisible(),"Collapsed column still exposes editable mixer controls");
+        auto* fader=dynamic_cast<GainMeterFader*>(controlsV3::named(*utilities,"columnGainDb"));
+        auto* mute=controlsV3::named(*utilities,"columnMute");
+        auto* pan=controlsV3::named(*utilities,"columnPan");
+        check(fader && fader->isVisible() && fader->isCompact() &&
+              mute && mute->isVisible() && pan && !pan->isVisible(),
+              "Collapsed Audio Column must retain only compact gain and mute controls");
         Show loaded;
         check(decodeShow(encodeShow(ui.show),loaded).wasOk() &&
               loaded.columns[0].collapsed && !loaded.columns[1].collapsed,
