@@ -267,8 +267,6 @@ void MainComponent::paint(juce::Graphics& g) {
     // available in the Master and channel meters.
     label(g,"SPACE   Next cue",{20,h-84,150,20},12,palette::muted);
     label(g,"ESC          Panic",{20,h-61,150,20},12,palette::muted);
-    label(g,"SHOW WORKSPACE   /   AUDIO  /  MIDI  /  OSC  /  CONTROL",{219,124,510,20},12,palette::muted,true);
-
     constexpr int inspectorWidth=288, inspectorInner=236;
     auto panel=juce::Rectangle<int>(editorX,154,inspectorWidth-20,h-201);
     g.setColour(palette::panel); g.fillRoundedRectangle(panel.toFloat(),9);
