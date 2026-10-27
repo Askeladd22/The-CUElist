@@ -37,6 +37,7 @@ void test(const char* name, const std::function<void()>& body) {
 #include "GainMeterFaderTests.h"
 #include "UiRefinementTests.h"
 #include "RowActionsUiTests.h"
+#include "ShowEditOperationsTests.h"
 #include "ControlMappingV10Tests.h"
 #include "ControlColumnTests.h"
 #include "StabilityV7Tests.h"
@@ -55,6 +56,7 @@ int main() {
     gainMeterFaderTests();
     uiRefinementTests();
     rowActionsUiTests();
+    showEditOperationsTests();
     controlMappingV10Tests();
     controlColumnTests();
     stabilityV7Tests();
