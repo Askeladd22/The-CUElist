@@ -515,7 +515,8 @@ void MainComponent::triggerRow(int row) {
     repaint(); grid.repaint();
 }
 void MainComponent::toggleRowPlayPause(int row) {
-    if(row<0 || row>=(int)show.rows.size() || !select(row,selectedColumn)) return;
+    if(row<0 || row>=(int)show.rows.size() || !applyInspector()) return;
+    // A pause/resume must not change the armed Next Cue or Inspector selection.
     bool active=false,paused=false;
     for(const auto& cell:show.rows[(size_t)row].cells) {
         if(!cell.followsRow) continue;

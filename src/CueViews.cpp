@@ -191,7 +191,8 @@ void CueGrid::paint(juce::Graphics& g) {
                 g.setColour(palette::red);g.fillEllipse((float)x+7,(float)y+6,3.f,3.f);
             }
             if(cell.loop)
-                label(g,"↻",{x+w-19,y+5,15,15},13,palette::amber,true);
+                label(g,"↻",{autoStopVisibleRows.count(row.id) ? x+w-59 : x+w-19,
+                    y+5,15,15},13,palette::amber,true);
             if (autoStopVisibleRows.count(row.id)) {
                 const bool active=row.stopOnNext&&cell.stopOnNext;
                 g.setColour(active?palette::teal.withAlpha(.27f):palette::amber.withAlpha(.16f));
