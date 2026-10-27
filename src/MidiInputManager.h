@@ -60,6 +60,9 @@ private:
     juce::String deviceId;
     std::unique_ptr<juce::MidiInput> input;
     void handleIncomingMidiMessage(juce::MidiInput*,const juce::MidiMessage& message) override {
+        // RX reflects every actual incoming MIDI packet, including unsupported
+        // mapping types (clock, SysEx, program changes), not just queued CCs.
+        received.fetch_add(1,std::memory_order_relaxed);
         Packet p;
         p.channel=message.getChannel();
         if (message.isController()) {
@@ -77,7 +80,6 @@ private:
             dropped.fetch_add(1,std::memory_order_relaxed); return;
         }
         queue[w]=p; write.store(next,std::memory_order_release);
-        received.fetch_add(1,std::memory_order_relaxed);
     }
 };
 }
