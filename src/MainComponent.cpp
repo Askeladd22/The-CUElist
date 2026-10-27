@@ -643,7 +643,9 @@ void MainComponent::timerCallback() {
     // touch a running audio callback. The update is atomic and recoverable.
     if (recoveryEnabled && ++recoveryTicks>=25*20) {
         recoveryTicks=0;
-        if (dirty) {
+        // "Later" must preserve the previous crash snapshot. A new
+        // session must not silently overwrite it before the user decides.
+        if (dirty && !preserveDeferredRecovery) {
             const auto result=ProjectRecovery::checkpoint(show,ProjectRecovery::defaultDirectory());
             if (result.failed()) {
                 juce::Logger::writeToLog("Recovery checkpoint: "+result.getErrorMessage());
@@ -790,7 +792,11 @@ void MainComponent::offerCrashRecovery() {
             if(result.failed()) safe->message(result.getErrorMessage());
             else safe->activateProject(std::move(candidate),{},true);
         } else if(answer==2) ProjectRecovery::discard(ProjectRecovery::defaultDirectory());
-        else safe->preserveDeferredRecovery=true;
+        else {
+            safe->preserveDeferredRecovery=true;
+            safe->status="Recovery deferred: previous checkpoint preserved until you decide.";
+            safe->repaint();
+        }
     });
 }
 void MainComponent::openProject() {
