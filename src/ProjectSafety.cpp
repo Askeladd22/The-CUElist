@@ -79,20 +79,78 @@ bool ProjectRecovery::discard(const juce::File& dir) {
     const auto file=snapshotFile(dir);
     return !file.exists() || file.deleteFile();
 }
-juce::Result ProjectRecovery::checkpoint(const Show& show,const juce::File& dir) {
-    if(const auto valid=validateShow(show);valid.failed()) return valid;
-    // A checkpoint intentionally never invents relative paths: they would be
-    // resolved relative to the recovery folder and could silently point elsewhere.
-    for(const auto& row:show.rows) for(const auto& cell:row.cells)
-        if(cell.file.isNotEmpty() && !juce::File::isAbsolutePath(cell.file))
-            return juce::Result::fail("Recovery requires resolved absolute media paths.");
-    if(dir.createDirectory().failed()) return juce::Result::fail("Cannot create recovery directory.");
-    const auto file=snapshotFile(dir);
+namespace {
+juce::Result writeRecoverySnapshot(const juce::String& text,const juce::File& dir) {
+    if(dir.createDirectory().failed())
+        return juce::Result::fail("Cannot create recovery directory.");
+    const auto file=ProjectRecovery::snapshotFile(dir);
     juce::TemporaryFile staged(file);
-    if(!staged.getFile().replaceWithText(encodeShow(show)) ||
+    if(!staged.getFile().replaceWithText(text) ||
        !staged.overwriteTargetFileWithTemporary())
         return juce::Result::fail("Recovery checkpoint could not be written.");
     return juce::Result::ok();
+}
+juce::Result validateRecoverySource(const Show& show) {
+    if(const auto valid=validateShow(show);valid.failed()) return valid;
+    for(const auto& row:show.rows) for(const auto& cell:row.cells)
+        if(cell.file.isNotEmpty() && !juce::File::isAbsolutePath(cell.file))
+            return juce::Result::fail("Recovery requires resolved absolute media paths.");
+    return juce::Result::ok();
+}
+}
+juce::Result ProjectRecovery::checkpoint(const Show& show,const juce::File& dir) {
+    if(const auto check=validateRecoverySource(show);check.failed()) return check;
+    return writeRecoverySnapshot(encodeShow(show),dir);
+}
+RecoveryCheckpointWriter::RecoveryCheckpointWriter(juce::File directory)
+    :dir(std::move(directory)),worker([this] {run();}) {}
+RecoveryCheckpointWriter::~RecoveryCheckpointWriter() {
+    flush();
+    {
+        std::lock_guard<std::mutex> guard(mutex);
+        stopping=true;
+    }
+    wake.notify_all();
+    if(worker.joinable()) worker.join();
+}
+juce::Result RecoveryCheckpointWriter::enqueue(const Show& show) {
+    if(const auto check=validateRecoverySource(show);check.failed()) return check;
+    // Serialization uses an immutable snapshot on the GUI thread, avoiding
+    // races with edits, while filesystem access is always on the worker.
+    auto text=encodeShow(show);
+    {
+        std::lock_guard<std::mutex> guard(mutex);
+        if(stopping) return juce::Result::fail("Recovery writer is closing.");
+        pending=std::move(text);
+        hasPending=true;
+    }
+    wake.notify_one();
+    return juce::Result::ok();
+}
+void RecoveryCheckpointWriter::flush() {
+    std::unique_lock<std::mutex> lock(mutex);
+    wake.wait(lock,[this] {return !hasPending && !writing;});
+}
+void RecoveryCheckpointWriter::run() {
+    for(;;) {
+        juce::String snapshot;
+        {
+            std::unique_lock<std::mutex> lock(mutex);
+            wake.wait(lock,[this] {return hasPending || stopping;});
+            if(stopping && !hasPending) break;
+            snapshot=std::move(pending);
+            pending.clear();
+            hasPending=false;
+            writing=true;
+        }
+        if(writeRecoverySnapshot(snapshot,dir).failed())
+            failures.fetch_add(1,std::memory_order_relaxed);
+        {
+            std::lock_guard<std::mutex> guard(mutex);
+            writing=false;
+        }
+        wake.notify_all();
+    }
 }
 juce::Result ProjectRecovery::restore(const juce::File& dir,Show& destination) {
     const auto file=snapshotFile(dir);

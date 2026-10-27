@@ -2,6 +2,9 @@
 #include "ShowModel.h"
 #include <juce_core/juce_core.h>
 #include <vector>
+#include <condition_variable>
+#include <mutex>
+#include <thread>
 
 namespace cuelist {
 enum class PreflightLevel { info, warning, critical };
@@ -34,4 +37,25 @@ public:
     static bool exists(const juce::File& directory);
     static bool discard(const juce::File& directory);
 };
+ // Background disk writer. Show validation/serialization remains on the caller
+ // thread; disk creation/replacement is isolated from the UI and audio callback.
+ // A single pending slot bounds memory usage and coalesces repeated snapshots.
+class RecoveryCheckpointWriter final {
+public:
+    explicit RecoveryCheckpointWriter(juce::File directory);
+    ~RecoveryCheckpointWriter();
+    juce::Result enqueue(const Show& show);
+    void flush(); // complete outstanding writes before save/discard/exit
+    unsigned failedWrites() const noexcept {return failures.load();}
+private:
+    void run();
+    juce::File dir;
+    std::mutex mutex;
+    std::condition_variable wake;
+    std::thread worker;
+    juce::String pending;
+    bool hasPending=false,writing=false,stopping=false;
+    std::atomic<unsigned> failures{0};
+};
+
 }
