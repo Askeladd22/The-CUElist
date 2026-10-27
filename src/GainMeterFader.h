@@ -45,10 +45,13 @@ public:
     bool isCompact() const noexcept {return compact;}
     void setCompact(bool value) {if(compact!=value){compact=value;repaint();}}
     float getGainDb() const noexcept { return gainDb; }
+    // Programmatic sync preserves historical gain even above the selected
+    // ceiling. Only an operator edit is constrained to the visible range.
     void setGainDb(float value,bool notify=false) {
         if (std::isnan(value) || value==std::numeric_limits<float>::infinity()) return;
         // Incoming project gain is never modified merely by changing range.
-        const auto next=value==silenceDb ? silenceDb : std::round(value*10.0f)*0.1f;
+        const auto next=value==silenceDb ? silenceDb :
+            std::round((notify ? juce::jlimit(minDb,ceilingDb,value) : value)*10.0f)*0.1f;
         if (next==gainDb || (std::isfinite(next) && std::isfinite(gainDb) && std::abs(next-gainDb)<0.001f)) return;
         gainDb=next; repaint();
         if (notify && onGainChanged) onGainChanged(gainDb);
