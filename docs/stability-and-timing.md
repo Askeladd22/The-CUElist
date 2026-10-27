@@ -1,6 +1,6 @@
 # The Cuelist — Stabilization (0.7) and transport foundations (0.8)
 
-**Current development version:** 0.7.0-alpha.1, **show format:** v10. A successful build is not certification for unattended or safety-critical show operation.
+**Current development version:** 0.8.0-alpha.1, **show format:** v10. A successful build is not certification for unattended or safety-critical show operation.
 
 ## Implemented in the stabilization preview
 
@@ -19,7 +19,7 @@
 4. Select **Save** and save the recovered project to a suitable location. Do not rely on recovery snapshots as your normal archival system.
 5. If recovery is not wanted choose **Discard checkpoint**. **Later** defers the decision for the next launch.
 
-**Limitations:** checkpoint updates are periodic (~20 seconds) and contain applied in-memory model edits, not every keystroke in an Inspector field. Long file writes can briefly occupy the UI thread; moving serialization/writes to a dedicated worker remains 0.8 work. Checkpoints do not make audio media themselves redundant. They are not a substitute for show backups.
+**Limitations:** checkpoint updates are periodic (~20 seconds) and contain applied in-memory model edits, not every keystroke in an Inspector field. Checkpoint *disk writes* now run on a bounded worker thread; project model validation and JSON serialization are still performed on the UI thread. Fully asynchronous model serialization remains future work. Checkpoints do not make audio media themselves redundant. They are not a substitute for show backups.
 
 ## Timing and devices — 0.8 foundations only
 
@@ -42,3 +42,11 @@ The periodic MIDI output refresh closes missing configured devices and attempts 
 `VERSION.txt` is the human-facing version authority. Keep its numeric major/minor/patch identical to `project(TheCuelist VERSION ...)` in CMake. Packages read `VERSION.txt`, and the executable embeds that same version as a quoted compile definition. Alpha/beta suffixes are allowed. Versioning of the serialized `.cuelist` show schema is independent and should change only with incompatible model changes; additive optional fields can remain within v10.
 
 The standard Windows workflow compiles and runs CTest, generates a package, validates its content/hashes, smoke-launches the extracted executable and uploads the archive. Hardware tests remain a separate release gate. Do not promote a preview to 1.0 based only on green CI.
+
+## Additions in the 0.8 alpha
+
+The new `ProjectMediaLoader` prepares decoded PCM separately from `MainComponent`, caches repeated media paths, respects the 512 MiB decoded-audio budget, and never overwrites the previous prepared state on a budget failure. A failed audio import no longer calls PANIC before validating the file. `RecoveryCheckpointWriter` holds at most one pending snapshot plus the one currently being written; writes are atomic and the UI flushes the worker before clearing a checkpoint.
+
+MIDI input reconnection now checks the same configured identifier every second after disconnection, clears stale pressed-key states and avoids triggering GO. MIDI output uses the same exact-ID selection policy; output-worker diagnostics count events dispatched more than 10 ms after their scheduled time. These are dispatch-jitter indicators, **not** end-to-end timing measurements.
+
+For the actual Windows show computer run `powershell -ExecutionPolicy Bypass -File scripts/hardware-check.ps1 -OscLoopback`. It lists audio and MIDI devices without opening MIDI outputs and optionally checks OSC on `127.0.0.1` only. The report is written to `build/hardware-reports`. See [0.8 implementation notes](0.8-implementation.md) for manual tests and remaining architectural work.

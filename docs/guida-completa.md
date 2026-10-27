@@ -1,14 +1,14 @@
 # The Cuelist — Complete Guide
 
-This page contains the detailed operating and technical instructions originally written for version 0.5.0, including subsequent UI features.
+This page describes current 0.8.0-alpha.1 behavior and retains historical context for earlier features. See the [0.8 architecture/integration notes](0.8-implementation.md) for new reliability features and hardware testing.
 
-**0.5.0 · Windows x64 · Portable · C++17 / JUCE 8 · Proprietary license**
+**0.8.0-alpha.1 · Windows x64 · Portable · C++17 / JUCE 8 · Proprietary license**
 
 The Cuelist controls live performances through a cue grid, audio clips, and a timeline. It plays WAV and MP3 files but does not support video. It also supports MIDI note clips with a built-in piano roll. OSC columns send UDP messages to a host/IP address and port configured in the column utilities. OSC clips may contain timed events in seconds or beats, with typed integer, float, string, and boolean arguments.
 
 ## Quick Start
 
-1. Extract **all** files from `The-Cuelist-0.5.0-Windows-x64.zip` into a writable folder.
+1. Extract **all** files from `The-Cuelist-0.8.0-alpha.1-Windows-x64.zip` into a writable folder.
 2. Open **The Cuelist.exe** or **Avvia.cmd**.
 3. Choose a device in **Audio devices**, import a WAV/MP3 file, and select the column's **Out** destination in its utilities.
 
@@ -18,11 +18,11 @@ The C/C++ runtime is statically linked; the verified executable depends only on 
 
 ## Downloading the Portable Executable from GitHub Actions
 
-The **Build Windows portable** workflow builds on Windows x64, runs automated tests, creates the ZIP, and verifies the archive contents and checksums. An optional local offline GUI startup check (`--offline`) is available with `scripts/check-package.ps1 -SmokeLaunch`. Visual Studio is not required to *use* the package.
+The **Build Windows portable** workflow builds on Windows x64, runs automated tests, creates the ZIP, and verifies the archive contents and checksums. The pipeline performs an offline GUI startup/shutdown check (`--offline`) with `scripts/check-package.ps1 -SmokeLaunch`. Visual Studio is not required to *use* the package.
 
 1. Open the repository's **Actions** tab and select **Build Windows portable**.
-2. Open a successful run (green check mark). Under **Artifacts**, download **The-Cuelist-0.5.0-Windows-x64-portable**.
-3. Extract the downloaded artifact. It contains **The-Cuelist-0.5.0-Windows-x64.zip** and a `.sha256` checksum.
+2. Open a successful run (green check mark). Under **Artifacts**, download **The-Cuelist-Windows-x64-portable**.
+3. Extract the downloaded artifact. It contains **The-Cuelist-0.8.0-alpha.1-Windows-x64.zip** and a `.sha256` checksum.
 4. Extract that second ZIP to any folder, including a USB drive, and open **The Cuelist.exe**. No installation is required.
 
 The workflow runs on commits to `feat/desktop-foundation`, pull requests targeting that branch, or manual dispatches from Actions. GitHub artifacts expire after 30 days; download the ZIP for long-term storage.
