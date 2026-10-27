@@ -249,3 +249,15 @@ Executable path: `build/TheCuelist_artefacts/Release/The Cuelist.exe`. Version 0
 The portable package does not include source code. User-created audio and show files retain their respective rights.
 
 JUCE and the other dependencies retain their own licenses. **JUCE licensing for distribution of this proprietary application must be verified before sharing it with third parties**: no license has been declared or activated on behalf of the copyright holder. See [JUCE licensing](https://juce.com/get-juce/) and [JUCE 8.0.12 framework license](https://github.com/juce-framework/JUCE/blob/8.0.12/LICENSE.md).
+
+## Recovery, Preflight and Diagnostics (0.7.0-alpha.1)
+
+**Preflight** (upper-right session toolbar) reports model validation, missing or empty audio media, configured MIDI output IDs that are unavailable, MIDI input disconnection and configured OSC UDP endpoints. OSC endpoints are **not** declared online without an application-level acknowledgement. Preflight is advisory; no existing GO/PANIC keyboard shortcut is removed.
+
+**Diagnostics** shows current local transport state: audio callback command overflow, MIDI input queue drops, MIDI output sent/dropped messages, OSC UDP sent/dropped messages, active voices and device status. Output counters restart when The Cuelist restarts, and an OSC send count does not prove the destination received it.
+
+**Crash recovery**: the app writes an atomic checkpoint to the user's application-data recovery folder every ~20 seconds while unsaved changes exist. After an abnormal exit, choose **Restore**, **Discard checkpoint**, or **Later** at next startup. Restoring does not autoplay or overwrite the saved show; check the recovered show, reconnect unavailable media, and save to a chosen `.cuelist` file. Clean exits discard transient checkpoints (unless you explicitly defer recovery). Checkpoints reference source media by absolute paths; always retain the actual media files.
+
+**Loading safety**: the application parses the new show and loads its media, including memory-limit checks, before stopping the previous show. A failed parse or exceeded PCM memory budget leaves the current show in place. Successfully switching to a new show does stop playback as before.
+
+See [the stability and timing engineering notes](stability-and-timing.md) for operator tests, version policy and remaining 0.8 work.
