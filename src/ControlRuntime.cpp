@@ -277,8 +277,10 @@ void MainComponent::dispatchControl(const ControlEvent& input) {
         return;
     }
     if (binding.target==ControlTarget::masterGain) {
-        if (shouldApplyMappedValue(show.masterGain,action->scaled))
-            setMasterAudio(action->scaled);
+        const float ceiling=juce::Decibels::decibelsToGain((float)audioFaderCeilingDb());
+        const float bounded=std::min(action->scaled,ceiling);
+        if (shouldApplyMappedValue(show.masterGain,bounded))
+            setMasterAudio(bounded);
     } else if (binding.target==ControlTarget::masterPan) {
         if (shouldApplyMappedValue(show.masterPan,action->scaled))
             setMasterPan(action->scaled);
@@ -288,9 +290,12 @@ void MainComponent::dispatchControl(const ControlEvent& input) {
         if (i>=0) {
                 const auto& c=show.columns[(size_t)i];
                 const float currentValue=binding.target==ControlTarget::columnPan ? c.pan : c.gain;
-                if (shouldApplyMappedValue(currentValue,action->scaled)) {
+                const float ceiling=juce::Decibels::decibelsToGain((float)audioFaderCeilingDb());
+                const float bounded=binding.target==ControlTarget::columnGain ?
+                    std::min(action->scaled,ceiling) : action->scaled;
+                if (shouldApplyMappedValue(currentValue,bounded)) {
                     setColumnUtilities(i,
-                        binding.target==ControlTarget::columnGain ? action->scaled : c.gain,
+                        binding.target==ControlTarget::columnGain ? bounded : c.gain,
                         binding.target==ControlTarget::columnPan ? action->scaled : c.pan,
                         c.muted,c.phaseInverted);
                     utilities.refresh();
