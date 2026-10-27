@@ -252,8 +252,10 @@ void MainComponent::resized() {
     addRowButton.setBounds(editorX-188,98,76,33); addColumnButton.setBounds(editorX-104,98,92,33);
     const bool docked=(clipEditor && !clipWindow) || (oscEditor && !oscWindow);
     const int dockHeight=docked ? (clipCollapsed ? 36 : this->dockHeight) : 0;
-    const int gridHeight=std::max(235,h-438-dockHeight);
-    constexpr int utilityHeight=244; // full-height mixing console; cue grid scrolls independently
+    // Prioritise the running cue list on show-sized desktops while preserving
+    // mixer controls, the timeline and docked editors at all window heights.
+    const int gridHeight=std::max(350,h-370-dockHeight);
+    constexpr int utilityHeight=220;
     viewport.setBounds(204,154,editorX-220,gridHeight-utilityHeight);
     utilities.setBounds(204,154+gridHeight-utilityHeight,editorX-220,utilityHeight);
     utilities.syncScroll(viewport.getViewPositionX());
