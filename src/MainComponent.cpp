@@ -209,8 +209,18 @@ MainComponent::~MainComponent() {
     viewport.setViewedComponent(nullptr,false); setLookAndFeel(nullptr);
 }
 
+WorkspaceLayout MainComponent::workspaceLayout() const {
+    const bool docked=(clipEditor && !clipWindow) || (oscEditor && !oscWindow);
+    const int activeDockHeight=docked ? (clipCollapsed ? 36 : dockHeight) : 0;
+    return calculateWorkspaceLayout({getWidth(),getHeight(),activeDockHeight,
+        grid.columnX((int)show.columns.size()),(int)show.rows.size(),
+        CueGrid::headerHeight,CueGrid::rowHeight,CueMetricsOverlay::width});
+}
+
 void MainComponent::paint(juce::Graphics& g) {
-    const int w=getWidth(),h=getHeight(); g.fillAll(palette::background);
+    const int w=getWidth(),h=getHeight();
+    const auto geometry=workspaceLayout();
+    g.fillAll(palette::background);
     g.setColour(palette::raised); g.fillRect(0,0,w,72);
     g.setColour(palette::panel); g.fillRect(0,73,180,h-73);
     g.setColour(palette::teal); g.fillRect(0,0,w,3);
@@ -262,24 +272,23 @@ void MainComponent::paint(juce::Graphics& g) {
     // available in the Master and channel meters.
     label(g,"SPACE   Next cue",{20,h-84,150,20},12,palette::muted);
     label(g,"ESC          Panic",{20,h-61,150,20},12,palette::muted);
-    constexpr int inspectorWidth=288, inspectorInner=236;
-    auto panel=juce::Rectangle<int>(editorX,154,inspectorWidth-20,h-201);
+    const int inspectorInner=geometry.inspectorInnerWidth;
+    auto panel=geometry.inspectorPanel;
     g.setColour(palette::panel); g.fillRoundedRectangle(panel.toFloat(),9);
     g.setColour(palette::line); g.drawRoundedRectangle(panel.toFloat(),9,1.25f);
-    const int x=editorX+16;
-    g.setColour(palette::teal); g.fillRoundedRectangle((float)editorX+13,163.0f,4.0f,49.0f,2.0f);
+    const int x=geometry.inspectorLeft;
+    g.setColour(palette::teal); g.fillRoundedRectangle((float)geometry.editorX+13,163.0f,4.0f,49.0f,2.0f);
     label(g,"INSPECTOR",{x+10,169,200,19},13,palette::teal,true);
     const auto& col=show.columns[selectedColumn];
     label(g,"CUE "+juce::String(selectedRow+1).paddedLeft('0',2),{x+10,195,140,28},22,palette::text,true);
     label(g,typeName(col.type),{x+131,200,98,21},11,palette::type((int)col.type),true,juce::Justification::centredRight);
     g.saveState();
-    { const float factor=juce::jlimit(0.72f,0.92f,(float)(h-232)/730.0f);
-      g.addTransform(juce::AffineTransform(1,0,0,0,factor,226*(1-factor))); }
+    g.addTransform(geometry.inspectorTransform());
     // Paint both Inspector cards in the same scaled coordinate system as
     // their labels and editable controls: CELL was drifting above its card.
     g.setColour(palette::raised.withAlpha(.52f));
-    g.fillRoundedRectangle((float)x-7,228.0f,(float)inspectorInner+14,245.0f,7.0f);
-    g.fillRoundedRectangle((float)x-7,478.0f,(float)inspectorInner+14,337.0f,7.0f);
+    g.fillRoundedRectangle(geometry.inspectorCueCard.toFloat(),7.0f);
+    g.fillRoundedRectangle(geometry.inspectorCellCard.toFloat(),7.0f);
     label(g,"ENTIRE CUE",{x+3,239,inspectorInner-6,20},14,palette::teal,true);
     label(g,"Cue name",{x,270,inspectorInner,18},12,palette::text,true);
     label(g,"Initial BPM",{x,338,inspectorInner,18},12,palette::text,true);
@@ -294,10 +303,12 @@ void MainComponent::paint(juce::Graphics& g) {
     if(col.type==ColumnType::osc)
         label(g,"UDP destination in column Utility",{x,711,inspectorInner,18},10,palette::muted);
     g.restoreState();
-    label(g,status,{192,h-35,std::max(1,editorX-200),25},12,palette::muted);
+    label(g,status,{geometry.viewport.getX(),h-35,std::max(1,geometry.editorX-200),25},12,palette::muted);
 }
 void MainComponent::resized() {
-    const int w=getWidth(),h=getHeight(); editorX=w-288;
+    const int w=getWidth(),h=getHeight();
+    const auto geometry=workspaceLayout();
+    editorX=geometry.editorX;
     newButton.setBounds(13,86,49,29); openButton.setBounds(67,86,49,29); saveButton.setBounds(121,86,49,29);
     projectNameLabel.setBounds(28,138,132,30);
     deviceButton.setBounds(20,188,140,33);
@@ -307,44 +318,33 @@ void MainComponent::resized() {
     preflightButton.setVisible(false); diagnosticsButton.setVisible(false);
     addRowButton.setVisible(false); addColumnButton.setVisible(false);
     const bool docked=(clipEditor && !clipWindow) || (oscEditor && !oscWindow);
-    const int activeDockHeight=docked ? (clipCollapsed ? 36 : this->dockHeight) : 0;
-    // Prioritise the running cue list on show-sized desktops while preserving
-    // mixer controls, the timeline and docked editors at all window heights.
-    // Keep at least one complete timeline lane visible alongside the larger
-    // cue rows. Mixer and cue list remain scrollable; no panel disappears.
-    const int gridHeight=std::max(310,h-400-activeDockHeight);
-    const int utilityHeight=h<800 ? 180 : 208;
-    // Close the large unused band between the toolbar and cue grid, and
-    // reduce the left/right gutters without covering the pinned metrics.
-    constexpr int cueLeft=192, cueTop=86, cueRightGap=8;
-    const int cueWidth=editorX-cueRightGap-cueLeft;
-    viewport.setBounds(cueLeft,cueTop,cueWidth,
-                       gridHeight-utilityHeight+154-cueTop);
-    utilities.setBounds(cueLeft,154+gridHeight-utilityHeight,cueWidth,utilityHeight);
+    // All workspace geometry comes from a single model-independent module.
+    // The component continues to own editor lifetime and visibility.
+    viewport.setBounds(geometry.viewport);
+    utilities.setBounds(geometry.utilities);
     utilities.syncScroll(viewport.getViewPositionX());
-    const int dockY=168+gridHeight;
     clipCollapseButton.setVisible(docked);
     clipCloseButton.setVisible(docked);
     dockResize.setVisible(docked && !clipCollapsed);
     if (docked && !clipCollapsed) {
-        dockResize.setBounds(std::max(700,editorX-245),dockY-8,94,11);
+        dockResize.setBounds(geometry.dockResize);
         dockResize.toFront(false);
     }
     if (docked) {
-        clipCollapseButton.setBounds(522,dockY+4,86,26);
-        clipCloseButton.setBounds(615,dockY+4,82,26);
+        clipCollapseButton.setBounds(geometry.dockCollapse);
+        clipCloseButton.setBounds(geometry.dockClose);
         clipCollapseButton.toFront(false); clipCloseButton.toFront(false);
         if (clipEditor && !clipWindow) {
             clipEditor->setVisible(!clipCollapsed);
-            if (!clipCollapsed) clipEditor->setBounds(cueLeft,dockY,cueWidth,activeDockHeight);
+            if (!clipCollapsed) clipEditor->setBounds(geometry.dockEditor);
         }
         if (oscEditor && !oscWindow) {
             oscEditor->setVisible(!clipCollapsed);
-            if (!clipCollapsed) oscEditor->setBounds(cueLeft,dockY,cueWidth,activeDockHeight);
+            if (!clipCollapsed) oscEditor->setBounds(geometry.dockEditor);
         }
     }
-    timeline.setBounds(cueLeft,dockY+activeDockHeight,cueWidth,std::max(75,h-gridHeight-activeDockHeight-215));
-    const int x=editorX+16, inner=236;
+    timeline.setBounds(geometry.timeline);
+    const int x=geometry.inspectorLeft, inner=geometry.inspectorInnerWidth;
     cellTab.setVisible(false);rowTab.setVisible(false);
     rowBehaviour.setVisible(false);rowMute.setVisible(false);rowGain.setVisible(false);
     behaviour.setVisible(false);cellAutoStop.setVisible(false);
@@ -363,22 +363,13 @@ void MainComponent::resized() {
     importButton.setBounds(x,757,inner,33);
     // Compact inspector on smaller displays, keeping all actions reachable.
     {
-        const float factor=juce::jlimit(0.72f,0.92f,(float)(h-232)/730.0f);
-        for (juce::Component* c : std::initializer_list<juce::Component*>{&rowLoop,&rowName,&bpm,&tempoButton,&cellName,&follow,&loop,&gainDb,&importButton,&midiEditButton,&oscEditButton}) {
-            auto b=c->getBounds(); b.setY(226+(int)((b.getY()-226)*factor)); b.setHeight(std::max(22,(int)(b.getHeight()*factor))); c->setBounds(b);
-        }
+        for (juce::Component* c : std::initializer_list<juce::Component*>{&rowLoop,&rowName,&bpm,&tempoButton,&cellName,&follow,&loop,&gainDb,&importButton,&midiEditButton,&oscEditButton})
+            c->setBounds(geometry.scaleInspectorControl(c->getBounds()));
     }
     goButton.setBounds(14,h-282,152,48);
     panicButton.setBounds(14,h-228,152,48);
-    // Reserve overlay clearance only when the real columns exceed the
-    // usable cue area: a one-column show should not acquire fake scrolling.
-    const int cueContent=grid.columnX((int)show.columns.size())+44;
-    const int clearWidth=viewport.getWidth()-CueMetricsOverlay::width-14;
-    const int scrollWidth=cueContent+(cueContent>clearWidth ? CueMetricsOverlay::width : 0);
-    grid.setSize(std::max(viewport.getWidth()-14,scrollWidth),
-                 std::max(viewport.getHeight()-14,CueGrid::headerHeight+(int)show.rows.size()*CueGrid::rowHeight+44));
-    cueMetrics.setBounds(viewport.getRight()-CueMetricsOverlay::width,viewport.getY(),
-                         CueMetricsOverlay::width,viewport.getHeight());
+    grid.setSize(geometry.gridSize.x,geometry.gridSize.y);
+    cueMetrics.setBounds(geometry.metrics);
     cueMetrics.toFront(false);
 }
 void MainComponent::refresh() {
