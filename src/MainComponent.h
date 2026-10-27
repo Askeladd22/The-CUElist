@@ -36,7 +36,7 @@ public:
     static juce::Colour cueColour(int id);
     bool isInterestedInFileDrag(const juce::StringArray&) override;
     void filesDropped(const juce::StringArray&,int,int) override;
-    static constexpr int rowHeight=62, headerHeight=72, nameWidth=290, columnWidth=136, compressedWidth=48;
+    static constexpr int rowHeight=62, headerHeight=72, nameWidth=290, columnWidth=152, compressedWidth=48;
     static constexpr int rowContentInset=4; // visual padding, used by both paint and hit-testing
 private:
     MainComponent& owner;
