@@ -125,19 +125,20 @@ void CueGrid::paint(juce::Graphics& g) {
         }
         g.saveState();
         g.addTransform(juce::AffineTransform::translation(0.f,(float)rowContentInset));
-        smallButton(g,"^",{5,y+13,18,20},r>0);
-        smallButton(g,"v",{26,y+13,18,20},r+1<(int)show.rows.size());
-        smallButton(g,"x",{47,y+13,18,20},true,true);
-        smallButton(g,"...",{nameWidth-65,y+13,25,20},true);
+        smallButton(g,"^",{5,y+6,18,18},r>0);
+        smallButton(g,"v",{5,y+27,18,18},r+1<(int)show.rows.size());
+        smallButton(g,"x",{27,y+13,18,20},true,true);
         g.setColour(next ? palette::amber : palette::teal);
-        g.fillRoundedRectangle(75.f,(float)y+9,43.f,32.f,5.f);
-        label(g,"GO",{75,y+9,43,32},13,palette::background,true,juce::Justification::centred);
+        g.fillRoundedRectangle(56.f,(float)y+9,42.f,32.f,5.f);
+        label(g,"GO",{56,y+9,42,32},13,palette::background,true,juce::Justification::centred);
         label(g,row.name.isEmpty()?"Untitled cue":row.name,
-            {128,y+4,nameWidth-201,24},15,palette::text,true);
+            {107,y+4,nameWidth-213,24},14,palette::text,true);
         const auto state=playing?"PLAYING":paused?"PAUSED":next?"NEXT CUE":row.muted?"MUTED":"STANDBY";
         label(g,juce::String(r+1).paddedLeft('0',2)+" / "+state,
-            {128,y+29,nameWidth-201,18},11,playing?palette::teal:next?palette::amber:palette::muted,true);
-        transportButton(g,{nameWidth-34,y+13,25,20},true,true);
+            {107,y+29,nameWidth-213,18},10,playing?palette::teal:next?palette::amber:palette::muted,true);
+        smallButton(g,playing?"||":">",{nameWidth-95,y+13,25,20},true);
+        transportButton(g,{nameWidth-65,y+13,25,20},true,true);
+        smallButton(g,"...",{nameWidth-34,y+13,25,20},true);
         for (int c=0;c<(int)show.columns.size();++c) {
             const auto& column=show.columns[(size_t)c];
             const auto& cell=row.cells[(size_t)c];
@@ -151,6 +152,8 @@ void CueGrid::paint(juce::Graphics& g) {
                 g.drawRoundedRectangle((float)x+5,(float)y+7,(float)w-10,39.f,5.f,1.f);
                 if (loaded) g.fillEllipse((float)x+w/2-4,(float)y+21,8.f,8.f);
                 else label(g,"—",{x+8,y+13,w-16,20},12,palette::muted,true,juce::Justification::centred);
+                if(!cell.followsRow) {g.setColour(palette::red);g.fillEllipse((float)x+6,(float)y+8,3.f,3.f);}
+                if(cell.loop) label(g,"↻",{x+w-19,y+8,12,15},12,palette::amber,true);
                 continue;
             }
             const auto box=juce::Rectangle<float>((float)x+4,(float)y+3,(float)w-8,49.f);
@@ -184,6 +187,11 @@ void CueGrid::paint(juce::Graphics& g) {
                           column.type==ColumnType::midi?"+ MIDI":"+ OSC",
                           {x+8,y+11,w-16,20},11,missing?palette::red:palette::muted,
                           false,juce::Justification::centred);
+            if(!cell.followsRow) {
+                g.setColour(palette::red);g.fillEllipse((float)x+7,(float)y+6,3.f,3.f);
+            }
+            if(cell.loop)
+                label(g,"↻",{x+w-19,y+5,15,15},13,palette::amber,true);
             if (autoStopVisibleRows.count(row.id)) {
                 const bool active=row.stopOnNext&&cell.stopOnNext;
                 g.setColour(active?palette::teal.withAlpha(.27f):palette::amber.withAlpha(.16f));
@@ -259,8 +267,10 @@ void CueGrid::mouseDown(const juce::MouseEvent& e) {
     const int row=e.y>=headerHeight ? (e.y-headerHeight)/rowHeight : -1;
     const int column=columnAt(e.x);
     if (e.mods.isPopupMenu()) {
-        if (row>=0 && row<(int)owner.show.rows.size())
-            showRowMenu(row,e.getScreenPosition(),column);
+        if (row>=0 && row<(int)owner.show.rows.size()) {
+            if(column>=0) showCellMenu(row,column,e.getScreenPosition());
+            else showRowMenu(row,e.getScreenPosition());
+        }
         return;
     }
     if (!e.mods.isLeftButtonDown()) return;
@@ -285,19 +295,23 @@ void CueGrid::mouseDown(const juce::MouseEvent& e) {
     if (row<0 || row>=(int)owner.show.rows.size()) return;
     const int localY=(e.y-headerHeight)%rowHeight-rowContentInset;
     if (e.x<nameWidth) {
-        if (e.x<70 && e.getNumberOfClicks()>1) return;
+        if (e.x<50 && e.getNumberOfClicks()>1) return;
         if (localY>=13 && localY<34 && e.x>=nameWidth-34 && e.x<nameWidth-9) {
-            if (e.getNumberOfClicks()==1) owner.stopRow(row);
-            return;
-        }
-        if (localY>=13 && localY<33 && e.x>=nameWidth-65 && e.x<nameWidth-40) {
             if (e.getNumberOfClicks()==1) showRowMenu(row,e.getScreenPosition());
             return;
         }
-        if (localY>=13 && localY<33 && e.x>=5 && e.x<23) owner.reorderRow(row,-1);
-        else if (localY>=13 && localY<33 && e.x>=26 && e.x<44) owner.reorderRow(row,1);
-        else if (localY>=13 && localY<33 && e.x>=47 && e.x<65) owner.deleteRow(row);
-        else if (e.x>=75 && e.x<118 && localY>=9 && localY<41) owner.triggerRow(row);
+        if (localY>=13 && localY<33 && e.x>=nameWidth-65 && e.x<nameWidth-40) {
+            if (e.getNumberOfClicks()==1) owner.stopRow(row);
+            return;
+        }
+        if (localY>=13 && localY<33 && e.x>=nameWidth-95 && e.x<nameWidth-70) {
+            if (e.getNumberOfClicks()==1) owner.toggleRowPlayPause(row);
+            return;
+        }
+        if (localY>=6 && localY<24 && e.x>=5 && e.x<23) owner.reorderRow(row,-1);
+        else if (localY>=27 && localY<45 && e.x>=5 && e.x<23) owner.reorderRow(row,1);
+        else if (localY>=13 && localY<33 && e.x>=27 && e.x<45) owner.deleteRow(row);
+        else if (e.x>=56 && e.x<98 && localY>=9 && localY<41) owner.triggerRow(row);
         else owner.select(row,owner.selectedColumn);
         return;
     }
@@ -357,7 +371,7 @@ void CueGrid::mouseDoubleClick(const juce::MouseEvent& e) {
     }
     const int row=(e.y-headerHeight)/rowHeight;
     if (row<0 || row>=(int)owner.show.rows.size()) return;
-    if (e.x>=128 && e.x<nameWidth-40) owner.renameTitle(false,row);
+    if (e.x>=107 && e.x<nameWidth-100) owner.renameTitle(false,row);
     else if (column>=0 && !owner.show.columns[(size_t)column].collapsed) {
         const int localX=e.x-columnX(column),localY=(e.y-headerHeight)%rowHeight-rowContentInset;
         if (localY>=25 && localY<43 && localX>=columnWidthAt(column)-49) return;

@@ -530,6 +530,23 @@ void MainComponent::triggerRow(int row) {
     }
     repaint(); grid.repaint();
 }
+void MainComponent::toggleRowPlayPause(int row) {
+    if(row<0 || row>=(int)show.rows.size() || !select(row,selectedColumn)) return;
+    bool active=false,paused=false;
+    for(const auto& cell:show.rows[(size_t)row].cells) {
+        if(!cell.followsRow) continue;
+        const auto p=engine.getCellPlayback(cell.id);
+        active=active||p.playing;
+        paused=paused||p.paused;
+    }
+    if(!active && !paused) {triggerRow(row);return;}
+    if(!engine.connected.load()) {message("No audio device available.");return;}
+    if(!engine.sendRowPauseToggle(show.rows[(size_t)row].id)) {
+        engine.panic();message("Transport command queue full.");return;
+    }
+    status=active ? "Cue paused." : "Cue resumed.";
+    grid.repaint();repaint();
+}
 void MainComponent::goNext() { if (nextCue<(int)show.rows.size()) triggerRow(nextCue); else { status="End of sequence. Select a cue to restart."; repaint(); } }
 void MainComponent::triggerCell() {
     if (!applyInspector()) return;
@@ -706,10 +723,14 @@ bool MainComponent::keyPressed(const juce::KeyPress& key) {
     if (key.getModifiers().isCommandDown() && !dynamic_cast<juce::TextEditor*>(juce::Component::getCurrentlyFocusedComponent())) {
         if (key.getKeyCode()=='C' || key.getKeyCode()=='c') return copySelectedCell();
         if (key.getKeyCode()=='V' || key.getKeyCode()=='v') return pasteSelectedCell();
+        if (key.getKeyCode()=='X' || key.getKeyCode()=='x') return cutSelectedCell();
     }
     if (key.getModifiers().isCommandDown() && (key.getKeyCode()=='Z' || key.getKeyCode()=='z'))
         return key.getModifiers().isShiftDown() ? redoEdit() : undoEdit();
     if (key.getModifiers().isCommandDown() && (key.getKeyCode()=='Y' || key.getKeyCode()=='y')) return redoEdit();
+    if (key.getKeyCode()==juce::KeyPress::backspaceKey &&
+        !dynamic_cast<juce::TextEditor*>(juce::Component::getCurrentlyFocusedComponent()))
+        return deleteSelectedCell();
     if (key==juce::KeyPress::escapeKey) { stopAll(); return true; }
     if (key.getModifiers().isCommandDown() && key.getKeyCode()=='S') { saveProject(); return true; }
     if (key==juce::KeyPress::spaceKey && !dynamic_cast<juce::TextEditor*>(juce::Component::getCurrentlyFocusedComponent())) { goNext(); return true; }
@@ -1106,6 +1127,44 @@ void MainComponent::moveClip(int sr,int sc,int tr,int tc) {
     auto result=moveCell(show,sr,sc,tr,tc); if (result.failed()) { status=result.getErrorMessage(); repaint(); return; }
     selectedRow=tr; selectedColumn=tc; nextCue=tr;
     refreshControlSettings(); changed("Cells swapped.",true);
+}
+void MainComponent::setCellLoop(int row,int column,bool enabled) {
+    if(row<0 || row>=(int)show.rows.size() || column<0 ||
+       column>=(int)show.columns.size() || show.columns[(size_t)column].collapsed) return;
+    if(!applyInspector()) return;
+    auto& cell=show.rows[(size_t)row].cells[(size_t)column];
+    if(cell.loop==enabled) return;
+    cell.loop=enabled;
+    changed(enabled ? "Cell loop enabled." : "Cell loop disabled.");
+}
+void MainComponent::setCellFollowsRow(int row,int column,bool enabled) {
+    if(row<0 || row>=(int)show.rows.size() || column<0 ||
+       column>=(int)show.columns.size() || show.columns[(size_t)column].collapsed) return;
+    if(!applyInspector()) return;
+    auto& cell=show.rows[(size_t)row].cells[(size_t)column];
+    if(cell.followsRow==enabled) return;
+    cell.followsRow=enabled;
+    changed(enabled ? "Cell included in Row GO." : "Cell excluded from Row GO.");
+}
+bool MainComponent::deleteSelectedCell() {
+    if(selectedRow<0 || selectedRow>=(int)show.rows.size() ||
+       selectedColumn<0 || selectedColumn>=(int)show.columns.size() ||
+       show.columns[(size_t)selectedColumn].collapsed ||
+       (show.columns[(size_t)selectedColumn].type==ColumnType::control &&
+        show.columns[(size_t)selectedColumn].controlLocked) || !applyInspector()) return false;
+    auto& cell=show.rows[(size_t)selectedRow].cells[(size_t)selectedColumn];
+    const int id=cell.id;
+    clips.erase(id);
+    // Clear content and settings with a stable cell identity.
+    cell=Cell{};cell.id=id;
+    closeMidiClip();closeOscClip();
+    refreshControlSettings();
+    changed("Cell deleted. Source files were not touched.");
+    return true;
+}
+bool MainComponent::cutSelectedCell() {
+    if(!copySelectedCell()) return false;
+    return deleteSelectedCell();
 }
 bool MainComponent::copySelectedCell() {
     if (selectedRow<0 || selectedRow>=(int)show.rows.size() ||

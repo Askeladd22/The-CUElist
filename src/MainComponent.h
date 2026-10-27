@@ -23,6 +23,7 @@ public:
     void mouseDrag(const juce::MouseEvent&) override;
     void mouseUp(const juce::MouseEvent&) override;
     void showRowMenu(int row,juce::Point<int> clickPosition,int cellColumn=-1);
+    void showCellMenu(int row,int column,juce::Point<int> screenPosition);
     int columnX(int index) const;
     int columnWidthAt(int index) const;
     int columnAt(int x) const;
@@ -133,6 +134,7 @@ public:
     bool hasClip(int row,int column) const;
     double clipDuration(int row,int column) const;
     void triggerRow(int row);
+    void toggleRowPlayPause(int row);
     void triggerCell();
     void triggerCellAt(int row,int column);
     void stopCellAt(int row,int column);
@@ -189,6 +191,10 @@ public:
     void setClipDuration(int column,double durationSeconds);
     bool copySelectedCell();
     bool pasteSelectedCell();
+    bool cutSelectedCell();
+    bool deleteSelectedCell();
+    void setCellLoop(int row,int column,bool enabled);
+    void setCellFollowsRow(int row,int column,bool enabled);
     void editRowBpm(int row);
     void seekTimeline(double seconds);
     void goNext();
