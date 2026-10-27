@@ -210,7 +210,9 @@ private:
     juce::TooltipWindow tooltip{this,600};
     CueGrid grid{*this}; CueMetricsOverlay cueMetrics{*this}; Timeline timeline{*this}; juce::Viewport viewport;
     ColumnUtilities utilities{*this};
-    juce::TextButton openButton{"Open"},saveButton{"Save"},newButton{"New"},addRowButton{"+ Cue"},addColumnButton{"+ Column"};
+    juce::TextButton openButton{"Open"},saveButton{"Save"},newButton{"New"},addRowButton{"+"},addColumnButton{"+"};
+    juce::TextButton preferencesButton{"Preferences"};
+    juce::Label projectNameLabel;
     juce::TextButton preflightButton{"Preflight"},diagnosticsButton{"Diagnostics"};
     juce::TextButton goButton{"GO  /  SPACE"},panicButton{"PANIC  /  ESC"},deviceButton{"Audio devices"},controlButton{"CONTROL MAPPING"};
     juce::TextButton importButton{"Import WAV / MP3"},playCellButton{"Play cell"},stopCellButton{"Stop"},clearButton{"Remove audio"};
@@ -276,6 +278,9 @@ private:
     int editorX=0;
     float displayPeak=0;
     int midiRefreshTicks=0;
+    uint64_t lastMidiRx=0,lastMidiTx=0,lastOscTx=0;
+    bool activityInitialized=false;
+    double midiRxUntil=0,midiTxUntil=0,oscTxUntil=0;
     unsigned midiInputReconnectAttempts=0;
     int recoveryTicks=0;
     bool recoveryEnabled=false;
@@ -288,6 +293,8 @@ private:
                                PreparedShowMedia prepared);
     void showPreflight();
     void showDiagnostics();
+    void showColumnMenu(juce::Point<int> screenPoint);
+    void addCue();
     void timerCallback() override;
     void midiClipEdited(int cellId,const MidiClip& before,const MidiClip& after,bool complete);
     void restoreMidiClip(int cellId,const MidiClip& snapshot);
