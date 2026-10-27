@@ -83,8 +83,10 @@ MainComponent::MainComponent(bool startAudio) {
     utilities.addAndMakeVisible(safetyLimiter);
     rowBehaviour.addItemList({"Use cell settings","Retrigger","Pause / Restart","Pause / Resume","Continue"},1);
     cellTab.setWantsKeyboardFocus(false); rowTab.setWantsKeyboardFocus(false);
-    cellTab.onClick=[this] { if (applyInspector()) { rowSettings=false; refresh(); } };
-    rowTab.onClick=[this] { if (applyInspector()) { rowSettings=true; refresh(); } };
+    // The Inspector displays Entire Q and Cell simultaneously; legacy tabs
+    // are retained as non-visible compatibility members only.
+    cellTab.setVisible(false);
+    rowTab.setVisible(false);
     rowName.setSelectAllWhenFocused(true); cellName.setSelectAllWhenFocused(true); bpm.setInputRestrictions(6,"0123456789.");
     rowName.setName("cueName"); cellName.setName("cellName"); bpm.setName("cueBpm");
     for (auto* editor : {&rowName,&cellName,&bpm}) editor->setEscapeAndReturnKeysConsumed(false);
@@ -248,9 +250,8 @@ void MainComponent::paint(juce::Graphics& g) {
     const int x=editorX+16;
     g.setColour(palette::teal); g.fillRoundedRectangle((float)editorX+13,163.0f,4.0f,49.0f,2.0f);
     g.setColour(palette::raised.withAlpha(.52f));
-    g.fillRoundedRectangle((float)x-7,228.0f,(float)inspectorInner+14,177.0f,7.0f);
-    g.fillRoundedRectangle((float)x-7,414.0f,(float)inspectorInner+14,
-                           (float)std::max(130,h-476),7.0f);
+    g.fillRoundedRectangle((float)x-7,228.0f,(float)inspectorInner+14,245.0f,7.0f);
+    g.fillRoundedRectangle((float)x-7,478.0f,(float)inspectorInner+14,337.0f,7.0f);
     label(g,"INSPECTOR",{x+10,169,200,19},13,palette::teal,true);
     const auto& col=show.columns[selectedColumn];
     label(g,"CUE "+juce::String(selectedRow+1).paddedLeft('0',2),{x+10,195,140,28},22,palette::text,true);
@@ -258,21 +259,16 @@ void MainComponent::paint(juce::Graphics& g) {
     g.saveState();
     { const float factor=juce::jlimit(0.72f,0.92f,(float)(h-232)/730.0f);
       g.addTransform(juce::AffineTransform(1,0,0,0,factor,226*(1-factor))); }
-    label(g,"Cue name",{x,235,inspectorInner,18},13,palette::text,true);
-    label(g,"Initial BPM",{x,303,inspectorInner,18},13,palette::text,true);
-    g.setColour(palette::line); g.drawHorizontalLine(405,(float)x,(float)x+inspectorInner);
-    if (!rowSettings) {
-    label(g,"CELL  /  "+col.name,{x,420,inspectorInner,20},14,palette::teal,true);
-    label(g,"Playback mode",{x,490,inspectorInner,18},13,palette::text,true);
-    if (col.type==ColumnType::audio) label(g,"Gain",{x,621,70,20},12,palette::muted);
-    if (col.type==ColumnType::osc)
-        label(g,"UDP destination in utilities",{x,707,inspectorInner,18},11,palette::teal);
-    } else {
-        label(g,"WHOLE CUE SETTINGS",{x,420,inspectorInner,20},14,palette::teal,true);
-        label(g,"Playback on row GO",{x,450,inspectorInner,20},12,palette::muted);
-        label(g,"Cue audio gain (dB)",{x,580,inspectorInner,20},12,palette::muted);
-        label(g,"Gain affects audio; MIDI uses velocity.",{x,652,inspectorInner,40},11,palette::muted);
-    }
+    label(g,"ENTIRE Q",{x,239,inspectorInner,20},14,palette::teal,true);
+    label(g,"Cue name",{x,270,inspectorInner,18},12,palette::text,true);
+    label(g,"Initial BPM",{x,338,inspectorInner,18},12,palette::text,true);
+    g.setColour(palette::line);g.drawHorizontalLine(473,(float)x,(float)x+inspectorInner);
+    label(g,"CELL  /  "+col.name,{x,489,inspectorInner,20},14,palette::teal,true);
+    label(g,"Cell name",{x,520,inspectorInner,18},12,palette::text,true);
+    if(col.type==ColumnType::audio)
+        label(g,"Clip gain",{x,592,inspectorInner,18},12,palette::muted,true);
+    if(col.type==ColumnType::osc)
+        label(g,"UDP destination in column Utility",{x,711,inspectorInner,18},10,palette::muted);
     g.restoreState();
     label(g,status,{204,h-35,std::max(1,editorX-218),25},12,palette::muted);
 }
@@ -319,24 +315,26 @@ void MainComponent::resized() {
     }
     timeline.setBounds(204,dockY+activeDockHeight,editorX-220,std::max(75,h-gridHeight-activeDockHeight-215));
     const int x=editorX+16, inner=236;
-    cellTab.setBounds(x,198,112,30); rowTab.setBounds(x+118,198,118,30);
-    rowBehaviour.setBounds(x,479,inner,33); rowMute.setBounds(x,527,inner,24);
-    rowLoop.setBounds(x,553,inner,24); rowGain.setBounds(x,610,inner,29);
-    rowName.setBounds(x,258,inner,35); bpm.setBounds(x,326,inner,35);
-    tempoButton.setBounds(x,368,inner,30); cellName.setBounds(x,450,inner,33);
-    behaviour.setBounds(x,512,inner,33);
-    follow.setBounds(x-3,556,inner,24); loop.setBounds(x-3,587,inner,24);
-    gain.setBounds(x+55,619,inner-55,28);
-    cellAutoStop.setBounds(x-3,647,inner,24);
-    midiEditButton.setBounds(x,673,inner,34);
-    oscEditButton.setBounds(x,673,inner,34);
-    importButton.setBounds(x,722,inner,35);
-    playCellButton.setBounds(x,765,132,33); stopCellButton.setBounds(x+138,765,inner-138,33);
-    clearButton.setBounds(x,804,105,31); applyButton.setBounds(x+111,804,inner-111,31);
+    cellTab.setVisible(false);rowTab.setVisible(false);
+    rowBehaviour.setVisible(false);rowMute.setVisible(false);rowGain.setVisible(false);
+    behaviour.setVisible(false);cellAutoStop.setVisible(false);
+    clearButton.setVisible(false);applyButton.setVisible(false);
+    playCellButton.setVisible(false);stopCellButton.setVisible(false);
+    rowName.setBounds(x,291,inner,33);
+    bpm.setBounds(x,359,inner,32);
+    tempoButton.setBounds(x,397,inner,29);
+    rowLoop.setBounds(x-3,440,inner,25);
+    cellName.setBounds(x,541,inner,31);
+    gain.setBounds(x+52,594,inner-52,27);
+    follow.setBounds(x-3,630,inner,25);
+    loop.setBounds(x-3,663,inner,25);
+    midiEditButton.setBounds(x,714,inner,33);
+    oscEditButton.setBounds(x,714,inner,33);
+    importButton.setBounds(x,757,inner,33);
     // Compact inspector on smaller displays, keeping all actions reachable.
     {
         const float factor=juce::jlimit(0.72f,0.92f,(float)(h-232)/730.0f);
-        for (juce::Component* c : std::initializer_list<juce::Component*>{&rowBehaviour,&rowMute,&rowLoop,&rowGain,&rowName,&bpm,&tempoButton,&cellName,&behaviour,&follow,&loop,&cellAutoStop,&gain,&importButton,&midiEditButton,&oscEditButton,&playCellButton,&stopCellButton,&clearButton,&applyButton}) {
+        for (juce::Component* c : std::initializer_list<juce::Component*>{&rowLoop,&rowName,&bpm,&tempoButton,&cellName,&follow,&loop,&gain,&importButton,&midiEditButton,&oscEditButton}) {
             auto b=c->getBounds(); b.setY(226+(int)((b.getY()-226)*factor)); b.setHeight(std::max(22,(int)(b.getHeight()*factor))); c->setBounds(b);
         }
     }
@@ -373,40 +371,32 @@ void MainComponent::refreshInspector() {
     rowGain.setValue(juce::Decibels::gainToDecibels(row.gain,-60.0f),juce::dontSendNotification);
     rowMute.setToggleState(row.muted,juce::dontSendNotification); rowLoop.setToggleState(row.loop,juce::dontSendNotification);
     rowBehaviour.setSelectedId(row.overrideBehaviour ? (int)row.behaviour+2 : 1,juce::dontSendNotification);
-    for (juce::Component* component : std::initializer_list<juce::Component*>{&cellName,&behaviour,&follow,&loop,&cellAutoStop,&gain,&importButton,&midiEditButton,&oscEditButton,&playCellButton,&stopCellButton,&clearButton}) component->setVisible(!rowSettings);
-    for (juce::Component* component : std::initializer_list<juce::Component*>{&rowBehaviour,&rowGain,&rowMute,&rowLoop}) component->setVisible(rowSettings);
-    bool audio=col.type==ColumnType::audio; const bool midi=col.type==ColumnType::midi;
-    for (juce::Component* component : std::initializer_list<juce::Component*>{&importButton,&midiEditButton,&oscEditButton,&playCellButton,&stopCellButton,&clearButton,&gain,&loop,&behaviour,&follow,&cellName}) component->setEnabled(true);
-    gain.setVisible(!rowSettings && audio);
-    midiEditButton.setEnabled(midi); oscEditButton.setEnabled(col.type==ColumnType::osc);
-    midiEditButton.setVisible(!rowSettings && midi);
-    oscEditButton.setVisible(!rowSettings && col.type==ColumnType::osc);
-    oscEditButton.setButtonText(c.osc ? "Edit OSC clip" : "Create OSC clip");
-    midiEditButton.setButtonText(c.midi ? "Edit piano roll" : "Create MIDI clip");
-    importButton.setVisible(!rowSettings && (audio || midi));
-    importButton.setButtonText(midi ? "Import MIDI" : "Import WAV / MP3");
-    importButton.setTooltip(midi ? "Files .mid/.midi: import notes using cue tempo." : "Mono or stereo WAV / MP3.");
-    clearButton.setButtonText(col.type==ColumnType::control ? "Clear set" :
-        col.type==ColumnType::osc ? "Remove OSC" : midi ? "Remove MIDI" : "Remove audio");
+    // The Entire Q controls and Cell controls are visible together, with no
+    // redundant transport, behavioural presets or manual Apply button.
+    rowSettings=false;
+    for(juce::Component* component:std::initializer_list<juce::Component*>{
+         &cellTab,&rowTab,&rowGain,&rowMute,&rowBehaviour,&behaviour,&cellAutoStop,
+         &playCellButton,&stopCellButton,&clearButton,&applyButton})
+        component->setVisible(false);
+    for(juce::Component* component:std::initializer_list<juce::Component*>{
+         &rowName,&bpm,&tempoButton,&rowLoop,&cellName,&follow,&loop})
+        component->setVisible(true);
+    const bool audio=col.type==ColumnType::audio;
+    const bool midi=col.type==ColumnType::midi;
+    const bool osc=col.type==ColumnType::osc;
     const bool control=col.type==ColumnType::control;
-    const bool loaded=hasClip(selectedRow,selectedColumn);
-    playCellButton.setVisible(!rowSettings && !control);
-    stopCellButton.setVisible(!rowSettings && !control);
-    clearButton.setVisible(!rowSettings && (!control || !col.controlLocked));
-    clearButton.setEnabled(!control && (loaded || c.file.isNotEmpty()) ||
-        control && c.controlSet.has_value() && !col.controlLocked);
-    playCellButton.setEnabled(loaded); stopCellButton.setEnabled(loaded);
-    oscEditButton.setVisible(!rowSettings && (col.type==ColumnType::osc || control));
-    if (control) {
-        oscEditButton.setButtonText(col.controlLocked ? "Edit default Control Set" : "Edit Control Set");
-        oscEditButton.setEnabled(true);
-    }
-    if (col.collapsed && !rowSettings)
-        for (juce::Component* component : std::initializer_list<juce::Component*>{
-             &cellName,&behaviour,&follow,&loop,&gain,&cellAutoStop,
-             &importButton,&midiEditButton,&oscEditButton,
-             &playCellButton,&stopCellButton,&clearButton})
-            component->setEnabled(false);
+    gain.setVisible(audio);
+    midiEditButton.setVisible(midi);
+    oscEditButton.setVisible(osc || control);
+    oscEditButton.setButtonText(control ? (col.controlLocked?"Edit default Control Set":"Edit Control Set")
+                                      : c.osc ? "Edit OSC clip" : "Create OSC clip");
+    midiEditButton.setButtonText(c.midi ? "Edit piano roll" : "Create MIDI clip");
+    importButton.setVisible(audio || midi);
+    importButton.setButtonText(midi?"Import MIDI":"Import WAV / MP3");
+    importButton.setTooltip(midi?"Import notes from .mid/.midi.":"Import WAV/MP3.");
+    for(juce::Component* component:std::initializer_list<juce::Component*>{
+        &cellName,&follow,&loop,&gain,&importButton,&midiEditButton,&oscEditButton})
+        component->setEnabled(!col.collapsed && !(control && col.controlLocked && component!=&oscEditButton));
 }
 bool MainComponent::select(int row,int column) {
     if (row<0 || row>=(int)show.rows.size() || column<0 || column>=(int)show.columns.size() || !applyInspector()) return false;
@@ -427,29 +417,23 @@ void MainComponent::changed(const juce::String& text,bool stopPlayback) {
 bool MainComponent::inspectorDiffers() const {
     const auto& row=show.rows[selectedRow]; const auto& cell=row.cells[selectedColumn];
     if (rowName.getText().trim()!=row.name || bpm.getText()!=juce::String(row.tempo.front().bpm,1)) return true;
-    if (rowMute.getToggleState()!=row.muted || rowLoop.getToggleState()!=row.loop
-        || rowBehaviour.getSelectedId()!=(row.overrideBehaviour ? (int)row.behaviour+2 : 1)
-        || std::abs(rowGain.getValue()-juce::Decibels::gainToDecibels(row.gain,-60.0f))>0.051) return true;
+    if(rowLoop.getToggleState()!=row.loop) return true;
     if (show.columns[selectedColumn].collapsed) return false;
-    if (show.columns[selectedColumn].type==ColumnType::osc)
-        return cellName.getText().trim()!=cell.name || behaviour.getSelectedId()!=(int)cell.behaviour+1
-            || follow.getToggleState()!=cell.followsRow || loop.getToggleState()!=cell.loop;
-    return cellName.getText().trim()!=cell.name || behaviour.getSelectedId()!=(int)cell.behaviour+1 || follow.getToggleState()!=cell.followsRow
-        || loop.getToggleState()!=cell.loop || std::abs(gain.getValue()-juce::Decibels::gainToDecibels(cell.gain,-60.0f))>0.051;
+    return cellName.getText().trim()!=cell.name ||
+        follow.getToggleState()!=cell.followsRow || loop.getToggleState()!=cell.loop ||
+        (show.columns[selectedColumn].type==ColumnType::audio &&
+         std::abs(gain.getValue()-juce::Decibels::gainToDecibels(cell.gain,-60.0f))>0.051);
 }
 bool MainComponent::applyInspector() {
     if (!inspectorDiffers()) return true;
     auto candidate=show; auto& row=candidate.rows[selectedRow]; auto& cell=row.cells[selectedColumn];
     row.name=rowName.getText().trim();
-    row.muted=rowMute.getToggleState(); row.loop=rowLoop.getToggleState();
-    row.overrideBehaviour=rowBehaviour.getSelectedId()>1;
-    if (row.overrideBehaviour) row.behaviour=(Behaviour)(rowBehaviour.getSelectedId()-2);
-    row.gain=juce::Decibels::decibelsToGain((float)rowGain.getValue(),-60.0f);
+    row.loop=rowLoop.getToggleState();
     if (bpm.getText()!=juce::String(row.tempo.front().bpm,1)) row.tempo.front().bpm=bpm.getText().getDoubleValue();
     if (!candidate.columns[(size_t)selectedColumn].collapsed) {
-        cell.name=cellName.getText().trim(); cell.behaviour=(Behaviour)(behaviour.getSelectedId()-1);
+        cell.name=cellName.getText().trim();
         cell.followsRow=follow.getToggleState(); cell.loop=loop.getToggleState();
-        if (candidate.columns[selectedColumn].type!=ColumnType::osc)
+        if (candidate.columns[selectedColumn].type==ColumnType::audio)
             cell.gain=juce::Decibels::decibelsToGain((float)gain.getValue(),-60.0f);
     }
     auto result=validateShow(candidate); if (result.failed()) { message(result.getErrorMessage()); return false; }
