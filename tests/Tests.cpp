@@ -103,28 +103,25 @@ int main() {
     controlsV3Tests();
     engineV4Tests();
     controlsV4Tests();
-    test("inspector activation menu and dB fader control live PCM without resetting cursor", [] {
-        MainComponent ui(false); ui.engine.connected.store(true);
-        auto clip=std::make_shared<AudioClip>(); clip->sampleRate=4; clip->samples.setSize(1,20);
-        for (int i=0;i<20;++i) clip->samples.setSample(0,i,0.01f*(i+1));
-        ui.clips[ui.show.rows[0].cells[0].id]=clip; ui.engine.publish(makeRenderState(ui.show,ui.clips)); ui.select(0,0);
-        juce::ComboBox* behaviour=nullptr; juce::Slider* gain=nullptr;
-        for (auto* child : ui.getChildren()) {
-            if (auto* combo=dynamic_cast<juce::ComboBox*>(child)) if (combo->getItemText(0)=="Retrigger") behaviour=combo;
-            if (child->getName()=="cellGainDb") gain=dynamic_cast<juce::Slider*>(child);
-        }
-        check(behaviour && gain,"Audio inspector controls absent");
-        auto sample=[&] { float value=0; float* out[]{&value}; ui.engine.collectRetired(); ui.engine.processBlock(out,1,1,4); return value; };
-        ui.triggerCell(); near(sample(),0.01);
-        gain->setValue(-6,juce::sendNotificationSync); const auto level=std::pow(10.0,-6.0/20.0); near(sample(),0.02*level);
-        behaviour->setSelectedId(3,juce::sendNotificationSync); ui.triggerCell(); near(sample(),0);
-        ui.triggerCell(); near(sample(),0.03*level);
-        behaviour->setSelectedId(4,juce::sendNotificationSync); ui.triggerCell(); near(sample(),0.04*level);
-        check(behaviour->getNumItems()==4,"Removed Stop remains in menu");
-        ui.stopCellAt(0,0); near(sample(),0);
-        behaviour->setSelectedId(1,juce::sendNotificationSync); ui.triggerCell(); near(sample(),0.01*level);
-        behaviour->setSelectedId(2,juce::sendNotificationSync); ui.triggerCell(); near(sample(),0);
-        ui.triggerCell(); near(sample(),0.01*level);
+    test("Inspector exposes clip gain, while legacy playback modes remain stored but hidden",[] {
+        MainComponent ui(false);ui.engine.connected.store(true);
+        auto clip=std::make_shared<AudioClip>();clip->sampleRate=4;clip->samples.setSize(1,20);
+        for(int i=0;i<20;++i) clip->samples.setSample(0,i,.01f*(i+1));
+        ui.clips[ui.show.rows[0].cells[0].id]=clip;
+        ui.engine.publish(makeRenderState(ui.show,ui.clips));
+        auto* gain=dynamic_cast<juce::Slider*>(controlsV3::named(ui,"cellGainDb"));
+        check(gain && gain->isVisible(),"Clip gain disappeared from Inspector");
+        auto sample=[&] {
+            float result=0;float* out[]{&result};
+            ui.engine.collectRetired();ui.engine.processBlock(out,1,1,4);return result;
+        };
+        ui.triggerCell();near(sample(),.01);
+        gain->setValue(-6,juce::sendNotificationSync);
+        near(sample(),.02*std::pow(10.0,-6.0/20.0));
+        auto* hiddenMode=dynamic_cast<juce::ComboBox*>(controlsV3::named(ui,"cellBehaviour"));
+        if(hiddenMode) check(!hiddenMode->isVisible(),"Legacy playback mode is still exposed");
+        check(ui.show.rows[0].cells[0].behaviour==Behaviour::retrigger,
+              "Retrigger default changed during Inspector simplification");
     });
     test("Enter commits names and GO advances without wrapping", [] {
         MainComponent ui(false); addRow(ui.show,{}); ui.engine.connected.store(true);

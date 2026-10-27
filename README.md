@@ -49,3 +49,12 @@ Audio Columns now have independent **L/R Master Send** (post-strip fader), **Dir
 - MIDI and OSC columns now have an independent **output data Mute** using their existing persisted `Column::muted` field. Cue state and playhead continue; MIDI note-on dispatch is blocked when muted and changing mute while notes are sounding invalidates pending MIDI messages and releases existing notes. The OSC dispatcher also invalidates packets queued before a mute transition.
 - MIDI Output TX indicator lights green briefly only when the MIDI output worker actually calls the device send for that column. It is not a MIDI input meter and does not report merely queued/pending events; the operating system/device may still fail downstream.
 - Master has one compact `Limit` toggle: OFF (empty LED), ON idle (dim red), ON reducing gain (bright red). The limiter DSP settings and Master routing remain unchanged.
+
+## Transport and Inspector UX — 0.9.0-beta.4
+
+- Safety Limiter visual intensity now follows **current** Master gain reduction rather than a latched per-block peak. The limiter DSP and Master/Direct routing are unchanged.
+- MIDI and OSC retain output Mute and real-dispatch activity LEDs in compressed Utilities, with aligned compact Mute controls in the extended layout.
+- Vertical row reorder arrows. Added row Play/Pause (next to Stop and the row context menu): pauses/resumes existing row-mode audio/MIDI/OSC voices and their position through the existing callback command queue, without restarting the row.
+- Right-clicking a cell now opens a **cell-only** menu (delete, cut, copy, paste, loop, Row GO inclusion). The cue menu remains separate. Ctrl+X cuts and Backspace deletes the selected cell while respecting focused text editors, locked Control columns and the existing clipboard identity rules.
+- Inspector: Entire Q and Cell appear together. Retained cue name, BPM/tempo map and Loop All Clips, followed by cell name, Clip Gain (audio), Include in Row GO, Loop Playback, Import MIDI and Piano Roll/OSC editing. Removed redundant tabs, playback modes, apply, transport and per-type removal controls from the displayed panel; legacy show fields remain stored for backward compatibility.
+- Cells show a red dot when excluded from Row GO and a small loop glyph when Loop Playback is enabled, including compressed cells.
