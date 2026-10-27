@@ -53,7 +53,7 @@ MainComponent::MainComponent(bool startAudio) {
     masterSlider.setTooltip("MASTER AUDIO: PCM output fader and L/R meter. Double-click: 0 dB.");
     utilities.addAndMakeVisible(masterSlider);
     masterSlider.onGainChanged=[this](float db) {
-        setMasterAudio(juce::Decibels::decibelsToGain(db,-60.0f));
+        setMasterAudio(GainMeterFader::toLinear(db));
     };
     configureMixerPan(masterPan);
     masterPan.setName("masterPan");
@@ -123,15 +123,28 @@ MainComponent::MainComponent(bool startAudio) {
         }
     };
     preferencesButton.setName("projectPreferences");
-    preferencesButton.setTooltip("Pre-flight checks and live diagnostics.");
+    preferencesButton.setTooltip("Pre-flight, diagnostics and fader display range.");
+    // Application setting, never serialized into or applied destructively to a Show.
+    juce::PropertiesFile::Options prefOptions;
+    prefOptions.applicationName="The Cuelist";
+    prefOptions.filenameSuffix="settings";
+    prefOptions.folderName="The Cuelist";
+    appPreferences=std::make_unique<juce::PropertiesFile>(prefOptions);
+    faderCeilingDb=appPreferences->getIntValue("audioFaderCeilingDb",6)==0 ? 0 : 6;
+    masterSlider.setMaximumDb(faderCeilingDb);
     preferencesButton.onClick=[this] {
         juce::PopupMenu menu;
         menu.addItem(1,"Pre-flight"); menu.addItem(2,"Diagnostics");
+        juce::PopupMenu faderMenu;
+        faderMenu.addItem(3,"-inf dB / +6 dB",true,faderCeilingDb==6);
+        faderMenu.addItem(4,"-inf dB / 0 dB",true,faderCeilingDb==0);
+        menu.addSubMenu("Fader Range",faderMenu);
         auto safe=juce::Component::SafePointer<MainComponent>(this);
         menu.showMenuAsync(juce::PopupMenu::Options().withTargetComponent(&preferencesButton),[safe](int choice) {
             if (!safe) return;
             if(choice==1) safe->showPreflight();
             else if(choice==2) safe->showDiagnostics();
+            else if(choice==3 || choice==4) safe->setAudioFaderCeilingDb(choice==3 ? 6 : 0);
         });
     };
     newButton.onClick=[this] { withDiscardConfirmation([this] { if(projectLoader) projectLoader->cancel(); closeMidiClip(); closeOscClip(); editHistory.clearUndoHistory(); stopAll(); show=makeShow(); clips.clear(); projectFile={}; selectedRow=selectedColumn=nextCue=0;
@@ -208,6 +221,22 @@ MainComponent::~MainComponent() {
     delete deviceDialog.getComponent();
     delete controlDialog.getComponent();
     viewport.setViewedComponent(nullptr,false); setLookAndFeel(nullptr);
+}
+
+void MainComponent::setAudioFaderCeilingDb(int db) {
+    const int chosen=db==0 ? 0 : 6;
+    if (faderCeilingDb==chosen) return;
+    faderCeilingDb=chosen;
+    if (appPreferences) {
+        appPreferences->setValue("audioFaderCeilingDb",chosen);
+        appPreferences->saveIfNeeded();
+    }
+    // A range change must never alter Show gain, queued transport or MIDI/OSC.
+    masterSlider.setMaximumDb(chosen);
+    utilities.refresh();
+    status=chosen==0 ? "Audio faders: -inf / 0 dB (unity at maximum)." :
+        "Audio faders: -inf / +6 dB.";
+    repaint();
 }
 
 WorkspaceLayout MainComponent::workspaceLayout() const {
