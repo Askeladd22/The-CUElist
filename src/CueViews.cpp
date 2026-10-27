@@ -46,6 +46,19 @@ void drawLoopIcon(juce::Graphics& g,juce::Rectangle<int> bounds,juce::Colour col
     arrow.addTriangle(tip.x,tip.y,left.x,left.y,right.x,right.y);
     g.fillPath(arrow);
 }
+void playPauseIcon(juce::Graphics& g,juce::Rectangle<int> box,bool pause) {
+    g.setColour(palette::raised); g.fillRoundedRectangle(box.toFloat(),5);
+    g.setColour(palette::line); g.drawRoundedRectangle(box.toFloat().reduced(.5f),5,1);
+    g.setColour(palette::teal);
+    const float cx=(float)box.getCentreX(),cy=(float)box.getCentreY();
+    if (pause) {
+        g.fillRoundedRectangle(cx-5.5f,cy-5.f,3.5f,10.f,0.7f);
+        g.fillRoundedRectangle(cx+2.f,cy-5.f,3.5f,10.f,0.7f);
+    } else {
+        juce::Path p; p.addTriangle(cx-3.5f,cy-5.5f,cx-3.5f,cy+5.5f,cx+5.f,cy);
+        g.fillPath(p);
+    }
+}
 void transportButton(juce::Graphics& g,juce::Rectangle<int> box,bool stop,bool enabled) {
     g.setColour((stop ? palette::red : palette::teal).withAlpha(enabled ? .16f : .06f));
     g.fillRoundedRectangle(box.toFloat(),5);
@@ -169,7 +182,7 @@ void CueGrid::paint(juce::Graphics& g) {
         const auto state=playing?"PLAYING":paused?"PAUSED":next?"NEXT CUE":row.muted?"MUTED":"STANDBY";
         label(g,juce::String(r+1).paddedLeft('0',2)+" / "+state,
             {107,y+29,nameWidth-213,18},10,playing?palette::teal:next?palette::amber:palette::muted,true);
-        smallButton(g,playing?"||":">",{nameWidth-95,y+13,25,20},true);
+        playPauseIcon(g,{nameWidth-95,y+13,25,20},playing);
         transportButton(g,{nameWidth-65,y+13,25,20},true,true);
         smallButton(g,"...",{nameWidth-34,y+13,25,20},true);
         for (int c=0;c<(int)show.columns.size();++c) {
@@ -317,6 +330,28 @@ void CueGrid::showRowMenu(int row,juce::Point<int> screenPoint,int cellColumn) {
         else if (item>=100 && item<=107) safe->setRowColour(r,item-100);
     });
 }
+void CueGrid::clickRowHeader(int row,int x,int localY,int clicks,juce::Point<int> screen) {
+    if (row<0 || row>=(int)owner.show.rows.size()) return;
+        if (x<50 && clicks>1) return;
+        if (localY>=13 && localY<34 && x>=nameWidth-34 && x<nameWidth-9) {
+            if (clicks==1) showRowMenu(row,screen);
+            return;
+        }
+        if (localY>=13 && localY<33 && x>=nameWidth-65 && x<nameWidth-40) {
+            if (clicks==1) owner.stopRow(row);
+            return;
+        }
+        if (localY>=13 && localY<33 && x>=nameWidth-95 && x<nameWidth-70) {
+            if (clicks==1) owner.toggleRowPlayPause(row);
+            return;
+        }
+        if (localY>=6 && localY<24 && x>=5 && x<23) owner.reorderRow(row,-1);
+        else if (localY>=27 && localY<45 && x>=5 && x<23) owner.reorderRow(row,1);
+        else if (localY>=13 && localY<33 && x>=27 && x<45) owner.deleteRow(row);
+        else if (x>=56 && x<98 && localY>=9 && localY<41) owner.triggerRow(row);
+        else owner.select(row,owner.selectedColumn);
+        return;
+}
 void CueGrid::mouseDown(const juce::MouseEvent& e) {
     dragRow=dragColumn=dropRow=dropColumn=-1;dragging=false;
     const int row=e.y>=headerHeight ? (e.y-headerHeight)/rowHeight : -1;
@@ -361,24 +396,7 @@ void CueGrid::mouseDown(const juce::MouseEvent& e) {
     if (row<0 || row>=(int)owner.show.rows.size()) return;
     const int localY=(e.y-headerHeight)%rowHeight-rowContentInset;
     if (e.x<nameWidth) {
-        if (e.x<50 && e.getNumberOfClicks()>1) return;
-        if (localY>=13 && localY<34 && e.x>=nameWidth-34 && e.x<nameWidth-9) {
-            if (e.getNumberOfClicks()==1) showRowMenu(row,e.getScreenPosition());
-            return;
-        }
-        if (localY>=13 && localY<33 && e.x>=nameWidth-65 && e.x<nameWidth-40) {
-            if (e.getNumberOfClicks()==1) owner.stopRow(row);
-            return;
-        }
-        if (localY>=13 && localY<33 && e.x>=nameWidth-95 && e.x<nameWidth-70) {
-            if (e.getNumberOfClicks()==1) owner.toggleRowPlayPause(row);
-            return;
-        }
-        if (localY>=6 && localY<24 && e.x>=5 && e.x<23) owner.reorderRow(row,-1);
-        else if (localY>=27 && localY<45 && e.x>=5 && e.x<23) owner.reorderRow(row,1);
-        else if (localY>=13 && localY<33 && e.x>=27 && e.x<45) owner.deleteRow(row);
-        else if (e.x>=56 && e.x<98 && localY>=9 && localY<41) owner.triggerRow(row);
-        else owner.select(row,owner.selectedColumn);
+        clickRowHeader(row,e.x,localY,e.getNumberOfClicks(),e.getScreenPosition());
         return;
     }
     if (column<0 || owner.show.columns[(size_t)column].collapsed) return;
@@ -461,6 +479,56 @@ void CueGrid::filesDropped(const juce::StringArray& files,int x,int y) {
     if (row<0 || row>=(int)owner.show.rows.size() || column<0 ||
         owner.show.columns[(size_t)column].collapsed) return;
     if (owner.select(row,column)) owner.importFile(juce::File(files[0]));
+}
+void PinnedCueHeaders::paint(juce::Graphics& g) {
+    g.saveState();
+    g.reduceClipRegion(getLocalBounds());
+    // Render the very same row/header artwork as the scrollable grid, but in
+    // a viewport that scrolls only vertically. No cloned hitbox geometry.
+    g.addTransform(juce::AffineTransform::translation(
+        0.0f,-(float)owner.viewport.getViewPositionY()));
+    owner.grid.paint(g);
+    g.restoreState();
+    g.setColour(palette::line);g.drawVerticalLine(getWidth()-1,0,(float)getHeight());
+}
+void PinnedCueHeaders::mouseDown(const juce::MouseEvent& e) {
+    const int y=e.y+owner.viewport.getViewPositionY();
+    const int row=y>=CueGrid::headerHeight ?
+        (y-CueGrid::headerHeight)/CueGrid::rowHeight : -1;
+    if (e.mods.isPopupMenu()) {
+        if (row>=0 && row<(int)owner.show.rows.size())
+            owner.grid.showRowMenu(row,e.getScreenPosition());
+        return;
+    }
+    if (!e.mods.isLeftButtonDown()) return;
+    const int addCueY=CueGrid::headerHeight+
+        (int)owner.show.rows.size()*CueGrid::rowHeight+7;
+    if (y>=addCueY && y<addCueY+29 &&
+        e.x>=CueGrid::nameWidth/2-18 && e.x<CueGrid::nameWidth/2+18) {
+        owner.addCue(); return;
+    }
+    if (row<0 || row>=(int)owner.show.rows.size()) return;
+    owner.grabKeyboardFocus();
+    owner.grid.clickRowHeader(row,e.x,
+        (y-CueGrid::headerHeight)%CueGrid::rowHeight-CueGrid::rowContentInset,
+        e.getNumberOfClicks(),e.getScreenPosition());
+}
+void PinnedCueHeaders::mouseDoubleClick(const juce::MouseEvent& e) {
+    const int y=e.y+owner.viewport.getViewPositionY();
+    const int row=y>=CueGrid::headerHeight ?
+        (y-CueGrid::headerHeight)/CueGrid::rowHeight : -1;
+    if (row>=0 && row<(int)owner.show.rows.size() &&
+        e.x>=107 && e.x<CueGrid::nameWidth-100)
+        owner.renameTitle(false,row);
+}
+void PinnedCueHeaders::mouseWheelMove(const juce::MouseEvent& e,
+                                      const juce::MouseWheelDetails& wheel) {
+    const int x=owner.viewport.getViewPositionX();
+    const int y=owner.viewport.getViewPositionY();
+    if (e.mods.isShiftDown())
+        owner.viewport.setViewPosition(x-(int)(wheel.deltaY*100),y);
+    else owner.viewport.setViewPosition(x,y-(int)(wheel.deltaY*100));
+    repaint();
 }
 void CueMetricsOverlay::paint(juce::Graphics& g) {
     g.fillAll(palette::raised);
