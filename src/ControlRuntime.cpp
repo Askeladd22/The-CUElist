@@ -27,7 +27,7 @@ void MainComponent::refreshControlSettings() {
 
 juce::Result MainComponent::selectControlInput(const juce::String& id) {
     auto result=midiInput.connect(id);
-    pressedInputs.clear();
+    physicalEdges.clear();
     // Preserve an explicitly selected disconnected identifier, never silently
     // switch to the first available device.
     show.controls.midiInputId=id;
@@ -254,38 +254,17 @@ bool MainComponent::setControlColumnPriority(int column,int priority) {
 }
 
 void MainComponent::dispatchControl(const ControlEvent& input) {
-    // Track physical button edges even when a cue has no matching binding.
-    // Otherwise an off/release arriving during a different preset is lost.
-    const auto physical=input.deviceId+"|"+juce::String((int)input.kind)+"|"+
-        juce::String(input.channel)+"|"+juce::String(input.number);
-    const bool wasDown=pressedInputs[physical];
-    const bool isDown=!input.isNoteOff && input.normalized()>=0.5f;
-    pressedInputs[physical]=isDown;
+    // Record even unmatched notes and CC releases, including across a GO
+    // that switches the effective Control Set.
+    const bool wasDown=physicalEdges.recordAndWasDown(input);
     // Hardware MIDI events have already been copied to the UI thread.
     // Pickup compares against the physical value expected for the current
     // actual target. No mutation of show happens in a MIDI callback.
+    // Compare against the actual output associated with the winning
+    // binding, never an Inspector-selected or lower-priority destination.
     std::optional<float> current;
-    // Determine pickup from the same winner the pure mapping engine selected,
-    // rather than an arbitrary earlier global binding.
-    if (const auto* winner=controlMapping.matched(input)) {
-        const auto& b=*winner;
-        if (b.target==ControlTarget::masterGain || b.target==ControlTarget::masterPan) {
-            const float d=b.maximum-b.minimum;
-            if (d>0) current=juce::jlimit(0.0f,1.0f,
-                ((b.target==ControlTarget::masterPan ? show.masterPan : show.masterGain)-b.minimum)/d);
-        } else if (b.target==ControlTarget::columnGain || b.target==ControlTarget::columnPan) {
-            for (const auto& col:show.columns) if (col.id==b.targetColumnId) {
-                const float d=b.maximum-b.minimum;
-                if (d>0) current=juce::jlimit(0.0f,1.0f,
-                    ((b.target==ControlTarget::columnPan ? col.pan : col.gain)-b.minimum)/d);
-                break;
-            }
-        }
-        if (current.has_value()) {
-            current=inverseControlCurve(*current,b.curve);
-            if (b.invert) current=1.0f-*current;
-        }
-    }
+    if (const auto* winner=controlMapping.matched(input))
+        current=mappedPickupTarget(show,*winner);
     const auto action=controlMapping.resolve(input,current);
     if (!action) return;
     const auto& binding=action->binding;
@@ -298,43 +277,41 @@ void MainComponent::dispatchControl(const ControlEvent& input) {
         return;
     }
     if (binding.target==ControlTarget::masterGain) {
-        if (std::abs(show.masterGain-action->scaled)>0.005f)
+        if (shouldApplyMappedValue(show.masterGain,action->scaled))
             setMasterAudio(action->scaled);
     } else if (binding.target==ControlTarget::masterPan) {
-        if (std::abs(show.masterPan-action->scaled)>0.005f)
+        if (shouldApplyMappedValue(show.masterPan,action->scaled))
             setMasterPan(action->scaled);
     } else if (binding.target==ControlTarget::columnGain ||
                binding.target==ControlTarget::columnPan) {
-        for (int i=0;i<(int)show.columns.size();++i)
-            if (show.columns[(size_t)i].id==binding.targetColumnId &&
-                show.columns[(size_t)i].type==ColumnType::audio) {
+        const int i=mappedTargetColumn(show,binding.targetColumnId,ColumnType::audio);
+        if (i>=0) {
                 const auto& c=show.columns[(size_t)i];
                 const float currentValue=binding.target==ControlTarget::columnPan ? c.pan : c.gain;
-                if (std::abs(currentValue-action->scaled)>0.005f) {
+                if (shouldApplyMappedValue(currentValue,action->scaled)) {
                     setColumnUtilities(i,
                         binding.target==ControlTarget::columnGain ? action->scaled : c.gain,
                         binding.target==ControlTarget::columnPan ? action->scaled : c.pan,
                         c.muted,c.phaseInverted);
                     utilities.refresh();
                 }
-                break;
-            }
+        }
     }
     if (binding.target==ControlTarget::midiCc) {
-        for (const auto& col:show.columns) if (col.id==binding.targetColumnId &&
-            col.type==ColumnType::midi) {
+        const int i=mappedTargetColumn(show,binding.targetColumnId,ColumnType::midi);
+        if (i>=0) {
+            const auto& col=show.columns[(size_t)i];
             if (!engine.sendMappedMidiCc(col.midiOutputId,binding.outputChannel,
-                    binding.outputNumber,juce::jlimit(0,127,(int)std::lround(action->scaled))))
+                    binding.outputNumber,mappedMidiCcValue(action->scaled)))
                 status="MIDI control: output unavailable or queue full.";
-            break;
         }
     } else if (binding.target==ControlTarget::oscFloat) {
-        for (const auto& col:show.columns) if (col.id==binding.targetColumnId &&
-            col.type==ColumnType::osc) {
+        const int i=mappedTargetColumn(show,binding.targetColumnId,ColumnType::osc);
+        if (i>=0) {
+            const auto& col=show.columns[(size_t)i];
             if (!controlOutput.sendOscFloat(col.oscHost,col.oscPort,
                 binding.oscAddress,action->scaled))
                 status="OSC control: invalid destination or queue full.";
-            break;
         }
     }
 }
