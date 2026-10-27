@@ -371,7 +371,7 @@ void MainComponent::resized() {
     goButton.setBounds(14,h-282,152,48);
     panicButton.setBounds(14,h-228,152,48);
     grid.setSize(std::max(viewport.getWidth()-14,grid.columnX((int)show.columns.size())+CueMetricsOverlay::width),
-                 std::max(viewport.getHeight()-14,CueGrid::headerHeight+(int)show.rows.size()*CueGrid::rowHeight));
+                 std::max(viewport.getHeight()-14,CueGrid::headerHeight+(int)show.rows.size()*CueGrid::rowHeight+48));
     cueMetrics.setBounds(viewport.getRight()-CueMetricsOverlay::width,viewport.getY(),
                          CueMetricsOverlay::width,viewport.getHeight());
     cueMetrics.toFront(false);
