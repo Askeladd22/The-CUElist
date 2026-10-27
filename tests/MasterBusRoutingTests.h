@@ -163,9 +163,8 @@ void masterBusRoutingTests() {
               "PRE/POST selector missing");
         check(controlsV3::named(ui,"masterMainOutput")!=nullptr,
               "Master Main Output selection missing");
-        check(controlsV3::named(ui,"masterSafetyLimiter")!=nullptr &&
-              controlsV3::named(ui,"masterLimiterIndicator")!=nullptr,
-              "Master limiter toggle or reduction indicator missing");
+        check(dynamic_cast<LimiterToggle*>(controlsV3::named(ui,"masterSafetyLimiter"))!=nullptr,
+              "Unified limiter enable/reduction control missing");
         ui.setColumnMasterSend(0,false);
         ui.setColumnDirectEnabled(0,true);
         ui.setColumnOutput(0,2);

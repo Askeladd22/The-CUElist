@@ -41,3 +41,11 @@ On the actual show PC, run `powershell -ExecutionPolicy Bypass -File scripts/har
 ## Mixer and routing — 0.9 audio-bus update
 
 Audio Columns now have independent **L/R Master Send** (post-strip fader), **Direct Out** (off or a selected physical stereo pair) and **PRE/POST Direct** (PRE bypasses the strip fader only; post-fader Master Send never changes). The Master has its own Main Out, gain/pan/mute, a stereo **pre-limiter** meter and an optional fixed -1 dBFS safety peak limiter (instantaneous attack, 150 ms release) with a red activity LED. Direct routes are never multiplied by Master gain/mute. A direct route that shares the Master Main Out is a *summing collision*: after the Master limiter, the two streams can clip; preflight warns about this. The output stage still clamps each device channel to [-1,+1]. The .cuelist JSON format stays at schema v10, with optional fields and migration for legacy audio routing (default output 1/2 goes through Master, higher output pairs stay direct). MIDI, OSC and cue logic are unchanged. See [routing test cases](tests/MasterBusRoutingTests.h).
+
+## Utility mixer pass — 0.9 beta.3
+
+- A collapsed Audio Column keeps a narrow working gain/meter fader and Mute at the bottom; expanding it restores the original integrated stereo GainMeterFader.
+- Audio Out and PRE/POST are lowered together by four pixels, keeping their widths; MIDI Out spans the full strip width. L/R Master Send is smaller and separated from Phase Invert.
+- MIDI and OSC columns now have an independent **output data Mute** using their existing persisted `Column::muted` field. Cue state and playhead continue; MIDI note-on dispatch is blocked when muted and changing mute while notes are sounding invalidates pending MIDI messages and releases existing notes. The OSC dispatcher also invalidates packets queued before a mute transition.
+- MIDI Output TX indicator lights green briefly only when the MIDI output worker actually calls the device send for that column. It is not a MIDI input meter and does not report merely queued/pending events; the operating system/device may still fail downstream.
+- Master has one compact `Limit` toggle: OFF (empty LED), ON idle (dim red), ON reducing gain (bright red). The limiter DSP settings and Master routing remain unchanged.

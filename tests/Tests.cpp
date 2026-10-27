@@ -27,6 +27,7 @@ void test(const char* name, const std::function<void()>& body) {
 #include "AutoStopV7Tests.h"
 #include "MixerV8Tests.h"
 #include "MasterBusRoutingTests.h"
+#include "UtilityPolishTests.h"
 #include "GainMeterFaderTests.h"
 #include "UiRefinementTests.h"
 #include "RowActionsUiTests.h"
@@ -43,6 +44,7 @@ int main() {
     autoStopV7Tests();
     mixerV8Tests();
     masterBusRoutingTests();
+    utilityPolishTests();
     gainMeterFaderTests();
     uiRefinementTests();
     rowActionsUiTests();
