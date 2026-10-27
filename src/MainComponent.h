@@ -102,6 +102,7 @@ public:
 private:
     struct Strip;
     MainComponent& owner;
+    juce::Component scrollableStrips;
     std::vector<std::unique_ptr<Strip>> strips;
     int scrollX=0;
     int masterRoutingChannels=-1, masterRoutingOutput=-1;
