@@ -26,7 +26,7 @@ void cueViewTests() {
         auto* grid=find<CueGrid>(ui); check(grid!=nullptr,"Grid absent");
         const int row=ui.show.rows[1].id, column=ui.show.columns[1].id;
         click(*grid,16,CueGrid::headerHeight+CueGrid::rowHeight+CueGrid::rowContentInset+22); check(ui.show.rows[0].id==row,"Middle row up arrow did not move one step");
-        click(*grid,35,CueGrid::headerHeight+CueGrid::rowContentInset+22); check(ui.show.rows[1].id==row,"Row down arrow did not move one step");
+        click(*grid,16,CueGrid::headerHeight+CueGrid::rowContentInset+36); check(ui.show.rows[1].id==row,"Row down arrow did not move one step");
         click(*grid,40,CueGrid::headerHeight+CueGrid::rowHeight+CueGrid::rowContentInset+22,2); check(ui.show.rows[1].id==row,"Second double click reordered again");
         click(*grid,CueGrid::nameWidth+CueGrid::columnWidth+(CueGrid::columnWidth-54),21); check(ui.show.columns[0].id==column,"Middle column left arrow did not move one step");
         click(*grid,CueGrid::nameWidth+CueGrid::columnWidth-34,21); check(ui.show.columns[1].id==column,"Column right arrow did not move one step");
@@ -63,7 +63,7 @@ void cueViewTests() {
     test("last cue and column delete hitboxes reset to blank usable show", [] {
         MainComponent ui(false); auto* grid=find<CueGrid>(ui); check(grid!=nullptr,"Grid absent");
         const auto rowId=ui.show.rows[0].id, columnId=ui.show.columns[0].id;
-        click(*grid,56,CueGrid::headerHeight+CueGrid::rowContentInset+22); check(ui.show.rows.size()==1 && ui.show.rows[0].id!=rowId,"Last cue delete was disabled");
+        click(*grid,36,CueGrid::headerHeight+CueGrid::rowContentInset+22); check(ui.show.rows.size()==1 && ui.show.rows[0].id!=rowId,"Last cue delete was disabled");
         click(*grid,CueGrid::nameWidth+CueGrid::columnWidth-12,21); check(ui.show.columns.size()==1 && ui.show.columns[0].id!=columnId,"Last column delete was disabled");
         check(validateShow(ui.show).wasOk(),"Delete hitboxes left invalid show");
     });

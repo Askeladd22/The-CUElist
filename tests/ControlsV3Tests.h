@@ -38,7 +38,7 @@ void controlsV3Tests() {
         click(*grid,CueGrid::nameWidth+2*CueGrid::columnWidth-40,CueGrid::headerHeight+CueGrid::rowContentInset+33); near(sample(),.3);
         click(*grid,CueGrid::nameWidth+CueGrid::columnWidth-40,CueGrid::headerHeight+CueGrid::rowHeight+CueGrid::rowContentInset+33); near(sample(),.7);
         click(*grid,CueGrid::nameWidth+CueGrid::columnWidth-16,CueGrid::headerHeight+CueGrid::rowContentInset+33); near(sample(),.6);
-        click(*grid,CueGrid::nameWidth-20,CueGrid::headerHeight+CueGrid::rowContentInset+23); near(sample(),.4);
+        click(*grid,CueGrid::nameWidth-52,CueGrid::headerHeight+CueGrid::rowContentInset+23); near(sample(),.4);
         check(ui.nextCueIndex()==1,"Stop changed sequential GO target");
     });
     test("column mixer widgets affect live PCM and stay aligned when scrolled", [] {

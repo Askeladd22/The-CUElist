@@ -4,9 +4,12 @@ inline void pianoRollTests() {
     test("MIDI pause GO remains available without an output device",[] {
         MainComponent ui(false); addColumn(ui.show,ColumnType::midi,{});
         ui.select(0,1);
-        for (auto* child:ui.getChildren()) if (auto* combo=dynamic_cast<juce::ComboBox*>(child))
-            if (combo->getItemText(0)=="Use cell settings") combo->setSelectedId(4,juce::sendNotificationSync);
-        auto& row=ui.show.rows[0]; row.cells[1].midi=MidiClip{4,{{0,4,60,100,1}}};
+        auto& row=ui.show.rows[0];
+        // Legacy pause-resume remains valid in the saved model even though
+        // the playback-mode chooser is no longer exposed in the Inspector.
+        row.overrideBehaviour=true;
+        row.behaviour=Behaviour::pauseResume;
+        row.cells[1].midi=MidiClip{4,{{0,4,60,100,1}}};
         ui.engine.connected.store(true); ui.engine.publish(makeRenderState(ui.show,ui.clips));
         check(ui.engine.send(row.id,true),"Cannot queue initial GO"); ui.engine.processBlock(nullptr,0,1,100);
         check(ui.engine.getCellPlayback(row.cells[1].id).playing,"Test clip not playing");
