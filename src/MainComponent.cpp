@@ -1,4 +1,5 @@
 #include "MainComponent.h"
+#include "ProjectSafety.h"
 #include "PianoRoll.h"
 #include "OscEditor.h"
 #include "MidiClip.h"
@@ -33,9 +34,10 @@ MainComponent::MainComponent(bool startAudio) {
     for (juce::Component* c : std::initializer_list<juce::Component*>{&openButton,&saveButton,&newButton,&addRowButton,&addColumnButton,
          &goButton,&panicButton,&deviceButton,&controlButton,&dockResize,&importButton,&midiEditButton,&oscEditButton,&playCellButton,&stopCellButton,&clearButton,&tempoButton,&applyButton,
          &cellTab,&rowTab,&rowGain,&rowBehaviour,&rowMute,&rowLoop,&rowName,&cellName,&bpm,&behaviour,&follow,&loop,&cellAutoStop,&gain,&viewport,&timeline,&utilities,
-         &clipCollapseButton,&clipCloseButton,&cueMetrics}) addAndMakeVisible(c);
+         &clipCollapseButton,&clipCloseButton,&cueMetrics,&preflightButton,&diagnosticsButton}) addAndMakeVisible(c);
     for (auto* b : {&openButton,&saveButton,&newButton,&addRowButton,&addColumnButton,&goButton,&panicButton,&deviceButton,&controlButton,
-                    &importButton,&midiEditButton,&oscEditButton,&playCellButton,&stopCellButton,&clearButton,&tempoButton,&applyButton}) b->setWantsKeyboardFocus(false);
+                    &importButton,&midiEditButton,&oscEditButton,&playCellButton,&stopCellButton,&clearButton,&tempoButton,&applyButton,
+                    &preflightButton,&diagnosticsButton}) b->setWantsKeyboardFocus(false);
     viewport.setViewedComponent(&grid,false); viewport.setScrollBarsShown(true,true);
     goButton.setColour(juce::TextButton::buttonColourId,juce::Colour(0xff097b70));
     goButton.setColour(juce::TextButton::textColourOffId,palette::text);
@@ -95,8 +97,15 @@ MainComponent::MainComponent(bool startAudio) {
     clipCloseButton.onClick=[this] { closeMidiClip(); closeOscClip(); };
     newButton.onClick=[this] { withDiscardConfirmation([this] { closeMidiClip(); closeOscClip(); editHistory.clearUndoHistory(); stopAll(); show=makeShow(); clips.clear(); projectFile={}; selectedRow=selectedColumn=nextCue=0;
         resetActiveMapping(); refreshControlSettings();
-        dirty=false; engine.publish(makeRenderState(show,clips)); refresh(); status="New show. Import files into Audio cells."; }); };
+        dirty=false; if (recoveryEnabled) {ProjectRecovery::discard(ProjectRecovery::defaultDirectory());preserveDeferredRecovery=false;}
+        engine.publish(makeRenderState(show,clips)); refresh(); status="New show. Import files into Audio cells."; }); };
     openButton.onClick=[this] { withDiscardConfirmation([this] { openProject(); }); };
+    preflightButton.setName("showPreflight");
+    diagnosticsButton.setName("showDiagnostics");
+    preflightButton.setTooltip("Check show media, output devices and controller availability before a performance.");
+    diagnosticsButton.setTooltip("Live engine status and counters for dropped MIDI/OSC/audio commands.");
+    preflightButton.onClick=[this] { showPreflight(); };
+    diagnosticsButton.onClick=[this] { showDiagnostics(); };
     saveButton.onClick=[this] { saveProject(); };
     addRowButton.onClick=[this] { if (!applyInspector()) return; addRow(show,{}); selectedRow=nextCue=(int)show.rows.size()-1; changed("Cue added. Playback stopped.",true); };
     addColumnButton.onClick=[this] {
@@ -141,9 +150,16 @@ MainComponent::MainComponent(bool startAudio) {
     else status="Offline mode: audio device not opened.";
     refreshControlSettings();
     engine.publish(makeRenderState(show,clips)); refresh(); startTimerHz(25);
+    recoveryEnabled=juce::JUCEApplication::getInstance()!=nullptr;
+    if (recoveryEnabled && ProjectRecovery::exists(ProjectRecovery::defaultDirectory())) {
+        auto safe=juce::Component::SafePointer<MainComponent>(this);
+        juce::MessageManager::callAsync([safe] {if (safe) safe->offerCrashRecovery();});
+    }
 }
 MainComponent::~MainComponent() {
     stopTimer(); engine.panic(); chooser.reset();
+    if (recoveryEnabled && !preserveDeferredRecovery)
+        ProjectRecovery::discard(ProjectRecovery::defaultDirectory());
     // The device selector holds a reference to engine.devices: destroy it first.
     closeMidiClip();
     closeOscClip();
@@ -241,6 +257,8 @@ void MainComponent::resized() {
     deviceButton.setBounds(20,188,140,33);
     controlButton.setBounds(std::max(506,w-666),22,144,30);
 
+    preflightButton.setBounds(editorX-431,98,105,33);
+    diagnosticsButton.setBounds(editorX-316,98,117,33);
     addRowButton.setBounds(editorX-188,98,76,33); addColumnButton.setBounds(editorX-104,98,92,33);
     const bool docked=(clipEditor && !clipWindow) || (oscEditor && !oscWindow);
     const int activeDockHeight=docked ? (clipCollapsed ? 36 : this->dockHeight) : 0;
@@ -621,6 +639,18 @@ bool MainComponent::keyPressed(const juce::KeyPress& key) {
 }
 void MainComponent::timerCallback() {
     engine.collectRetired();
+    // Checkpoint only the validated in-memory model; never copy media or
+    // touch a running audio callback. The update is atomic and recoverable.
+    if (recoveryEnabled && ++recoveryTicks>=25*20) {
+        recoveryTicks=0;
+        if (dirty) {
+            const auto result=ProjectRecovery::checkpoint(show,ProjectRecovery::defaultDirectory());
+            if (result.failed()) {
+                juce::Logger::writeToLog("Recovery checkpoint: "+result.getErrorMessage());
+                status="Recovery checkpoint unavailable. Save your project.";
+            }
+        }
+    }
     // Consume transport confirmation before hardware events in this UI tick.
     // Empty cue GO is acknowledged too; merely selecting a row is not.
     const int confirmed=engine.acknowledgedCueId.load(std::memory_order_acquire);
@@ -664,33 +694,113 @@ void MainComponent::saveProject() {
             auto file=fc.getResult(); auto result=saveShow(safe->show,file);
             if (result.failed()) { safe->message(result.getErrorMessage()); return; }
             Show portable; if (loadShow(file,portable).wasOk()) safe->show=std::move(portable);
-            safe->projectFile=file; safe->dirty=false; safe->status="Saved: "+file.getFullPathName(); safe->repaint();
+            safe->projectFile=file; safe->dirty=false; safe->status="Saved: "+file.getFullPathName();
+            if (safe->recoveryEnabled) {
+                ProjectRecovery::discard(ProjectRecovery::defaultDirectory());
+                safe->preserveDeferredRecovery=false;
+            }
+            safe->repaint();
         });
+}
+void MainComponent::showPreflight() {
+    juce::StringArray outputs;
+    for(const auto& d:juce::MidiOutput::getAvailableDevices()) outputs.add(d.identifier);
+    const auto report=preflightShow(show,engine.connected.load(),outputs,midiInput.connected());
+    const auto icon=report.criticalCount()>0 ? juce::MessageBoxIconType::WarningIcon :
+        report.warningCount()>0 ? juce::MessageBoxIconType::InfoIcon :
+        juce::MessageBoxIconType::NoIcon;
+    juce::AlertWindow::showMessageBoxAsync(icon,"Show preflight",report.describe(),"Close",this);
+    status=report.criticalCount()>0 ? "Preflight: critical problems detected." :
+           report.warningCount()>0 ? "Preflight: warnings to review." :
+           "Preflight complete: no critical project errors.";
+    repaint();
+}
+void MainComponent::showDiagnostics() {
+    const auto stats=engine.diagnostics();
+    juce::String details="ENGINE DIAGNOSTICS\n";
+    details+="Audio device: "+juce::String(engine.connected.load()?"ONLINE":"OFFLINE");
+    details+="\nActive audio/MIDI/OSC cells: "+juce::String(engine.activeVoices.load());
+    details+="\nAudio callback commands dropped: "+juce::String(stats.audioCommandsDropped);
+    details+="\nMIDI input: "+juce::String(midiInput.connected()?"CONNECTED":"DISCONNECTED");
+    details+="\nMIDI input messages dropped: "+juce::String(midiInput.droppedCount());
+    details+="\nMIDI output messages sent: "+juce::String(stats.midiOutputSent);
+    details+="\nMIDI output messages dropped: "+juce::String(stats.midiOutputDropped);
+    details+="\nOSC UDP packets sent: "+juce::String(stats.oscSent);
+    details+="\nOSC UDP packets dropped / send failures: "+juce::String(stats.oscDropped);
+    details+="\n\nThese counters are local to the current process. UDP sent does not prove receiver delivery.";
+    juce::AlertWindow::showMessageBoxAsync(juce::MessageBoxIconType::InfoIcon,
+        "Diagnostics",details,"Close",this);
+}
+bool MainComponent::activateProject(Show candidate,const juce::File& source,bool recovering) {
+    // PREPARE before committing: an unreadable or oversized new show must
+    // never panic, unload or corrupt the current live show.
+    ClipMap loaded;
+    juce::StringArray issues;
+    for(const auto& row:candidate.rows) for(const auto& c:row.cells) if(c.file.isNotEmpty()) {
+        std::shared_ptr<const AudioClip> clip;
+        const auto read=loadClip(juce::File(c.file),clip);
+        if(read.failed()) {issues.add(read.getErrorMessage());continue;}
+        loaded[c.id]=clip;
+        if(!memoryFits(loaded)) {
+            message("Show exceeds 512 MB PCM. The current show has not been replaced.");
+            return false;
+        }
+    }
+    // Only after all memory checks pass do we stop the previous show.
+    engine.panic();
+    for(const auto& column:candidate.columns)
+        if(column.type==ColumnType::midi && column.midiOutputId.isNotEmpty()) {
+            const auto opened=engine.setMidiOutput(column.midiOutputId);
+            if(opened.failed()) issues.add(opened.getErrorMessage());
+        }
+    closeMidiClip();closeOscClip();editHistory.clearUndoHistory();
+    show=std::move(candidate);clips=std::move(loaded);
+    projectFile=recovering ? juce::File{} : source;dirty=recovering;
+    selectedRow=selectedColumn=nextCue=0;
+    resetActiveMapping();refreshControlSettings();
+    engine.publish(makeRenderState(show,clips));refresh();
+    status=recovering ? "Recovered unsaved show. Use Save to choose a project filename." :
+                        "Project opened: "+source.getFileName();
+    if(!recovering && recoveryEnabled) {
+        ProjectRecovery::discard(ProjectRecovery::defaultDirectory());
+        preserveDeferredRecovery=false;
+    }
+    if(!issues.isEmpty())
+        message(juce::String(issues.size())+" missing media or MIDI output issues.\n\n"+
+                issues.joinIntoString("\n").substring(0,1500));
+    return true;
+}
+void MainComponent::offerCrashRecovery() {
+    if(!ProjectRecovery::exists(ProjectRecovery::defaultDirectory())) return;
+    auto safe=juce::Component::SafePointer<MainComponent>(this);
+    juce::AlertWindow::showAsync(
+        juce::MessageBoxOptions().withIconType(juce::MessageBoxIconType::QuestionIcon)
+            .withTitle("Recover an unsaved show?")
+            .withMessage("A recovery checkpoint from an interrupted session was found. "
+                         "Restoring does not overwrite the original project or any media. "
+                         "Playback will not start automatically.")
+            .withButton("Restore").withButton("Discard checkpoint").withButton("Later")
+            .withAssociatedComponent(this),[safe](int answer) {
+        if(!safe) return;
+        if(answer==1) {
+            Show candidate;
+            const auto result=ProjectRecovery::restore(ProjectRecovery::defaultDirectory(),candidate);
+            if(result.failed()) safe->message(result.getErrorMessage());
+            else safe->activateProject(std::move(candidate),{},true);
+        } else if(answer==2) ProjectRecovery::discard(ProjectRecovery::defaultDirectory());
+        else safe->preserveDeferredRecovery=true;
+    });
 }
 void MainComponent::openProject() {
     chooser=std::make_unique<juce::FileChooser>("Open show",projectFile,"*.cuelist;*.json;*.bak");
     chooser->launchAsync(juce::FileBrowserComponent::openMode|juce::FileBrowserComponent::canSelectFiles,
         [safe=juce::Component::SafePointer<MainComponent>(this)](const juce::FileChooser& fc) {
-            if (!safe || fc.getResult()==juce::File{}) return;
-            const auto file=fc.getResult(); if (file.getSize()>32*1024*1024) { safe->message("Project file too large (maximum 32 MB)."); return; }
-            Show candidate; auto result=loadShow(file,candidate);
-            if (result.failed()) { safe->message(result.getErrorMessage()); return; }
-            safe->engine.panic(); ClipMap loaded; juce::StringArray issues;
-            for (const auto& row : candidate.rows) for (const auto& c : row.cells) if (c.file.isNotEmpty()) {
-                std::shared_ptr<const AudioClip> clip; auto read=loadClip(juce::File(c.file),clip);
-                if (read.failed()) { issues.add(read.getErrorMessage()); continue; }
-                loaded[c.id]=clip; if (!safe->memoryFits(loaded)) { safe->message("Show exceeds 512 MB PCM: loading cancelled. The current project remains open."); return; }
-            }
-            for (const auto& column:candidate.columns) if (column.type==ColumnType::midi && column.midiOutputId.isNotEmpty()) {
-                auto opened=safe->engine.setMidiOutput(column.midiOutputId); if (opened.failed()) issues.add(opened.getErrorMessage());
-            }
-            safe->closeMidiClip(); safe->closeOscClip(); safe->editHistory.clearUndoHistory();
-            safe->show=std::move(candidate); safe->clips=std::move(loaded); safe->projectFile=file; safe->dirty=false;
-            safe->selectedRow=safe->selectedColumn=safe->nextCue=0;
-            safe->resetActiveMapping(); safe->refreshControlSettings();
-            safe->engine.publish(makeRenderState(safe->show,safe->clips)); safe->refresh();
-            safe->status="Project opened: "+file.getFileName();
-            if (!issues.isEmpty()) safe->message(juce::String(issues.size())+" media or MIDI output issues. Reconnect files or select a device in utilities.\n\n"+issues.joinIntoString("\n").substring(0,1500));
+            if(!safe || fc.getResult()==juce::File{}) return;
+            const auto file=fc.getResult();
+            Show candidate;
+            const auto result=loadShow(file,candidate);
+            if(result.failed()) {safe->message(result.getErrorMessage());return;}
+            safe->activateProject(std::move(candidate),file,false);
         });
 }
 void MainComponent::showDevices() {
