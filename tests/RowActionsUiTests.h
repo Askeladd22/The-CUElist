@@ -24,6 +24,37 @@ void rowActionsUiTests() {
         check(decodeShow(encodeShow(show),restored).wasOk(),"Named columns failed v8 roundtrip");
         check(restored.columns[2].name=="MIDI 1","Names lost after save");
     });
+    test("row and column reordering preserves typed cell IDs and cached audio",[] {
+        MainComponent ui(false);
+        addColumn(ui.show,ColumnType::midi,"MIDI");
+        addRow(ui.show,"Later");
+        const int originalRow=ui.show.rows[0].id;
+        const int audioColumn=ui.show.columns[0].id;
+        const int midiColumn=ui.show.columns[1].id;
+        const int originalAudio=ui.show.rows[0].cells[0].id;
+        const int originalMidi=ui.show.rows[0].cells[1].id;
+        const int secondAudio=ui.show.rows[1].cells[0].id;
+        auto pcm=std::make_shared<AudioClip>();
+        pcm->sampleRate=48000; pcm->samples.setSize(1,128); pcm->samples.clear();
+        ui.clips[originalAudio]=pcm;
+
+        ui.reorderColumn(0,1);
+        check(ui.show.columns[0].id==midiColumn && ui.show.columns[1].id==audioColumn,
+              "Column reorder changed stable column IDs");
+        check(ui.show.rows[0].cells[0].id==originalMidi &&
+              ui.show.rows[0].cells[1].id==originalAudio &&
+              ui.show.rows[1].cells[1].id==secondAudio,
+              "Cells lost their association with the reordered column types");
+        check(ui.clips.at(originalAudio)==pcm,"Column reorder discarded cached audio");
+
+        ui.reorderRow(0,1);
+        check(ui.show.rows[1].id==originalRow &&
+              ui.show.rows[1].cells[1].id==originalAudio &&
+              ui.clips.at(originalAudio)==pcm,
+              "Cue reorder damaged identity or audio ownership");
+        check(validateShow(ui.show).wasOk(),
+              "Reordering rows and columns produced invalid show structure");
+    });
     test("row duplicate keeps all media and cue properties while regenerating stable identities",[] {
         MainComponent ui(false);
         addColumn(ui.show,ColumnType::midi,"MIDI 1");
