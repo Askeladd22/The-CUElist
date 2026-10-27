@@ -20,8 +20,7 @@ std::optional<float> mappedPickupTarget(const Show& show,
     if (faderCeilingDb.has_value() &&
         (binding.target==ControlTarget::masterGain ||
          binding.target==ControlTarget::columnGain))
-        maximum=std::min(maximum,juce::Decibels::decibelsToGain(
-            (float)*faderCeilingDb));
+        maximum=std::min(maximum,std::pow(10.0f,(float)*faderCeilingDb/20.0f));
     const float span=maximum-binding.minimum;
     if (!(span>0.0f)) return {};
 
@@ -45,7 +44,7 @@ std::optional<float> mappedPickupTarget(const Show& show,
 }
 
 float mappedFaderGain(const MappedControl& action,int faderCeilingDb) noexcept {
-    const float ceiling=juce::Decibels::decibelsToGain((float)faderCeilingDb);
+    const float ceiling=std::pow(10.0f,(float)faderCeilingDb/20.0f);
     const auto& b=action.binding;
     if (b.maximum>ceiling && b.maximum>b.minimum) {
         const float fraction=(action.scaled-b.minimum)/(b.maximum-b.minimum);
