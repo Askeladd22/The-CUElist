@@ -41,7 +41,9 @@ void drawLoopIcon(juce::Graphics& g,juce::Rectangle<int> bounds,juce::Colour col
     const auto tip=end+tangent*(headLength*0.48f);
     const auto base=end-tangent*(headLength*0.52f);
     juce::Path arrow;
-    arrow.addTriangle(tip,base+normal*halfWidth,base-normal*halfWidth);
+    const auto left=base+normal*halfWidth;
+    const auto right=base-normal*halfWidth;
+    arrow.addTriangle(tip.x,tip.y,left.x,left.y,right.x,right.y);
     g.fillPath(arrow);
 }
 void transportButton(juce::Graphics& g,juce::Rectangle<int> box,bool stop,bool enabled) {
