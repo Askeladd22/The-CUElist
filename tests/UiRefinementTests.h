@@ -122,4 +122,37 @@ void uiRefinementTests() {
               master->getNumChildComponents()==0,
               "Master does not use the compact integrated meter/fader");
     });
+    test("Midnight Console layout enlarges fields and meters without dropping controls",[] {
+        MainComponent ui(false);
+        ui.setSize(1640,900);
+        auto* cue=controlsV3::named(ui,"cueName");
+        auto* bpm=controlsV3::named(ui,"cueBpm");
+        auto* cell=controlsV3::named(ui,"cellName");
+        auto* grid=cueViewFixtures::find<CueGrid>(ui);
+        auto* mixer=cueViewFixtures::find<ColumnUtilities>(ui);
+        auto* ruler=cueViewFixtures::find<Timeline>(ui);
+        auto* master=controlsV3::named(*mixer,"masterAudioDb");
+        auto* pan=controlsV3::named(*mixer,"masterPan");
+        auto* mute=controlsV3::named(*mixer,"masterMute");
+        check(cue && bpm && cell && cue->getWidth()>=260 &&
+              bpm->getWidth()>=260 && cell->getWidth()>=260,
+              "Inspector restyling removed or clipped text inputs");
+        check(grid && mixer && ruler && master && pan && mute &&
+              mixer->getHeight()>=200 && master->getHeight()>=155,
+              "Mixer/timeline redesign removed audio controls");
+        check(controlsV3::named(*ruler,"timelineGridVisibility") &&
+              controlsV3::named(*ruler,"timelineSnapToggle"),
+              "Grid and snap controls disappeared during restyling");
+        check(CueGrid::rowHeight>=64 && CueGrid::rowContentInset>0,
+              "Comfortable cue spacing was not applied");
+        check(palette::background!=palette::panel &&
+              palette::panel!=palette::raised &&
+              palette::muted!=palette::text,
+              "Dark palette lost its text or panel contrast");
+        ui.setSize(1450,768);
+        check(cue->getWidth()>=260 && cue->getBottom()<ui.getHeight() &&
+              bpm->getBottom()<ui.getHeight(),
+              "Compact-height window clipped important Inspector fields");
+    });
+
 }
