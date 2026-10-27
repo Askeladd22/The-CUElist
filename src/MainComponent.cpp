@@ -243,12 +243,12 @@ void MainComponent::resized() {
 
     addRowButton.setBounds(editorX-188,98,76,33); addColumnButton.setBounds(editorX-104,98,92,33);
     const bool docked=(clipEditor && !clipWindow) || (oscEditor && !oscWindow);
-    const int dockHeight=docked ? (clipCollapsed ? 36 : this->dockHeight) : 0;
+    const int activeDockHeight=docked ? (clipCollapsed ? 36 : this->dockHeight) : 0;
     // Prioritise the running cue list on show-sized desktops while preserving
     // mixer controls, the timeline and docked editors at all window heights.
     // Keep at least one complete timeline lane visible alongside the larger
     // cue rows. Mixer and cue list remain scrollable; no panel disappears.
-    const int gridHeight=std::max(310,h-400-dockHeight);
+    const int gridHeight=std::max(310,h-400-activeDockHeight);
     const int utilityHeight=h<800 ? 180 : 208;
     viewport.setBounds(204,154,editorX-220,gridHeight-utilityHeight);
     utilities.setBounds(204,154+gridHeight-utilityHeight,editorX-220,utilityHeight);
@@ -267,14 +267,14 @@ void MainComponent::resized() {
         clipCollapseButton.toFront(false); clipCloseButton.toFront(false);
         if (clipEditor && !clipWindow) {
             clipEditor->setVisible(!clipCollapsed);
-            if (!clipCollapsed) clipEditor->setBounds(204,dockY,editorX-220,dockHeight);
+            if (!clipCollapsed) clipEditor->setBounds(204,dockY,editorX-220,activeDockHeight);
         }
         if (oscEditor && !oscWindow) {
             oscEditor->setVisible(!clipCollapsed);
-            if (!clipCollapsed) oscEditor->setBounds(204,dockY,editorX-220,dockHeight);
+            if (!clipCollapsed) oscEditor->setBounds(204,dockY,editorX-220,activeDockHeight);
         }
     }
-    timeline.setBounds(204,dockY+dockHeight,editorX-220,std::max(75,h-gridHeight-dockHeight-215));
+    timeline.setBounds(204,dockY+activeDockHeight,editorX-220,std::max(75,h-gridHeight-activeDockHeight-215));
     const int x=editorX+16, inner=236;
     cellTab.setBounds(x,198,112,30); rowTab.setBounds(x+118,198,118,30);
     rowBehaviour.setBounds(x,479,inner,33); rowMute.setBounds(x,527,inner,24);

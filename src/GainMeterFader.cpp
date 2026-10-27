@@ -45,11 +45,11 @@ void GainMeterFader::paint(juce::Graphics& g) {
     }
 
     // A single, visible gain thumb overlaps both L/R bars. No child slider.
-    const float cursor=yForDb(gainDb,top,bottom);
-    const juce::Rectangle<float> thumb(8.0f,cursor-5.0f,37.0f,10.0f);
+    const float thumbY=yForDb(gainDb,top,bottom);
+    const juce::Rectangle<float> thumb(8.0f,thumbY-5.0f,37.0f,10.0f);
     g.setColour(palette::background); g.fillRoundedRectangle(thumb.expanded(1),2.5f);
     g.setColour(palette::text); g.fillRoundedRectangle(thumb,2.2f);
-    g.setColour(palette::background); g.fillRect(14.0f,cursor-.65f,25.0f,1.3f);
+    g.setColour(palette::background); g.fillRect(14.0f,thumbY-.65f,25.0f,1.3f);
     if (hasKeyboardFocus(false)) {
         g.setColour(palette::teal); g.drawRoundedRectangle(thumb.expanded(2),3.0f,1.1f);
     }

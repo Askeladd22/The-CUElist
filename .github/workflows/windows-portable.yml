@@ -35,7 +35,7 @@ jobs:
 
       - name: Verify extracted ZIP, launcher and checksums
         shell: powershell
-        run: .\scripts\check-package.ps1
+        run: .\scripts\check-package.ps1 -SmokeLaunch
 
       - name: Upload portable ZIP and checksum
         uses: actions/upload-artifact@v4
