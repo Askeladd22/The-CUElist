@@ -481,10 +481,15 @@ void CueGrid::filesDropped(const juce::StringArray& files,int x,int y) {
     if (owner.select(row,column)) owner.importFile(juce::File(files[0]));
 }
 void PinnedCueHeaders::paint(juce::Graphics& g) {
+    // Keep the title band fixed, just like the right BPM/Auto Stop header.
     g.saveState();
-    g.reduceClipRegion(getLocalBounds());
-    // Render the very same row/header artwork as the scrollable grid, but in
-    // a viewport that scrolls only vertically. No cloned hitbox geometry.
+    g.reduceClipRegion({0,0,getWidth(),CueGrid::headerHeight});
+    owner.grid.paint(g);
+    g.restoreState();
+    g.saveState();
+    g.reduceClipRegion({0,CueGrid::headerHeight,getWidth(),
+                        std::max(0,getHeight()-CueGrid::headerHeight)});
+    // The rows move vertically with the scrollable cells, never horizontally.
     g.addTransform(juce::AffineTransform::translation(
         0.0f,-(float)owner.viewport.getViewPositionY()));
     owner.grid.paint(g);
@@ -492,6 +497,7 @@ void PinnedCueHeaders::paint(juce::Graphics& g) {
     g.setColour(palette::line);g.drawVerticalLine(getWidth()-1,0,(float)getHeight());
 }
 void PinnedCueHeaders::mouseDown(const juce::MouseEvent& e) {
+    if (e.y<CueGrid::headerHeight) return;
     const int y=e.y+owner.viewport.getViewPositionY();
     const int row=y>=CueGrid::headerHeight ?
         (y-CueGrid::headerHeight)/CueGrid::rowHeight : -1;
@@ -514,6 +520,7 @@ void PinnedCueHeaders::mouseDown(const juce::MouseEvent& e) {
         e.getNumberOfClicks(),e.getScreenPosition());
 }
 void PinnedCueHeaders::mouseDoubleClick(const juce::MouseEvent& e) {
+    if (e.y<CueGrid::headerHeight) return;
     const int y=e.y+owner.viewport.getViewPositionY();
     const int row=y>=CueGrid::headerHeight ?
         (y-CueGrid::headerHeight)/CueGrid::rowHeight : -1;
