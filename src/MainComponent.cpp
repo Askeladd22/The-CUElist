@@ -681,7 +681,24 @@ void MainComponent::timerCallback() {
         midiRefreshTicks=0; engine.refreshMidiOutputs();
         if (midiInput.connected() && !midiInput.stillAvailable()) {
             midiInput.disconnect();
+            pressedInputs.clear(); // stale NoteOn states must not survive unplug
             status="MIDI input disconnected. Mappings suspended.";
+        }
+        // Reconnect only the device selected in the project, never whichever
+        // controller Windows happens to enumerate first. No playback or GO
+        // is triggered by reconnecting.
+        if (!midiInput.connected() && show.controls.midiInputId.isNotEmpty()) {
+            bool present=false;
+            for (const auto& port:juce::MidiInput::getAvailableDevices())
+                if (port.identifier==show.controls.midiInputId) {present=true;break;}
+            if (present) {
+                ++midiInputReconnectAttempts;
+                const auto restored=midiInput.connect(show.controls.midiInputId);
+                if (restored.wasOk()) {
+                    pressedInputs.clear();
+                    status="MIDI controller reconnected (same device).";
+                }
+            }
         }
     }
     utilities.syncScroll(viewport.getViewPositionX()); utilities.refreshRouting(); grid.repaint();
@@ -735,6 +752,7 @@ void MainComponent::showDiagnostics() {
     details+="\nAudio callback commands dropped: "+juce::String(stats.audioCommandsDropped);
     details+="\nMIDI input: "+juce::String(midiInput.connected()?"CONNECTED":"DISCONNECTED");
     details+="\nMIDI input messages dropped: "+juce::String(midiInput.droppedCount());
+    details+="\nMIDI input reconnect attempts: "+juce::String(midiInputReconnectAttempts);
     details+="\nMIDI output messages sent: "+juce::String(stats.midiOutputSent);
     details+="\nMIDI output messages dropped: "+juce::String(stats.midiOutputDropped);
     details+="\nMIDI dispatches >10 ms late: "+juce::String(stats.midiLateOver10ms);

@@ -260,6 +260,7 @@ private:
     int editorX=0;
     float displayPeak=0;
     int midiRefreshTicks=0;
+    unsigned midiInputReconnectAttempts=0;
     int recoveryTicks=0;
     bool recoveryEnabled=false;
     bool preserveDeferredRecovery=false;
