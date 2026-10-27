@@ -254,8 +254,10 @@ void MainComponent::resized() {
     const int dockHeight=docked ? (clipCollapsed ? 36 : this->dockHeight) : 0;
     // Prioritise the running cue list on show-sized desktops while preserving
     // mixer controls, the timeline and docked editors at all window heights.
-    const int gridHeight=std::max(350,h-370-dockHeight);
-    constexpr int utilityHeight=220;
+    // Keep at least one complete timeline lane visible alongside the larger
+    // cue rows. Mixer and cue list remain scrollable; no panel disappears.
+    const int gridHeight=std::max(310,h-400-dockHeight);
+    const int utilityHeight=h<800 ? 180 : 208;
     viewport.setBounds(204,154,editorX-220,gridHeight-utilityHeight);
     utilities.setBounds(204,154+gridHeight-utilityHeight,editorX-220,utilityHeight);
     utilities.syncScroll(viewport.getViewPositionX());
