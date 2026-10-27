@@ -42,11 +42,11 @@
 **Phase 2c (current PR, transactional deletion):**
 
 - `prepareDeletedCue` and `prepareDeletedColumn` build a replacement Show and gather the deleted cell IDs without touching the current model, PCM cache, GUI or devices. Neither output changes on failure.
-- Cue deletion removes legacy mappings scoped to that cue ID; column deletion removes references to its ID from legacy mappings, locked Control Column defaults, cue-specific sets, and reusable templates.
+- Cue deletion removes legacy mappings scoped to that cue ID and clears stale locked-Control default-source cue IDs without discarding their settings; column deletion removes references to its ID from legacy mappings, locked Control Column defaults, cue-specific sets, and reusable templates.
 - Cleanup includes column gain, **column pan**, MIDI CC, OSC output and explicit column-scoped mappings (previous UI deletion omitted column pan).
 - After model validation succeeds, the UI removes only those cell IDs from its PCM cache, installs the prepared model, refreshes mapping state and invokes the existing stopped-transport change flow.
 - Deleting the final cue or column leaves a valid blank cue or Audio column just as before; no live audio or file on disk is deleted.
-- New model-only tests cover cross-layer mapping cleanup, stable IDs, last-item fallback and invalid-input atomicity.
+- New model-only tests cover cross-layer mapping cleanup, locked-Control source metadata, stable IDs, last-item fallback and invalid-input atomicity; an additional UI test verifies that remaining decoded PCM survives column deletion.
 
 The next stage is Phase 3: extracting testable workspace layout geometry from painting, while preserving existing screen positions.
 
