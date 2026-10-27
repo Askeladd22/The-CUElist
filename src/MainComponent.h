@@ -1,5 +1,6 @@
 #pragma once
 #include "AudioEngine.h"
+#include "ProjectSafety.h"
 #include "GainMeterFader.h"
 #include "MixerControls.h"
 #include "MidiInputManager.h"
@@ -262,6 +263,7 @@ private:
     int recoveryTicks=0;
     bool recoveryEnabled=false;
     bool preserveDeferredRecovery=false;
+    std::unique_ptr<RecoveryCheckpointWriter> recoveryWriter;
     void offerCrashRecovery();
     bool activateProject(Show candidate,const juce::File& source,bool recovering);
     void showPreflight();

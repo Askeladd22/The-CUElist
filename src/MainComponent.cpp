@@ -98,7 +98,11 @@ MainComponent::MainComponent(bool startAudio) {
     clipCloseButton.onClick=[this] { closeMidiClip(); closeOscClip(); };
     newButton.onClick=[this] { withDiscardConfirmation([this] { closeMidiClip(); closeOscClip(); editHistory.clearUndoHistory(); stopAll(); show=makeShow(); clips.clear(); projectFile={}; selectedRow=selectedColumn=nextCue=0;
         resetActiveMapping(); refreshControlSettings();
-        dirty=false; if (recoveryEnabled) {ProjectRecovery::discard(ProjectRecovery::defaultDirectory());preserveDeferredRecovery=false;}
+        dirty=false; if (recoveryEnabled) {
+            if (recoveryWriter) recoveryWriter->flush();
+            ProjectRecovery::discard(ProjectRecovery::defaultDirectory());
+            preserveDeferredRecovery=false;
+        }
         engine.publish(makeRenderState(show,clips)); refresh(); status="New show. Import files into Audio cells."; }); };
     openButton.onClick=[this] { withDiscardConfirmation([this] { openProject(); }); };
     preflightButton.setName("showPreflight");
@@ -152,6 +156,9 @@ MainComponent::MainComponent(bool startAudio) {
     refreshControlSettings();
     engine.publish(makeRenderState(show,clips)); refresh(); startTimerHz(25);
     recoveryEnabled=juce::JUCEApplication::getInstance()!=nullptr;
+    if (recoveryEnabled) {
+        recoveryWriter=std::make_unique<RecoveryCheckpointWriter>(ProjectRecovery::defaultDirectory());
+    }
     if (recoveryEnabled && ProjectRecovery::exists(ProjectRecovery::defaultDirectory())) {
         auto safe=juce::Component::SafePointer<MainComponent>(this);
         juce::MessageManager::callAsync([safe] {if (safe) safe->offerCrashRecovery();});
@@ -159,6 +166,8 @@ MainComponent::MainComponent(bool startAudio) {
 }
 MainComponent::~MainComponent() {
     stopTimer(); engine.panic(); chooser.reset();
+    // Join the writer before touching its destination on clean shutdown.
+    recoveryWriter.reset();
     if (recoveryEnabled && !preserveDeferredRecovery)
         ProjectRecovery::discard(ProjectRecovery::defaultDirectory());
     // The device selector holds a reference to engine.devices: destroy it first.
@@ -644,7 +653,9 @@ void MainComponent::timerCallback() {
         // "Later" must preserve the previous crash snapshot. A new
         // session must not silently overwrite it before the user decides.
         if (dirty && !preserveDeferredRecovery) {
-            const auto result=ProjectRecovery::checkpoint(show,ProjectRecovery::defaultDirectory());
+            const auto result=recoveryWriter ?
+                recoveryWriter->enqueue(show) :
+                juce::Result::fail("Recovery writer unavailable.");
             if (result.failed()) {
                 juce::Logger::writeToLog("Recovery checkpoint: "+result.getErrorMessage());
                 status="Recovery checkpoint unavailable. Save your project.";
@@ -696,6 +707,7 @@ void MainComponent::saveProject() {
             Show portable; if (loadShow(file,portable).wasOk()) safe->show=std::move(portable);
             safe->projectFile=file; safe->dirty=false; safe->status="Saved: "+file.getFullPathName();
             if (safe->recoveryEnabled) {
+                if (safe->recoveryWriter) safe->recoveryWriter->flush();
                 ProjectRecovery::discard(ProjectRecovery::defaultDirectory());
                 safe->preserveDeferredRecovery=false;
             }
@@ -729,6 +741,8 @@ void MainComponent::showDiagnostics() {
     details+="\nOSC UDP packets sent: "+juce::String(stats.oscSent);
     details+="\nOSC UDP packets dropped / send failures: "+juce::String(stats.oscDropped);
     details+="\nOSC dispatches >10 ms late: "+juce::String(stats.oscLateOver10ms);
+    details+="\nRecovery I/O failures: "+juce::String(
+        recoveryWriter ? recoveryWriter->failedWrites() : 0u);
     details+="\n\nThese counters are local to the current process. UDP sent does not prove receiver delivery.";
     juce::AlertWindow::showMessageBoxAsync(juce::MessageBoxIconType::InfoIcon,
         "Diagnostics",details,"Close",this);
@@ -761,6 +775,7 @@ bool MainComponent::activateProject(Show candidate,const juce::File& source,bool
     status=recovering ? "Recovered unsaved show. Use Save to choose a project filename." :
                         "Project opened: "+source.getFileName();
     if(!recovering && recoveryEnabled) {
+        if (recoveryWriter) recoveryWriter->flush();
         ProjectRecovery::discard(ProjectRecovery::defaultDirectory());
         preserveDeferredRecovery=false;
     }
@@ -786,7 +801,10 @@ void MainComponent::offerCrashRecovery() {
             const auto result=ProjectRecovery::restore(ProjectRecovery::defaultDirectory(),candidate);
             if(result.failed()) safe->message(result.getErrorMessage());
             else safe->activateProject(std::move(candidate),{},true);
-        } else if(answer==2) ProjectRecovery::discard(ProjectRecovery::defaultDirectory());
+        } else if(answer==2) {
+            if (safe->recoveryWriter) safe->recoveryWriter->flush();
+            ProjectRecovery::discard(ProjectRecovery::defaultDirectory());
+        }
         else {
             safe->preserveDeferredRecovery=true;
             safe->status="Recovery deferred: previous checkpoint preserved until you decide.";
