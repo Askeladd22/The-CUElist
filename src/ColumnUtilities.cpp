@@ -276,7 +276,7 @@ struct ColumnUtilities::Strip final : juce::Component {
                        collapsed ? 34 : 84,
                        collapsed ? std::max(45,h-103) : std::max(98,h-36));
         pan.setBounds(w-49,34,43,43);
-        masterSend.setBounds(w-45,113,26,26);
+        masterSend.setBounds(w-45,117,26,26);
         mute.setBounds(collapsed ? (w-30)/2 : w-77,h-36,
                        collapsed ? 30 : 32,29);
         phase.setBounds(w-42,h-36,32,29);
