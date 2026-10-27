@@ -232,8 +232,15 @@ void workspaceLayoutTests() {
                   "Timeline resize shifted pinned headers or caused clipping");
         const auto compact=calculateWorkspaceLayout({1180,820,208,746,3,72,62,184,290,400});
         check(compact.timeline.getHeight()>=75 &&
-              compact.timeline.getBottom()<=773,
-              "Compact window lost its minimum Timeline lane");
+              compact.timeline.getBottom()<=773 &&
+              compact.effectiveDockHeight>=130,
+              "Compact window lost its minimum Timeline or editor lane");
+        const auto withDock=calculateWorkspaceLayout({1440,900,208,746,3,72,62,184,290,65});
+        const auto withoutResize=calculateWorkspaceLayout({1440,900,208,746,3,72,62,184,290,0});
+        check(withDock.timeline.getHeight()==withoutResize.timeline.getHeight()+65 &&
+              withDock.dockEditor.getHeight()==withoutResize.dockEditor.getHeight()-65 &&
+              withDock.utilities.getY()==withoutResize.utilities.getY(),
+              "Timeline could not grow with docked MIDI editor or changed upper grid");
     });
     test("Live Timeline splitter drag does not move pinned BPM or cue headers",[] {
         MainComponent ui(false);
