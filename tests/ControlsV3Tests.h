@@ -33,11 +33,11 @@ void controlsV3Tests() {
         ui.select(1,0); ui.engine.connected.store(true); ui.engine.publish(makeRenderState(ui.show,ui.clips));
         auto* grid=find<CueGrid>(ui);
         auto sample=[&] { float value=0; float* out[]{&value}; ui.engine.collectRetired(); ui.engine.processBlock(out,1,1,48000); return value; };
-        click(*grid,CueGrid::nameWidth+116,CueGrid::headerHeight+CueGrid::rowContentInset+37); near(sample(),.1);
+        click(*grid,CueGrid::nameWidth+CueGrid::columnWidth-44,CueGrid::headerHeight+CueGrid::rowContentInset+37); near(sample(),.1);
         check(ui.nextCueIndex()==1,"Cell play changed sequential GO target");
-        click(*grid,CueGrid::nameWidth+CueGrid::columnWidth+116,CueGrid::headerHeight+CueGrid::rowContentInset+37); near(sample(),.3);
-        click(*grid,CueGrid::nameWidth+116,CueGrid::headerHeight+CueGrid::rowHeight+CueGrid::rowContentInset+37); near(sample(),.7);
-        click(*grid,CueGrid::nameWidth+140,CueGrid::headerHeight+CueGrid::rowContentInset+37); near(sample(),.6);
+        click(*grid,CueGrid::nameWidth+2*CueGrid::columnWidth-44,CueGrid::headerHeight+CueGrid::rowContentInset+37); near(sample(),.3);
+        click(*grid,CueGrid::nameWidth+CueGrid::columnWidth-44,CueGrid::headerHeight+CueGrid::rowHeight+CueGrid::rowContentInset+37); near(sample(),.7);
+        click(*grid,CueGrid::nameWidth+CueGrid::columnWidth-19,CueGrid::headerHeight+CueGrid::rowContentInset+37); near(sample(),.6);
         click(*grid,CueGrid::nameWidth-23,CueGrid::headerHeight+CueGrid::rowContentInset+27); near(sample(),.4);
         check(ui.nextCueIndex()==1,"Stop changed sequential GO target");
     });
