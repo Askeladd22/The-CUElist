@@ -14,6 +14,7 @@ struct WorkspaceLayoutInput {
     int rowHeaderHeight=72;
     int rowHeight=62;
     int pinnedMetricsWidth=184;
+    int pinnedHeaderWidth=290;
 };
 
 struct WorkspaceLayout {
@@ -32,6 +33,7 @@ struct WorkspaceLayout {
     juce::Rectangle<int> dockCollapse;
     juce::Rectangle<int> dockClose;
     juce::Rectangle<int> metrics;
+    juce::Rectangle<int> cueHeaders;
     juce::Rectangle<int> inspectorPanel;
 
     // The Inspector cards are in *unscaled* painting coordinates; the same

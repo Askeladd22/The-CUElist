@@ -22,7 +22,7 @@ MainComponent::MainComponent(bool startAudio) {
     for (juce::Component* c : std::initializer_list<juce::Component*>{&openButton,&saveButton,&newButton,&addRowButton,&addColumnButton,
          &goButton,&panicButton,&deviceButton,&controlButton,&dockResize,&importButton,&midiEditButton,&oscEditButton,&playCellButton,&stopCellButton,&clearButton,&tempoButton,&applyButton,
          &cellTab,&rowTab,&rowGain,&rowBehaviour,&rowMute,&rowLoop,&rowName,&cellName,&bpm,&behaviour,&follow,&loop,&cellAutoStop,&gainDb,&viewport,&timeline,&utilities,
-         &clipCollapseButton,&clipCloseButton,&cueMetrics,&preflightButton,&diagnosticsButton,&preferencesButton,&projectNameLabel}) addAndMakeVisible(c);
+         &clipCollapseButton,&clipCloseButton,&cueHeaders,&cueMetrics,&preflightButton,&diagnosticsButton,&preferencesButton,&projectNameLabel}) addAndMakeVisible(c);
     for (auto* b : {&openButton,&saveButton,&newButton,&addRowButton,&addColumnButton,&goButton,&panicButton,&deviceButton,&controlButton,
                     &importButton,&midiEditButton,&oscEditButton,&playCellButton,&stopCellButton,&clearButton,&tempoButton,&applyButton,
                     &preflightButton,&diagnosticsButton,&preferencesButton}) b->setWantsKeyboardFocus(false);
@@ -53,7 +53,7 @@ MainComponent::MainComponent(bool startAudio) {
     masterSlider.setTooltip("MASTER AUDIO: PCM output fader and L/R meter. Double-click: 0 dB.");
     utilities.addAndMakeVisible(masterSlider);
     masterSlider.onGainChanged=[this](float db) {
-        setMasterAudio(juce::Decibels::decibelsToGain(db,-60.0f));
+        setMasterAudio(GainMeterFader::toLinear(db));
     };
     configureMixerPan(masterPan);
     masterPan.setName("masterPan");
@@ -123,15 +123,28 @@ MainComponent::MainComponent(bool startAudio) {
         }
     };
     preferencesButton.setName("projectPreferences");
-    preferencesButton.setTooltip("Pre-flight checks and live diagnostics.");
+    preferencesButton.setTooltip("Pre-flight, diagnostics and fader display range.");
+    // Application setting, never serialized into or applied destructively to a Show.
+    juce::PropertiesFile::Options prefOptions;
+    prefOptions.applicationName="The Cuelist";
+    prefOptions.filenameSuffix="settings";
+    prefOptions.folderName="The Cuelist";
+    appPreferences=std::make_unique<juce::PropertiesFile>(prefOptions);
+    faderCeilingDb=appPreferences->getIntValue("audioFaderCeilingDb",6)==0 ? 0 : 6;
+    masterSlider.setMaximumDb(faderCeilingDb);
     preferencesButton.onClick=[this] {
         juce::PopupMenu menu;
         menu.addItem(1,"Pre-flight"); menu.addItem(2,"Diagnostics");
+        juce::PopupMenu faderMenu;
+        faderMenu.addItem(3,"-∞ dB / +6 dB",true,faderCeilingDb==6);
+        faderMenu.addItem(4,"-∞ dB / 0 dB",true,faderCeilingDb==0);
+        menu.addSubMenu("Fader Range",faderMenu);
         auto safe=juce::Component::SafePointer<MainComponent>(this);
         menu.showMenuAsync(juce::PopupMenu::Options().withTargetComponent(&preferencesButton),[safe](int choice) {
             if (!safe) return;
             if(choice==1) safe->showPreflight();
             else if(choice==2) safe->showDiagnostics();
+            else if(choice==3 || choice==4) safe->setAudioFaderCeilingDb(choice==3 ? 6 : 0);
         });
     };
     newButton.onClick=[this] { withDiscardConfirmation([this] { if(projectLoader) projectLoader->cancel(); closeMidiClip(); closeOscClip(); editHistory.clearUndoHistory(); stopAll(); show=makeShow(); clips.clear(); projectFile={}; selectedRow=selectedColumn=nextCue=0;
@@ -210,6 +223,22 @@ MainComponent::~MainComponent() {
     viewport.setViewedComponent(nullptr,false); setLookAndFeel(nullptr);
 }
 
+void MainComponent::setAudioFaderCeilingDb(int db) {
+    const int chosen=db==0 ? 0 : 6;
+    if (faderCeilingDb==chosen) return;
+    faderCeilingDb=chosen;
+    if (appPreferences) {
+        appPreferences->setValue("audioFaderCeilingDb",chosen);
+        appPreferences->saveIfNeeded();
+    }
+    // A range change must never alter Show gain, queued transport or MIDI/OSC.
+    masterSlider.setMaximumDb(chosen);
+    utilities.refresh();
+    status=chosen==0 ? "Audio faders: -inf / 0 dB (unity at maximum)." :
+        "Audio faders: -inf / +6 dB.";
+    repaint();
+}
+
 WorkspaceLayout MainComponent::workspaceLayout() const {
     const bool docked=(clipEditor && !clipWindow) || (oscEditor && !oscWindow);
     const int activeDockHeight=docked ? (clipCollapsed ? 36 : dockHeight) : 0;
@@ -273,16 +302,24 @@ void MainComponent::paint(juce::Graphics& g) {
     // available in the Master and channel meters.
     label(g,"SPACE   Next cue",{20,h-84,150,20},12,palette::muted);
     label(g,"ESC          Panic",{20,h-61,150,20},12,palette::muted);
+    // Continue the non-scrollable metrics surface beneath the mixer. This
+    // rightmost band is never a hidden extension of audio/MIDI/OSC strips.
+    g.setColour(palette::panel);
+    g.fillRect(geometry.metrics.getX(),geometry.utilities.getY(),
+               geometry.metrics.getWidth(),geometry.utilities.getHeight());
+    g.setColour(palette::line);
+    g.drawVerticalLine(geometry.metrics.getX(),(float)geometry.utilities.getY(),
+                       (float)geometry.utilities.getBottom());
     const int inspectorInner=geometry.inspectorInnerWidth;
     auto panel=geometry.inspectorPanel;
     g.setColour(palette::panel); g.fillRoundedRectangle(panel.toFloat(),9);
     g.setColour(palette::line); g.drawRoundedRectangle(panel.toFloat(),9,1.25f);
     const int x=geometry.inspectorLeft;
-    g.setColour(palette::teal); g.fillRoundedRectangle((float)geometry.editorX+13,163.0f,4.0f,49.0f,2.0f);
-    label(g,"INSPECTOR",{x+10,169,200,19},13,palette::teal,true);
+    g.setColour(palette::teal); g.fillRoundedRectangle((float)geometry.editorX+13,93.0f,4.0f,49.0f,2.0f);
+    label(g,"INSPECTOR",{x+10,99,200,19},13,palette::teal,true);
     const auto& col=show.columns[selectedColumn];
-    label(g,"CUE "+juce::String(selectedRow+1).paddedLeft('0',2),{x+10,195,140,28},22,palette::text,true);
-    label(g,typeName(col.type),{x+131,200,98,21},11,palette::type((int)col.type),true,juce::Justification::centredRight);
+    label(g,"CUE "+juce::String(selectedRow+1).paddedLeft('0',2),{x+10,129,140,28},22,palette::text,true);
+    label(g,typeName(col.type),{x+131,134,98,21},11,palette::type((int)col.type),true,juce::Justification::centredRight);
     g.saveState();
     g.addTransform(geometry.inspectorTransform());
     // Paint both Inspector cards in the same scaled coordinate system as
@@ -290,19 +327,19 @@ void MainComponent::paint(juce::Graphics& g) {
     g.setColour(palette::raised.withAlpha(.52f));
     g.fillRoundedRectangle(geometry.inspectorCueCard.toFloat(),7.0f);
     g.fillRoundedRectangle(geometry.inspectorCellCard.toFloat(),7.0f);
-    label(g,"ENTIRE CUE",{x+3,239,inspectorInner-6,20},14,palette::teal,true);
-    label(g,"Cue name",{x,270,inspectorInner,18},12,palette::text,true);
-    label(g,"Initial BPM",{x,338,inspectorInner,18},12,palette::text,true);
-    g.setColour(palette::line);g.drawHorizontalLine(473,(float)x,(float)x+inspectorInner);
-    label(g,"CELL",{x+3,489,59,20},14,palette::teal,true);
-    label(g,"/  "+col.name,{x+62,489,inspectorInner-68,20},13,palette::text,true);
-    label(g,"Cell name",{x,520,inspectorInner,18},12,palette::text,true);
+    label(g,"ENTIRE CUE",{x+3,173,inspectorInner-6,20},14,palette::teal,true);
+    label(g,"Cue name",{x,204,inspectorInner,18},12,palette::text,true);
+    label(g,"Initial BPM",{x,272,inspectorInner,18},12,palette::text,true);
+    g.setColour(palette::line);g.drawHorizontalLine(407,(float)x,(float)x+inspectorInner);
+    label(g,"CELL",{x+3,423,59,20},14,palette::teal,true);
+    label(g,"/  "+col.name,{x+62,423,inspectorInner-68,20},13,palette::text,true);
+    label(g,"Cell name",{x,454,inspectorInner,18},12,palette::text,true);
     if(col.type==ColumnType::audio) {
-        label(g,"Gain",{x,598,48,18},12,palette::muted,true);
-        label(g,"dB",{x+163,598,43,18},12,palette::muted,true);
+        label(g,"Gain",{x,532,48,18},12,palette::muted,true);
+        label(g,"dB",{x+163,532,43,18},12,palette::muted,true);
     }
     if(col.type==ColumnType::osc)
-        label(g,"UDP destination in column Utility",{x,711,inspectorInner,18},10,palette::muted);
+        label(g,"UDP destination in column Utility",{x,645,inspectorInner,18},10,palette::muted);
     g.restoreState();
     label(g,status,{geometry.viewport.getX(),h-35,std::max(1,geometry.editorX-200),25},12,palette::muted);
 }
@@ -351,17 +388,17 @@ void MainComponent::resized() {
     behaviour.setVisible(false);cellAutoStop.setVisible(false);
     clearButton.setVisible(false);applyButton.setVisible(false);
     playCellButton.setVisible(false);stopCellButton.setVisible(false);
-    rowName.setBounds(x,291,inner,33);
-    bpm.setBounds(x,359,inner,32);
-    tempoButton.setBounds(x,397,inner,29);
-    rowLoop.setBounds(x-3,440,inner,25);
-    cellName.setBounds(x,541,inner,31);
-    gainDb.setBounds(x+57,594,99,27);
-    follow.setBounds(x-3,630,inner,25);
-    loop.setBounds(x-3,663,inner,25);
-    midiEditButton.setBounds(x,714,inner,33);
-    oscEditButton.setBounds(x,714,inner,33);
-    importButton.setBounds(x,757,inner,33);
+    rowName.setBounds(x,225,inner,33);
+    bpm.setBounds(x,293,inner,32);
+    tempoButton.setBounds(x,331,inner,29);
+    rowLoop.setBounds(x-3,374,inner,25);
+    cellName.setBounds(x,475,inner,31);
+    gainDb.setBounds(x+57,528,99,27);
+    follow.setBounds(x-3,564,inner,25);
+    loop.setBounds(x-3,597,inner,25);
+    midiEditButton.setBounds(x,648,inner,33);
+    oscEditButton.setBounds(x,648,inner,33);
+    importButton.setBounds(x,691,inner,33);
     // Compact inspector on smaller displays, keeping all actions reachable.
     {
         for (juce::Component* c : std::initializer_list<juce::Component*>{&rowLoop,&rowName,&bpm,&tempoButton,&cellName,&follow,&loop,&gainDb,&importButton,&midiEditButton,&oscEditButton})
@@ -370,6 +407,8 @@ void MainComponent::resized() {
     goButton.setBounds(14,h-282,152,48);
     panicButton.setBounds(14,h-228,152,48);
     grid.setSize(geometry.gridSize.x,geometry.gridSize.y);
+    cueHeaders.setBounds(geometry.cueHeaders);
+    cueHeaders.toFront(false);
     cueMetrics.setBounds(geometry.metrics);
     cueMetrics.toFront(false);
 }
@@ -377,6 +416,7 @@ void MainComponent::refresh() {
     selectedRow=juce::jlimit(0,(int)show.rows.size()-1,selectedRow);
     selectedColumn=juce::jlimit(0,(int)show.columns.size()-1,selectedColumn);
     syncClipEditor(); syncOscEditor(); refreshInspector(); utilities.refresh(); resized();
+    cueHeaders.repaint();
     if (!projectNameLabel.isBeingEdited() && projectNameLabel.getText()!=show.name)
         projectNameLabel.setText(show.name,juce::dontSendNotification);
     repaint(); grid.repaint(); timeline.repaint(); cueMetrics.repaint();
@@ -721,7 +761,7 @@ void MainComponent::timerCallback() {
     }
     lastMidiRx=rx; lastMidiTx=tx; lastOscTx=oscTx;
     activityInitialized=true;
-    utilities.syncScroll(viewport.getViewPositionX()); utilities.refreshRouting(); grid.repaint();
+    utilities.syncScroll(viewport.getViewPositionX()); utilities.refreshRouting(); grid.repaint(); cueHeaders.repaint();
     displayPeak=std::max(engine.peak.load(),displayPeak*.88f);
     utilities.refreshMeters(); repaint(); timeline.repaint(); cueMetrics.repaint();
 }

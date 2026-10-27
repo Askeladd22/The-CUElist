@@ -36,8 +36,8 @@ void cueTransportUXTests() {
         utility->refresh();ui.resized();
         ui.toggleColumnCollapsed(1);
         ui.toggleColumnCollapsed(2);
-        auto* midi=utility->getChildComponent(1);
-        auto* osc=utility->getChildComponent(2);
+        auto* midi=utility->getChildComponent(0)->getChildComponent(1);
+        auto* osc=utility->getChildComponent(0)->getChildComponent(2);
         for(auto* strip:{midi,osc}) {
             auto* mute=dynamic_cast<juce::ToggleButton*>(
                 controlsV3::named(*strip,"columnDataOutputMute"));

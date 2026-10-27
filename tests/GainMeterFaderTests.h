@@ -2,23 +2,25 @@
 #include "GainMeterFader.h"
 
 void gainMeterFaderTests() {
-    test("integrated dB geometry round-trips gain and meter values without drift", [] {
-        const float top=12, bottom=124;
-        for (const float db : {-60.0f,-48.0f,-36.0f,-24.0f,-18.0f,-12.0f,-6.0f,0.0f,6.0f,12.0f}) {
-            const auto y=GainMeterFader::yForDb(db,top,bottom);
-            near(GainMeterFader::dbForY(y,top,bottom),db);
-            check(y>=top && y<=bottom,"Gain/meter label drawn outside calibrated range");
+    test("Fader range geometry round-trips at -inf/+6 and -inf/0 ceilings", [] {
+        const float top=12,bottom=124;
+        for (const float ceiling:{6.0f,0.0f}) {
+            for (const float db:{-48.0f,-36.0f,-24.0f,-18.0f,-12.0f,-6.0f,0.0f}) {
+                const auto y=GainMeterFader::yForDb(db,top,bottom,ceiling);
+                near(GainMeterFader::dbForY(y,top,bottom,ceiling),db);
+                check(y>=top && y<=bottom,"Tick fell outside the selected range");
+            }
+            near(GainMeterFader::dbForY(top,top,bottom,ceiling),ceiling);
+            check(GainMeterFader::dbForY(bottom,top,bottom,ceiling)==GainMeterFader::silenceDb,
+                  "Lowest fader position did not become digital silence");
         }
-        check(GainMeterFader::yForDb(12,top,bottom)
-            < GainMeterFader::yForDb(0,top,bottom),"Positive gain drawn below unity");
-        check(GainMeterFader::yForDb(-60,top,bottom)
-            > GainMeterFader::yForDb(-6,top,bottom),"Floor drawn above strong signal");
-        near(GainMeterFader::dbForY(-100,top,bottom),12);
-        near(GainMeterFader::dbForY(500,top,bottom),-60);
-        const float unityPosition=(bottom-GainMeterFader::yForDb(0,top,bottom))/(bottom-top);
-        check(unityPosition>.70f && unityPosition<.80f,"Unity should be near 75% of travel");
-        check(std::abs(GainMeterFader::dbForY((top+bottom)*.5f,top,bottom)+24.0f)>3.0f,
-            "Fader is still linearly mapped to dB");
+        near(GainMeterFader::yForDb(0,top,bottom,0),top);
+        near(GainMeterFader::toLinear(GainMeterFader::silenceDb),0);
+        near(GainMeterFader::toLinear(0),1);
+        check(std::abs(GainMeterFader::toLinear(6)-std::pow(10.0,6.0/20.0))<0.0001,
+              "6 dB ceiling has incorrect linear gain");
+        check(GainMeterFader::yForDb(6,top,bottom)<GainMeterFader::yForDb(0,top,bottom),
+              "Positive gain drawn below unity on the +6 dB scale");
     });
     test("GainMeterFader owns one mouse/keyboard control and preserves saved dB range", [] {
         GainMeterFader component;
@@ -36,10 +38,21 @@ void gainMeterFaderTests() {
         near(component.getGainDb(),0);
         check(callbacks==1,"UI synchronisation must not notify the engine");
         component.setGainDb(900,true);
-        near(component.getGainDb(),12);
+        near(component.getGainDb(),6);
         component.setGainDb(-900,true);
         near(component.getGainDb(),-60);
         check(component.getGainDb()>=GainMeterFader::minDb,"Gain fell below floor");
+        component.setGainDb(5,false);
+        const int priorCallbacks=callbacks;
+        component.setMaximumDb(0);
+        near(component.getGainDb(),5);
+        check(callbacks==priorCallbacks,"Switching preference changed saved gain");
+        component.setGainDb(900,true);
+        near(component.getGainDb(),0);
+        component.setGainDb(GainMeterFader::silenceDb,true);
+        check(component.getGainDb()==GainMeterFader::silenceDb &&
+              GainMeterFader::toLinear(component.getGainDb())==0.0f,
+              "Minimum fader does not fully mute linear audio");
         near(juce::Decibels::decibelsToGain(-60.0f,-60.0f),0);
     });
     test("stereo meter displays independent L/R dBFS, silence and decay/hold", [] {

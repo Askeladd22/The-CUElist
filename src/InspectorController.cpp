@@ -19,7 +19,7 @@ bool parseGainDb(const juce::String& input, double& value) {
 
 void MainComponent::refreshInspector() {
     const auto& row=show.rows[selectedRow]; const auto& c=row.cells[selectedColumn]; const auto& col=show.columns[selectedColumn];
-    masterSlider.setGainDb(juce::Decibels::gainToDecibels(show.masterGain,-60.0f));
+    masterSlider.setGainDb(GainMeterFader::fromLinear(show.masterGain));
     masterPan.setValue(show.masterPan,juce::dontSendNotification);
     masterMute.setToggleState(show.masterMuted,juce::dontSendNotification);
     safetyLimiter.setToggleState(show.safetyLimiterEnabled,juce::dontSendNotification);

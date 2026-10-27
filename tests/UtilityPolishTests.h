@@ -10,7 +10,7 @@ void utilityPolishTests() {
         utility->refresh();ui.resized();
         ui.toggleColumnCollapsed(0);
         utility->refresh();ui.resized();
-        auto* strip=utility->getChildComponent(0);
+        auto* strip=utility->getChildComponent(0)->getChildComponent(0);
         auto* gain=dynamic_cast<GainMeterFader*>(controlsV3::named(*strip,"columnGainDb"));
         auto* mute=dynamic_cast<juce::ToggleButton*>(controlsV3::named(*strip,"columnMute"));
         check(gain && mute && gain->isVisible() && mute->isVisible() &&
@@ -28,8 +28,8 @@ void utilityPolishTests() {
         addColumn(ui.show,ColumnType::midi,"M");
         auto* utility=cueViewFixtures::find<ColumnUtilities>(ui);
         utility->refresh();ui.resized();
-        auto* audio=utility->getChildComponent(0);
-        auto* midi=utility->getChildComponent(1);
+        auto* audio=utility->getChildComponent(0)->getChildComponent(0);
+        auto* midi=utility->getChildComponent(0)->getChildComponent(1);
         auto* audioOut=dynamic_cast<juce::ComboBox*>(controlsV3::named(*audio,"columnOutput"));
         auto* midiOut=dynamic_cast<juce::ComboBox*>(controlsV3::named(*midi,"columnOutput"));
         auto* prepost=dynamic_cast<juce::TextButton*>(controlsV3::named(*audio,"columnDirectPrePost"));
@@ -104,9 +104,9 @@ void utilityPolishTests() {
         addColumn(ui.show,ColumnType::osc,"O");
         auto* utility=cueViewFixtures::find<ColumnUtilities>(ui);
         utility->refresh();ui.resized();
-        auto* audio=utility->getChildComponent(0);
-        auto* midi=utility->getChildComponent(1);
-        auto* osc=utility->getChildComponent(2);
+        auto* audio=utility->getChildComponent(0)->getChildComponent(0);
+        auto* midi=utility->getChildComponent(0)->getChildComponent(1);
+        auto* osc=utility->getChildComponent(0)->getChildComponent(2);
         check(!controlsV3::named(*audio,"columnDataOutputMute")->isVisible(),
               "Audio has unexpected data mute");
         auto* muteMidi=dynamic_cast<juce::ToggleButton*>(controlsV3::named(*midi,"columnDataOutputMute"));

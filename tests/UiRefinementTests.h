@@ -114,7 +114,7 @@ void uiRefinementTests() {
         auto* masterPan=dynamic_cast<juce::Slider*>(controlsV3::named(*utilities,"masterPan"));
         auto* masterMute=dynamic_cast<juce::ToggleButton*>(controlsV3::named(*utilities,"masterMute"));
         check(masterPan && masterMute,"Master pan and mute missing from utilities");
-        auto* audio=utilities->getChildComponent(0);
+        auto* audio=utilities->getChildComponent(0)->getChildComponent(0);
         auto* fader=dynamic_cast<GainMeterFader*>(controlsV3::named(*audio,"columnGainDb"));
         auto* pan=dynamic_cast<juce::Slider*>(controlsV3::named(*audio,"columnPan"));
         check(fader && pan && pan->getWidth()>=43 && pan->getWidth()<=50 && fader->getWidth()<=96,"Strip controls were not reduced");
@@ -218,7 +218,7 @@ void uiRefinementTests() {
         check(overlay && view && grid,"Fixed cue controls or grid missing");
         const int pinnedX=overlay->getX();
         check(overlay->getWidth()==CueMetricsOverlay::width &&
-              pinnedX==view->getRight()-CueMetricsOverlay::width,
+              pinnedX==view->getRight(),
               "BPM and Auto Stop are not anchored to the viewport edge");
         view->setViewPosition(180,0);
         check(overlay->getX()==pinnedX,"Cue metrics moved with horizontally scrolled columns");
@@ -240,10 +240,10 @@ void uiRefinementTests() {
                 view=candidate; break;
             }
         check(overlay && grid && view,"Cue grid, viewport or pinned controls missing");
-        check(view->getX()==192 && view->getY()==86 &&
-              ui.getWidth()-288-view->getRight()==8,
+        check(view->getX()==184 && view->getY()==78 &&
+              ui.getWidth()-288-overlay->getRight()==8,
               "Excessive left/right/top cue-list margins returned");
-        check(overlay->getRight()==view->getRight() &&
+        check(overlay->getX()==view->getRight() &&
               overlay->getWidth()==CueMetricsOverlay::width &&
               CueMetricsOverlay::width>=180,
               "BPM/Auto Stop column lost its padded fixed position");
@@ -258,8 +258,8 @@ void uiRefinementTests() {
         check(std::abs(juce::Decibels::gainToDecibels(ui.show.rows[0].cells[0].gain,-60.0f)-5.5f)<0.06f,
               "Numeric Gain did not update the audio cell");
         ui.setSize(1180,820);
-        check(overlay->getRight()==view->getRight() &&
-              view->getY()==86 && ui.getWidth()-288-view->getRight()==8,
+        check(overlay->getX()==view->getRight() &&
+              view->getY()==78 && ui.getWidth()-288-overlay->getRight()==8,
               "Compact cue-list positioning broke at smaller window size");
     });
     test("Project title is editable and survives v10 serialization",[] {
@@ -293,7 +293,7 @@ void uiRefinementTests() {
         MainComponent ui(false);addColumn(ui.show,ColumnType::control,"Control");
         auto* utility=cueViewFixtures::find<ColumnUtilities>(ui);
         utility->refresh();
-        auto* strip=utility->getChildComponent(1);
+        auto* strip=utility->getChildComponent(0)->getChildComponent(1);
         auto* lock=dynamic_cast<juce::Button*>(controlsV3::named(*strip,"controlColumnLock"));
         check(lock && lock->isVisible() && !lock->getToggleState(),
               "Unlocked icon state missing");
@@ -314,6 +314,91 @@ void uiRefinementTests() {
         ControlEvent event;
         check(input.poll(event) && event.number==21 && event.value==72,
               "MIDI RX activity diverged from queued controller message");
+    });
+
+
+    test("Pinned row headers stay clickable while many cue columns scroll",[] {
+        MainComponent ui(false);
+        addRow(ui.show,"Second cue");
+        for (int c=0;c<11;++c) addColumn(ui.show,ColumnType::audio,"Extension");
+        ui.setSize(1180,820);
+        auto* headers=cueViewFixtures::find<PinnedCueHeaders>(ui);
+        auto* metrics=cueViewFixtures::find<CueMetricsOverlay>(ui);
+        auto* utilities=cueViewFixtures::find<ColumnUtilities>(ui);
+        juce::Viewport* view=nullptr;
+        for (auto* child:ui.getChildren())
+            if (auto* found=dynamic_cast<juce::Viewport*>(child)) {view=found;break;}
+        check(headers && metrics && utilities && view,"Fixed workspace regions are missing");
+        check(headers->getX()==view->getX() &&
+              headers->getRight()==view->getX()+CueGrid::nameWidth &&
+              metrics->getX()==view->getRight() &&
+              utilities->getRight()==metrics->getX(),
+              "Three-zone workspace does not exclude pinned strips from scrolling");
+        view->setViewPosition(350,0);
+        check(headers->getX()==view->getX() &&
+              metrics->getX()==view->getRight(),
+              "Pinned header or metrics moved when scrolling right");
+        cueViewFixtures::click(*headers,120.f,
+            (float)(CueGrid::headerHeight+CueGrid::rowHeight+18));
+        check(ui.selectedRow==1,
+              "Fixed row title failed to select its own cue after horizontal scrolling");
+        check(utilities->getChildComponent(0)->getX()==CueGrid::nameWidth &&
+              utilities->getChildComponent(0)->getRight()<=utilities->getWidth(),
+              "Scrolled utility strips were not confined to the central region");
+    });
+
+    test("Collapsed Audio MIDI and OSC mute glyphs share the same vertical baseline",[] {
+        MainComponent ui(false);
+        addColumn(ui.show,ColumnType::midi,"MIDI"); addColumn(ui.show,ColumnType::osc,"OSC");
+        for (int c=0;c<3;++c) ui.show.columns[(size_t)c].collapsed=true;
+        auto* utility=cueViewFixtures::find<ColumnUtilities>(ui);
+        utility->refresh();ui.resized();
+        auto* region=utility->getChildComponent(0);
+        auto* audio=region->getChildComponent(0);
+        auto* midi=region->getChildComponent(1);
+        auto* osc=region->getChildComponent(2);
+        auto* mute=controlsV3::named(*audio,"columnMute");
+        auto* midiMute=controlsV3::named(*midi,"columnDataOutputMute");
+        auto* oscMute=controlsV3::named(*osc,"columnDataOutputMute");
+        check(mute && midiMute && oscMute &&
+              mute->getY()==midiMute->getY() && mute->getY()==oscMute->getY(),
+              "Collapsed MIDI/OSC mute buttons sit above the Audio mute");
+    });
+
+    test("Fader range preference persists without rewriting Show gain or routing",[] {
+        MainComponent ui(false);
+        const int prior=ui.audioFaderCeilingDb();
+        const auto before=encodeShow(ui.show);
+        ui.setAudioFaderCeilingDb(0);
+        check(ui.audioFaderCeilingDb()==0 && encodeShow(ui.show)==before,
+              "Fader range change altered the saved show, routing or gain");
+        {
+            MainComponent reopened(false);
+            check(reopened.audioFaderCeilingDb()==0,
+                  "Fader range was not saved in application preferences");
+        }
+        ui.setAudioFaderCeilingDb(prior); // Leave the operator preference unchanged.
+    });
+
+    test("MIDI control at maximum honors the selected 0 dB and +6 dB fader ceilings",[] {
+        MainComponent ui(false);
+        const int prior=ui.audioFaderCeilingDb();
+        ControlBinding gain;
+        gain.deviceId="controller";gain.kind=ControlKind::cc;gain.channel=1;
+        gain.number=27;gain.target=ControlTarget::masterGain;
+        gain.takeover=ControlTakeover::jump;gain.minimum=0;gain.maximum=4;
+        check(ui.addMappingBinding(gain),"Could not assign gain fader to controller");
+        ui.setAudioFaderCeilingDb(0);
+        ui.dispatchControlForTest({"controller",ControlKind::cc,1,27,64,false});
+        check(std::abs(ui.show.masterGain-64.0/127.0)<0.0002,
+              "Intermediate MIDI CC did not span the full 0 dB fader range");
+        ui.dispatchControlForTest({"controller",ControlKind::cc,1,27,127,false});
+        near(ui.show.masterGain,1.0);
+        ui.setAudioFaderCeilingDb(6);
+        ui.dispatchControlForTest({"controller",ControlKind::cc,1,27,127,false});
+        check(std::abs(ui.show.masterGain-std::pow(10.0,6.0/20.0))<0.0002,
+              "Full MIDI CC value did not reach the +6 dB ceiling");
+        ui.setAudioFaderCeilingDb(prior);
     });
 
 }

@@ -4,11 +4,13 @@ void controlsV4Tests() {
     test("utility routing replaces inspector output and MIDI OSC have no audio controls", [] {
         MainComponent ui(false); addColumn(ui.show,ColumnType::midi,{}); addColumn(ui.show,ColumnType::osc,{});
         auto* utilities=find<ColumnUtilities>(ui); utilities->refresh();
-        check(utilities->getNumChildComponents()==8,"Three utility strips and five Master controls expected");
+        check(utilities->getNumChildComponents()==6 &&
+              utilities->getChildComponent(0)->getNumChildComponents()==3,
+              "Three clipped utility strips and five pinned Master controls expected");
         for (const auto* name: {"masterAudioDb","masterPan","masterMute","masterMainOutput","masterSafetyLimiter"})
             check(controlsV3::named(*utilities,name)!=nullptr,"A Master control is missing");
         for (int c=0;c<3;++c) {
-            auto* strip=utilities->getChildComponent(c);
+            auto* strip=utilities->getChildComponent(0)->getChildComponent(c);
             auto* output=dynamic_cast<juce::ComboBox*>(controlsV3::named(*strip,"columnOutput"));
             check(output && output->isVisible()==(c!=2),"Audio/MIDI routing or OSC destination visibility incorrect");
             if (c!=2) check(output->isEnabled(),"Audio/MIDI routing unavailable");

@@ -128,9 +128,9 @@ void mixerV8Tests() {
         auto* masterPan=dynamic_cast<juce::Slider*>(controlsV3::named(ui,"masterPan"));
         auto* masterMute=dynamic_cast<juce::ToggleButton*>(controlsV3::named(ui,"masterMute"));
         check(masterPan && masterMute,"Master pan and mute controls missing");
-        auto* audio=utilities->getChildComponent(0);
-        auto* midiStrip=utilities->getChildComponent(1);
-        auto* oscStrip=utilities->getChildComponent(2);
+        auto* audio=utilities->getChildComponent(0)->getChildComponent(0);
+        auto* midiStrip=utilities->getChildComponent(0)->getChildComponent(1);
+        auto* oscStrip=utilities->getChildComponent(0)->getChildComponent(2);
         auto* fader=dynamic_cast<GainMeterFader*>(controlsV3::named(*audio,"columnGainDb"));
         auto* pan=dynamic_cast<juce::Slider*>(controlsV3::named(*audio,"columnPan"));
         check(fader && fader->getNumChildComponents()==0,"Stereo fader/meter must be one component, not layered widgets");

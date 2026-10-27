@@ -31,17 +31,30 @@ public:
     int columnAt(int x) const;
     int totalColumnsWidth() const;
     void toggleAutoStopDetails(int row);
+    void clickRowHeader(int row,int x,int localY,int clicks,juce::Point<int> screen);
     bool autoStopDetailsVisible(int rowId) const { return autoStopVisibleRows.count(rowId)>0; }
     static juce::Colour cueColour(int id);
     bool isInterestedInFileDrag(const juce::StringArray&) override;
     void filesDropped(const juce::StringArray&,int,int) override;
-    static constexpr int rowHeight=62, headerHeight=72, nameWidth=315, columnWidth=152, compressedWidth=48;
+    static constexpr int rowHeight=62, headerHeight=72, nameWidth=290, columnWidth=136, compressedWidth=48;
     static constexpr int rowContentInset=4; // visual padding, used by both paint and hit-testing
 private:
     MainComponent& owner;
     int dragRow=-1, dragColumn=-1, dropRow=-1, dropColumn=-1;
     std::set<int> autoStopVisibleRows;
     bool dragging=false;
+};
+// Stays outside the horizontally scrolled content, but follows its vertical
+// offset and reuses CueGrid rendering and row hit targets.
+class PinnedCueHeaders final : public juce::Component {
+public:
+    explicit PinnedCueHeaders(MainComponent& p):owner(p) {}
+    void paint(juce::Graphics&) override;
+    void mouseDown(const juce::MouseEvent&) override;
+    void mouseDoubleClick(const juce::MouseEvent&) override;
+    void mouseWheelMove(const juce::MouseEvent&,const juce::MouseWheelDetails&) override;
+private:
+    MainComponent& owner;
 };
 class CueMetricsOverlay final : public juce::Component {
 public:
@@ -102,6 +115,7 @@ public:
 private:
     struct Strip;
     MainComponent& owner;
+    juce::Component scrollableStrips;
     std::vector<std::unique_ptr<Strip>> strips;
     int scrollX=0;
     int masterRoutingChannels=-1, masterRoutingOutput=-1;
@@ -147,6 +161,8 @@ public:
     void setColumnDirectPostFader(int column,bool post);
     void setColumnDirectEnabled(int column,bool enabled);
     void setMasterAudio(float gain);
+    int audioFaderCeilingDb() const noexcept { return faderCeilingDb; }
+    void setAudioFaderCeilingDb(int db);
     void setMasterPan(float pan);
     void setMasterMute(bool muted);
     void setMasterOutput(int channel);
@@ -207,10 +223,12 @@ public:
     int selectedRow=0, selectedColumn=0;
     AudioEngine engine;
 private:
-    friend class CueGrid; friend class CueMetricsOverlay; friend class Timeline; friend class MidiUndoAction; friend class ColumnUtilities; friend class ControlPanel;
+    friend class CueGrid; friend class PinnedCueHeaders; friend class CueMetricsOverlay; friend class Timeline; friend class MidiUndoAction; friend class ColumnUtilities; friend class ControlPanel;
     Theme theme;
+    std::unique_ptr<juce::PropertiesFile> appPreferences;
+    int faderCeilingDb=6;
     juce::TooltipWindow tooltip{this,600};
-    CueGrid grid{*this}; CueMetricsOverlay cueMetrics{*this}; Timeline timeline{*this}; juce::Viewport viewport;
+    CueGrid grid{*this}; PinnedCueHeaders cueHeaders{*this}; CueMetricsOverlay cueMetrics{*this}; Timeline timeline{*this}; juce::Viewport viewport;
     ColumnUtilities utilities{*this};
     juce::TextButton openButton{"Open"},saveButton{"Save"},newButton{"New"},addRowButton{"+"},addColumnButton{"+"};
     juce::TextButton preferencesButton{"Preferences"};
