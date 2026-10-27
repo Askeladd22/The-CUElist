@@ -47,7 +47,7 @@ public:
     void paint(juce::Graphics&) override;
     void mouseDown(const juce::MouseEvent&) override;
     void mouseWheelMove(const juce::MouseEvent&,const juce::MouseWheelDetails&) override;
-    static constexpr int width=148;
+    static constexpr int width=164;
 private:
     MainComponent& owner;
 };
