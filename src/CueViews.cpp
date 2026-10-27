@@ -465,8 +465,8 @@ void CueGrid::filesDropped(const juce::StringArray& files,int x,int y) {
 void CueMetricsOverlay::paint(juce::Graphics& g) {
     g.fillAll(palette::raised);
     g.setColour(palette::teal);g.fillRect(0,0,3,getHeight());
-    label(g,"BPM",{7,18,50,23},11,palette::text,true);
-    label(g,"AUTO STOP",{80,18,78,23},10,palette::text,true);
+    label(g,"BPM",{22,18,61,23},11,palette::text,true);
+    label(g,"AUTO STOP",{100,18,78,23},10,palette::text,true);
     const int scroll=owner.viewport.getViewPositionY();
     const int first=std::max(0,(scroll-CueGrid::headerHeight)/CueGrid::rowHeight);
     const int last=std::min((int)owner.show.rows.size(),
@@ -480,16 +480,16 @@ void CueMetricsOverlay::paint(juce::Graphics& g) {
         if (row.colour>0) {
             g.setColour(cueTone.withAlpha(.28f));g.fillRect(3,y,getWidth()-3,CueGrid::rowHeight);
         }
-        label(g,juce::String(row.tempo.front().bpm,1),{7,y+14,61,24},14,palette::text,true);
+        label(g,juce::String(row.tempo.front().bpm,1),{22,y+14,65,24},14,palette::text,true);
         g.setColour(row.stopOnNext?palette::teal.withAlpha(.3f):palette::muted.withAlpha(.2f));
-        g.fillRoundedRectangle(85.f,(float)y+12,31.f,19.f,9.f);
+        g.fillRoundedRectangle(105.f,(float)y+12,31.f,19.f,9.f);
         g.setColour(row.stopOnNext?palette::teal:palette::muted);
-        g.fillEllipse(row.stopOnNext?101.f:88.f,(float)y+15,13.f,13.f);
-        label(g,row.stopOnNext?"ON":"OFF",{119,y+11,34,22},10,
+        g.fillEllipse(row.stopOnNext?121.f:108.f,(float)y+15,13.f,13.f);
+        label(g,row.stopOnNext?"ON":"OFF",{139,y+11,39,22},10,
               row.stopOnNext?palette::teal:palette::muted,true);
         const bool details=owner.grid.autoStopDetailsVisible(row.id);
         label(g,details?"-":"+",
-              {97,y+36,24,20},15,details?palette::amber:palette::muted,true,
+              {117,y+36,24,20},15,details?palette::amber:palette::muted,true,
               juce::Justification::centred);
         g.setColour(palette::line);
         g.drawHorizontalLine(y+CueGrid::rowHeight-1,0,(float)getWidth());
@@ -508,7 +508,7 @@ void CueMetricsOverlay::mouseDown(const juce::MouseEvent& e) {
     const int row=(e.y+scroll-CueGrid::headerHeight)/CueGrid::rowHeight;
     if (row<0 || row>=(int)owner.show.rows.size()) return;
     const int localY=(e.y+scroll-CueGrid::headerHeight)%CueGrid::rowHeight;
-    if (e.x<69) owner.editRowBpm(row);
+    if (e.x<91) owner.editRowBpm(row);
     else if (localY>=32) owner.grid.toggleAutoStopDetails(row);
     else owner.setAutoStop(row,!owner.show.rows[(size_t)row].stopOnNext);
     repaint();

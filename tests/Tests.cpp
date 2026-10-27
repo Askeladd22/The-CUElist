@@ -116,14 +116,14 @@ int main() {
         for(int i=0;i<20;++i) clip->samples.setSample(0,i,.01f*(i+1));
         ui.clips[ui.show.rows[0].cells[0].id]=clip;
         ui.engine.publish(makeRenderState(ui.show,ui.clips));
-        auto* gain=dynamic_cast<juce::Slider*>(controlsV3::named(ui,"cellGainDb"));
+        auto* gain=dynamic_cast<juce::TextEditor*>(controlsV3::named(ui,"cellGainDb"));
         check(gain && gain->isVisible(),"Clip gain disappeared from Inspector");
         auto sample=[&] {
             float result=0;float* out[]{&result};
             ui.engine.collectRetired();ui.engine.processBlock(out,1,1,4);return result;
         };
         ui.triggerCell();near(sample(),.01);
-        gain->setValue(-6,juce::sendNotificationSync);
+        gain->setText("-6.0",false); gain->onReturnKey();
         near(sample(),.02*std::pow(10.0,-6.0/20.0));
         auto* hiddenMode=dynamic_cast<juce::ComboBox*>(controlsV3::named(ui,"cellBehaviour"));
         if(hiddenMode) check(!hiddenMode->isVisible(),"Legacy playback mode is still exposed");
@@ -141,10 +141,12 @@ int main() {
         ui.goNext(); check(ui.nextCueIndex()==2,"Sequence wrapped");
         ui.select(0,0); check(ui.nextCueIndex()==0,"Selection did not rearm");
     });
-    test("dB slider updates model immediately and structural controls preserve shape", [] {
+    test("Gain dB input applies to the model and structural controls preserve shape", [] {
         MainComponent ui(false);
         for (auto* child : ui.getChildren()) if (child->getName()=="cellGainDb") {
-            auto* slider=dynamic_cast<juce::Slider*>(child); slider->setValue(-6,juce::sendNotificationSync);
+            auto* edit=dynamic_cast<juce::TextEditor*>(child);
+            check(edit!=nullptr,"Gain input is not an editable text field");
+            edit->setText("-6.0",false); edit->onReturnKey();
         }
         near(ui.show.rows[0].cells[0].gain,std::pow(10.0,-6.0/20.0));
         ui.setClipStart(0,2.37); near(ui.show.rows[0].cells[0].startSeconds,2.37);
@@ -172,7 +174,7 @@ int main() {
         for (auto* child : ui.getChildren()) if (auto* edit=dynamic_cast<juce::TextEditor*>(child)) {
             ++editors; check(!edit->keyPressed(juce::KeyPress(juce::KeyPress::escapeKey)),"Editor swallowed Escape");
         }
-        check(editors==3,"Missing inspector fields");
+        check(editors==4,"Missing inspector fields, including numeric Gain");
     });
     test("WAV import and atomic project save work on disk with previous-version backup", [] {
         const auto folder=juce::File::getSpecialLocation(juce::File::currentExecutableFile).getParentDirectory().getChildFile("test-artifacts");

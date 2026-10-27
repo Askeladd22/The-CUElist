@@ -229,6 +229,39 @@ void uiRefinementTests() {
               "Expanded column positions are inconsistent");
     });
 
+    test("Cue list fills compact outer gutters while pinned BPM and Gain editor stay usable",[] {
+        MainComponent ui(false);
+        ui.setSize(1647,895);
+        auto* overlay=cueViewFixtures::find<CueMetricsOverlay>(ui);
+        auto* grid=cueViewFixtures::find<CueGrid>(ui);
+        juce::Viewport* view=nullptr;
+        for (auto* child:ui.getChildren())
+            if (auto* candidate=dynamic_cast<juce::Viewport*>(child)) {
+                view=candidate; break;
+            }
+        check(overlay && grid && view,"Cue grid, viewport or pinned controls missing");
+        check(view->getX()==192 && view->getY()==86 &&
+              ui.getWidth()-288-view->getRight()==8,
+              "Excessive left/right/top cue-list margins returned");
+        check(overlay->getRight()==view->getRight() &&
+              overlay->getWidth()==CueMetricsOverlay::width &&
+              CueMetricsOverlay::width>=180,
+              "BPM/Auto Stop column lost its padded fixed position");
+        check(grid->getWidth()<=view->getWidth(),
+              "One-column show should not force unnecessary horizontal scrolling");
+        auto* gain=dynamic_cast<juce::TextEditor*>(controlsV3::named(ui,"cellGainDb"));
+        check(gain && gain->isVisible() && gain->getWidth()<=110,
+              "Inspector should offer a compact numeric dB editor, not a fader");
+        gain->setText("5.5",false);
+        check(ui.hasUnsavedChanges(),"Uncommitted Gain dB changes must be tracked");
+        gain->onReturnKey();
+        check(std::abs(juce::Decibels::gainToDecibels(ui.show.rows[0].cells[0].gain,-60.0f)-5.5f)<0.06f,
+              "Numeric Gain did not update the audio cell");
+        ui.setSize(1180,820);
+        check(overlay->getRight()==view->getRight() &&
+              view->getY()==86 && ui.getWidth()-288-view->getRight()==8,
+              "Compact cue-list positioning broke at smaller window size");
+    });
     test("Project title is editable and survives v10 serialization",[] {
         MainComponent ui(false);
         auto* title=dynamic_cast<juce::Label*>(controlsV3::named(ui,"projectName"));
