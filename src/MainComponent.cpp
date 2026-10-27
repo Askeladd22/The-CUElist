@@ -1,5 +1,6 @@
 #include "MainComponent.h"
 #include "ProjectSafety.h"
+#include "ProjectMediaLoader.h"
 #include "PianoRoll.h"
 #include "OscEditor.h"
 #include "MidiClip.h"
@@ -431,13 +432,7 @@ bool MainComponent::applyInspector() {
 }
 void MainComponent::message(const juce::String& text) { status=text; repaint(); juce::AlertWindow::showMessageBoxAsync(juce::MessageBoxIconType::WarningIcon,"The Cuelist",text,"OK",this); }
 bool MainComponent::memoryFits(const ClipMap& collection) const {
-    // Pasted Audio cells intentionally share one immutable PCM object; counting
-    // the same shared media once per cell would reject valid large shows.
-    int64_t bytes=0;
-    std::set<const AudioClip*> counted;
-    for (const auto& item:collection) if (item.second && counted.insert(item.second.get()).second)
-        bytes+=(int64_t)item.second->samples.getNumSamples()*item.second->samples.getNumChannels()*4;
-    return bytes<=512LL*1024*1024;
+    return withinPcmBudget(collection);
 }
 void MainComponent::importDialog() {
     if (show.columns[selectedColumn].type==ColumnType::osc ||
@@ -467,10 +462,13 @@ void MainComponent::importFile(const juce::File& file) {
         return;
     }
     if (show.columns[selectedColumn].type!=ColumnType::audio) { message("Import audio into an Audio column."); return; }
-    engine.panic(); std::shared_ptr<const AudioClip> clip; auto result=loadClip(file,clip);
+    std::shared_ptr<const AudioClip> clip;
+    const auto result=loadClip(file,clip);
     if (result.failed()) { message(result.getErrorMessage()); return; }
     auto updated=clips; auto& c=show.rows[selectedRow].cells[selectedColumn]; updated[c.id]=clip;
     if (!memoryFits(updated)) { message("Preload limit reached: 512 MB PCM per show. The file was not added."); return; }
+    // Invalid imports no longer stop an ongoing performance; a successful
+    // import still uses changed(...), preserving its original transport policy.
     clips=std::move(updated); c.file=file.getFullPathName(); c.name=file.getFileNameWithoutExtension();
     changed("Imported "+file.getFileName()+". Double-click the cell to play.");
 }
@@ -738,18 +736,15 @@ void MainComponent::showDiagnostics() {
 bool MainComponent::activateProject(Show candidate,const juce::File& source,bool recovering) {
     // PREPARE before committing: an unreadable or oversized new show must
     // never panic, unload or corrupt the current live show.
-    ClipMap loaded;
-    juce::StringArray issues;
-    for(const auto& row:candidate.rows) for(const auto& c:row.cells) if(c.file.isNotEmpty()) {
-        std::shared_ptr<const AudioClip> clip;
-        const auto read=loadClip(juce::File(c.file),clip);
-        if(read.failed()) {issues.add(read.getErrorMessage());continue;}
-        loaded[c.id]=clip;
-        if(!memoryFits(loaded)) {
-            message("Show exceeds 512 MB PCM. The current show has not been replaced.");
-            return false;
-        }
+    PreparedShowMedia prepared;
+    const auto preparedResult=prepareShowMedia(candidate,prepared);
+    if(preparedResult.failed()) {
+        message(preparedResult.getErrorMessage()+
+                " The current show has not been replaced.");
+        return false;
     }
+    auto loaded=std::move(prepared.clips);
+    auto issues=std::move(prepared.issues);
     // Only after all memory checks pass do we stop the previous show.
     engine.panic();
     for(const auto& column:candidate.columns)
