@@ -26,6 +26,7 @@ void test(const char* name, const std::function<void()>& body) {
 #include "OscAutomationV9Tests.h"
 #include "AutoStopV7Tests.h"
 #include "MixerV8Tests.h"
+#include "MasterBusRoutingTests.h"
 #include "GainMeterFaderTests.h"
 #include "UiRefinementTests.h"
 #include "RowActionsUiTests.h"
@@ -41,6 +42,7 @@ int main() {
     oscAutomationV9Tests();
     autoStopV7Tests();
     mixerV8Tests();
+    masterBusRoutingTests();
     gainMeterFaderTests();
     uiRefinementTests();
     rowActionsUiTests();
