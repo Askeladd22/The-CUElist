@@ -2,7 +2,8 @@ param([switch]$SmokeLaunch)
 $ErrorActionPreference = 'Stop'
 $repo = Split-Path $PSScriptRoot -Parent
 $version = (Get-Content -LiteralPath (Join-Path $repo 'VERSION.txt') -Raw).Trim()
-if ($version -notmatch '^\\d+\\.\\d+\\.\\d+(-[a-zA-Z0-9.]+)?
+if ($version -notmatch '^\d+\.\d+\.\d+(-[a-zA-Z0-9.]+)?$') { throw 'Invalid VERSION.txt.' }
+$name = "The-Cuelist-$version-Windows-x64"
 $zip = Join-Path $repo ('dist\' + $name + '.zip')
 $checkRoot = Join-Path $repo ('build\package-check-' + [guid]::NewGuid().ToString('N'))
 New-Item -ItemType Directory -Path $checkRoot | Out-Null
