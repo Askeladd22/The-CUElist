@@ -28,7 +28,7 @@ void GainMeterFader::paint(juce::Graphics& g) {
         }
         g.setColour(palette::muted);
         g.setFont(font(9.0f,true));
-        g.drawText(gainDb==silenceDb ? juce::String("-inf") : juce::String((int)std::round(gainDb)),0,getHeight()-18,
+        g.drawText(gainDb==silenceDb ? juce::String("-∞") : juce::String((int)std::round(gainDb)),0,getHeight()-18,
                    getWidth(),17,juce::Justification::centred,false);
         return;
     }
@@ -67,8 +67,9 @@ void GainMeterFader::paint(juce::Graphics& g) {
         // Retain all tick marks but skip conflicting labels in short strips.
         if (y-previousLabel>=13.0f || previousLabel<0) {
             g.setFont(font(10.0f));
-            g.drawText(tick>0 ? "+"+juce::String(tick) : juce::String(tick),
-                       53,(int)std::round(y-7),36,14,juce::Justification::centredLeft,false);
+            g.drawText(tick==-60 ? juce::String("-∞") :
+                       tick>0 ? "+"+juce::String(tick) : juce::String(tick),
+                       52,(int)std::round(y-7),25,14,juce::Justification::centredLeft,false);
             previousLabel=y;
         }
     }
@@ -89,7 +90,7 @@ void GainMeterFader::paint(juce::Graphics& g) {
     g.drawText("R",29,(int)bottom+3,12,14,juce::Justification::centred,false);
     g.setColour(palette::text);
     g.setFont(font(12.0f,true));
-    g.drawText(gainDb==silenceDb ? juce::String("-inf dB") : juce::String(gainDb,1)+" dB",4,getHeight()-22,
+    g.drawText(gainDb==silenceDb ? juce::String("-∞ dB") : juce::String(gainDb,1)+" dB",4,getHeight()-22,
                std::max(70,getWidth()-8),20,juce::Justification::centredLeft,false);
 }
 void GainMeterFader::mouseDown(const juce::MouseEvent& e) {
