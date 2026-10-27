@@ -5,16 +5,16 @@ void workspaceLayoutTests() {
     test("Workspace geometry preserves the 0.9 desktop cue/mixer/timeline arrangement",[] {
         const auto geometry=calculateWorkspaceLayout({1647,895,0,467,1,72,62,184});
         check(geometry.editorX==1359 &&
-              geometry.viewport==juce::Rectangle<int>(184,78,983,363),
+              geometry.viewport==juce::Rectangle<int>(182,74,985,367),
               "Desktop viewport changed the agreed cue-list gutters");
-        check(geometry.utilities==juce::Rectangle<int>(184,441,983,208) &&
+        check(geometry.utilities==juce::Rectangle<int>(182,441,985,208) &&
               geometry.utilities.getY()==geometry.viewport.getBottom(),
               "Utility mixer no longer meets the cue-list viewport");
-        check(geometry.timeline==juce::Rectangle<int>(184,663,983,185),
+        check(geometry.timeline==juce::Rectangle<int>(182,663,1169,185),
               "Timeline position changed without a layout request");
-        check(geometry.metrics==juce::Rectangle<int>(1167,78,184,363),
+        check(geometry.metrics==juce::Rectangle<int>(1167,74,184,367),
               "BPM/Auto Stop is no longer pinned to the viewport edge");
-        check(geometry.inspectorPanel==juce::Rectangle<int>(1359,84,268,763),
+        check(geometry.inspectorPanel==juce::Rectangle<int>(1359,76,268,771),
               "Inspector outer card moved");
         check(geometry.gridSize.x<=geometry.viewport.getWidth(),
               "Single-column show acquired unwanted horizontal scrolling");
@@ -24,7 +24,7 @@ void workspaceLayoutTests() {
         for (const auto& dimensions:std::initializer_list<juce::Point<int>>{
                  {1180,820},{1440,900},{1647,895},{1920,1080}}) {
             const auto g=calculateWorkspaceLayout({dimensions.x,dimensions.y,0,467,3,72,62,184});
-            check(g.viewport.getX()==184 && g.viewport.getY()==78 &&
+            check(g.viewport.getX()==182 && g.viewport.getY()==74 &&
                   g.editorX-g.metrics.getRight()==8,
                   "Cue-list gutters changed on window resizing");
             check(g.metrics.getX()==g.viewport.getRight() &&
@@ -34,7 +34,7 @@ void workspaceLayoutTests() {
             check(g.utilities.getX()==g.viewport.getX() &&
                   g.utilities.getWidth()==g.viewport.getWidth() &&
                   g.timeline.getX()==g.viewport.getX() &&
-                  g.timeline.getWidth()==g.viewport.getWidth(),
+                  g.timeline.getRight()==g.editorX-8,
                   "Mixer and timeline are no longer aligned with the cue list");
         }
     });
@@ -130,7 +130,7 @@ void workspaceLayoutTests() {
               collapsed.effectiveDockHeight==36 &&
               closed.effectiveDockHeight==0,
               "Previously fitting dock states must remain unchanged");
-        check(normal.viewport.getY()==78 && normal.viewport.getHeight()==178 &&
+        check(normal.viewport.getY()==74 && normal.viewport.getHeight()==182 &&
               normal.timeline.getBottom()==773,
               "Default compact layout geometry unexpectedly changed");
         check(collapsed.timeline.getBottom()==773 &&
@@ -199,4 +199,59 @@ void workspaceLayoutTests() {
                   "JUCE workspace bounds differ from pure geometry");
         }
     });
+
+    test("Full-width Timeline and docked MIDI/OSC editor do not inherit BPM clipping",[] {
+        for (int width:{1180,1440,1647,1920})
+            for (int dock:{0,36,208}) {
+                const auto g=calculateWorkspaceLayout({width,900,dock,746,3,72,62,184,290});
+                check(g.metrics.getX()==g.viewport.getRight() &&
+                      g.utilities.getRight()==g.metrics.getX(),
+                      "Fixed BPM gutter no longer excludes upper Utility columns");
+                check(g.timeline.getRight()==g.editorX-8 &&
+                      g.dockEditor.getRight()==g.editorX-8 &&
+                      g.timeline.getWidth()==g.utilities.getWidth()+g.metrics.getWidth(),
+                      "Lower MIDI OSC or Timeline was clipped at BPM boundary");
+                check(g.timeline.getY()==g.dockEditor.getBottom(),
+                      "Timeline no longer follows the dock");
+            }
+    });
+    test("Timeline resize redistributes height without shifting pinned cues",[] {
+        const auto initial=calculateWorkspaceLayout({1440,900,0,746,3,72,62,184,290,0});
+        const auto expanded=calculateWorkspaceLayout({1440,900,0,746,3,72,62,184,290,72});
+        const auto reduced=calculateWorkspaceLayout({1440,900,0,746,3,72,62,184,290,-65});
+        check(expanded.timeline.getHeight()==initial.timeline.getHeight()+72 &&
+              reduced.timeline.getHeight()==initial.timeline.getHeight()-65,
+              "Timeline vertical drag had the wrong gain or direction");
+        for (const auto* g:{&initial,&expanded,&reduced})
+            check(g->cueHeaders.getY()==initial.cueHeaders.getY() &&
+                  g->cueHeaders.getX()==initial.cueHeaders.getX() &&
+                  g->metrics.getX()==g->viewport.getRight() &&
+                  g->utilities.getRight()==g->metrics.getX() &&
+                  std::abs(g->timelineResize.getCentreY()-g->timeline.getY())<=1 &&
+                  g->timeline.getBottom()<=853,
+                  "Timeline resize shifted pinned headers or caused clipping");
+        const auto compact=calculateWorkspaceLayout({1180,820,208,746,3,72,62,184,290,400});
+        check(compact.timeline.getHeight()>=75 &&
+              compact.timeline.getBottom()<=773,
+              "Compact window lost its minimum Timeline lane");
+    });
+    test("Live Timeline splitter drag does not move pinned BPM or cue headers",[] {
+        MainComponent ui(false);
+        ui.setSize(1440,900);
+        auto* splitter=controlsV3::named(ui,"timelineResizeHandle");
+        auto* timeline=cueViewFixtures::find<Timeline>(ui);
+        auto* headers=cueViewFixtures::find<PinnedCueHeaders>(ui);
+        auto* metrics=cueViewFixtures::find<CueMetricsOverlay>(ui);
+        check(splitter && timeline && headers && metrics,"Timeline splitter missing");
+        const int height=timeline->getHeight();
+        const int cueY=headers->getY(),bpmX=metrics->getX();
+        const juce::Point<float> from{45.f,5.f},up{45.f,-47.f};
+        splitter->mouseDown(cueViewFixtures::event(*splitter,from,from));
+        splitter->mouseDrag(cueViewFixtures::event(*splitter,up,from,1,true));
+        splitter->mouseUp(cueViewFixtures::event(*splitter,up,from,1,true));
+        check(timeline->getHeight()==height+52 && headers->getY()==cueY &&
+              metrics->getX()==bpmX && timeline->getRight()==1144,
+              "Actual splitter did not resize Timeline or shifted fixed controls");
+    });
+
 }
