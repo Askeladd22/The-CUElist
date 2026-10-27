@@ -21,6 +21,7 @@ struct WorkspaceLayout {
     int inspectorLeft=0;
     int inspectorInnerWidth=236;
     int dockY=0;
+    int effectiveDockHeight=0; // the visible dock size after fitting the window
     float inspectorScale=1.0f;
 
     juce::Rectangle<int> viewport;
@@ -43,9 +44,10 @@ struct WorkspaceLayout {
     juce::Rectangle<int> scaleInspectorControl(juce::Rectangle<int>) const noexcept;
 };
 
-// Keeps the 0.9 screenshot-approved geometry unchanged at the supported
-// desktop sizes. Dock height is already resolved to 0 / 36 / dockHeight by
-// MainComponent; geometry itself has no editor lifetime/visibility concerns.
+// Keep the approved 0.9 geometry when panels fit. On compact windows, fit
+// the dock without concealing the minimum timeline lane or bottom status area.
+// Input dock height is a preference (0 / 36 / dockHeight): the returned
+// effectiveDockHeight is the amount actually visible on this window.
 WorkspaceLayout calculateWorkspaceLayout(const WorkspaceLayoutInput& input);
 
 } // namespace cuelist
