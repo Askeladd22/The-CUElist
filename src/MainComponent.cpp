@@ -302,6 +302,14 @@ void MainComponent::paint(juce::Graphics& g) {
     // available in the Master and channel meters.
     label(g,"SPACE   Next cue",{20,h-84,150,20},12,palette::muted);
     label(g,"ESC          Panic",{20,h-61,150,20},12,palette::muted);
+    // Continue the non-scrollable metrics surface beneath the mixer. This
+    // rightmost band is never a hidden extension of audio/MIDI/OSC strips.
+    g.setColour(palette::panel);
+    g.fillRect(geometry.metrics.getX(),geometry.utilities.getY(),
+               geometry.metrics.getWidth(),geometry.utilities.getHeight());
+    g.setColour(palette::line);
+    g.drawVerticalLine(geometry.metrics.getX(),(float)geometry.utilities.getY(),
+                       (float)geometry.utilities.getBottom());
     const int inspectorInner=geometry.inspectorInnerWidth;
     auto panel=geometry.inspectorPanel;
     g.setColour(palette::panel); g.fillRoundedRectangle(panel.toFloat(),9);
