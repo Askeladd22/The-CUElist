@@ -143,8 +143,9 @@ void uiRefinementTests() {
         check(controlsV3::named(*ruler,"timelineGridVisibility") &&
               controlsV3::named(*ruler,"timelineSnapToggle"),
               "Grid and snap controls disappeared during restyling");
-        check(CueGrid::rowHeight>=64 && CueGrid::rowContentInset>0,
-              "Comfortable cue spacing was not applied");
+        check(CueGrid::rowHeight>=86 && CueGrid::nameWidth>=360 &&
+              CueGrid::rowContentInset>=14,
+              "Performance-sized cue cards or name lane are missing");
         check(palette::background!=palette::panel &&
               palette::panel!=palette::raised &&
               palette::muted!=palette::text,
