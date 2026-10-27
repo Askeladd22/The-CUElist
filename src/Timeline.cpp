@@ -182,7 +182,12 @@ void Timeline::paint(juce::Graphics& g) {
     for (int i=0;i<=4;++i) {
         const int x=timelineStart+area*i/4;
         label(g,timeText(viewStart+length*i/4),{x-10,53,75,20},12,palette::muted);
-        g.setColour(palette::line.withAlpha(.8f)); g.drawVerticalLine(x,76,(float)bottom);
+        // A short ruler has no track area below y=76; avoid a reversed or
+        // negative-height vertical line on 120-124px Timeline windows.
+        if (bottom>76) {
+            g.setColour(palette::line.withAlpha(.8f));
+            g.drawVerticalLine(x,76,(float)bottom);
+        }
     }
     if (getHeight()<completeTimelineHeight) return;
     // Musical grid follows secondsAtBeat across all tempo changes, but its
