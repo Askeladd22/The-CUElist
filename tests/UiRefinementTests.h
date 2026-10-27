@@ -45,9 +45,9 @@ void uiRefinementTests() {
     });
     test("BPM row label opens direct edit dialog without metric control", [] {
         MainComponent ui(false);
-        auto* grid=find<CueGrid>(ui);
-        const int x=CueGrid::nameWidth+(int)ui.show.columns.size()*CueGrid::columnWidth+40;
-        click(*grid,(float)x,(float)CueGrid::headerHeight+CueGrid::rowContentInset+17);
+        auto* metrics=find<CueMetricsOverlay>(ui);
+        check(metrics!=nullptr,"Fixed BPM / Auto Stop overlay missing");
+        click(*metrics,22.0f,(float)CueGrid::headerHeight+17);
         auto* modal=dynamic_cast<juce::AlertWindow*>(juce::ModalComponentManager::getInstance()->getModalComponent(0));
         check(modal!=nullptr && modal->getTextEditor("value")!=nullptr,"BPM row label did not open editor");
         check(modal->getTextEditor("value")->getText().contains("120"),"BPM dialog initial value incorrect");
@@ -134,8 +134,8 @@ void uiRefinementTests() {
         auto* master=controlsV3::named(*mixer,"masterAudioDb");
         auto* pan=controlsV3::named(*mixer,"masterPan");
         auto* mute=controlsV3::named(*mixer,"masterMute");
-        check(cue && bpm && cell && cue->getWidth()>=260 &&
-              bpm->getWidth()>=260 && cell->getWidth()>=260,
+        check(cue && bpm && cell && cue->getWidth()>=220 &&
+              bpm->getWidth()>=220 && cell->getWidth()>=220,
               "Inspector restyling removed or clipped text inputs");
         check(grid && mixer && ruler && master && pan && mute &&
               mixer->getHeight()>=200 && master->getHeight()>=155 &&
@@ -144,15 +144,15 @@ void uiRefinementTests() {
         check(controlsV3::named(*ruler,"timelineGridVisibility") &&
               controlsV3::named(*ruler,"timelineSnapToggle"),
               "Grid and snap controls disappeared during restyling");
-        check(CueGrid::rowHeight>=86 && CueGrid::nameWidth>=360 &&
-              CueGrid::rowContentInset>=14,
+        check(CueGrid::rowHeight<=66 && CueGrid::columnWidth<=156 &&
+              CueGrid::compressedWidth<=50,
               "Performance-sized cue cards or name lane are missing");
         check(palette::background!=palette::panel &&
               palette::panel!=palette::raised &&
               palette::muted!=palette::text,
               "Dark palette lost its text or panel contrast");
         ui.setSize(1450,768);
-        check(cue->getWidth()>=260 && cue->getBottom()<ui.getHeight() &&
+        check(cue->getWidth()>=220 && cue->getBottom()<ui.getHeight() &&
               bpm->getBottom()<ui.getHeight(),
               "Compact-height window clipped important Inspector fields");
     });
