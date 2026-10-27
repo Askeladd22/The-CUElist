@@ -214,33 +214,43 @@ int main() {
         check(dialog==nullptr,"Device selector outlived audio manager");
     });
     if (failures==0) {
-        // Native JUCE rendering artifact for visual QA, not a substitute for interaction tests.
-        const auto folder=juce::File::getSpecialLocation(juce::File::currentExecutableFile).getParentDirectory().getChildFile("test-artifacts");
-        std::cerr << "QA begin: preview construct" << std::endl;
-        MainComponent preview(false); preview.importFile(folder.getChildFile("verification.wav"));
-        std::cerr << "QA preview initialized" << std::endl;
+        // Native JUCE snapshots remain useful for manual visual inspection.
+        // Explicit stages reveal teardown / rendering failures on Windows.
+        std::cerr << "VISUAL QA: begin" << std::endl;
+        const auto folder=juce::File::getSpecialLocation(juce::File::currentExecutableFile)
+            .getParentDirectory().getChildFile("test-artifacts");
+        MainComponent preview(false);
+        preview.importFile(folder.getChildFile("verification.wav"));
+        std::cerr << "VISUAL QA: imported" << std::endl;
         preview.setSize(1440,900);
-        auto stream=folder.getChildFile("interface-preview.png").createOutputStream();
-        if (stream) { stream->setPosition(0); stream->truncate(); juce::PNGImageFormat{}.writeImageToStream(preview.createComponentSnapshot(preview.getLocalBounds()),*stream); }
-        std::cerr << "QA base snapshot saved" << std::endl;
-        addColumn(preview.show,ColumnType::midi,"MIDI"); addColumn(preview.show,ColumnType::osc,"OSC");
-        cueViewFixtures::find<ColumnUtilities>(preview)->refresh(); preview.setSize(1700,900);
-        preview.engine.connected.store(true); preview.triggerCell();
-        // Two normal-sized audio callbacks avoid the maxMixerFrames scratch cap.
-        juce::AudioBuffer<float> visualAudio(2,48000); preview.engine.collectRetired();
-        preview.engine.processBlock(visualAudio.getArrayOfWritePointers(),2,48000,48000);
-        preview.engine.processBlock(visualAudio.getArrayOfWritePointers(),2,48000,48000);
-        std::cerr << "QA mixed waveform processed" << std::endl;
-        stream=folder.getChildFile("interface-mixed-progress.png").createOutputStream();
-        if (stream) { stream->setPosition(0); stream->truncate(); juce::PNGImageFormat{}.writeImageToStream(preview.createComponentSnapshot(preview.getLocalBounds()),*stream); }
-        std::cerr << "QA mixed snapshot saved" << std::endl;
-        for (auto* child : preview.getChildren()) if (auto* button=dynamic_cast<juce::TextButton*>(child))
-            if (button->getButtonText()=="Entire cue") button->onClick();
+        auto savePreview=[&](const juce::String& name) {
+            auto stream=folder.getChildFile(name).createOutputStream();
+            if(stream) {
+                stream->setPosition(0);stream->truncate();
+                juce::PNGImageFormat{}.writeImageToStream(
+                    preview.createComponentSnapshot(preview.getLocalBounds()),*stream);
+            }
+        };
+        savePreview("interface-preview.png");
+        std::cerr << "VISUAL QA: initial snapshot" << std::endl;
+        addColumn(preview.show,ColumnType::midi,"MIDI");
+        addColumn(preview.show,ColumnType::osc,"OSC");
+        cueViewFixtures::find<ColumnUtilities>(preview)->refresh();
+        preview.setSize(1700,900);
+        preview.engine.connected.store(true);
+        preview.triggerCell();
+        // Use normal audio callback sizes, not an artificial 96000 frames.
+        juce::AudioBuffer<float> buffer(2,1024);
+        for(int i=0;i<16;++i) {
+            preview.engine.collectRetired();
+            preview.engine.processBlock(buffer.getArrayOfWritePointers(),2,1024,48000);
+        }
+        std::cerr << "VISUAL QA: audio processed" << std::endl;
+        savePreview("interface-mixed-progress.png");
+        // Entire Q and Cell are simultaneously visible, no tab-switch.
         preview.setSize(1180,820);
-        std::cerr << "QA compact layout resized" << std::endl;
-        stream=folder.getChildFile("interface-row-small.png").createOutputStream();
-        if (stream) { stream->setPosition(0); stream->truncate(); juce::PNGImageFormat{}.writeImageToStream(preview.createComponentSnapshot(preview.getLocalBounds()),*stream); }
-        std::cerr << "QA all snapshots complete" << std::endl;
+        savePreview("interface-row-small.png");
+        std::cerr << "VISUAL QA: all snapshots complete" << std::endl;
     }
     std::cout << checks << " assertions, " << failures << " failed tests\n";
     return failures == 0 ? 0 : 1;
