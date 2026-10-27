@@ -40,9 +40,9 @@ jobs:
       - name: Upload portable ZIP and checksum
         uses: actions/upload-artifact@v4
         with:
-          name: The-Cuelist-0.5.0-Windows-x64-portable
+          name: The-Cuelist-Windows-x64-portable
           path: |
-            dist/The-Cuelist-0.5.0-Windows-x64.zip
-            dist/The-Cuelist-0.5.0-Windows-x64.zip.sha256
+            dist/The-Cuelist-*-Windows-x64.zip
+            dist/The-Cuelist-*-Windows-x64.zip.sha256
           if-no-files-found: error
           retention-days: 30

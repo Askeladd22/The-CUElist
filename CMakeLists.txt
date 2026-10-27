@@ -1,5 +1,9 @@
 cmake_minimum_required(VERSION 3.22)
-project(TheCuelist VERSION 0.5.0 LANGUAGES C CXX)
+project(TheCuelist VERSION 0.7.0 LANGUAGES C CXX)
+file(STRINGS "${CMAKE_CURRENT_SOURCE_DIR}/VERSION.txt" THE_CUELIST_DISPLAY_VERSION LIMIT_COUNT 1)
+if(NOT THE_CUELIST_DISPLAY_VERSION MATCHES "^0\\.7\\.0(-[a-zA-Z0-9.]+)?$")
+  message(FATAL_ERROR "VERSION.txt must match the release's CMake version.")
+endif()
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
@@ -22,3 +26,6 @@ add_test(NAME CuelistTests COMMAND CuelistTests)
 juce_add_gui_app(TheCuelist PRODUCT_NAME "The Cuelist" COMPANY_NAME "The Cuelist" BUNDLE_ID "app.thecuelist.desktop" ICON_BIG "${CMAKE_CURRENT_SOURCE_DIR}/assets/thecuelist_icon.png")
 target_sources(TheCuelist PRIVATE src/ControlUI.cpp src/Main.cpp src/MainComponent.cpp src/CueViews.cpp src/Timeline.cpp src/ColumnUtilities.cpp src/GainMeterFader.cpp src/PianoRoll.cpp src/MidiUI.cpp src/OscEditor.cpp src/OscUI.cpp)
 target_link_libraries(TheCuelist PRIVATE CuelistCore CuelistAssets)
+
+# Product version and distributable name are derived from VERSION.txt.
+target_compile_definitions(TheCuelist PRIVATE THE_CUELIST_VERSION="${THE_CUELIST_DISPLAY_VERSION}")

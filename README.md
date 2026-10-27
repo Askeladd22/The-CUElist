@@ -16,7 +16,7 @@ It is designed for show playback control without requiring a full digital audio 
 - **Branding:** approved transparent icon included as `assets/thecuelist_icon.png` and embedded in the GUI/executable.
 - **Portable projects:** save shows as `.cuelist` files, alongside their media folder and backups.
 
-**Development status:** **Road to 0.7 (Control Columns, ongoing validation)**; the executable is still identified as **0.5.0**. Show format **v10** with optional Control Column fields can load projects from v1–v9 and earlier v10 documents. Windows CI builds and automated tests have succeeded, but a complete test on live production hardware has not been carried out. Video, timecode, and MIDI controller feedback are not yet implemented. Control Mapping remains experimental: do not use it in a live show without thorough rehearsal and validation.
+**Development status:** **0.7.0-alpha.1 (stabilization preview)**; product, Windows package and release identifiers use the single `VERSION.txt` source. The 0.8 architecture/timing work is preliminary, not a complete 0.8 release. Show format **v10** with optional Control Column fields can load projects from v1–v9 and earlier v10 documents. Windows CI builds and automated tests have succeeded, but a complete test on live production hardware has not been carried out. Video, timecode, and MIDI controller feedback are not yet implemented. Control Mapping remains experimental: do not use it in a live show without thorough rehearsal and validation.
 
 For license terms, see the [English reference translation](LICENSE.en.md) and the authoritative [Italian original](LICENSE).
 
