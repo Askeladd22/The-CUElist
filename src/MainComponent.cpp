@@ -686,7 +686,7 @@ void MainComponent::timerCallback() {
         midiRefreshTicks=0; engine.refreshMidiOutputs();
         if (midiInput.connected() && !midiInput.stillAvailable()) {
             midiInput.disconnect();
-            pressedInputs.clear(); // stale NoteOn states must not survive unplug
+            physicalEdges.clear(); // stale NoteOn states must not survive unplug
             status="MIDI input disconnected. Mappings suspended.";
         }
         // Reconnect only the device selected in the project, never whichever
@@ -698,7 +698,7 @@ void MainComponent::timerCallback() {
                 ++midiInputReconnectAttempts;
                 const auto restored=midiInput.connect(show.controls.midiInputId);
                 if (restored.wasOk()) {
-                    pressedInputs.clear();
+                    physicalEdges.clear();
                     status="MIDI controller reconnected (same device).";
                 }
             }
