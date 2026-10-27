@@ -78,7 +78,7 @@ public:
         g.drawFittedText("L/R",getLocalBounds(),juce::Justification::centred,1);
     }
 };
-class LimiterIndicator final : public juce::Component {
+class LimiterIndicator final : public juce::Component, public juce::SettableTooltipClient {
 public:
     void setActive(bool value) {if(value!=active){active=value;repaint();}}
     void paint(juce::Graphics& g) override {
