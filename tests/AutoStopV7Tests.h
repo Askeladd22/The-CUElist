@@ -109,7 +109,7 @@ void autoStopV7Tests() {
         check(control!=nullptr,"Inspector Auto Stop checkbox missing");
         check(control->getToggleState(),"New cell checkbox should default to ON");
         const int x=CueGrid::nameWidth + CueGrid::columnWidth*2 + CueGrid::columnWidth-30;
-        const int y=CueGrid::headerHeight+16;
+        const int y=CueGrid::headerHeight+CueGrid::rowContentInset+16;
         // Badge toggles stay hidden until the row disclosure is expanded.
         click(*grid,(float)x,(float)y);
         check(ui.show.rows[0].cells[2].stopOnNext,"Hidden Auto Stop badge was clickable");
