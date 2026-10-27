@@ -136,8 +136,8 @@ MainComponent::MainComponent(bool startAudio) {
         juce::PopupMenu menu;
         menu.addItem(1,"Pre-flight"); menu.addItem(2,"Diagnostics");
         juce::PopupMenu faderMenu;
-        faderMenu.addItem(3,"-inf dB / +6 dB",true,faderCeilingDb==6);
-        faderMenu.addItem(4,"-inf dB / 0 dB",true,faderCeilingDb==0);
+        faderMenu.addItem(3,"-∞ dB / +6 dB",true,faderCeilingDb==6);
+        faderMenu.addItem(4,"-∞ dB / 0 dB",true,faderCeilingDb==0);
         menu.addSubMenu("Fader Range",faderMenu);
         auto safe=juce::Component::SafePointer<MainComponent>(this);
         menu.showMenuAsync(juce::PopupMenu::Options().withTargetComponent(&preferencesButton),[safe](int choice) {
