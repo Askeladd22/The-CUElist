@@ -52,4 +52,87 @@ juce::Result prepareInsertedCueCopy(const Show& current, int afterIndex,
     return juce::Result::ok();
 }
 
+namespace {
+bool refersToColumn(const ControlBinding& binding, int columnId) {
+    if (binding.targetColumnId!=columnId) return false;
+    return binding.scope==ControlScope::column ||
+        binding.target==ControlTarget::columnGain ||
+        binding.target==ControlTarget::columnPan ||
+        binding.target==ControlTarget::midiCc ||
+        binding.target==ControlTarget::oscFloat;
+}
+
+void purgeColumnTargets(std::vector<ControlBinding>& bindings, int columnId) {
+    bindings.erase(std::remove_if(bindings.begin(),bindings.end(),
+        [columnId](const ControlBinding& binding) {
+            return refersToColumn(binding,columnId);
+        }),bindings.end());
+}
+
+void purgeColumnTargets(ControlSet& set, int columnId) {
+    purgeColumnTargets(set.bindings,columnId);
+}
+}
+
+juce::Result prepareDeletedCue(const Show& current, int index,
+                               Show& destination, std::vector<int>& removedCellIds) {
+    if (index<0 || index>=(int)current.rows.size())
+        return juce::Result::fail("Cue delete index outside the show.");
+    Show prepared=current;
+    const int removedId=prepared.rows[(size_t)index].id;
+    std::vector<int> removed;
+    removed.reserve(prepared.rows[(size_t)index].cells.size());
+    for (const auto& cell:prepared.rows[(size_t)index].cells) removed.push_back(cell.id);
+
+    prepared.rows.erase(prepared.rows.begin()+index);
+    if (prepared.rows.empty()) addRow(prepared,{});
+
+    auto& bindings=prepared.controls.bindings;
+    bindings.erase(std::remove_if(bindings.begin(),bindings.end(),
+        [removedId](const ControlBinding& binding) {
+            return binding.scope==ControlScope::cue && binding.scopeId==removedId;
+        }),bindings.end());
+
+    if (auto result=validateShow(prepared);result.failed()) return result;
+    destination=std::move(prepared);
+    removedCellIds=std::move(removed);
+    return juce::Result::ok();
+}
+
+juce::Result prepareDeletedColumn(const Show& current, int index,
+                                  Show& destination, std::vector<int>& removedCellIds) {
+    if (index<0 || index>=(int)current.columns.size())
+        return juce::Result::fail("Column delete index outside the show.");
+    // Reject malformed input rather than accessing an absent cell or erasing
+    // only part of a column. The caller receives no partial model/cache edits.
+    for (const auto& row:current.rows)
+        if (row.cells.size()!=current.columns.size())
+            return juce::Result::fail("Cannot delete a column from a nonrectangular show.");
+
+    Show prepared=current;
+    const int removedId=prepared.columns[(size_t)index].id;
+    std::vector<int> removed;
+    removed.reserve(prepared.rows.size());
+    for (auto& row:prepared.rows) {
+        removed.push_back(row.cells[(size_t)index].id);
+        row.cells.erase(row.cells.begin()+index);
+    }
+
+    prepared.columns.erase(prepared.columns.begin()+index);
+    if (prepared.columns.empty()) addColumn(prepared,ColumnType::audio,{});
+
+    purgeColumnTargets(prepared.controls.bindings,removedId);
+    for (auto& column:prepared.columns)
+        purgeColumnTargets(column.controlDefaultSet,removedId);
+    for (auto& row:prepared.rows) for (auto& cell:row.cells)
+        if (cell.controlSet) purgeColumnTargets(*cell.controlSet,removedId);
+    for (auto& item:prepared.controls.templates)
+        purgeColumnTargets(item.set,removedId);
+
+    if (auto result=validateShow(prepared);result.failed()) return result;
+    destination=std::move(prepared);
+    removedCellIds=std::move(removed);
+    return juce::Result::ok();
+}
+
 } // namespace cuelist
