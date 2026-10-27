@@ -253,7 +253,7 @@ void MainComponent::resized() {
     const bool docked=(clipEditor && !clipWindow) || (oscEditor && !oscWindow);
     const int dockHeight=docked ? (clipCollapsed ? 36 : this->dockHeight) : 0;
     const int gridHeight=std::max(235,h-438-dockHeight);
-    constexpr int utilityHeight=208; // taller L/R meters; cue area still scrolls
+    constexpr int utilityHeight=244; // full-height mixing console; cue grid scrolls independently
     viewport.setBounds(204,154,editorX-220,gridHeight-utilityHeight);
     utilities.setBounds(204,154+gridHeight-utilityHeight,editorX-220,utilityHeight);
     utilities.syncScroll(viewport.getViewPositionX());
