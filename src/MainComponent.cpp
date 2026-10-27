@@ -556,6 +556,29 @@ void MainComponent::setColumnOutput(int column,int outputIndex) {
     engine.publish(makeRenderState(show,clips));
     status="Column audio output updated."; repaint();
 }
+void MainComponent::setRowColour(int row,int colour) {
+    if (row<0 || row>=(int)show.rows.size() || colour<0 || colour>7) return;
+    if (show.rows[(size_t)row].colour==colour) return;
+    show.rows[(size_t)row].colour=colour;
+    dirty=true;
+    status="Cue colour updated.";
+    refresh();
+}
+void MainComponent::toggleColumnCollapsed(int column) {
+    if (column<0 || column>=(int)show.columns.size()) return;
+    if (!applyInspector()) return;
+    auto& target=show.columns[(size_t)column];
+    target.collapsed=!target.collapsed; // visual state only, playback is unchanged
+    if (target.collapsed && column==selectedColumn) {
+        for (int i=0;i<(int)show.columns.size();++i)
+            if (!show.columns[(size_t)i].collapsed) { selectedColumn=i; break; }
+    }
+    dirty=true;
+    status=target.collapsed ? "Column collapsed (read-only preview)." :
+                             "Column expanded (editing enabled).";
+    refreshControlSettings();
+    refresh();
+}
 void MainComponent::setAutoStop(int row,bool enabled) {
     if (row<0 || row>=(int)show.rows.size()) return;
     show.rows[row].stopOnNext=enabled; dirty=true; engine.publish(makeRenderState(show,clips));
