@@ -202,46 +202,31 @@ bool MainComponent::duplicateRow(int index) {
 
 void MainComponent::deleteRow(int index) {
     if (index<0 || index>=(int)show.rows.size() || !applyInspector()) return;
-    const int removedId=show.rows[(size_t)index].id;
-    for (auto& c : show.rows[index].cells) clips.erase(c.id);
-    show.rows.erase(show.rows.begin()+index); if (show.rows.empty()) addRow(show,{});
-    auto& bindings=show.controls.bindings;
-    bindings.erase(std::remove_if(bindings.begin(),bindings.end(),
-        [removedId](const ControlBinding& b) {
-            return b.scope==ControlScope::cue && b.scopeId==removedId;
-        }),bindings.end());
+    Show candidate;
+    std::vector<int> removedCellIds;
+    const auto result=prepareDeletedCue(show,index,candidate,removedCellIds);
+    if (result.failed()) { message(result.getErrorMessage()); return; }
+
+    // No media or live playback state is mutated before model validation.
+    for (int cellId:removedCellIds) clips.erase(cellId);
+    show=std::move(candidate);
     refreshControlSettings();
-    selectedRow=nextCue=std::min(index,(int)show.rows.size()-1); changed("Cue deleted. Original files retained.",true);
+    selectedRow=nextCue=std::min(index,(int)show.rows.size()-1);
+    changed("Cue deleted. Original files retained.",true);
 }
 
 void MainComponent::deleteColumn(int index) {
     if (index<0 || index>=(int)show.columns.size() || !applyInspector()) return;
-    const int removedId=show.columns[(size_t)index].id;
-    for (auto& row : show.rows) { clips.erase(row.cells[index].id); row.cells.erase(row.cells.begin()+index); }
-    show.columns.erase(show.columns.begin()+index); if (show.columns.empty()) addColumn(show,ColumnType::audio,{});
-    auto& bindings=show.controls.bindings;
-    bindings.erase(std::remove_if(bindings.begin(),bindings.end(),
-        [removedId](const ControlBinding& b) {
-            return (b.scope==ControlScope::column || b.target==ControlTarget::columnGain ||
-                b.target==ControlTarget::midiCc || b.target==ControlTarget::oscFloat)
-                    && b.targetColumnId==removedId;
-        }),bindings.end());
-    // A deleted target cannot remain in any other Control Set.
-    const auto purge=[removedId](ControlSet& set) {
-        auto& bindings=set.bindings;
-        bindings.erase(std::remove_if(bindings.begin(),bindings.end(),
-            [removedId](const ControlBinding& b){
-                return b.targetColumnId==removedId &&
-                    (b.target==ControlTarget::columnGain ||
-                     b.target==ControlTarget::midiCc || b.target==ControlTarget::oscFloat);
-            }),bindings.end());
-    };
-    for (auto& col:show.columns) purge(col.controlDefaultSet);
-    for (auto& row:show.rows) for (auto& cell:row.cells)
-        if (cell.controlSet) purge(*cell.controlSet);
-    for (auto& saved:show.controls.templates) purge(saved.set);
+    Show candidate;
+    std::vector<int> removedCellIds;
+    const auto result=prepareDeletedColumn(show,index,candidate,removedCellIds);
+    if (result.failed()) { message(result.getErrorMessage()); return; }
+
+    for (int cellId:removedCellIds) clips.erase(cellId);
+    show=std::move(candidate);
     refreshControlSettings();
-    selectedColumn=std::min(index,(int)show.columns.size()-1); changed("Column deleted. Original files retained.",true);
+    selectedColumn=std::min(index,(int)show.columns.size()-1);
+    changed("Column deleted. Original files retained.",true);
 }
 
 void MainComponent::editRowBpm(int index) {
