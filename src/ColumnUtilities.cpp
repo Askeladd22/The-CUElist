@@ -272,11 +272,11 @@ struct ColumnUtilities::Strip final : juce::Component {
                          type==ColumnType::audio ? w-67 : w-12,25);
         directMode.setBounds(w-56,8,50,25);
         oscDestination.setBounds(6,4,w-12,28);
-        gain.setBounds(collapsed ? (w-34)/2 : 4,collapsed ? 23 : 33,
-                       collapsed ? 34 : 84,
+        gain.setBounds(collapsed ? (w-34)/2 : 7,collapsed ? 23 : 33,
+                       collapsed ? 34 : 92,
                        collapsed ? std::max(45,h-103) : std::max(98,h-36));
-        pan.setBounds(w-49,34,43,43);
-        masterSend.setBounds(w-45,117,26,26);
+        pan.setBounds(w-60,34,49,49);
+        masterSend.setBounds(w-48,117,26,26);
         mute.setBounds(collapsed ? (w-30)/2 : w-77,h-36,
                        collapsed ? 30 : 32,29);
         phase.setBounds(w-42,h-36,32,29);
@@ -325,10 +325,10 @@ struct ColumnUtilities::Strip final : juce::Component {
         const int h=getHeight(),w=getWidth();
         label(g,"MUTE",{w-86,h-53,42,16},10,palette::muted,true,juce::Justification::centred);
         label(g,"PHASE",{w-47,h-53,46,16},10,palette::muted,true,juce::Justification::centred);
-        label(g,"PAN",{w-56,80,50,16},11,palette::muted,true,juce::Justification::centred);
+        label(g,"PAN",{w-63,86,56,16},11,palette::muted,true,juce::Justification::centred);
         const double v=owner.show.columns[(size_t)index].pan;
         const juce::String panText=std::abs(v)<.005 ? "C" : juce::String(v<0?"L ":"R ")+juce::String((int)std::round(std::abs(v)*100));
-        label(g,panText,{w-56,98,50,18},11,palette::text,false,juce::Justification::centred);
+        label(g,panText,{w-63,100,58,18},11,palette::text,false,juce::Justification::centred);
     }
 };
 ColumnUtilities::ColumnUtilities(MainComponent& p) : owner(p) { addAndMakeVisible(scrollableStrips); }
@@ -389,7 +389,7 @@ void ColumnUtilities::resized() {
         std::max(0,getWidth()-masterWidth),getHeight());
     owner.masterSlider.setBounds(13,34,78,std::max(92,getHeight()-37));
     owner.masterPan.setBounds(193,38,43,43);
-    owner.masterMute.setBounds(239,130,34,33);
+    owner.masterMute.setBounds(198,146,34,31);
     owner.masterOutput.setBounds(104,59,85,25);
     owner.safetyLimiter.setBounds(104,127,86,30);
     for (size_t i=0;i<strips.size();++i)
@@ -405,14 +405,12 @@ void ColumnUtilities::paint(juce::Graphics& g) {
     g.setColour(palette::line);g.drawRoundedRectangle(card,8.0f,1.0f);
     g.setColour(palette::teal);g.fillRoundedRectangle(14.0f,4.0f,95.0f,3.0f,1.5f);
     label(g,"MASTER AUDIO",{14,10,CueGrid::nameWidth-28,20},13,palette::teal,true);
-    label(g,"PAN",{188,87,55,16},11,palette::muted,true,juce::Justification::centred);
+    label(g,"PAN",{187,86,55,16},11,palette::muted,true,juce::Justification::centred);
     const auto pan=owner.show.masterPan;
     label(g,std::abs(pan)<.005f ? juce::String("C") : juce::String(pan<0?"L ":"R ")
         +juce::String((int)std::round(std::abs(pan)*100)),
-        {186,102,62,18},11,palette::text,false,juce::Justification::centred);
-    label(g,"MUTE",{233,137,47,20},11,palette::muted,true);
+        {187,101,55,18},11,palette::text,false,juce::Justification::centred);
+    label(g,"MUTE",{191,126,48,17},11,palette::muted,true,juce::Justification::centred);
     label(g,"MAIN OUT",{103,40,88,16},10,palette::muted,true);
-    label(g,"PRE-LIMIT L/R",{102,17,160,17},10,palette::muted);
-    label(g,"MIDI and OSC unaffected",{102,179,175,18},11,palette::muted);
 }
 }
