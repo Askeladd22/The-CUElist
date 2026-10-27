@@ -9,8 +9,13 @@ int failures = 0, checks = 0;
 void check(bool condition, const char* message) { ++checks; if (!condition) throw std::runtime_error(message); }
 void near(double actual, double expected) { check(std::abs(actual - expected) < 0.00001, "Unexpected numeric result"); }
 void test(const char* name, const std::function<void()>& body) {
-    try { body(); std::cout << "PASS " << name << '\n'; }
-    catch (const std::exception& e) { ++failures; std::cerr << "FAIL " << name << ": " << e.what() << '\n'; }
+    // Print the test currently executing immediately, even if the process
+    // is terminated by native callback/GUI code before normal teardown.
+    std::cerr << "RUN " << name << std::endl;
+    try { body(); std::cout << "PASS " << name << std::endl; }
+    catch (const std::exception& e) {
+        ++failures; std::cerr << "FAIL " << name << ": " << e.what() << std::endl;
+    }
 }
 #include "AudioTests.h"
 #include "ModelV2Tests.h"
