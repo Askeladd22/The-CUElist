@@ -31,7 +31,7 @@
 - `CMakeLists.txt`: compile both modules in the application and tests.
 - Extend automated tests with row/column identity, typed-cell associations and cached PCM ownership while preserving existing copy/paste and row duplication test coverage.
 
-**Phase 2b (current PR, first model slice):** introduce `ShowEditOperations.h/.cpp` in `CuelistCore` with three tested, JUCE-GUI-free model operations:
+**Phase 2b (merged into feat/desktop-foundation):** introduce `ShowEditOperations.h/.cpp` in `CuelistCore` with three tested, JUCE-GUI-free model operations:
 
 - `swapCueRows`: bounded cue reordering that preserves stable row IDs.
 - `swapCueColumns`: bounded column reordering with corresponding typed cell slots swapped across every row; rejects malformed rectangular layouts.
@@ -39,7 +39,16 @@
 - `CueOperations.cpp` keeps existing operator/transport sequencing but delegates these three model edits; the GUI still owns media-cache association and checks PCM memory limits **before** adopting a newly prepared show.
 - New model-only regression tests cover stable IDs, clip/type association, correct Control Set identity cloning, range failures and project nonmutation.
 
-Next **phase 2c**, if justified by test coverage, will target pure deletion and binding cleanup. Do not bundle it with the current reordering/clipboard slice.
+**Phase 2c (current PR, transactional deletion):**
+
+- `prepareDeletedCue` and `prepareDeletedColumn` build a replacement Show and gather the deleted cell IDs without touching the current model, PCM cache, GUI or devices. Neither output changes on failure.
+- Cue deletion removes legacy mappings scoped to that cue ID and clears stale locked-Control default-source cue IDs without discarding their settings; column deletion removes references to its ID from legacy mappings, locked Control Column defaults, cue-specific sets, and reusable templates.
+- Cleanup includes column gain, **column pan**, MIDI CC, OSC output and explicit column-scoped mappings (previous UI deletion omitted column pan).
+- After model validation succeeds, the UI removes only those cell IDs from its PCM cache, installs the prepared model, refreshes mapping state and invokes the existing stopped-transport change flow.
+- Deleting the final cue or column leaves a valid blank cue or Audio column just as before; no live audio or file on disk is deleted.
+- New model-only tests cover cross-layer mapping cleanup, locked-Control source metadata, stable IDs, last-item fallback and invalid-input atomicity; an additional UI test verifies that remaining decoded PCM survives column deletion.
+
+The next stage is Phase 3: extracting testable workspace layout geometry from painting, while preserving existing screen positions.
 
 No existing audio callback, playback state inheritance, project schema or media-cache ownership changes are made in phase 2a.
 
