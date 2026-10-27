@@ -417,6 +417,7 @@ juce::Result decodeShow(const juce::String& text, Show& destination) {
         for (auto& r : array(root,"rows")) {
             Row row; row.id = integer(r,"id"); row.name = string(r,"name"); row.tempo.clear();
             if (version>=10) row.mappingPresetId=integer(r,"mappingPresetId");
+            if (r.hasProperty("colour")) row.colour=integer(r,"colour");
             if (version >= 4) row.stopOnNext=boolean(r,"stopOnNext");
             if (version >= 2) {
                 row.gain=(float)number(r,"gain"); row.muted=boolean(r,"muted"); row.loop=boolean(r,"loop");
