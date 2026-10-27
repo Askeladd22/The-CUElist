@@ -96,18 +96,20 @@ void workspaceLayoutTests() {
             auto* grid=cueViewFixtures::find<CueGrid>(ui);
             auto* overlay=cueViewFixtures::find<CueMetricsOverlay>(ui);
             auto* strips=cueViewFixtures::find<ColumnUtilities>(ui);
+            auto* timeline=cueViewFixtures::find<Timeline>(ui);
             juce::Viewport* viewport=nullptr;
             for (auto* child:ui.getChildren())
                 if (auto* candidate=dynamic_cast<juce::Viewport*>(child)) {
                     viewport=candidate; break;
                 }
-            check(grid && overlay && strips && viewport,
+            check(grid && overlay && strips && timeline && viewport,
                   "Workspace controls were not found");
             const auto expected=calculateWorkspaceLayout({dimensions.x,dimensions.y,0,
                 grid->columnX((int)ui.show.columns.size()),(int)ui.show.rows.size(),
                 CueGrid::headerHeight,CueGrid::rowHeight,CueMetricsOverlay::width});
             check(viewport->getBounds()==expected.viewport &&
                   strips->getBounds()==expected.utilities &&
+                  timeline->getBounds()==expected.timeline &&
                   overlay->getBounds()==expected.metrics &&
                   grid->getWidth()==expected.gridSize.x &&
                   grid->getHeight()==expected.gridSize.y,
