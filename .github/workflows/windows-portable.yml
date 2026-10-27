@@ -1,4 +1,4 @@
-name: Build Windows portable
+name: Windows CI (portable package on demand)
 
 on:
   push:
@@ -14,7 +14,7 @@ permissions:
 
 jobs:
   portable:
-    name: Windows x64 portable ZIP
+    name: Build and test Windows x64
     runs-on: windows-2022
     timeout-minutes: 60
     env:
@@ -29,15 +29,18 @@ jobs:
         shell: powershell
         run: .\scripts\build.ps1
 
-      - name: Create standalone Windows package
+      - name: Create standalone Windows package (manual release only)
+        if: github.event_name == 'workflow_dispatch'
         shell: powershell
         run: .\scripts\package.ps1 -SkipBuild
 
       - name: Verify extracted ZIP, launcher and checksums
+        if: github.event_name == 'workflow_dispatch'
         shell: powershell
         run: .\scripts\check-package.ps1 -SmokeLaunch
 
       - name: Upload portable ZIP and checksum
+        if: github.event_name == 'workflow_dispatch'
         uses: actions/upload-artifact@v4
         with:
           name: The-Cuelist-Windows-x64-portable

@@ -72,6 +72,72 @@ void architectureV8Tests() {
         check(ProjectRecovery::discard(dir),"Cannot discard completed recovery checkpoint");
         dir.deleteRecursively();
     });
+    test("0.9 cancelled media preparation does not expose a partially loaded show",[] {
+        auto show=makeShow();
+        const auto path=juce::File::getSpecialLocation(juce::File::tempDirectory)
+            .getChildFile("cuelist-cancelled-media.wav");
+        show.rows[0].cells[0].file=path.getFullPathName();
+        int called=0;
+        AudioClipLoader mock=[&](const juce::File&,std::shared_ptr<const AudioClip>& clip) {
+            ++called;
+            auto result=std::make_shared<AudioClip>();
+            result->samples.setSize(2,16);
+            clip=std::move(result);
+            return juce::Result::ok();
+        };
+        PreparedShowMedia untouched;
+        untouched.pcmBytes=4321;
+        check(prepareShowMedia(show,untouched,mock,maxShowPcmBytes,
+                    [] {return true;}).failed(),
+              "A cancelled prepare was accepted");
+        check(untouched.clips.empty() && untouched.pcmBytes==4321 && called==0,
+              "Cancelled preparation mutated the caller's loaded media");
+    });
+    test("0.9 superseded project loads never return stale audio or show metadata",[] {
+        const auto directory=juce::File::getSpecialLocation(juce::File::tempDirectory)
+            .getChildFile("cuelist-async-open-"+juce::Uuid().toString());
+        check(directory.createDirectory().wasOk(),"Could not create asynchronous test directory");
+        const auto oldFile=directory.getChildFile("previous.cuelist");
+        const auto latestFile=directory.getChildFile("latest.cuelist");
+        auto oldShow=makeShow(), latestShow=makeShow();
+        oldShow.name="OLD"; latestShow.name="LATEST";
+        const auto fakeMedia=directory.getChildFile("virtual.wav").getFullPathName();
+        oldShow.rows[0].cells[0].file=fakeMedia;
+        latestShow.rows[0].cells[0].file=fakeMedia;
+        check(oldFile.replaceWithText(encodeShow(oldShow)) &&
+              latestFile.replaceWithText(encodeShow(latestShow)),
+              "Could not write projects for background load");
+        std::atomic<int> started{0};
+        AudioClipLoader decoder=[&](const juce::File&,std::shared_ptr<const AudioClip>& clip) {
+            started.fetch_add(1);
+            juce::Thread::sleep(65); // emulate an expensive disk decoder
+            auto audio=std::make_shared<AudioClip>();
+            audio->samples.setSize(2,16);
+            clip=std::move(audio);
+            return juce::Result::ok();
+        };
+        {
+            ProjectLoadWorker worker(decoder);
+            worker.request(oldFile);
+            for(int n=0;n<200 && started.load()==0;++n) juce::Thread::sleep(5);
+            check(started.load()>0,"Background worker never began decoding");
+            worker.cancel();
+            worker.request(latestFile);
+            PreparedProject completed;
+            bool received=false;
+            for(int n=0;n<400 && !received;++n) {
+                received=worker.takeCompleted(completed);
+                if(!received) juce::Thread::sleep(5);
+            }
+            check(received && completed.status.wasOk() &&
+                  completed.source==latestFile && completed.show.name=="LATEST" &&
+                  completed.media.clips.size()==1,
+                  "Background worker committed an obsolete/cancelled project");
+            check(!worker.takeCompleted(completed),
+                  "Background worker emitted a second stale completion");
+        }
+        directory.deleteRecursively();
+    });
     test("MIDI reconnection policy rejects renamed or reordered hardware",[] {
         struct Port {juce::String identifier;};
         std::vector<Port> ports={{"keyboard-2"},{"lighting-desk"}};

@@ -1,6 +1,6 @@
 # The Cuelist — Stabilization (0.7) and transport foundations (0.8)
 
-**Current development version:** 0.8.0-alpha.1, **show format:** v10. A successful build is not certification for unattended or safety-critical show operation.
+**Current development version:** 0.9.0-beta.1, **show format:** v10. A successful build is not certification for unattended or safety-critical show operation.
 
 ## Implemented in the stabilization preview
 
@@ -50,3 +50,7 @@ The new `ProjectMediaLoader` prepares decoded PCM separately from `MainComponent
 MIDI input reconnection now checks the same configured identifier every second after disconnection, clears stale pressed-key states and avoids triggering GO. MIDI output uses the same exact-ID selection policy; output-worker diagnostics count events dispatched more than 10 ms after their scheduled time. These are dispatch-jitter indicators, **not** end-to-end timing measurements.
 
 For the actual Windows show computer run `powershell -ExecutionPolicy Bypass -File scripts/hardware-check.ps1 -OscLoopback`. It lists audio and MIDI devices without opening MIDI outputs and optionally checks OSC on `127.0.0.1` only. The report is written to `build/hardware-reports`. See [0.8 implementation notes](0.8-implementation.md) for manual tests and remaining architectural work.
+
+## 0.9 beta — loading and recovery
+
+Opening a show from the Open dialog now uses a single reusable worker to decode the project and audio. A newer request or subsequent editing cancels the preceding result. Only a fully prepared project is committed on the message thread, after which old playback is stopped. A failed load preserves the current show. This does not yet move individual WAV/MP3 imports or portable Save (media copying) off the UI thread. The worker checks cancellation between media files; a single synchronous decoder call can still take time to finish on shutdown. Checkpoint JSON serialization is now on the recovery worker; model validation and snapshot copying remain synchronous. See [0.9 release checklist](0.9-release-checklist.md).
