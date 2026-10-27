@@ -4,8 +4,8 @@ void controlsV4Tests() {
     test("utility routing replaces inspector output and MIDI OSC have no audio controls", [] {
         MainComponent ui(false); addColumn(ui.show,ColumnType::midi,{}); addColumn(ui.show,ColumnType::osc,{});
         auto* utilities=find<ColumnUtilities>(ui); utilities->refresh();
-        check(utilities->getNumChildComponents()==6,"Three utility strips and three Master controls expected");
-        for (const auto* name: {"masterAudioDb","masterPan","masterMute"})
+        check(utilities->getNumChildComponents()==9,"Three utility strips and six Master controls expected");
+        for (const auto* name: {"masterAudioDb","masterPan","masterMute","masterMainOutput","masterSafetyLimiter","masterLimiterIndicator"})
             check(controlsV3::named(*utilities,name)!=nullptr,"A Master control is missing");
         for (int c=0;c<3;++c) {
             auto* strip=utilities->getChildComponent(c);
