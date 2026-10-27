@@ -82,13 +82,21 @@ No existing audio callback, playback state inheritance, project schema or media-
 - Tests cover locked vs cue-local mappings, equal-priority reordering, acknowledged-cue presets, malformed in-memory grids and physical GO press/release debounce. Existing MIDI Learn, Control Set, mapping validation, pickup, MIDI/OSC routing and project v10 tests are preserved.
 - No GUI geometry or audio callback changes. Windows build and complete automated tests required before merging.
 
-**Phase 4b (current PR; device-neutral dispatch policy):**
+**Phase 4b (merged into feat/desktop-foundation; CI must still be verified):**
 
 - `src/ControlDispatchPolicy.h/.cpp` in `CuelistCore` owns deterministic physical MIDI button-edge tracking (`PhysicalControlEdges`), current-target normalization for pickup, stable column-ID/type selection, fader deadband and MIDI CC output quantization. These do not invoke audio callbacks or send to hardware.
 - `src/MainComponent.h` keeps a `PhysicalControlEdges` member rather than a raw held-input map. Project MIDI input changes, disconnect and reconnect still clear the physical state before new events are accepted.
 - `src/ControlRuntime.cpp` delegates only the *same* decisions to the core helpers. GO/PANIC continues to be triggered solely from a new physical edge on the UI thread. MIDI and OSC send functions are unchanged.
 - Five new tests cover device/channel/input independence, unmatched releases across cue switches, reverse pickup curves and inversion, output type and ID after column reorder, and CC rounding/deadband.
 - Full app/UI regressions and Windows release CI are required before merging; physical controller and MIDI/OSC output acceptance remains separate.
+
+**Phase 4c (current PR; MIDI session reliability):**
+
+- `src/MidiSessionPolicy.h/.cpp` separates *decisions* from MIDI port opening: `planMidiSession` checks only exact device identifiers in an enumerated device snapshot. It distinguishes an unplugged connected input, a selected input that has returned, a disabled configuration and a similarly named but different controller. It never opens ports itself.
+- `MainComponent::timerCallback()` uses a single inventory snapshot on each normal refresh and retains the existing same-tick disconnect/reconnect sequence, status text and pressed-input clearing. It never connects to a different discovered device, and never triggers GO or PANIC on reconnection.
+- `consumeMidiLearnEvent` preserves one-shot MIDI Learn behavior: an armed event updates the capture and is not dispatched to live outputs. Ordinary processing resumes after capture without changing supported MIDI event types.
+- New offline regression tests cover exact-ID device replacement/reappearance, disabled inputs, MIDI Learn isolation (including mapped GO), stale packet queue reset, and post-reconnect physical button re-arming. No physical interfaces are needed for CI.
+- No changes to audio callback, mapping priorities, output queues or project JSON v10. The operator must still rehearse device unplug/replug and MIDI/OSC routing on actual hardware.
 
 **Later:** if live hardware tests reveal a need, inject dedicated MIDI/OSC output sinks for deterministic end-to-end routing tests in a separate PR. Do not casually alter MIDI/OSC queues, GO acknowledgment timing or audio callback behavior.
 

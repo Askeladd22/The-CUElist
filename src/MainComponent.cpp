@@ -1,4 +1,5 @@
 #include "MainComponent.h"
+#include "MidiSessionPolicy.h"
 #include "ProjectSafety.h"
 #include "ProjectMediaLoader.h"
 #include "DeviceIdentity.h"
@@ -679,28 +680,31 @@ void MainComponent::timerCallback() {
     }
     ControlEvent control; int processed=0;
     while (processed++<256 && midiInput.poll(control)) {
-        if (controlLearnArmed) { learnedInput=control; controlLearnArmed=false; }
-        else dispatchControl(control);
+        // MIDI Learn consumes its first event without dispatching GO/PANIC.
+        if (!consumeMidiLearnEvent(controlLearnArmed,learnedInput,control))
+            dispatchControl(control);
     }
     if (++midiRefreshTicks>=25) {
         midiRefreshTicks=0; engine.refreshMidiOutputs();
-        if (midiInput.connected() && !midiInput.stillAvailable()) {
+        // Take one inventory snapshot per refresh. The policy checks exact
+        // device identifiers and never substitutes a similarly named port.
+        const auto devices=juce::MidiInput::getAvailableDevices();
+        const auto firstAction=planMidiSession(show.controls.midiInputId,
+            midiInput.identifier(),midiInput.connected(),devices);
+        if (firstAction==MidiSessionAction::disconnectMissing) {
             midiInput.disconnect();
             physicalEdges.clear(); // stale NoteOn states must not survive unplug
             status="MIDI input disconnected. Mappings suspended.";
         }
-        // Reconnect only the device selected in the project, never whichever
-        // controller Windows happens to enumerate first. No playback or GO
-        // is triggered by reconnecting.
-        if (!midiInput.connected() && show.controls.midiInputId.isNotEmpty()) {
-            if (hasExactMidiIdentifier(juce::MidiInput::getAvailableDevices(),
-                                       show.controls.midiInputId)) {
-                ++midiInputReconnectAttempts;
-                const auto restored=midiInput.connect(show.controls.midiInputId);
-                if (restored.wasOk()) {
-                    physicalEdges.clear();
-                    status="MIDI controller reconnected (same device).";
-                }
+        // Preserve the original same-tick disconnect/reconnect flow, if a
+        // different explicitly selected device is already present.
+        if (planMidiSession(show.controls.midiInputId,midiInput.identifier(),
+                midiInput.connected(),devices)==MidiSessionAction::reconnectSelected) {
+            ++midiInputReconnectAttempts;
+            const auto restored=midiInput.connect(show.controls.midiInputId);
+            if (restored.wasOk()) {
+                physicalEdges.clear();
+                status="MIDI controller reconnected (same device).";
             }
         }
     }
