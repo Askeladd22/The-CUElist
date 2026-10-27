@@ -6,7 +6,8 @@ if (!$SkipBuild) { & (Join-Path $PSScriptRoot 'build.ps1') }
 $exe = Join-Path $repo 'build\TheCuelist_artefacts\Release\The Cuelist.exe'
 if (!(Test-Path -LiteralPath $exe)) { throw 'Release executable missing. Compile on the development PC before packaging.' }
 $version = (Get-Content -LiteralPath (Join-Path $repo 'VERSION.txt') -Raw).Trim()
-if ($version -notmatch '^\\d+\\.\\d+\\.\\d+(-[a-zA-Z0-9.]+)?
+if ($version -notmatch '^\d+\.\d+\.\d+(-[a-zA-Z0-9.]+)?$') { throw 'Invalid VERSION.txt.' }
+$packageName = "The-Cuelist-$version-Windows-x64"
 $dist = Join-Path $repo 'dist'
 $stagingRoot = Join-Path $repo ('build\package-' + [guid]::NewGuid().ToString('N'))
 $package = Join-Path $stagingRoot $packageName
