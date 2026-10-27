@@ -10,6 +10,10 @@ constexpr int cueLeft=192;
 constexpr int cueTop=86;
 constexpr int cueRightGap=8;
 constexpr int cueGridTail=44;
+constexpr int minimumGridHeight=310;
+constexpr int minimumTimelineHeight=75;
+constexpr int statusFooterGap=47;
+constexpr int dockBaseY=168;
 }
 
 juce::AffineTransform WorkspaceLayout::inspectorTransform() const noexcept {
@@ -34,20 +38,27 @@ WorkspaceLayout calculateWorkspaceLayout(const WorkspaceLayoutInput& input) {
     result.inspectorInnerWidth=inspectorInnerWidth;
     result.inspectorScale=std::clamp((float)(input.height-232)/730.0f,0.72f,0.92f);
 
-    const int gridHeight=std::max(310,input.height-400-input.activeDockHeight);
+    // The resized dock is a user preference, not an unconditional demand for
+    // screen space. At the minimum 820px window height a 400px editor would
+    // otherwise push the entire Timeline below the usable window.
+    // Fit it below the minimum cue-list region and above a 75px timeline.
+    const int maximumDockHeight=std::max(0,input.height-
+        (dockBaseY+minimumGridHeight+minimumTimelineHeight+statusFooterGap));
+    result.effectiveDockHeight=std::clamp(input.activeDockHeight,0,maximumDockHeight);
+    const int gridHeight=std::max(minimumGridHeight,input.height-400-result.effectiveDockHeight);
     const int utilityHeight=input.height<800 ? 180 : 208;
     const int cueWidth=result.editorX-cueRightGap-cueLeft;
     const int utilityY=154+gridHeight-utilityHeight;
     result.viewport={cueLeft,cueTop,cueWidth,utilityY-cueTop};
     result.utilities={cueLeft,utilityY,cueWidth,utilityHeight};
 
-    result.dockY=168+gridHeight;
+    result.dockY=dockBaseY+gridHeight;
     result.dockResize={std::max(700,result.editorX-245),result.dockY-8,94,11};
     result.dockCollapse={522,result.dockY+4,86,26};
     result.dockClose={615,result.dockY+4,82,26};
-    result.dockEditor={cueLeft,result.dockY,cueWidth,input.activeDockHeight};
-    result.timeline={cueLeft,result.dockY+input.activeDockHeight,cueWidth,
-        std::max(75,input.height-gridHeight-input.activeDockHeight-215)};
+    result.dockEditor={cueLeft,result.dockY,cueWidth,result.effectiveDockHeight};
+    result.timeline={cueLeft,result.dockY+result.effectiveDockHeight,cueWidth,
+        std::max(minimumTimelineHeight,input.height-gridHeight-result.effectiveDockHeight-215)};
 
     result.metrics={result.viewport.getRight()-input.pinnedMetricsWidth,
         result.viewport.getY(),input.pinnedMetricsWidth,result.viewport.getHeight()};

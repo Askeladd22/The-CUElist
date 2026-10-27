@@ -52,9 +52,9 @@ The next stage is Phase 3: extracting testable workspace layout geometry from pa
 
 No existing audio callback, playback state inheritance, project schema or media-cache ownership changes are made in phase 2a.
 
-## Phase 3 — workspace layout boundaries (current PR)
+## Phase 3 — workspace layout boundaries
 
-**Phase 3a (implemented; CI verification pending):** centralize the screenshot-approved workspace geometry in the deterministic `WorkspaceLayout.h/.cpp` calculator.
+**Phase 3a (merged into feat/desktop-foundation):** centralize the screenshot-approved workspace geometry in the deterministic `WorkspaceLayout.h/.cpp` calculator.
 
 - `calculateWorkspaceLayout` owns rectangular bounds for the cue viewport, mixer utilities, timeline, docked clip editor and drag/close/collapse handles, pinned BPM / Auto Stop area, inspector outer panel and both section cards, plus virtual cue grid dimensions.
 - `WorkspaceLayout::inspectorTransform` and `scaleInspectorControl` share the identical vertical scaling formula previously duplicated between painting and `resized()`. The Inspector card background and CELL heading remain aligned across window sizes.
@@ -62,7 +62,15 @@ No existing audio callback, playback state inheritance, project schema or media-
 - Regression tests verify 1180×820, 1440×900, 1647×895 and 1920×1080, scrolling/pinned controls, collapsed/expanded clip dock, the shared Inspector transform and actual JUCE component bounds.
 - No visual reflow or spacing change in this phase; it is a structural extraction with the exact existing baseline coordinates and control sizes.
 
-**Phase 3b (later, separate PR):** once the geometry helper is proven, address narrower display constraints or improve layout responsiveness with deliberate visual change review, rather than silently changing the approved layout.
+**Phase 3b (current PR — fit docked editors to compact windows):**
+
+- Preserve the approved 0.9 cue-grid, Inspector, mixer and Timeline geometry for all dock states that already fit.
+- Resolve the *visible* dock height inside `WorkspaceLayout` against the available window height. The requested editor height (up to 400px) remains a preference; minimum 310px grid region, 75px Timeline lane and 47px footer reserve take precedence. At 1180×820 the largest dock is 220px; at 1440×900 it is 300px; at 1920×1080 all 400px fit.
+- When a compact window is later enlarged, restore the preferred dock height automatically. The resize handle starts subsequent drags from the *currently visible* height rather than an invisible oversized preference.
+- No change to GO/PANIC, media handling, audio timing, MIDI/OSC, project serialization or fixed BPM/Auto Stop placement.
+- Add geometry checks across supported display sizes, closed/collapsed/default dock baselines, and an end-to-end JUCE dock drag/resize/regrow test.
+
+**Phase 3c (only if visual testing warrants it):** handle narrower-than-supported window sizes or revisit the Inspector's control density as a separate deliberate GUI design change, not as part of a runtime-safety fix.
 
 ## Phase 4 — Control Mapping boundaries (separate PR)
 
