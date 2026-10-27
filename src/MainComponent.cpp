@@ -37,10 +37,11 @@ MainComponent::MainComponent(bool startAudio) {
     for (auto* b : {&openButton,&saveButton,&newButton,&addRowButton,&addColumnButton,&goButton,&panicButton,&deviceButton,&controlButton,
                     &importButton,&midiEditButton,&oscEditButton,&playCellButton,&stopCellButton,&clearButton,&tempoButton,&applyButton}) b->setWantsKeyboardFocus(false);
     viewport.setViewedComponent(&grid,false); viewport.setScrollBarsShown(true,true);
-    goButton.setColour(juce::TextButton::buttonColourId,palette::teal.darker(0.55f));
-    panicButton.setColour(juce::TextButton::buttonColourId,juce::Colour(0xff422133));
-    panicButton.setColour(juce::TextButton::textColourOffId,palette::red);
-    importButton.setColour(juce::TextButton::buttonColourId,palette::teal.darker(0.65f));
+    goButton.setColour(juce::TextButton::buttonColourId,juce::Colour(0xff097b70));
+    goButton.setColour(juce::TextButton::textColourOffId,palette::text);
+    panicButton.setColour(juce::TextButton::buttonColourId,juce::Colour(0xff923b49));
+    panicButton.setColour(juce::TextButton::textColourOffId,palette::text);
+    importButton.setColour(juce::TextButton::buttonColourId,juce::Colour(0xff097b70));
     behaviour.addItemList({"Retrigger","Pause / Restart","Pause / Resume","Continue"},1);
     gain.setSliderStyle(juce::Slider::LinearHorizontal); gain.setTextBoxStyle(juce::Slider::TextBoxRight,false,52,24);
     for (auto* slider : {&gain,&rowGain}) {
@@ -153,8 +154,15 @@ MainComponent::~MainComponent() {
 
 void MainComponent::paint(juce::Graphics& g) {
     const int w=getWidth(),h=getHeight(); g.fillAll(palette::background);
-    g.setColour(palette::panel); g.fillRect(0,0,w,72); g.fillRect(0,73,180,h-73);
-    g.setColour(palette::line); g.drawHorizontalLine(72,0,(float)w); g.drawVerticalLine(180,73,(float)h);
+    g.setColour(palette::raised); g.fillRect(0,0,w,72);
+    g.setColour(palette::panel); g.fillRect(0,73,180,h-73);
+    g.setColour(palette::teal); g.fillRect(0,0,w,3);
+    g.setColour(palette::line); g.drawHorizontalLine(72,0,(float)w);
+    g.drawVerticalLine(180,73,(float)h);
+    // Darker sidebar console inset retains all existing navigation controls.
+    g.setColour(palette::background.withAlpha(.30f));
+    g.fillRoundedRectangle(10.0f,238.0f,160.0f,143.0f,8.0f);
+    g.fillRoundedRectangle(10.0f,396.0f,160.0f,164.0f,8.0f);
     static const auto appIcon=juce::ImageFileFormat::loadFrom(
         BinaryData::thecuelist_icon_png,BinaryData::thecuelist_icon_pngSize);
     if (appIcon.isValid())
@@ -163,7 +171,7 @@ void MainComponent::paint(juce::Graphics& g) {
         g.setColour(i==1 ? palette::teal : palette::text);
         g.fillRoundedRectangle(23.0f,23.0f+i*9,23.0f-i*4,4,2);
     }
-    label(g,"The Cuelist",{60,16,150,30},22,palette::text,true);
+    label(g,"The Cuelist",{60,14,165,32},24,palette::text,true);
     label(g,"SHOW CONTROL",{61,45,130,16},11,palette::muted,true);
     label(g,"SESSION",{232,25,100,22},12,palette::teal,true);
     g.setColour(palette::teal); g.fillRect(232,69,65,3);
@@ -172,12 +180,12 @@ void MainComponent::paint(juce::Graphics& g) {
     g.setColour(engine.connected.load() ? palette::teal : palette::red); g.fillEllipse((float)w-377,31,9,9);
     label(g,engine.connected.load() ? "Audio available" : "Audio unavailable",{w-359,22,172,25},12,palette::muted);
     label(g,"WORKSPACE",{20,99,140,18},11,palette::muted,true);
-    g.setColour(palette::teal.withAlpha(0.10f)); g.fillRoundedRectangle(12,131,156,42,6);
-    g.setColour(palette::teal); g.fillRoundedRectangle(12,140,3,24,1);
-    label(g,"Cuelist",{28,138,125,28},14,palette::teal,true);
+    g.setColour(palette::teal.withAlpha(0.19f)); g.fillRoundedRectangle(12,131,156,45,8);
+    g.setColour(palette::teal); g.fillRoundedRectangle(12,137,4,34,2);
+    label(g,"Cuelist",{28,138,125,30},16,palette::text,true);
     label(g,"PROJECT",{20,242,140,18},11,palette::muted,true);
-    label(g,show.name,{20,269,143,26},16,palette::text,true);
-    label(g,juce::String((int)show.rows.size())+" cues  /  "+juce::String((int)show.columns.size())+" columns",{20,301,150,22},12,palette::muted);
+    label(g,show.name,{20,268,143,30},17,palette::text,true);
+    label(g,juce::String((int)show.rows.size())+" cues / "+juce::String((int)show.columns.size())+" columns",{20,302,150,22},13,palette::muted);
     label(g,hasUnsavedChanges() ? "Unsaved changes" : "No changes",{20,330,153,22},11,hasUnsavedChanges() ? palette::amber : palette::muted);
     g.setColour(palette::line); g.drawHorizontalLine(383,20,160);
     label(g,"ENGINES",{20,408,140,18},11,palette::muted,true);
@@ -186,38 +194,48 @@ void MainComponent::paint(juce::Graphics& g) {
     label(g,"OSC / UDP",{20,480,150,24},13,palette::teal);
     label(g,"CONTROL MIDI",{20,509,150,22},12,palette::teal);
     label(g,activeCueId>0 ? "Cue mapping: "+juce::String(activeCueId) : "Global mapping",{20,533,150,20},11,palette::muted);
-    label(g,nextCue<(int)show.rows.size() ? "Next cue: "+juce::String(nextCue+1) : "End of sequence",{20,h-315,150,22},12,palette::teal);
+    g.setColour(palette::amber.withAlpha(.11f));
+    g.fillRoundedRectangle(12.0f,(float)h-339,156.0f,51.0f,8.0f);
+    label(g,"ON DECK",{20,h-333,145,16},11,palette::amber,true);
+    label(g,nextCue<(int)show.rows.size() ? "NEXT  /  "+juce::String(nextCue+1).paddedLeft('0',2) :
+          "END OF SHOW",{20,h-314,148,24},17,palette::text,true);
     label(g,"OUTPUT",{20,h-198,130,18},11,palette::muted,true);
     g.setColour(palette::raised); g.fillRoundedRectangle(20.0f,(float)h-164,138,7,3);
     g.setColour(displayPeak>.97f ? palette::red : palette::teal); g.fillRoundedRectangle(20.0f,(float)h-164,138*displayPeak,7,3);
     label(g,juce::String(engine.activeVoices.load())+" playing cells",{20,h-146,150,22},11,palette::muted);
     label(g,"SPACE   Next cue",{20,h-92,150,20},12,palette::muted);
     label(g,"ESC          Panic",{20,h-70,150,20},12,palette::muted);
-    label(g,"Session",{204,89,200,32},24,palette::text,true);
-    label(g,"Audio, MIDI, OSC and Control in a single cue list.",{205,124,490,20},13,palette::muted);
+    g.setColour(palette::teal); g.fillRoundedRectangle(204.0f,88.0f,4.0f,45.0f,2.0f);
+    label(g,"SESSION / CUE CONTROL",{219,89,390,32},25,palette::text,true);
+    label(g,"SHOW WORKSPACE   •   AUDIO  /  MIDI  /  OSC  /  CONTROL",{219,124,510,20},12,palette::muted,true);
 
-    constexpr int inspectorWidth=320, inspectorInner=268;
+    constexpr int inspectorWidth=360, inspectorInner=308;
     auto panel=juce::Rectangle<int>(editorX,154,inspectorWidth-20,h-201);
-    g.setColour(palette::panel); g.fillRoundedRectangle(panel.toFloat(),8);
-    g.setColour(palette::line); g.drawRoundedRectangle(panel.toFloat(),8,1);
-    int x=editorX+16;
-    label(g,"INSPECTOR",{x,169,200,18},12,palette::muted,true);
+    g.setColour(palette::panel); g.fillRoundedRectangle(panel.toFloat(),9);
+    g.setColour(palette::line); g.drawRoundedRectangle(panel.toFloat(),9,1.25f);
+    const int x=editorX+16;
+    g.setColour(palette::teal); g.fillRoundedRectangle((float)editorX+13,163.0f,4.0f,49.0f,2.0f);
+    g.setColour(palette::raised.withAlpha(.52f));
+    g.fillRoundedRectangle((float)x-7,228.0f,(float)inspectorInner+14,177.0f,7.0f);
+    g.fillRoundedRectangle((float)x-7,414.0f,(float)inspectorInner+14,
+                           (float)std::max(130,h-476),7.0f);
+    label(g,"INSPECTOR",{x+10,169,200,19},13,palette::teal,true);
     const auto& col=show.columns[selectedColumn];
-    label(g,"CUE "+juce::String(selectedRow+1).paddedLeft('0',2),{x,198,130,25},18,palette::text,true);
-    label(g,typeName(col.type),{x+159,201,107,20},12,palette::type((int)col.type),true,juce::Justification::centredRight);
+    label(g,"CUE "+juce::String(selectedRow+1).paddedLeft('0',2),{x+10,195,140,28},22,palette::text,true);
+    label(g,typeName(col.type),{x+185,200,112,21},13,palette::type((int)col.type),true,juce::Justification::centredRight);
     g.saveState();
     if (h<890) { const float factor=juce::jlimit(0.70f,1.0f,(float)(h-232)/658.0f); g.addTransform(juce::AffineTransform(1,0,0,0,factor,226*(1-factor))); }
-    label(g,"Cue name",{x,235,inspectorInner,18},12,palette::muted);
-    label(g,"Initial BPM",{x,303,inspectorInner,18},12,palette::muted);
+    label(g,"Cue name",{x,235,inspectorInner,18},13,palette::text,true);
+    label(g,"Initial BPM",{x,303,inspectorInner,18},13,palette::text,true);
     g.setColour(palette::line); g.drawHorizontalLine(405,(float)x,(float)x+inspectorInner);
     if (!rowSettings) {
-    label(g,"CELL  /  "+col.name,{x,420,inspectorInner,20},12,palette::muted,true);
-    label(g,"Playback mode",{x,490,inspectorInner,18},12,palette::muted);
+    label(g,"CELL  /  "+col.name,{x,420,inspectorInner,20},14,palette::teal,true);
+    label(g,"Playback mode",{x,490,inspectorInner,18},13,palette::text,true);
     if (col.type==ColumnType::audio) label(g,"Gain",{x,621,70,20},12,palette::muted);
     if (col.type==ColumnType::osc)
         label(g,"UDP destination in utilities",{x,707,inspectorInner,18},11,palette::teal);
     } else {
-        label(g,"WHOLE CUE SETTINGS",{x,420,inspectorInner,20},12,palette::teal,true);
+        label(g,"WHOLE CUE SETTINGS",{x,420,inspectorInner,20},14,palette::teal,true);
         label(g,"Playback on row GO",{x,450,inspectorInner,20},12,palette::muted);
         label(g,"Cue audio gain (dB)",{x,580,inspectorInner,20},12,palette::muted);
         label(g,"Gain affects audio; MIDI uses velocity.",{x,652,inspectorInner,40},11,palette::muted);
@@ -226,7 +244,7 @@ void MainComponent::paint(juce::Graphics& g) {
     label(g,status,{204,h-35,std::max(1,editorX-218),25},12,palette::muted);
 }
 void MainComponent::resized() {
-    const int w=getWidth(),h=getHeight(); editorX=w-320;
+    const int w=getWidth(),h=getHeight(); editorX=w-360;
     newButton.setBounds(w-190,23,68,29); openButton.setBounds(w-116,23,46,29); saveButton.setBounds(w-64,23,52,29);
     deviceButton.setBounds(20,188,140,33);
     controlButton.setBounds(std::max(506,w-666),22,144,30);
@@ -261,8 +279,8 @@ void MainComponent::resized() {
         }
     }
     timeline.setBounds(204,dockY+dockHeight,editorX-220,std::max(75,h-gridHeight-dockHeight-215));
-    const int x=editorX+16, inner=268;
-    cellTab.setBounds(x,198,130,30); rowTab.setBounds(x+138,198,130,30);
+    const int x=editorX+16, inner=308;
+    cellTab.setBounds(x,198,148,31); rowTab.setBounds(x+156,198,152,31);
     rowBehaviour.setBounds(x,479,inner,33); rowMute.setBounds(x,527,inner,24);
     rowLoop.setBounds(x,553,inner,24); rowGain.setBounds(x,610,inner,29);
     rowName.setBounds(x,258,inner,35); bpm.setBounds(x,326,inner,35);
@@ -274,8 +292,8 @@ void MainComponent::resized() {
     midiEditButton.setBounds(x,673,inner,34);
     oscEditButton.setBounds(x,673,inner,34);
     importButton.setBounds(x,722,inner,35);
-    playCellButton.setBounds(x,765,160,32); stopCellButton.setBounds(x+168,765,inner-168,32);
-    clearButton.setBounds(x,804,124,30); applyButton.setBounds(x+132,804,inner-132,30);
+    playCellButton.setBounds(x,765,176,33); stopCellButton.setBounds(x+184,765,inner-184,33);
+    clearButton.setBounds(x,804,140,31); applyButton.setBounds(x+148,804,inner-148,31);
     // Compact inspector on smaller displays, keeping all actions reachable.
     if (h<890) {
         const float factor=juce::jlimit(0.70f,1.0f,(float)(h-232)/658.0f);
@@ -283,7 +301,8 @@ void MainComponent::resized() {
             auto b=c->getBounds(); b.setY(226+(int)((b.getY()-226)*factor)); b.setHeight(std::max(22,(int)(b.getHeight()*factor))); c->setBounds(b);
         }
     }
-    goButton.setBounds(20,h-282,140,40); panicButton.setBounds(20,h-235,140,40);
+    goButton.setBounds(14,h-282,152,48);
+    panicButton.setBounds(14,h-228,152,48);
     grid.setSize(std::max(viewport.getWidth()-14,CueGrid::nameWidth+(int)show.columns.size()*CueGrid::columnWidth+205),
                  std::max(viewport.getHeight()-14,CueGrid::headerHeight+(int)show.rows.size()*CueGrid::rowHeight));
 }
