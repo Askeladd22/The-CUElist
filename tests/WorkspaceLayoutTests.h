@@ -5,14 +5,14 @@ void workspaceLayoutTests() {
     test("Workspace geometry preserves the 0.9 desktop cue/mixer/timeline arrangement",[] {
         const auto geometry=calculateWorkspaceLayout({1647,895,0,467,1,72,62,184});
         check(geometry.editorX==1359 &&
-              geometry.viewport==juce::Rectangle<int>(182,74,985,367),
+              geometry.viewport==juce::Rectangle<int>(182,74,993,367),
               "Desktop viewport changed the agreed cue-list gutters");
-        check(geometry.utilities==juce::Rectangle<int>(182,441,985,208) &&
+        check(geometry.utilities==juce::Rectangle<int>(182,441,993,208) &&
               geometry.utilities.getY()==geometry.viewport.getBottom(),
               "Utility mixer no longer meets the cue-list viewport");
-        check(geometry.timeline==juce::Rectangle<int>(182,663,1169,185),
+        check(geometry.timeline==juce::Rectangle<int>(182,649,1177,199),
               "Timeline position changed without a layout request");
-        check(geometry.metrics==juce::Rectangle<int>(1167,74,184,367),
+        check(geometry.metrics==juce::Rectangle<int>(1175,74,184,367),
               "BPM/Auto Stop is no longer pinned to the viewport edge");
         check(geometry.inspectorPanel==juce::Rectangle<int>(1359,76,268,771),
               "Inspector outer card moved");
@@ -34,7 +34,7 @@ void workspaceLayoutTests() {
             check(g.utilities.getX()==g.viewport.getX() &&
                   g.utilities.getWidth()==g.viewport.getWidth() &&
                   g.timeline.getX()==g.viewport.getX() &&
-                  g.timeline.getRight()==g.editorX-8,
+                  g.timeline.getRight()==g.editorX,
                   "Mixer and timeline are no longer aligned with the cue list");
         }
     });
@@ -207,8 +207,8 @@ void workspaceLayoutTests() {
                 check(g.metrics.getX()==g.viewport.getRight() &&
                       g.utilities.getRight()==g.metrics.getX(),
                       "Fixed BPM gutter no longer excludes upper Utility columns");
-                check(g.timeline.getRight()==g.editorX-8 &&
-                      g.dockEditor.getRight()==g.editorX-8 &&
+                check(g.timeline.getRight()==g.editorX &&
+                      g.dockEditor.getRight()==g.editorX &&
                       g.timeline.getWidth()==g.utilities.getWidth()+g.metrics.getWidth(),
                       "Lower MIDI OSC or Timeline was clipped at BPM boundary");
                 check(g.timeline.getY()==g.dockEditor.getBottom(),
@@ -257,8 +257,97 @@ void workspaceLayoutTests() {
         splitter->mouseDrag(cueViewFixtures::event(*splitter,up,from,1,true));
         splitter->mouseUp(cueViewFixtures::event(*splitter,up,from,1,true));
         check(timeline->getHeight()==height+52 && headers->getY()==cueY &&
-              metrics->getX()==bpmX && timeline->getRight()==1144,
+              metrics->getX()==bpmX && timeline->getRight()==1152,
               "Actual splitter did not resize Timeline or shifted fixed controls");
+    });
+
+
+    test("Upper utility, Timeline and Inspector form gap-free independent regions",[] {
+        for (const auto resolution:std::initializer_list<juce::Point<int>>{
+                 {1180,820},{1440,900},{1647,895},{1920,1080}})
+            for (int dock:{0,36,208}) {
+                const auto g=calculateWorkspaceLayout({resolution.x,resolution.y,
+                    dock,290+4*152,8,72,62,184,290});
+                check(g.utilities.getBottom()==g.dockEditor.getY() &&
+                      g.dockEditor.getBottom()==g.timeline.getY(),
+                      "Blank horizontal band remains above the Timeline");
+                check(g.viewport.getRight()==g.metrics.getX() &&
+                      g.utilities.getRight()==g.metrics.getX() &&
+                      g.metrics.getRight()==g.editorX &&
+                      g.timeline.getRight()==g.editorX &&
+                      g.dockEditor.getRight()==g.editorX &&
+                      g.inspectorPanel.getX()==g.editorX,
+                      "Inspector/Cue List gap or lower clipping boundary returned");
+                check(g.timelineResize.getY()<=g.timeline.getY() &&
+                      g.timelineResize.getBottom()>=g.timeline.getY() &&
+                      g.timeline.getBottom()<=resolution.y-47,
+                      "Resize handle is disconnected from panels or Timeline clips footer");
+            }
+    });
+    test("Repeated Timeline shrink and expansion keeps structural bounds and footer",[] {
+        for (int dock:{0,36,208}) {
+            for (int adjustment:{0,-600,0,90,-100,300,-600,0}) {
+                const auto g=calculateWorkspaceLayout({1440,900,dock,746,6,72,62,184,290,adjustment});
+                check(g.timeline.getHeight()>=75 &&
+                      g.timeline.getY()==g.dockEditor.getBottom() &&
+                      g.utilities.getBottom()==g.dockEditor.getY() &&
+                      g.timeline.getBottom()<=853 &&
+                      g.viewport.getY()==74 &&
+                      g.metrics.getX()==g.viewport.getRight(),
+                      "Timeline repeated resizing created clipping or moved fixed regions");
+            }
+        }
+    });
+    test("Timeline content controls hide outside their visible height budget",[] {
+        MainComponent ui(false);ui.setSize(1440,900);
+        auto* timeline=cueViewFixtures::find<Timeline>(ui);
+        auto* grid=controlsV3::named(*timeline,"timelineGridVisibility");
+        auto* snap=controlsV3::named(*timeline,"timelineSnapToggle");
+        juce::ScrollBar* scrollbar=nullptr;
+        for (auto* child:timeline->getChildren())
+            if (auto* s=dynamic_cast<juce::ScrollBar*>(child)) scrollbar=s;
+        check(timeline && grid && snap && scrollbar,"Timeline content controls missing");
+        for (int height:{220,75,140,210,75,170,75,235}) {
+            timeline->setSize(800,height);
+            const bool toolbar=height>=120,full=height>=170;
+            check(grid->isVisible()==toolbar && snap->isVisible()==toolbar &&
+                  scrollbar->isVisible()==full,
+                  "A ruler/player control remained visible when Timeline was too short");
+            for (auto* child:timeline->getChildren())
+                if (child->isVisible())
+                    check(child->getBounds().getY()>=0 &&
+                          child->getBounds().getBottom()<=timeline->getHeight(),
+                          "Timeline retained a visible child outside its clipping bounds");
+        }
+    });
+    test("Live Timeline splitter hides and restores controls over repeated drags",[] {
+        MainComponent ui(false);ui.setSize(1440,900);
+        auto* splitter=controlsV3::named(ui,"timelineResizeHandle");
+        auto* timeline=cueViewFixtures::find<Timeline>(ui);
+        auto* grid=controlsV3::named(*timeline,"timelineGridVisibility");
+        juce::ScrollBar* scrollbar=nullptr;
+        for (auto* child:timeline->getChildren())
+            if (auto* sc=dynamic_cast<juce::ScrollBar*>(child)) scrollbar=sc;
+        check(splitter && timeline && grid && scrollbar,"Timeline drag fixture missing");
+        const juce::Point<float> start{45.f,5.f};
+        auto drag=[&](float displacement) {
+            const juce::Point<float> end{45.f,5.f+displacement};
+            splitter->mouseDown(cueViewFixtures::event(*splitter,start,start));
+            splitter->mouseDrag(cueViewFixtures::event(*splitter,end,start,1,true));
+            splitter->mouseUp(cueViewFixtures::event(*splitter,end,start,1,true));
+        };
+        drag(300);
+        check(timeline->getHeight()==75 && !grid->isVisible() &&
+              !scrollbar->isVisible(),"Shrinking Timeline left playback controls visible");
+        drag(-65);
+        check(timeline->getHeight()==140 && grid->isVisible() &&
+              !scrollbar->isVisible(),"Intermediate Timeline should show ruler only");
+        drag(-110);
+        check(timeline->getHeight()==250 && grid->isVisible() &&
+              scrollbar->isVisible(),"Expanding Timeline did not restore player details");
+        drag(400);
+        check(timeline->getHeight()==75 && !grid->isVisible() &&
+              !scrollbar->isVisible(),"Second shrink left stale content in foreground");
     });
 
 }
