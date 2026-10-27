@@ -10,11 +10,17 @@ juce::String timeText(double seconds) {
 }
 void smallButton(juce::Graphics& g, const juce::String& text, juce::Rectangle<int> box, bool enabled, bool danger=false) {
     const auto colour=danger ? palette::red : palette::muted;
-    g.setColour(palette::raised.withAlpha(enabled ? 1.0f : .4f)); g.fillRoundedRectangle(box.toFloat(),3);
-    label(g,text,box,11,colour.withAlpha(enabled ? 1.0f : .25f),true,juce::Justification::centred);
+    g.setColour(palette::raised.withAlpha(enabled ? 1.0f : .45f));
+    g.fillRoundedRectangle(box.toFloat(),5);
+    g.setColour(palette::line.withAlpha(enabled ? 1.0f : .4f));
+    g.drawRoundedRectangle(box.toFloat().reduced(.5f),5,1);
+    label(g,text,box,12,colour.withAlpha(enabled ? 1.0f : .45f),true,juce::Justification::centred);
 }
 void transportButton(juce::Graphics& g,juce::Rectangle<int> box,bool stop,bool enabled) {
-    g.setColour(palette::raised); g.fillRoundedRectangle(box.toFloat(),3);
+    g.setColour((stop ? palette::red : palette::teal).withAlpha(enabled ? .16f : .06f));
+    g.fillRoundedRectangle(box.toFloat(),5);
+    g.setColour((stop ? palette::red : palette::teal).withAlpha(enabled ? .75f : .30f));
+    g.drawRoundedRectangle(box.toFloat().reduced(.5f),5,1);
     g.setColour((stop ? palette::red : palette::teal).withAlpha(enabled ? 1.0f : .25f));
     const float x=(float)box.getCentreX(),y=(float)box.getCentreY();
     if (stop) g.fillRect(x-4,y-4,8.0f,8.0f);
@@ -23,14 +29,19 @@ void transportButton(juce::Graphics& g,juce::Rectangle<int> box,bool stop,bool e
 }
 
 void CueGrid::paint(juce::Graphics& g) {
-    g.fillAll(palette::panel); g.setColour(palette::raised); g.fillRect(0,0,getWidth(),headerHeight);
-    label(g,"CUE",{14,10,80,18},12,palette::muted,true);
-    label(g,"Order / GO / name",{14,35,nameWidth-25,22},13,palette::text);
+    g.fillAll(palette::background);
+    g.setColour(palette::raised); g.fillRect(0,0,getWidth(),headerHeight);
+    g.setColour(palette::line); g.drawHorizontalLine(headerHeight-1,0,(float)getWidth());
+    g.setColour(palette::teal); g.fillRoundedRectangle(12.0f,9.0f,3.0f,50.0f,1.5f);
+    label(g,"CUE LIST",{25,10,170,22},14,palette::teal,true);
+    label(g,"SEQUENCE   /   LIVE CUES",{25,37,nameWidth-40,23},12,palette::muted,true);
     const auto& show=owner.show;
     for (int c=0;c<(int)show.columns.size();++c) {
         const int x=nameWidth+c*columnWidth; const auto colour=palette::type((int)show.columns[c].type);
-        g.setColour(colour); g.fillRect(x,0,columnWidth-1,3);
-        label(g,columnTypeName(show.columns[c].type),{x+10,11,75,20},11,colour,true);
+        g.setColour(colour); g.fillRect(x,0,columnWidth-1,5);
+        g.setColour(colour.withAlpha(.09f));
+        g.fillRect(x,5,columnWidth-1,headerHeight-6);
+        label(g,columnTypeName(show.columns[c].type),{x+10,11,78,20},12,colour,true);
         smallButton(g,"<",{x+88,11,20,20},c>0);
         smallButton(g,">",{x+112,11,20,20},c+1<(int)show.columns.size());
         smallButton(g,"x",{x+136,11,20,20},true,true);
@@ -42,43 +53,61 @@ void CueGrid::paint(juce::Graphics& g) {
             show.columns[c].type==ColumnType::midi ? "MIDI" :
             show.columns[c].type==ColumnType::osc ? "OSC" : "Control";
         const auto name=show.columns[c].name.isEmpty() ? juce::String(prefix)+" "+juce::String(ordinal) : show.columns[c].name;
-        label(g,name,{x+10,36,columnWidth-20,24},14,palette::text,true);
+        label(g,name,{x+10,36,columnWidth-20,25},15,palette::text,true);
         if (show.columns[c].type==ColumnType::control && show.columns[c].controlLocked)
             label(g,"LOCKED",{x+75,12,70,17},10,palette::amber,true);
         g.setColour(palette::line); g.drawVerticalLine(x,0,(float)getHeight());
     }
     const int tail=nameWidth+(int)show.columns.size()*columnWidth;
-    label(g,"BPM (click)",{tail+12,31,92,24},12,palette::muted,true);
-    label(g,"AUTO STOP",{tail+105,31,96,24},11,palette::muted,true);
+    label(g,"BPM (click)",{tail+12,31,92,24},13,palette::text,true);
+    label(g,"AUTO STOP",{tail+105,31,96,24},12,palette::text,true);
     const auto clip=g.getClipBounds();
     const int first=std::max(0,(clip.getY()-headerHeight)/rowHeight), last=std::min((int)show.rows.size(),(clip.getBottom()-headerHeight)/rowHeight+1);
     for (int r=first;r<last;++r) {
         const int y=headerHeight+r*rowHeight; const bool selected=r==owner.selectedRow, next=r==owner.nextCueIndex();
         const auto& row=show.rows[r];
-        g.setColour(selected ? palette::teal.withAlpha(.11f) :
-                    next ? palette::amber.withAlpha(.045f) :
-                    r%2 ? palette::background.withAlpha(.32f) : palette::panel);
+        bool playing=false,paused=false;
+        if (owner.engine.connected.load()) for (const auto& cell:row.cells) {
+            const auto state=owner.engine.getCellPlayback(cell.id);
+            playing=playing||state.playing;
+            paused=paused||state.paused;
+        }
+        g.setColour(selected ? palette::raised.withAlpha(.94f) :
+                    playing ? palette::teal.withAlpha(.17f) :
+                    next ? palette::amber.withAlpha(.11f) : palette::panel);
         g.fillRect(0,y,getWidth(),rowHeight);
-        if (selected || next) { g.setColour(next ? palette::amber : palette::teal); g.fillRect(0,y,3,rowHeight); }
+        if (next || playing || selected) {
+            g.setColour(playing ? palette::teal : next ? palette::amber : palette::muted);
+            g.fillRect(0,y,5,rowHeight);
+        }
+        g.setColour(palette::line.withAlpha(.66f));
+        g.drawHorizontalLine(y+rowHeight-1,0,(float)getWidth());
         g.saveState();
         g.addTransform(juce::AffineTransform::translation(0.0f,(float)rowContentInset));
         smallButton(g,"^",{6,y+17,20,21},r>0); smallButton(g,"v",{30,y+17,20,21},r+1<(int)show.rows.size());
         smallButton(g,"x",{54,y+17,20,21},true,true);
         smallButton(g,"...",{nameWidth-70,y+17,28,21},true);
-        g.setColour((next ? palette::amber : palette::teal).withAlpha(.14f)); g.fillRoundedRectangle(84.0f,(float)y+12,44,30,4);
-        label(g,"GO",{84,y+12,44,30},13,next ? palette::amber : palette::teal,true,juce::Justification::centred);
-        label(g,row.name,{137,y+6,nameWidth-220,27},15,palette::text,selected);
-        label(g,juce::String(r+1).paddedLeft('0',2)+(next ? "  NEXT" : row.muted ? "  MUTE" : ""),{137,y+33,nameWidth-181,17},11,next ? palette::amber : palette::muted);
+        g.setColour(next ? palette::amber : palette::teal);
+        g.fillRoundedRectangle(84.0f,(float)y+12,48,33,5);
+        label(g,"GO",{84,y+12,48,33},15,palette::background,true,juce::Justification::centred);
+        label(g,row.name.isEmpty() ? "Untitled cue" : row.name,
+              {142,y+5,nameWidth-250,28},17,palette::text,true);
+        const juce::String cueState=playing ? "PLAYING" : paused ? "PAUSED" :
+                                    next ? "NEXT CUE" : row.muted ? "MUTED" : "STANDBY";
+        const auto stateColour=playing ? palette::teal : next || paused ? palette::amber : palette::muted;
+        label(g,juce::String(r+1).paddedLeft('0',2)+"  /  "+cueState,
+              {142,y+32,nameWidth-248,19},12,stateColour,true);
         transportButton(g,{nameWidth-36,y+17,26,22},true,true);
         for (int c=0;c<(int)show.columns.size();++c) {
             const int x=nameWidth+c*columnWidth; const auto& cell=row.cells[c];
             const bool loaded=owner.hasClip(r,c), missing=cell.file.isNotEmpty() && !loaded;
             const auto colour=missing ? palette::red : palette::type((int)show.columns[c].type);
-            const auto box=juce::Rectangle<float>((float)x+5,(float)y+6,(float)columnWidth-10,(float)rowHeight-12);
-            g.setColour(loaded ? colour.withAlpha(.15f) : palette::background.withAlpha(.5f)); g.fillRoundedRectangle(box,5);
+            const auto box=juce::Rectangle<float>((float)x+5,(float)y+1,(float)columnWidth-10,62.0f);
+            g.setColour(loaded ? colour.withAlpha(.24f) : palette::background.withAlpha(.65f));
+            g.fillRoundedRectangle(box,7);
             const bool drop=dragging && dropRow==r && dropColumn==c;
             g.setColour(drop ? palette::amber : selected && c==owner.selectedColumn ? colour : palette::line.withAlpha(.65f));
-            g.drawRoundedRectangle(box,5,drop || (selected && c==owner.selectedColumn) ? 1.5f : .6f);
+            g.drawRoundedRectangle(box,7,drop || (selected && c==owner.selectedColumn) ? 2.0f : 1.0f);
             if (show.columns[c].type==ColumnType::control) {
                 const auto& col=show.columns[c];
                 const ControlSet* set=col.controlLocked ? &col.controlDefaultSet :
@@ -94,14 +123,14 @@ void CueGrid::paint(juce::Graphics& g) {
             } else if (loaded) {
                 auto playback=owner.engine.getCellPlayback(cell.id);
                 if (!owner.engine.connected.load()) playback.playing=playback.waiting=playback.paused=false;
-                label(g,cell.name.isEmpty() ? (cell.midi ? "MIDI" : cell.osc ? "OSC" : juce::File(cell.file).getFileNameWithoutExtension()) : cell.name,{x+13,y+10,columnWidth-68,23},13,palette::text);
+                label(g,cell.name.isEmpty() ? (cell.midi ? "MIDI" : cell.osc ? "OSC" : juce::File(cell.file).getFileNameWithoutExtension()) : cell.name,{x+13,y+9,columnWidth-68,24},14,palette::text,true);
                 const auto seconds=owner.clipDuration(r,c);
                 label(g,playback.waiting ? "WAITING" : timeText(playback.positionSeconds)+" / "+timeText(seconds),
-                      {x+13,y+32,columnWidth-72,18},11,colour);
+                      {x+13,y+35,columnWidth-72,19},12,colour);
                 const auto progress=seconds>0 ? juce::jlimit(0.0,1.0,playback.positionSeconds/seconds) : 0;
-                g.setColour(palette::line); g.fillRect(x+8,y+rowHeight-11,columnWidth-16,3);
+                g.setColour(palette::line); g.fillRect(x+8,y+56,columnWidth-16,4);
                 g.setColour(playback.paused || playback.waiting ? palette::amber : colour);
-                g.fillRect((float)x+8,(float)y+rowHeight-11,(float)((columnWidth-16)*progress),3.0f);
+                g.fillRect((float)x+8,(float)y+56,(float)((columnWidth-16)*progress),4.0f);
                 if (playback.playing || playback.paused) {
                     g.setColour(playback.paused ? palette::amber : palette::teal);
                     g.fillEllipse((float)x+columnWidth-19,(float)y+13,8,8);
@@ -127,7 +156,7 @@ void CueGrid::paint(juce::Graphics& g) {
             }
         }
         const auto tempo=row.tempo.front();
-        label(g,juce::String(tempo.bpm,1),{tail+12,y+14,79,24},14,palette::teal,true);
+        label(g,juce::String(tempo.bpm,1),{tail+12,y+14,79,25},17,palette::text,true);
         g.setColour(row.stopOnNext ? palette::teal.withAlpha(.25f) : palette::raised);
         g.fillRoundedRectangle((float)tail+115,(float)y+8,34,19,9.5f);
         g.setColour(row.stopOnNext ? palette::teal : palette::muted);
@@ -135,7 +164,7 @@ void CueGrid::paint(juce::Graphics& g) {
         label(g,row.stopOnNext ? "ON" : "OFF",{tail+154,y+8,38,20},11,row.stopOnNext ? palette::teal : palette::muted);
         smallButton(g,autoStopVisibleRows.count(row.id) ? "−" : "+",{tail+118,y+32,28,19},true);
         g.restoreState();
-        g.setColour(palette::line.withAlpha(.68f));
+        g.setColour(palette::line.withAlpha(.65f));
         g.drawHorizontalLine(y+rowHeight-1,0,(float)getWidth());
     }
 }
@@ -256,7 +285,7 @@ void CueGrid::mouseDown(const juce::MouseEvent& e) {
         if (localY>=17 && localY<38 && e.x>=6 && e.x<26) owner.reorderRow(row,-1);
         else if (localY>=17 && localY<38 && e.x>=30 && e.x<50) owner.reorderRow(row,1);
         else if (localY>=17 && localY<38 && e.x>=54 && e.x<74) owner.deleteRow(row);
-        else if (e.x>=84 && e.x<128 && localY>=12 && localY<42) owner.triggerRow(row);
+        else if (e.x>=84 && e.x<132 && localY>=12 && localY<45) owner.triggerRow(row);
         else owner.select(row,owner.selectedColumn);
     } else if (column<(int)owner.show.columns.size() && owner.select(row,column)) {
         if (owner.show.columns[(size_t)column].type==ColumnType::control) {
