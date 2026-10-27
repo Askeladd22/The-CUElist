@@ -147,6 +147,8 @@ public:
     void setColumnDirectPostFader(int column,bool post);
     void setColumnDirectEnabled(int column,bool enabled);
     void setMasterAudio(float gain);
+    int audioFaderCeilingDb() const noexcept { return faderCeilingDb; }
+    void setAudioFaderCeilingDb(int db);
     void setMasterPan(float pan);
     void setMasterMute(bool muted);
     void setMasterOutput(int channel);
@@ -209,6 +211,8 @@ public:
 private:
     friend class CueGrid; friend class CueMetricsOverlay; friend class Timeline; friend class MidiUndoAction; friend class ColumnUtilities; friend class ControlPanel;
     Theme theme;
+    std::unique_ptr<juce::PropertiesFile> appPreferences;
+    int faderCeilingDb=6;
     juce::TooltipWindow tooltip{this,600};
     CueGrid grid{*this}; CueMetricsOverlay cueMetrics{*this}; Timeline timeline{*this}; juce::Viewport viewport;
     ColumnUtilities utilities{*this};
