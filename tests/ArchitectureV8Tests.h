@@ -58,6 +58,8 @@ void architectureV8Tests() {
             for(int n=0;n<30;++n) {
                 show.name="Snapshot "+juce::String(n);
                 check(worker.enqueue(show).wasOk(),"Could not queue recovery snapshot");
+                // The live object can change immediately after enqueue.
+                show.name="Subsequent GUI edit";
             }
             worker.flush();
             Show restored;

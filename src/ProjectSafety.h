@@ -2,6 +2,7 @@
 #include "ShowModel.h"
 #include <juce_core/juce_core.h>
 #include <vector>
+#include <optional>
 #include <condition_variable>
 #include <mutex>
 #include <thread>
@@ -37,9 +38,9 @@ public:
     static bool exists(const juce::File& directory);
     static bool discard(const juce::File& directory);
 };
- // Background disk writer. Show validation/serialization remains on the caller
- // thread; disk creation/replacement is isolated from the UI and audio callback.
- // A single pending slot bounds memory usage and coalesces repeated snapshots.
+// Background recovery writer: take an owned Show snapshot on the UI thread,
+// then serialize and write it on a bounded worker. One pending snapshot plus
+// the in-progress snapshot bounds the queue and coalesces rapid edits.
 class RecoveryCheckpointWriter final {
 public:
     explicit RecoveryCheckpointWriter(juce::File directory);
@@ -53,8 +54,8 @@ private:
     std::mutex mutex;
     std::condition_variable wake;
     std::thread worker;
-    juce::String pending;
-    bool hasPending=false,writing=false,stopping=false;
+    std::optional<Show> pending;
+    bool writing=false,stopping=false;
     std::atomic<unsigned> failures{0};
 };
 

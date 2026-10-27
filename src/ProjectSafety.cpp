@@ -119,35 +119,36 @@ RecoveryCheckpointWriter::~RecoveryCheckpointWriter() {
 }
 juce::Result RecoveryCheckpointWriter::enqueue(const Show& show) {
     if(const auto check=validateRecoverySource(show);check.failed()) return check;
-    // Serialization uses an immutable snapshot on the GUI thread, avoiding
-    // races with edits, while filesystem access is always on the worker.
-    auto text=encodeShow(show);
+    // Copy the immutable model while it belongs to the GUI thread. JSON
+    // encoding and all filesystem operations run on the background worker.
+    // This avoids a data race with subsequent Inspector or cue edits.
+    Show snapshot=show;
     {
         std::lock_guard<std::mutex> guard(mutex);
         if(stopping) return juce::Result::fail("Recovery writer is closing.");
-        pending=std::move(text);
-        hasPending=true;
+        pending=std::move(snapshot); // coalesce snapshots, never grow a queue
     }
     wake.notify_one();
     return juce::Result::ok();
 }
 void RecoveryCheckpointWriter::flush() {
     std::unique_lock<std::mutex> lock(mutex);
-    wake.wait(lock,[this] {return !hasPending && !writing;});
+    wake.wait(lock,[this] {return !pending.has_value() && !writing;});
 }
 void RecoveryCheckpointWriter::run() {
     for(;;) {
-        juce::String snapshot;
+        Show snapshot;
         {
             std::unique_lock<std::mutex> lock(mutex);
-            wake.wait(lock,[this] {return hasPending || stopping;});
-            if(stopping && !hasPending) break;
-            snapshot=std::move(pending);
-            pending.clear();
-            hasPending=false;
+            wake.wait(lock,[this] {return pending.has_value() || stopping;});
+            if(stopping && !pending.has_value()) break;
+            snapshot=std::move(*pending);
+            pending.reset();
             writing=true;
         }
-        if(writeRecoverySnapshot(snapshot,dir).failed())
+        // Worker owns the snapshot exclusively: no access to the live Show.
+        const auto serialized=encodeShow(snapshot);
+        if(writeRecoverySnapshot(serialized,dir).failed())
             failures.fetch_add(1,std::memory_order_relaxed);
         {
             std::lock_guard<std::mutex> guard(mutex);
