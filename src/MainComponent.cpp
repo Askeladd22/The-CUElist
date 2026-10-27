@@ -81,9 +81,6 @@ MainComponent::MainComponent(bool startAudio) {
     safetyLimiter.setWantsKeyboardFocus(false);
     safetyLimiter.onClick=[this] {setSafetyLimiter(safetyLimiter.getToggleState());};
     utilities.addAndMakeVisible(safetyLimiter);
-    limiterIndicator.setName("masterLimiterIndicator");
-    limiterIndicator.setTooltip("Red while the Master Bus limiter is reducing gain.");
-    utilities.addAndMakeVisible(limiterIndicator);
     rowBehaviour.addItemList({"Use cell settings","Retrigger","Pause / Restart","Pause / Resume","Continue"},1);
     cellTab.setWantsKeyboardFocus(false); rowTab.setWantsKeyboardFocus(false);
     cellTab.onClick=[this] { if (applyInspector()) { rowSettings=false; refresh(); } };
@@ -631,6 +628,18 @@ void MainComponent::setColumnDirectEnabled(int column,bool enabled) {
     dirty=true; engine.publish(makeRenderState(show,clips));
     status=enabled ? "Direct Output enabled." : "Direct Output off (L/R unchanged).";
     utilities.refresh(); repaint();
+}
+void MainComponent::setDataOutputMuted(int column,bool muted) {
+    if(column<0 || column>=(int)show.columns.size()) return;
+    auto& col=show.columns[(size_t)column];
+    if((col.type!=ColumnType::midi && col.type!=ColumnType::osc) || col.muted==muted) return;
+    col.muted=muted;
+    dirty=true;
+    engine.publish(makeRenderState(show,clips));
+    status=muted ? "Data output muted (cue timeline remains active)."
+                 : "Data output unmuted.";
+    utilities.refresh();
+    repaint();
 }
 void MainComponent::setColumnUtilities(int column,float level,float pan,bool muted,bool inverted) {
     if (column<0 || column>=(int)show.columns.size() || !std::isfinite(level) || !std::isfinite(pan)) return;

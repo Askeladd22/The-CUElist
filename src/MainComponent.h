@@ -138,6 +138,7 @@ public:
     void stopCellAt(int row,int column);
     void stopRow(int row);
     void setColumnUtilities(int column,float gain,float pan,bool muted,bool inverted);
+    void setDataOutputMuted(int column,bool muted);
     void setColumnMasterSend(int column,bool enabled);
     void setColumnDirectPostFader(int column,bool post);
     void setColumnDirectEnabled(int column,bool enabled);
@@ -221,8 +222,7 @@ private:
     juce::Slider masterPan;
     UtilityIcon masterMute{false};
     juce::ComboBox masterOutput;
-    juce::ToggleButton safetyLimiter{"LIMIT"};
-    LimiterIndicator limiterIndicator;
+    LimiterToggle safetyLimiter;
     struct DockResizeHandle : juce::Component, juce::SettableTooltipClient {
         explicit DockResizeHandle(MainComponent& p) : owner(p) { setMouseCursor(juce::MouseCursor::UpDownResizeCursor); }
         void paint(juce::Graphics& g) override { g.setColour(palette::muted); g.fillRoundedRectangle(getLocalBounds().toFloat().withSizeKeepingCentre(76,3),1.5f); }

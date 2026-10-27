@@ -35,6 +35,8 @@ public:
         const double position=juce::jlimit(0.0,1.0,(double)(bottom-y)/(bottom-top));
         return (float)(minDb+(maxDb-minDb)*std::log1p(2.0*position)/std::log(3.0));
     }
+    bool isCompact() const noexcept {return compact;}
+    void setCompact(bool value) {if(compact!=value){compact=value;repaint();}}
     float getGainDb() const noexcept { return gainDb; }
     void setGainDb(float value,bool notify=false) {
         if (!std::isfinite(value)) return;
@@ -72,8 +74,9 @@ private:
     struct Peak { float current=minDb,held=minDb; int holdTicks=0; };
     std::array<Peak,2> peaks {};
     float gainDb=0.0f;
-    float topY() const noexcept { return 12.0f; }
-    float bottomY() const noexcept { return (float)std::max(15,getHeight()-35); }
+    bool compact=false;
+    float topY() const noexcept { return compact ? 7.0f : 12.0f; }
+    float bottomY() const noexcept { return (float)std::max(15,getHeight()-(compact ? 19 : 35)); }
     void setFromMouse(float y) {
         const auto db=std::round(dbForY(y,topY(),bottomY())*10.0f)*0.1f;
         setGainDb(db,true);

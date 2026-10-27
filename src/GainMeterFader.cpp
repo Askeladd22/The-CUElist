@@ -4,6 +4,34 @@ namespace cuelist {
 void GainMeterFader::paint(juce::Graphics& g) {
     const float top=topY(),bottom=bottomY();
     const float length=bottom-top;
+    if(compact) {
+        const float mid=getWidth()*.5f;
+        const auto rail=juce::Rectangle<float>(mid-10.0f,top,20.0f,length);
+        g.setColour(palette::raised);g.fillRoundedRectangle(rail,3.0f);
+        g.setColour(palette::line);g.drawRoundedRectangle(rail,3.0f,1.0f);
+        for(int ch=0;ch<2;++ch) {
+            const float value=peaks[(size_t)ch].current;
+            if(value>minDb+.01f) {
+                const float y=yForDb(value,top,bottom);
+                g.setColour(value>=0 ? palette::red : value>=-9 ? palette::amber : palette::teal);
+                g.fillRect(mid-7.0f+ch*8.0f,y,6.0f,bottom-y);
+            }
+        }
+        const float y=yForDb(gainDb,top,bottom);
+        g.setColour(palette::background);
+        g.fillRoundedRectangle(mid-15.0f,y-5.0f,30.0f,10.0f,2.0f);
+        g.setColour(palette::text);
+        g.fillRoundedRectangle(mid-13.0f,y-3.0f,26.0f,6.0f,1.7f);
+        if(hasKeyboardFocus(false)) {
+            g.setColour(palette::teal);
+            g.drawRoundedRectangle(mid-15.0f,y-5.0f,30.0f,10.0f,2.0f,1.0f);
+        }
+        g.setColour(palette::muted);
+        g.setFont(font(9.0f,true));
+        g.drawText(juce::String((int)std::round(gainDb)),0,getHeight()-18,
+                   getWidth(),17,juce::Justification::centred,false);
+        return;
+    }
     const juce::Rectangle<float> backdrop(12.0f,top,28.0f,length);
     g.setColour(palette::raised); g.fillRoundedRectangle(backdrop,3.0f);
     g.setColour(palette::line); g.drawRoundedRectangle(backdrop,3.0f,1.0f);

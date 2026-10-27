@@ -78,18 +78,45 @@ public:
         g.drawFittedText("L/R",getLocalBounds(),juce::Justification::centred,1);
     }
 };
-class LimiterIndicator final : public juce::Component, public juce::SettableTooltipClient {
+// A single compact button combines limiter enable and gain reduction indication.
+class LimiterToggle final : public juce::ToggleButton {
 public:
-    void setActive(bool value) {if(value!=active){active=value;repaint();}}
-    void paint(juce::Graphics& g) override {
-        const auto area=getLocalBounds().toFloat().reduced(3);
-        g.setColour(active ? palette::red : palette::muted.withAlpha(.18f));
-        g.fillEllipse(area);
-        g.setColour(active ? palette::red : palette::line);
-        g.drawEllipse(area,1.0f);
+    LimiterToggle() {setButtonText("Limit");}
+    void setReducing(bool value) {
+        if(reducing!=value) {reducing=value;repaint();}
+    }
+    bool isReducing() const noexcept {return reducing;}
+    void paintButton(juce::Graphics& g,bool hover,bool down) override {
+        const bool on=getToggleState();
+        const auto bounds=getLocalBounds().toFloat();
+        const auto dot=juce::Rectangle<float>(13.0f,13.0f).withCentre({bounds.getX()+11.0f,bounds.getCentreY()});
+        g.setColour(!on ? palette::raised : reducing ? palette::red : palette::red.withAlpha(.27f));
+        g.fillEllipse(dot);
+        g.setColour(!on ? palette::muted : reducing ? palette::red : palette::red.withAlpha(.75f));
+        g.drawEllipse(dot,reducing && on ? 2.3f : 1.2f);
+        if(on && reducing) {
+            g.setColour(palette::red.withAlpha(.25f));
+            g.drawEllipse(dot.expanded(3.0f),1.6f);
+        }
+        g.setColour(on ? palette::text : hover || down ? palette::text : palette::muted);
+        g.setFont(font(12.0f,true));
+        g.drawText("Limit",23,0,std::max(1,getWidth()-23),getHeight(),juce::Justification::centredLeft,false);
     }
 private:
-    bool active=false;
+    bool reducing=false;
+};
+class MidiActivityLed final : public juce::Component {
+public:
+    void setActive(bool value) {if(active!=value){active=value;repaint();}}
+    bool isActive() const noexcept {return active;}
+    void paint(juce::Graphics& g) override {
+        const auto dot=juce::Rectangle<float>(9.0f,9.0f).withCentre({7.0f,getHeight()*.5f});
+        g.setColour(active ? palette::teal : palette::raised);g.fillEllipse(dot);
+        g.setColour(active ? palette::teal : palette::line);g.drawEllipse(dot,1.0f);
+        g.setColour(active ? palette::text : palette::muted);
+        g.setFont(font(10.0f,true));
+        g.drawText("TX",17,0,std::max(1,getWidth()-17),getHeight(),juce::Justification::centredLeft,false);
+    }
 };
 
 inline void configureMixerPan(juce::Slider& pan) {
