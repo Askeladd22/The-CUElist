@@ -114,7 +114,7 @@ void uiRefinementTests() {
         auto* masterPan=dynamic_cast<juce::Slider*>(controlsV3::named(*utilities,"masterPan"));
         auto* masterMute=dynamic_cast<juce::ToggleButton*>(controlsV3::named(*utilities,"masterMute"));
         check(masterPan && masterMute,"Master pan and mute missing from utilities");
-        auto* audio=utilities->getChildComponent(0);
+        auto* audio=utilities->getChildComponent(0)->getChildComponent(0);
         auto* fader=dynamic_cast<GainMeterFader*>(controlsV3::named(*audio,"columnGainDb"));
         auto* pan=dynamic_cast<juce::Slider*>(controlsV3::named(*audio,"columnPan"));
         check(fader && pan && pan->getWidth()>=43 && pan->getWidth()<=50 && fader->getWidth()<=96,"Strip controls were not reduced");
@@ -293,7 +293,7 @@ void uiRefinementTests() {
         MainComponent ui(false);addColumn(ui.show,ColumnType::control,"Control");
         auto* utility=cueViewFixtures::find<ColumnUtilities>(ui);
         utility->refresh();
-        auto* strip=utility->getChildComponent(1);
+        auto* strip=utility->getChildComponent(0)->getChildComponent(1);
         auto* lock=dynamic_cast<juce::Button*>(controlsV3::named(*strip,"controlColumnLock"));
         check(lock && lock->isVisible() && !lock->getToggleState(),
               "Unlocked icon state missing");
