@@ -21,9 +21,9 @@
 
 **Important limit:** phase 1 separates source boundaries, **not** model ownership. These methods are still `MainComponent` members. This is intentional: moving ownership or changing event ordering before regression tests would make this first step substantially riskier.
 
-## Phase 2 — cue editing boundaries (current PR)
+## Phase 2 — cue editing boundaries
 
-**Phase 2a (implemented; awaiting CI):** split existing UI-owned editing commands by their responsibility, without changing logic, IDs, event ordering or ownership.
+**Phase 2a (merged into feat/desktop-foundation):** split existing UI-owned editing commands by their responsibility, without changing logic, IDs, event ordering or ownership.
 
 - `src/CueOperations.cpp`: row colour/Auto Stop, add/rename/reorder/copy/duplicate/paste/delete cue, column add/reorder/delete/collapse, tempo/BPM edits and the transient editing dialogs.
 - `src/CellOperations.cpp`: cell swap/copy/paste/cut/delete, loop/follows-row toggles, clip timing and timeline seek.
@@ -31,7 +31,15 @@
 - `CMakeLists.txt`: compile both modules in the application and tests.
 - Extend automated tests with row/column identity, typed-cell associations and cached PCM ownership while preserving existing copy/paste and row duplication test coverage.
 
-**Phase 2b (future separate PR):** after characterization and CI, factor selected *pure* show-model editing operations behind explicit inputs and outputs, preserving stable IDs and atomic failure semantics. This is deliberately not folded into the code-motion step.
+**Phase 2b (current PR, first model slice):** introduce `ShowEditOperations.h/.cpp` in `CuelistCore` with three tested, JUCE-GUI-free model operations:
+
+- `swapCueRows`: bounded cue reordering that preserves stable row IDs.
+- `swapCueColumns`: bounded column reordering with corresponding typed cell slots swapped across every row; rejects malformed rectangular layouts.
+- `prepareInsertedCueCopy`: transactional cue insertion into a separate output Show, reassigning row, cell and private Control Set binding IDs. The destination is only replaced after full `validateShow` succeeds; failed copies leave output unmodified.
+- `CueOperations.cpp` keeps existing operator/transport sequencing but delegates these three model edits; the GUI still owns media-cache association and checks PCM memory limits **before** adopting a newly prepared show.
+- New model-only regression tests cover stable IDs, clip/type association, correct Control Set identity cloning, range failures and project nonmutation.
+
+Next **phase 2c**, if justified by test coverage, will target pure deletion and binding cleanup. Do not bundle it with the current reordering/clipboard slice.
 
 No existing audio callback, playback state inheritance, project schema or media-cache ownership changes are made in phase 2a.
 
