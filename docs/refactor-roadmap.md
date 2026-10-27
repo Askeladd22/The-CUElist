@@ -62,7 +62,7 @@ No existing audio callback, playback state inheritance, project schema or media-
 - Regression tests verify 1180×820, 1440×900, 1647×895 and 1920×1080, scrolling/pinned controls, collapsed/expanded clip dock, the shared Inspector transform and actual JUCE component bounds.
 - No visual reflow or spacing change in this phase; it is a structural extraction with the exact existing baseline coordinates and control sizes.
 
-**Phase 3b (current PR — fit docked editors to compact windows):**
+**Phase 3b (merged into feat/desktop-foundation — compact dock sizing):**
 
 - Preserve the approved 0.9 cue-grid, Inspector, mixer and Timeline geometry for all dock states that already fit.
 - Resolve the *visible* dock height inside `WorkspaceLayout` against the available window height. The requested editor height (up to 400px) remains a preference; minimum 310px grid region, 75px Timeline lane and 47px footer reserve take precedence. At 1180×820 the largest dock is 220px; at 1440×900 it is 300px; at 1920×1080 all 400px fit.
@@ -72,11 +72,19 @@ No existing audio callback, playback state inheritance, project schema or media-
 
 **Phase 3c (only if visual testing warrants it):** handle narrower-than-supported window sizes or revisit the Inspector's control density as a separate deliberate GUI design change, not as part of a runtime-safety fix.
 
-## Phase 4 — Control Mapping boundaries (separate PR)
+## Phase 4 — Control Mapping boundaries
 
-- Separate mapping resolution/dispatch from the Control Panel component.
-- Cover MIDI Learn, device reconnection, GO/PANIC physical-edge debouncing, Control Set priority and OSC/MIDI output by regression tests.
-- Hardware acceptance remains mandatory before release.
+**Phase 4a (current PR; CI verification pending):** isolate mapping/device business logic from the Control Panel dialog without changing runtime behavior.
+
+- `src/ControlUI.cpp` retains `ControlPanel`, `openControlPanel` and `editControlSet`: presentation, operator controls and the MIDI Learn interface.
+- `src/ControlRuntime.cpp` contains runtime mapping initialization, MIDI input selection, binding edits, presets, Control Set lock/priority/templates, and the original `dispatchControl`. The code still executes on the JUCE UI thread; the audio callback remains unchanged.
+- `src/ControlLayerBuilder.h/.cpp` lives in the independent core library and provides deterministic `buildControlLayers(show)` and `activeControlPresetForCue(show, acknowledgedCueId)`. Visible Control Column order resolves equal-priority ties, locked defaults apply across cues, and selected rows never activate hardware mappings.
+- Tests cover locked vs cue-local mappings, equal-priority reordering, acknowledged-cue presets, malformed in-memory grids and physical GO press/release debounce. Existing MIDI Learn, Control Set, mapping validation, pickup, MIDI/OSC routing and project v10 tests are preserved.
+- No GUI geometry or audio callback changes. Windows build and complete automated tests required before merging.
+
+**Phase 4b (later, separate PR):** after phase 4a CI and manual MIDI/OSC acceptance, introduce a narrowly scoped control-dispatch test seam if needed to isolate the physical-edge logic and output sinks further; do not risk a sweeping dispatch rewrite before show-control hardware testing.
+
+Hardware acceptance is mandatory before release.
 
 ## Release gate
 

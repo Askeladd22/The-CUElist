@@ -41,8 +41,15 @@ void workspaceLayoutTests() {
 
     test("Scrollable cue columns reserve pinned BPM/Auto Stop clearance",[] {
         const auto compact=calculateWorkspaceLayout({1180,820,0,467,1,72,62,184});
-        check(compact.gridSize.x<=compact.viewport.getWidth(),
-              "Small show created a phantom horizontal scrollbar");
+        // The contextual add-column '+' extends 37px beyond columnEndX.
+        // At the minimum window width its right edge is behind the fixed
+        // 184px BPM/Auto Stop overlay. That narrow-window scroll is needed
+        // to reach the control and must not be mistaken for phantom space.
+        check(compact.gridSize.x>compact.viewport.getWidth(),
+              "Compact grid must scroll to expose its add-column control");
+        const auto wide=calculateWorkspaceLayout({1647,895,0,467,1,72,62,184});
+        check(wide.gridSize.x<=wide.viewport.getWidth(),
+              "Roomy one-column show acquired unwanted horizontal scroll");
         const auto many=calculateWorkspaceLayout({1180,820,0,315+9*152,25,72,62,184});
         check(many.gridSize.x>many.viewport.getWidth() &&
               many.gridSize.y>=72+25*62+44,
