@@ -543,8 +543,11 @@ void AudioEngine::audioDeviceIOCallbackWithContext(const float* const*,int,float
     processBlock(outputs,channels,frames,deviceSampleRate);
 }
 void AudioEngine::processBlock(float* const* outputs,int channels,int frames,double sampleRate) noexcept {
-    midiRouter.beginBlock(sampleRate);
-    oscRouter.beginBlock(sampleRate);
+    // MIDI and OSC events from the same audio block share one monotonic
+    // origin. Reading the clock separately caused inter-protocol skew.
+    const double blockOriginMs=juce::Time::getMillisecondCounterHiRes();
+    midiRouter.beginBlock(sampleRate,blockOriginMs);
+    oscRouter.beginBlock(sampleRate,blockOriginMs);
     if (retired.load()==nullptr) {
         if (auto* next=pending.exchange(nullptr)) {
             if (current && next->preservePlayback && next->minimumCommandRevision==current->minimumCommandRevision)

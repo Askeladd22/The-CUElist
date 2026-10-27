@@ -21,7 +21,7 @@ public:
     // UI thread only: route identity belongs to column, not to individual events.
     int configure(int columnId,const juce::String& host,int port);
     std::shared_ptr<OscStream> stream(int cellId,int route);
-    void beginBlock(double sampleRate) noexcept;
+    void beginBlock(double sampleRate,double sharedOriginMs=-1) noexcept;
     void selectStream(OscStream* s) noexcept override { selected=s; }
     void emit(int route,const uint8_t* data,unsigned size,int sampleOffset) noexcept override;
     void emergencyStop() noexcept;

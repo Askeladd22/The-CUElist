@@ -32,7 +32,7 @@ public:
     std::atomic<unsigned> dropped{0}, sent{0};
     std::shared_ptr<MidiStream> stream(int cellId,int route);
     void selectStream(MidiStream* value) noexcept override { selected=value; }
-    void beginBlock(double rate) noexcept;
+    void beginBlock(double rate,double sharedOriginMs=-1) noexcept;
 private:
     struct Packet { int route,status,a,b; double due=0; MidiStream* stream=nullptr; uint64_t epoch=0; double blockOrigin=0; };
     static constexpr unsigned capacity=65536;

@@ -1,4 +1,5 @@
 #include "OscOutputRouter.h"
+#include "TransportTiming.h"
 #include <algorithm>
 #include <cstring>
 namespace cuelist {
@@ -24,8 +25,8 @@ std::shared_ptr<OscStream> OscOutputRouter::stream(int cellId,int route) {
     if (s->route!=route) { s->route=route; s->epoch.fetch_add(1); }
     return s;
 }
-void OscOutputRouter::beginBlock(double rate) noexcept {
-    blockTime=juce::Time::getMillisecondCounterHiRes();
+void OscOutputRouter::beginBlock(double rate,double sharedOriginMs) noexcept {
+    blockTime=sharedOriginMs>=0 ? sharedOriginMs : juce::Time::getMillisecondCounterHiRes();
     msPerSample=rate>0 ? 1000.0/rate : 0;
 }
 void OscOutputRouter::emit(int route,const uint8_t* data,unsigned size,int offset) noexcept {
@@ -34,7 +35,7 @@ void OscOutputRouter::emit(int route,const uint8_t* data,unsigned size,int offse
     const auto next=(w+1)%capacity;
     if (next==readIndex.load(std::memory_order_acquire)) { dropped.fetch_add(1); return; }
     auto& p=(*queue)[w];
-    p.route=route; p.size=size; p.due=blockTime+msPerSample*offset;
+    p.route=route; p.size=size; p.due=scheduleOutputMillis(blockTime,offset,msPerSample);
     p.stream=selected; p.epoch=selected ? selected->epoch.load() : 0;
     std::memcpy(p.bytes.data(),data,size);
     writeIndex.store(next,std::memory_order_release);

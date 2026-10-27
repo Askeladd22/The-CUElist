@@ -1,4 +1,5 @@
 #include "MidiOutputRouter.h"
+#include "TransportTiming.h"
 namespace cuelist {
 MidiOutputRouter::MidiOutputRouter():Thread("MIDI output dispatcher"),queue(std::make_unique<std::array<Packet,capacity>>()) { startThread(); }
 MidiOutputRouter::~MidiOutputRouter() { signalThreadShouldExit(); stopThread(-1); }
@@ -82,8 +83,9 @@ std::shared_ptr<MidiStream> MidiOutputRouter::stream(int cellId,int output) {
     }
     value->route=output; return value;
 }
-void MidiOutputRouter::beginBlock(double rate) noexcept {
-    blockTime=juce::Time::getMillisecondCounterHiRes(); sampleMillis=rate>0 ? 1000.0/rate : 0;
+void MidiOutputRouter::beginBlock(double rate,double sharedOriginMs) noexcept {
+    blockTime=sharedOriginMs>=0 ? sharedOriginMs : juce::Time::getMillisecondCounterHiRes();
+    sampleMillis=rate>0 ? 1000.0/rate : 0;
 }
 void MidiOutputRouter::emit(int route,int status,int a,int b,int offset) noexcept {
     if (route<0 || emergency.load(std::memory_order_relaxed)) return;
@@ -93,7 +95,7 @@ void MidiOutputRouter::emit(int route,int status,int a,int b,int offset) noexcep
         dropped.fetch_add(1,std::memory_order_relaxed);
         emergency.store(true); return;
     }
-    (*queue)[w]={route,status,a,b,blockTime+offset*sampleMillis,selected,selected ? selected->epoch.load() : 0,blockTime}; write.store(next,std::memory_order_release);
+    (*queue)[w]={route,status,a,b,scheduleOutputMillis(blockTime,offset,sampleMillis),selected,selected ? selected->epoch.load() : 0,blockTime}; write.store(next,std::memory_order_release);
 }
 void MidiOutputRouter::emergencyStop() noexcept { emergency.store(true); }
 void MidiOutputRouter::run() {
