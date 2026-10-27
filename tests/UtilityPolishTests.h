@@ -55,8 +55,9 @@ void utilityPolishTests() {
         auto show=makeShow();
         addColumn(show,ColumnType::midi,"M");
         addColumn(show,ColumnType::osc,"O");
-        MidiClip midi; midi.lengthBeats=8; midi.notes={{0,2,60,90,1}};
-        OscClip osc; osc.length=3; osc.events={{1,"/cue",{{OscValueType::integer,5,0,{}}}}};
+        MidiClip midi; midi.lengthBeats=8; midi.notes={{0,6,60,90,1}};
+        OscClip osc; osc.length=3; osc.events={{1,"/cue",{{OscValueType::integer,5,0,{}}}},
+                            {2.5,"/cue",{{OscValueType::integer,6,0,{}}}}};
         show.rows[0].cells[1].midi=midi;
         show.rows[0].cells[2].osc=osc;
         show.columns[1].muted=true;
