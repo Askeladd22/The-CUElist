@@ -203,7 +203,13 @@ void uiRefinementTests() {
         for (int i=0;i<7;++i) addColumn(ui.show,ColumnType::audio,"Extra");
         ui.setSize(1250,900);
         auto* overlay=cueViewFixtures::find<CueMetricsOverlay>(ui);
-        auto* view=cueViewFixtures::find<juce::Viewport>(ui);
+        // TextEditor contains its own internal Viewport. Find the main cue
+        // viewport among direct children, not an unrelated editor scroller.
+        juce::Viewport* view=nullptr;
+        for (auto* child:ui.getChildren())
+            if (auto* candidate=dynamic_cast<juce::Viewport*>(child)) {
+                view=candidate;break;
+            }
         auto* grid=cueViewFixtures::find<CueGrid>(ui);
         check(overlay && view && grid,"Fixed cue controls or grid missing");
         const int pinnedX=overlay->getX();
