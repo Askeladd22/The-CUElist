@@ -7,6 +7,7 @@
 #include "WorkspaceLayout.h"
 #include "MidiInputManager.h"
 #include "ControlOutputRouter.h"
+#include "ControlDispatchPolicy.h"
 #include <set>
 #include "Theme.h"
 namespace cuelist {
@@ -255,7 +256,7 @@ private:
     bool controlLearnArmed=false;
     std::optional<ControlEvent> learnedInput;
     juce::Component::SafePointer<juce::DialogWindow> controlDialog;
-    std::map<juce::String,bool> pressedInputs;
+    PhysicalControlEdges physicalEdges;
     void resetActiveMapping();
     void dispatchControl(const ControlEvent&);
     void refreshControlSettings();
