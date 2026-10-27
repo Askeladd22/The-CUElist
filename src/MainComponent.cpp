@@ -7,12 +7,24 @@
 #include "MidiClip.h"
 #include "BinaryData.h"
 #include <sstream>
+#include <cstdlib>
+#include <cmath>
 
 namespace cuelist {
 namespace {
 juce::String typeName(ColumnType t) { return t==ColumnType::audio ? "AUDIO" : t==ColumnType::midi ? "MIDI" : t==ColumnType::osc ? "OSC" : "CONTROL"; }
 juce::String duration(double seconds) {
     int s=(int)seconds; return juce::String(s/60).paddedLeft('0',2)+":"+juce::String(s%60).paddedLeft('0',2);
+}
+bool parseGainDb(const juce::String& input, double& value) {
+    const auto trimmed=input.trim().toStdString();
+    if (trimmed.empty()) return false;
+    char* end=nullptr;
+    const double parsed=std::strtod(trimmed.c_str(),&end);
+    if (end==trimmed.c_str() || *end!='\0' || !std::isfinite(parsed)
+        || parsed < -60.0 || parsed > 12.0) return false;
+    value=parsed;
+    return true;
 }
 void prompt(juce::Component* parent,const juce::String& title,const juce::String& hint,const juce::String& initial,
             bool multiline,std::function<void(juce::String)> result) {
@@ -35,7 +47,7 @@ MainComponent::MainComponent(bool startAudio) {
     setLookAndFeel(&theme); setWantsKeyboardFocus(true); setSize(1440,900);
     for (juce::Component* c : std::initializer_list<juce::Component*>{&openButton,&saveButton,&newButton,&addRowButton,&addColumnButton,
          &goButton,&panicButton,&deviceButton,&controlButton,&dockResize,&importButton,&midiEditButton,&oscEditButton,&playCellButton,&stopCellButton,&clearButton,&tempoButton,&applyButton,
-         &cellTab,&rowTab,&rowGain,&rowBehaviour,&rowMute,&rowLoop,&rowName,&cellName,&bpm,&behaviour,&follow,&loop,&cellAutoStop,&gain,&viewport,&timeline,&utilities,
+         &cellTab,&rowTab,&rowGain,&rowBehaviour,&rowMute,&rowLoop,&rowName,&cellName,&bpm,&behaviour,&follow,&loop,&cellAutoStop,&gainDb,&viewport,&timeline,&utilities,
          &clipCollapseButton,&clipCloseButton,&cueMetrics,&preflightButton,&diagnosticsButton,&preferencesButton,&projectNameLabel}) addAndMakeVisible(c);
     for (auto* b : {&openButton,&saveButton,&newButton,&addRowButton,&addColumnButton,&goButton,&panicButton,&deviceButton,&controlButton,
                     &importButton,&midiEditButton,&oscEditButton,&playCellButton,&stopCellButton,&clearButton,&tempoButton,&applyButton,
@@ -47,12 +59,22 @@ MainComponent::MainComponent(bool startAudio) {
     panicButton.setColour(juce::TextButton::textColourOffId,palette::text);
     importButton.setColour(juce::TextButton::buttonColourId,juce::Colour(0xff097b70));
     behaviour.addItemList({"Retrigger","Pause / Restart","Pause / Resume","Continue"},1);
-    gain.setSliderStyle(juce::Slider::LinearHorizontal); gain.setTextBoxStyle(juce::Slider::TextBoxRight,false,52,24);
-    for (auto* slider : {&gain,&rowGain}) {
-        slider->setSliderStyle(juce::Slider::LinearHorizontal); slider->setTextBoxStyle(juce::Slider::TextBoxRight,false,72,24);
-        slider->setRange(-60,12,0.1); slider->setNumDecimalPlacesToDisplay(1); slider->setTextValueSuffix(" dB"); slider->setDoubleClickReturnValue(true,0);
-    }
-    gain.setName("cellGainDb"); rowGain.setName("rowGainDb");
+    rowGain.setSliderStyle(juce::Slider::LinearHorizontal);
+    rowGain.setTextBoxStyle(juce::Slider::TextBoxRight,false,72,24);
+    rowGain.setRange(-60,12,0.1); rowGain.setNumDecimalPlacesToDisplay(1);
+    rowGain.setTextValueSuffix(" dB"); rowGain.setDoubleClickReturnValue(true,0);
+    rowGain.setName("rowGainDb");
+    // The Inspector edits the same linear Cell gain as before, but no longer
+    // exposes an additional fader beside the dedicated audio strip faders.
+    gainDb.setName("cellGainDb");
+    gainDb.setInputRestrictions(8,"0123456789.-");
+    gainDb.setSelectAllWhenFocused(true);
+    gainDb.setJustification(juce::Justification::centredRight);
+    gainDb.setFont(font(13.5f));
+    gainDb.setTooltip("Cell Gain (dB). Enter a value from -60.0 to +12.0; press Enter to apply.");
+    gainDb.setEscapeAndReturnKeysConsumed(false);
+    gainDb.onReturnKey=[this] { if (applyInspector()) grabKeyboardFocus(); };
+    gainDb.onFocusLost=[this] { if (gainDb.isVisible() && inspectorDiffers()) applyInspector(); };
     masterSlider.setName("masterAudioDb");
     masterSlider.setTooltip("MASTER AUDIO: PCM output fader and L/R meter. Double-click: 0 dB.");
     utilities.addAndMakeVisible(masterSlider);
@@ -94,7 +116,7 @@ MainComponent::MainComponent(bool startAudio) {
         editor->setFont(font(14.0f));
     bpm.setSelectAllWhenFocused(true);
     for (auto* editor : {&rowName,&cellName,&bpm}) editor->onReturnKey=[this] { if (applyInspector()) grabKeyboardFocus(); };
-    gain.onValueChange=[this] { applyInspector(); }; rowGain.onValueChange=[this] { applyInspector(); };
+    rowGain.onValueChange=[this] { applyInspector(); };
     for (auto* combo : {&behaviour,&rowBehaviour}) combo->onChange=[this] { applyInspector(); };
     for (auto* toggle : {&follow,&loop,&rowMute,&rowLoop}) toggle->onClick=[this] { applyInspector(); };
     cellAutoStop.setName("cellAutoStop");
@@ -273,9 +295,6 @@ void MainComponent::paint(juce::Graphics& g) {
     g.setColour(palette::line); g.drawRoundedRectangle(panel.toFloat(),9,1.25f);
     const int x=editorX+16;
     g.setColour(palette::teal); g.fillRoundedRectangle((float)editorX+13,163.0f,4.0f,49.0f,2.0f);
-    g.setColour(palette::raised.withAlpha(.52f));
-    g.fillRoundedRectangle((float)x-7,228.0f,(float)inspectorInner+14,245.0f,7.0f);
-    g.fillRoundedRectangle((float)x-7,478.0f,(float)inspectorInner+14,337.0f,7.0f);
     label(g,"INSPECTOR",{x+10,169,200,19},13,palette::teal,true);
     const auto& col=show.columns[selectedColumn];
     label(g,"CUE "+juce::String(selectedRow+1).paddedLeft('0',2),{x+10,195,140,28},22,palette::text,true);
@@ -283,6 +302,11 @@ void MainComponent::paint(juce::Graphics& g) {
     g.saveState();
     { const float factor=juce::jlimit(0.72f,0.92f,(float)(h-232)/730.0f);
       g.addTransform(juce::AffineTransform(1,0,0,0,factor,226*(1-factor))); }
+    // Paint both Inspector cards in the same scaled coordinate system as
+    // their labels and editable controls: CELL was drifting above its card.
+    g.setColour(palette::raised.withAlpha(.52f));
+    g.fillRoundedRectangle((float)x-7,228.0f,(float)inspectorInner+14,245.0f,7.0f);
+    g.fillRoundedRectangle((float)x-7,478.0f,(float)inspectorInner+14,337.0f,7.0f);
     label(g,"ENTIRE CUE",{x+3,239,inspectorInner-6,20},14,palette::teal,true);
     label(g,"Cue name",{x,270,inspectorInner,18},12,palette::text,true);
     label(g,"Initial BPM",{x,338,inspectorInner,18},12,palette::text,true);
@@ -290,12 +314,14 @@ void MainComponent::paint(juce::Graphics& g) {
     label(g,"CELL",{x+3,489,59,20},14,palette::teal,true);
     label(g,"/  "+col.name,{x+62,489,inspectorInner-68,20},13,palette::text,true);
     label(g,"Cell name",{x,520,inspectorInner,18},12,palette::text,true);
-    if(col.type==ColumnType::audio)
+    if(col.type==ColumnType::audio) {
         label(g,"Gain",{x,598,48,18},12,palette::muted,true);
+        label(g,"dB",{x+163,598,43,18},12,palette::muted,true);
+    }
     if(col.type==ColumnType::osc)
         label(g,"UDP destination in column Utility",{x,711,inspectorInner,18},10,palette::muted);
     g.restoreState();
-    label(g,status,{204,h-35,std::max(1,editorX-218),25},12,palette::muted);
+    label(g,status,{192,h-35,std::max(1,editorX-200),25},12,palette::muted);
 }
 void MainComponent::resized() {
     const int w=getWidth(),h=getHeight(); editorX=w-288;
@@ -315,8 +341,13 @@ void MainComponent::resized() {
     // cue rows. Mixer and cue list remain scrollable; no panel disappears.
     const int gridHeight=std::max(310,h-400-activeDockHeight);
     const int utilityHeight=h<800 ? 180 : 208;
-    viewport.setBounds(204,154,editorX-220,gridHeight-utilityHeight);
-    utilities.setBounds(204,154+gridHeight-utilityHeight,editorX-220,utilityHeight);
+    // Close the large unused band between the toolbar and cue grid, and
+    // reduce the left/right gutters without covering the pinned metrics.
+    constexpr int cueLeft=192, cueTop=86, cueRightGap=8;
+    const int cueWidth=editorX-cueRightGap-cueLeft;
+    viewport.setBounds(cueLeft,cueTop,cueWidth,
+                       gridHeight-utilityHeight+154-cueTop);
+    utilities.setBounds(cueLeft,154+gridHeight-utilityHeight,cueWidth,utilityHeight);
     utilities.syncScroll(viewport.getViewPositionX());
     const int dockY=168+gridHeight;
     clipCollapseButton.setVisible(docked);
@@ -332,14 +363,14 @@ void MainComponent::resized() {
         clipCollapseButton.toFront(false); clipCloseButton.toFront(false);
         if (clipEditor && !clipWindow) {
             clipEditor->setVisible(!clipCollapsed);
-            if (!clipCollapsed) clipEditor->setBounds(204,dockY,editorX-220,activeDockHeight);
+            if (!clipCollapsed) clipEditor->setBounds(cueLeft,dockY,cueWidth,activeDockHeight);
         }
         if (oscEditor && !oscWindow) {
             oscEditor->setVisible(!clipCollapsed);
-            if (!clipCollapsed) oscEditor->setBounds(204,dockY,editorX-220,activeDockHeight);
+            if (!clipCollapsed) oscEditor->setBounds(cueLeft,dockY,cueWidth,activeDockHeight);
         }
     }
-    timeline.setBounds(204,dockY+activeDockHeight,editorX-220,std::max(75,h-gridHeight-activeDockHeight-215));
+    timeline.setBounds(cueLeft,dockY+activeDockHeight,cueWidth,std::max(75,h-gridHeight-activeDockHeight-215));
     const int x=editorX+16, inner=236;
     cellTab.setVisible(false);rowTab.setVisible(false);
     rowBehaviour.setVisible(false);rowMute.setVisible(false);rowGain.setVisible(false);
@@ -351,7 +382,7 @@ void MainComponent::resized() {
     tempoButton.setBounds(x,397,inner,29);
     rowLoop.setBounds(x-3,440,inner,25);
     cellName.setBounds(x,541,inner,31);
-    gain.setBounds(x+52,594,inner-52,27);
+    gainDb.setBounds(x+57,594,99,27);
     follow.setBounds(x-3,630,inner,25);
     loop.setBounds(x-3,663,inner,25);
     midiEditButton.setBounds(x,714,inner,33);
@@ -360,14 +391,19 @@ void MainComponent::resized() {
     // Compact inspector on smaller displays, keeping all actions reachable.
     {
         const float factor=juce::jlimit(0.72f,0.92f,(float)(h-232)/730.0f);
-        for (juce::Component* c : std::initializer_list<juce::Component*>{&rowLoop,&rowName,&bpm,&tempoButton,&cellName,&follow,&loop,&gain,&importButton,&midiEditButton,&oscEditButton}) {
+        for (juce::Component* c : std::initializer_list<juce::Component*>{&rowLoop,&rowName,&bpm,&tempoButton,&cellName,&follow,&loop,&gainDb,&importButton,&midiEditButton,&oscEditButton}) {
             auto b=c->getBounds(); b.setY(226+(int)((b.getY()-226)*factor)); b.setHeight(std::max(22,(int)(b.getHeight()*factor))); c->setBounds(b);
         }
     }
     goButton.setBounds(14,h-282,152,48);
     panicButton.setBounds(14,h-228,152,48);
-    grid.setSize(std::max(viewport.getWidth()-14,grid.columnX((int)show.columns.size())+CueMetricsOverlay::width+48),
-                 std::max(viewport.getHeight()-14,CueGrid::headerHeight+(int)show.rows.size()*CueGrid::rowHeight+48));
+    // Reserve overlay clearance only when the real columns exceed the
+    // usable cue area: a one-column show should not acquire fake scrolling.
+    const int cueContent=grid.columnX((int)show.columns.size())+44;
+    const int clearWidth=viewport.getWidth()-CueMetricsOverlay::width-14;
+    const int scrollWidth=cueContent+(cueContent>clearWidth ? CueMetricsOverlay::width : 0);
+    grid.setSize(std::max(viewport.getWidth()-14,scrollWidth),
+                 std::max(viewport.getHeight()-14,CueGrid::headerHeight+(int)show.rows.size()*CueGrid::rowHeight+44));
     cueMetrics.setBounds(viewport.getRight()-CueMetricsOverlay::width,viewport.getY(),
                          CueMetricsOverlay::width,viewport.getHeight());
     cueMetrics.toFront(false);
@@ -395,7 +431,7 @@ void MainComponent::refreshInspector() {
     cellAutoStop.setToggleState(c.stopOnNext,juce::dontSendNotification);
     cellAutoStop.setTooltip(row.stopOnNext ? "ON: participates in Auto Stop. OFF: continues after the next GO."
         : "Cue Auto Stop is OFF: this cell option applies when the cue is set to ON.");
-    gain.setValue(juce::Decibels::gainToDecibels(c.gain,-60.0f),juce::dontSendNotification);
+    gainDb.setText(juce::String(juce::Decibels::gainToDecibels(c.gain,-60.0f),1),false);
     rowGain.setValue(juce::Decibels::gainToDecibels(row.gain,-60.0f),juce::dontSendNotification);
     rowMute.setToggleState(row.muted,juce::dontSendNotification); rowLoop.setToggleState(row.loop,juce::dontSendNotification);
     rowBehaviour.setSelectedId(row.overrideBehaviour ? (int)row.behaviour+2 : 1,juce::dontSendNotification);
@@ -413,7 +449,7 @@ void MainComponent::refreshInspector() {
     const bool midi=col.type==ColumnType::midi;
     const bool osc=col.type==ColumnType::osc;
     const bool control=col.type==ColumnType::control;
-    gain.setVisible(audio);
+    gainDb.setVisible(audio);
     midiEditButton.setVisible(midi);
     oscEditButton.setVisible(osc || control);
     oscEditButton.setButtonText(control ? (col.controlLocked?"Edit default Control Set":"Edit Control Set")
@@ -423,7 +459,7 @@ void MainComponent::refreshInspector() {
     importButton.setButtonText(midi?"Import MIDI":"Import WAV / MP3");
     importButton.setTooltip(midi?"Import notes from .mid/.midi.":"Import WAV/MP3.");
     for(juce::Component* component:std::initializer_list<juce::Component*>{
-        &cellName,&follow,&loop,&gain,&importButton,&midiEditButton,&oscEditButton})
+        &cellName,&follow,&loop,&gainDb,&importButton,&midiEditButton,&oscEditButton})
         component->setEnabled(!col.collapsed && !(control && col.controlLocked && component!=&oscEditButton));
 }
 bool MainComponent::select(int row,int column) {
@@ -447,10 +483,14 @@ bool MainComponent::inspectorDiffers() const {
     if (rowName.getText().trim()!=row.name || bpm.getText()!=juce::String(row.tempo.front().bpm,1)) return true;
     if(rowLoop.getToggleState()!=row.loop) return true;
     if (show.columns[selectedColumn].collapsed) return false;
+    if (show.columns[selectedColumn].type==ColumnType::audio) {
+        double value=0;
+        if (!parseGainDb(gainDb.getText(),value) ||
+            std::abs(value-juce::Decibels::gainToDecibels(cell.gain,-60.0f))>0.051)
+            return true;
+    }
     return cellName.getText().trim()!=cell.name ||
-        follow.getToggleState()!=cell.followsRow || loop.getToggleState()!=cell.loop ||
-        (show.columns[selectedColumn].type==ColumnType::audio &&
-         std::abs(gain.getValue()-juce::Decibels::gainToDecibels(cell.gain,-60.0f))>0.051);
+           follow.getToggleState()!=cell.followsRow || loop.getToggleState()!=cell.loop;
 }
 bool MainComponent::applyInspector() {
     if (!inspectorDiffers()) return true;
@@ -461,8 +501,14 @@ bool MainComponent::applyInspector() {
     if (!candidate.columns[(size_t)selectedColumn].collapsed) {
         cell.name=cellName.getText().trim();
         cell.followsRow=follow.getToggleState(); cell.loop=loop.getToggleState();
-        if (candidate.columns[selectedColumn].type==ColumnType::audio)
-            cell.gain=juce::Decibels::decibelsToGain((float)gain.getValue(),-60.0f);
+        if (candidate.columns[selectedColumn].type==ColumnType::audio) {
+            double value=0;
+            if (!parseGainDb(gainDb.getText(),value)) {
+                message("Cell Gain must be a number from -60.0 to +12.0 dB.");
+                return false;
+            }
+            cell.gain=juce::Decibels::decibelsToGain((float)value,-60.0f);
+        }
     }
     auto result=validateShow(candidate); if (result.failed()) { message(result.getErrorMessage()); return false; }
     show=std::move(candidate); changed("Settings applied. BPM does not change audio playback speed.");
