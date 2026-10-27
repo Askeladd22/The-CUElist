@@ -47,11 +47,12 @@ void controlsV4Tests() {
         for (int s=0;s<16;++s) clip->samples.setSample(0,s,.2f);
         for (const auto& row : ui.show.rows) ui.clips[row.cells[0].id]=clip;
         ui.engine.publish(makeRenderState(ui.show,ui.clips));
-        auto* grid=find<CueGrid>(ui); const float toggleX=(float)(CueGrid::nameWidth+CueGrid::columnWidth+132);
+        auto* overlay=find<CueMetricsOverlay>(ui);check(overlay!=nullptr,"Sticky Auto Stop control missing");
         auto sample=[&] { float value=0; float* out[]{&value}; ui.engine.collectRetired(); ui.engine.processBlock(out,1,1,4); return value; };
         ui.goNext(); near(sample(),.2); ui.goNext(); near(sample(),.2);
         check(!ui.engine.getCellPlayback(ui.show.rows[0].cells[0].id).playing,"Prior cue still marked playing");
-        click(*grid,toggleX,68+27); check(!ui.show.rows[0].stopOnNext,"Toggle hitbox did not disable");
+        click(*overlay,117.0f,(float)CueGrid::headerHeight+16);
+        check(!ui.show.rows[0].stopOnNext,"Toggle hitbox did not disable");
         ui.select(0,0); ui.goNext(); near(sample(),.2); ui.goNext(); near(sample(),.4);
         check(ui.engine.getCellPlayback(ui.show.rows[0].cells[0].id).playing,"Overlap row was stopped");
         Show decoded; check(decodeShow(encodeShow(ui.show),decoded).wasOk(),"Toggle save invalid");

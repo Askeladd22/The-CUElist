@@ -169,8 +169,8 @@ void uiRefinementTests() {
               grid->columnWidthAt(0)==CueGrid::compressedWidth &&
               grid->columnX(1)==CueGrid::nameWidth+CueGrid::compressedWidth,
               "Column did not collapse or adjacent position remained unchanged");
-        check(ui.show.rows[0].cells[0].id==original &&
-              !ui.select(0,0),"Collapsed column is still editable or lost cell identity");
+        check(ui.show.rows[0].cells[0].id==original && ui.select(0,0),
+              "Collapsed column lost its cue selection or cell identity");
         auto* utilities=cueViewFixtures::find<ColumnUtilities>(ui);
         auto* fader=controlsV3::named(*utilities,"columnGainDb");
         check(fader && !fader->isVisible(),"Collapsed column still exposes editable mixer controls");

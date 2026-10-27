@@ -296,6 +296,7 @@ void CueGrid::mouseDown(const juce::MouseEvent& e) {
     if (row<0 || row>=(int)owner.show.rows.size()) return;
     const int localY=(e.y-headerHeight)%rowHeight-rowContentInset;
     if (e.x<nameWidth) {
+        if (e.x<70 && e.getNumberOfClicks()>1) return;
         if (localY>=13 && localY<34 && e.x>=nameWidth-34 && e.x<nameWidth-9) {
             if (e.getNumberOfClicks()==1) owner.stopRow(row);
             return;
