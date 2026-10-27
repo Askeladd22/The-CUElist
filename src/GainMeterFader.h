@@ -18,7 +18,7 @@ public:
         setName("columnGainDb");
         setWantsKeyboardFocus(true);
         setMouseCursor(juce::MouseCursor::PointingHandCursor);
-        setTooltip("Fader: gain in dB. Barre L/R: picco in dBFS prima del Master. Doppio clic: 0 dB.");
+        setTooltip("Fader gain in dB; L/R peak meters in dBFS. Double-click to reset to 0 dB.");
     }
 
     // Calibrated logarithmic taper: unity sits around 75% of the travel.

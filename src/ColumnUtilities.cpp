@@ -163,7 +163,7 @@ struct ColumnUtilities::Strip final : juce::Component {
         output.setBounds(6,4,w-12,25);
         oscDestination.setBounds(6,4,w-12,28);
         gain.setBounds(7,33,92,std::max(98,h-36));
-        pan.setBounds(w-56,34,46,46);
+        pan.setBounds(w-60,34,49,49);
         mute.setBounds(w-77,h-36,32,29);
         phase.setBounds(w-42,h-36,32,29);
         controlLock.setBounds(6,5,65,29);
@@ -184,10 +184,12 @@ struct ColumnUtilities::Strip final : juce::Component {
         }
         if (owner.show.columns[(size_t)index].type!=ColumnType::audio) return;
         const int h=getHeight(),w=getWidth();
-        label(g,"PAN",{w-60,82,54,13},9,palette::muted,true,juce::Justification::centred);
+        label(g,"MUTE",{w-86,h-53,42,16},10,palette::muted,true,juce::Justification::centred);
+        label(g,"PHASE",{w-47,h-53,46,16},10,palette::muted,true,juce::Justification::centred);
+        label(g,"PAN",{w-63,86,56,16},11,palette::muted,true,juce::Justification::centred);
         const double v=owner.show.columns[(size_t)index].pan;
         const juce::String panText=std::abs(v)<.005 ? "C" : juce::String(v<0?"L ":"R ")+juce::String((int)std::round(std::abs(v)*100));
-        label(g,panText,{w-62,98,58,15},9,palette::text,false,juce::Justification::centred);
+        label(g,panText,{w-63,103,58,18},11,palette::text,false,juce::Justification::centred);
     }
 };
 ColumnUtilities::ColumnUtilities(MainComponent& p) : owner(p) {}
@@ -218,21 +220,21 @@ void ColumnUtilities::refreshMeters() {
 }
 void ColumnUtilities::resized() {
     owner.masterSlider.setBounds(21-scrollX,34,92,std::max(92,getHeight()-37));
-    owner.masterPan.setBounds(174-scrollX,36,48,48);
-    owner.masterMute.setBounds(180-scrollX,122,35,31);
+    owner.masterPan.setBounds(214-scrollX,38,49,49);
+    owner.masterMute.setBounds(222-scrollX,130,37,33);
     for (size_t i=0;i<strips.size();++i)
         strips[i]->setBounds(CueGrid::nameWidth+(int)i*CueGrid::columnWidth-scrollX,1,CueGrid::columnWidth,getHeight()-2);
 }
 void ColumnUtilities::paint(juce::Graphics& g) {
     g.fillAll(palette::panel); g.setColour(palette::line); g.drawHorizontalLine(0,0,(float)getWidth());
-    label(g,"MASTER AUDIO",{14-scrollX,10,CueGrid::nameWidth-28,20},11,palette::teal,true);
-    label(g,"PAN",{175-scrollX,86,50,14},9,palette::muted,true,juce::Justification::centred);
+    label(g,"MASTER AUDIO",{14-scrollX,10,CueGrid::nameWidth-28,20},12,palette::teal,true);
+    label(g,"PAN",{213-scrollX,91,55,16},11,palette::muted,true,juce::Justification::centred);
     const auto pan=owner.show.masterPan;
     label(g,std::abs(pan)<.005f ? juce::String("C") : juce::String(pan<0?"L ":"R ")
         +juce::String((int)std::round(std::abs(pan)*100)),
-        {171-scrollX,103,58,15},9,palette::text,false,juce::Justification::centred);
-    label(g,"MUTE",{220-scrollX,128,56,19},10,palette::muted,true);
-    label(g,"PCM audio only",{119-scrollX,16,155,16},10,palette::muted);
-    label(g,"MIDI and OSC unaffected",{118-scrollX,159,175,16},9,palette::muted);
+        {210-scrollX,108,62,18},11,palette::text,false,juce::Justification::centred);
+    label(g,"MUTE",{262-scrollX,137,47,20},11,palette::muted,true);
+    label(g,"PCM audio only",{122-scrollX,17,167,17},11,palette::muted);
+    label(g,"MIDI and OSC unaffected",{122-scrollX,179,180,18},11,palette::muted);
 }
 }

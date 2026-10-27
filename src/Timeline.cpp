@@ -141,9 +141,9 @@ void Timeline::paint(juce::Graphics& g) {
     syncViewport(); g.fillAll(palette::panel);
     if (owner.selectedRow<0 || owner.selectedRow>=(int)owner.show.rows.size()) return;
     const auto& row=owner.show.rows[owner.selectedRow];
-    label(g,"TIMELINE",{16,11,110,23},11,palette::teal,true);
-    label(g,"GRID",{143,11,52,23},10,palette::muted,true);
-    label(g,"SNAP",{370,11,35,23},10,palette::muted,true);
+    label(g,"TIMELINE",{16,11,110,23},13,palette::teal,true);
+    label(g,"GRID",{143,11,52,23},11,palette::muted,true);
+    label(g,"SNAP",{370,11,35,23},11,palette::muted,true);
     for (int i=0;i<3;++i) {
         const auto box=zoomButton(getWidth(),i);
         g.setColour(palette::raised); g.fillRoundedRectangle(box.toFloat(),3);
@@ -155,8 +155,8 @@ void Timeline::paint(juce::Graphics& g) {
     trackScroll=juce::jlimit(0,std::max(0,audioTracks*trackHeight-std::max(1,bottom-tracksTop)),trackScroll);
     for (int i=0;i<=4;++i) {
         const int x=timelineStart+area*i/4;
-        label(g,timeText(viewStart+length*i/4),{x-10,53,65,18},10,palette::muted);
-        g.setColour(palette::line.withAlpha(.6f)); g.drawVerticalLine(x,76,(float)bottom);
+        label(g,timeText(viewStart+length*i/4),{x-10,53,75,20},12,palette::muted);
+        g.setColour(palette::line.withAlpha(.8f)); g.drawVerticalLine(x,76,(float)bottom);
     }
     // Musical grid follows secondsAtBeat across all tempo changes, but its
     // visibility/resolution never changes how clip dragging is quantized.
@@ -176,7 +176,7 @@ void Timeline::paint(juce::Graphics& g) {
             const int x=timelineStart+(int)std::round(area*(seconds-viewStart)/length);
             const bool bar=std::abs(beat/4-std::round(beat/4))<.0001;
             const bool quarter=std::abs(beat-std::round(beat))<.0001;
-            g.setColour(palette::teal.withAlpha(bar ? .37f : quarter ? .22f : .11f));
+            g.setColour(palette::teal.withAlpha(bar ? .31f : quarter ? .19f : .09f));
             g.drawVerticalLine(x,76,(float)bottom);
         }
         g.restoreState();
@@ -187,10 +187,14 @@ void Timeline::paint(juce::Graphics& g) {
         const int y=tracksTop+track++*trackHeight-trackScroll;
         const bool present=owner.hasClip(owner.selectedRow,c); if (present) ++loaded;
         if (y+32<tracksTop || y>=bottom) continue;
+        g.setColour(c==owner.selectedColumn ? palette::raised.withAlpha(.48f)
+                                            : (c%2==0 ? palette::background.withAlpha(.28f)
+                                                      : palette::panel));
+        g.fillRect(0,y,getWidth(),trackHeight-1);
         const auto& name=owner.show.columns[c].name;
         label(g,name.isEmpty() ? (owner.show.columns[c].type==ColumnType::midi ? "MIDI " :
             owner.show.columns[c].type==ColumnType::control ? "Control " :
-            owner.show.columns[c].type==ColumnType::osc ? "OSC " : "Audio ")+juce::String(c+1) : name,{16,y,115,30},12,c==owner.selectedColumn ? palette::text : palette::muted);
+            owner.show.columns[c].type==ColumnType::osc ? "OSC " : "Audio ")+juce::String(c+1) : name,{16,y,115,30},13,c==owner.selectedColumn ? palette::text : palette::muted);
         if (owner.show.columns[c].type==ColumnType::control) {
             const auto& column=owner.show.columns[(size_t)c];
             const auto& cell=row.cells[(size_t)c];
@@ -202,7 +206,7 @@ void Timeline::paint(juce::Graphics& g) {
             label(g,column.controlLocked ? "LOCKED DEFAULT / ALL CUES" :
                   set && !set->bindings.empty() ?
                   juce::String((int)set->bindings.size())+" control mappings" : "No Control Set",
-                  {timelineStart+9,y+5,std::max(1,area-18),21},11,
+                  {timelineStart+9,y+5,std::max(1,area-18),21},12,
                   palette::type((int)ColumnType::control),true);
             continue;
         }
@@ -249,11 +253,14 @@ void Timeline::paint(juce::Graphics& g) {
             g.setColour(palette::teal.withAlpha(.65f));
             g.fillRoundedRectangle(x+width-7,(float)y+5,4,21,1.5f);
         }
-        label(g,(cell.name.isEmpty() ? (cell.midi ? "MIDI" : cell.osc ? "OSC" : "AUDIO") : cell.name)+"  +"+juce::String(cell.startSeconds,2)+"s",{(int)x+8,y+5,std::max(1,(int)width-16),20},11,palette::text);
+        label(g,(cell.name.isEmpty() ? (cell.midi ? "MIDI" : cell.osc ? "OSC" : "AUDIO") : cell.name)+"  +"+juce::String(cell.startSeconds,2)+"s",{(int)x+8,y+5,std::max(1,(int)width-16),20},12,palette::text);
         g.restoreState();
     }
     g.restoreState();
-    if (loaded==0) label(g,"Import audio or create a MIDI clip to see it here.",{timelineStart,83,getWidth()-160,32},12,palette::muted);
+    if (loaded==0 && std::none_of(owner.show.columns.begin(),owner.show.columns.end(),
+        [](const Column& col){return col.type==ColumnType::control;}))
+        label(g,"Import audio or create a MIDI clip to see it here.",
+              {timelineStart,83,getWidth()-160,32},13,palette::muted);
     if (owner.engine.monitoredRowId.load()==row.id) {
         const auto seconds=owner.engine.playheadSeconds.load(); const auto x=(float)(timelineStart+area*(seconds-viewStart)/length);
         if (x>=timelineStart && x<=getWidth()-20) {
@@ -262,7 +269,7 @@ void Timeline::paint(juce::Graphics& g) {
         }
     }
     label(g,juce::String(row.tempo.front().bpm,1)+" BPM  /  drag MIDI/OSC right edge: length  /  "+row.name+"  /  "+juce::String(zoom,1)+"x",
-          {16,getHeight()-27,getWidth()-30,20},10,palette::muted);
+          {16,getHeight()-27,getWidth()-30,20},11,palette::muted);
     const int available=std::max(1,bottom-tracksTop), total=track*trackHeight;
     if (total>available) {
         const float thumb=std::max(12.0f,(float)available*available/total);
