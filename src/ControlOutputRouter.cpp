@@ -33,8 +33,9 @@ void ControlOutputRouter::run() {
         OscValue argument; argument.type=OscValueType::decimal; argument.decimal=p.decimal;
         event.arguments.push_back(std::move(argument));
         auto bytes=encodeOscMessage(event);
-        if (!bytes.empty() && bytes.size()<=1024)
-            udp.write(p.host,p.port,bytes.data(),(int)bytes.size());
+        if (!bytes.empty() && bytes.size()<=1024 &&
+            udp.write(p.host,p.port,bytes.data(),(int)bytes.size())==(int)bytes.size())
+            sent.fetch_add(1,std::memory_order_relaxed);
     }
 }
 }
