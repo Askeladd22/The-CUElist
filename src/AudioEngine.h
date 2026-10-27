@@ -37,7 +37,7 @@ struct ColumnPeakTelemetry {
     }
 };
 struct Voice {
-    int cellId = 0, rowId = 0, output = 0, columnIndex = -1;
+    int cellId = 0, rowId = 0, output = 0, columnIndex = -1, columnId = 0;
     std::shared_ptr<ColumnPeakTelemetry> columnMeter;
     std::shared_ptr<const AudioClip> clip;
     struct NoteEvent { double seconds=0; int status=0, pitch=0, velocity=0; };
@@ -133,6 +133,7 @@ public:
     float getColumnPeak(int columnId) const noexcept;
     // Returns post-cell/row/strip, pre-master L/R peaks (linear amplitude).
     std::array<float,2> getColumnStereoPeak(int columnId) const noexcept;
+    uint64_t getMidiColumnSent(int columnId) {return midiRouter.getColumnSent(columnId);}
     std::atomic<bool> limiterActive{false};
     juce::AudioDeviceManager devices;
     std::atomic<float> peak {0};

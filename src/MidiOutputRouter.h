@@ -4,11 +4,15 @@
 #include <atomic>
 #include <map>
 #include <deque>
+#include <memory>
+#include <cstdint>
 namespace cuelist {
 struct MidiStream {
     std::atomic<uint64_t> epoch {0};
     uint64_t workerEpoch=0;
     int route=-1;
+    // Device-sent activity for the owner MIDI column, not queued events.
+    std::shared_ptr<std::atomic<uint64_t>> columnSent;
     std::array<unsigned short,2048> sounding {};
 };
 // The callback may only enqueue bounded short messages. Implementations must not allocate or block.
@@ -30,7 +34,8 @@ public:
     void emit(int,int,int,int,int) noexcept override;
     void emergencyStop() noexcept;
     std::atomic<unsigned> dropped{0}, sent{0}, lateOver10ms{0};
-    std::shared_ptr<MidiStream> stream(int cellId,int route);
+    std::shared_ptr<MidiStream> stream(int cellId,int route,int columnId);
+    uint64_t getColumnSent(int columnId); // GUI reads actual device sends
     void selectStream(MidiStream* value) noexcept override { selected=value; }
     void beginBlock(double rate,double sharedOriginMs=-1) noexcept;
 private:
@@ -47,6 +52,7 @@ private:
     std::vector<std::array<unsigned,2048>> sounding;
     std::vector<double> resetTimes;
     std::map<int,std::shared_ptr<MidiStream>> streams;
+    std::map<int,std::shared_ptr<std::atomic<uint64_t>>> sentByColumn;
     MidiStream* selected=nullptr;
     double blockTime=0, sampleMillis=0;
     void run() override;

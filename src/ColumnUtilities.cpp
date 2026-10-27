@@ -10,6 +10,7 @@ struct ColumnUtilities::Strip final : juce::Component {
     UtilityIcon mute{false},phase{true},dataMute{false};
     MidiActivityLed midiActivity;
     uint64_t lastMidiSent=0;
+    bool midiActivityInitialized=false;
     double activityUntil=0;
     juce::ComboBox output;
     juce::TextButton directMode{"POST"};
@@ -197,7 +198,10 @@ struct ColumnUtilities::Strip final : juce::Component {
             // successful send to the selected device, never upon enqueue.
             const auto sent=owner.engine.getMidiColumnSent(id);
             const auto now=juce::Time::getMillisecondCounterHiRes();
-            if(sent!=lastMidiSent) {
+            if(!midiActivityInitialized) {
+                lastMidiSent=sent;
+                midiActivityInitialized=true;
+            } else if(sent!=lastMidiSent) {
                 if(sent>lastMidiSent) activityUntil=now+180.0;
                 lastMidiSent=sent;
             }

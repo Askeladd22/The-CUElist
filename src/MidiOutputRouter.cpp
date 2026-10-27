@@ -75,14 +75,24 @@ bool MidiOutputRouter::queueMappedCc(const juce::String& id,int channel,int cc,i
 int MidiOutputRouter::route(const juce::String& id) const {
     const auto it=routes.find(id); return it==routes.end() ? -1 : it->second;
 }
-std::shared_ptr<MidiStream> MidiOutputRouter::stream(int cellId,int output) {
+std::shared_ptr<MidiStream> MidiOutputRouter::stream(int cellId,int output,int columnId) {
     const juce::ScopedLock lock(deviceLock);
     auto& value=streams[cellId]; if (!value) value=std::make_shared<MidiStream>();
     // A fresh identity for route changes; retain old identity until router destruction.
     if (value->route!=output && value->route>=0) {
         static int retiredId=-1; streams[retiredId--]=value; value=std::make_shared<MidiStream>();
     }
-    value->route=output; return value;
+    value->route=output;
+    auto& activity=sentByColumn[columnId];
+    if(!activity) activity=std::make_shared<std::atomic<uint64_t>>(0);
+    value->columnSent=activity;
+    return value;
+}
+uint64_t MidiOutputRouter::getColumnSent(int columnId) {
+    const juce::ScopedLock lock(deviceLock);
+    const auto found=sentByColumn.find(columnId);
+    return found==sentByColumn.end() ? 0 :
+        found->second->load(std::memory_order_relaxed);
 }
 void MidiOutputRouter::beginBlock(double rate,double sharedOriginMs) noexcept {
     blockTime=sharedOriginMs>=0 ? sharedOriginMs : juce::Time::getMillisecondCounterHiRes();
@@ -155,11 +165,15 @@ void MidiOutputRouter::run() {
                         ++total; if (p.stream) ++p.stream->sounding[key];
                         devices[(size_t)p.route]->sendMessageNow(juce::MidiMessage(p.status,p.a,p.b));
                         sent.fetch_add(1,std::memory_order_relaxed);
+                        if(p.stream && p.stream->columnSent)
+                            p.stream->columnSent->fetch_add(1,std::memory_order_relaxed);
                     } else if (p.stream && p.stream->sounding[key]) {
                         total-=std::min(total,(unsigned)p.stream->sounding[key]); p.stream->sounding[key]=0;
                         if (!total) {
                             devices[(size_t)p.route]->sendMessageNow(juce::MidiMessage(p.status,p.a,p.b));
                             sent.fetch_add(1,std::memory_order_relaxed);
+                            if(p.stream && p.stream->columnSent)
+                                p.stream->columnSent->fetch_add(1,std::memory_order_relaxed);
                         }
                     }
                 }

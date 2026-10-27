@@ -224,7 +224,7 @@ void RenderState::render(float* const* outputs,int channels,int frames,double sa
                         const auto& e=v.midiEvents[v.midiCursor++]; auto& count=v.heldNotes[(size_t)((e.status&15)*128+e.pitch)];
                         if ((e.status&0xf0)==0x90) { ++count; v.heldVelocity[(size_t)((e.status&15)*128+e.pitch)]=(unsigned char)e.velocity; } else if (count) --count;
                     }
-                    if (!v.rowMuted) for (size_t key=0;key<v.heldNotes.size();++key) if (v.heldNotes[key] && v.midiSink)
+                    if (!v.rowMuted && !v.columnMuted) for (size_t key=0;key<v.heldNotes.size();++key) if (v.heldNotes[key] && v.midiSink)
                         v.midiSink->emit(v.midiRoute,0x90+(int)(key/128),(int)(key%128),v.heldVelocity[key],i);
                     v.midiNeedsSync=false;
                 }
@@ -232,7 +232,8 @@ void RenderState::render(float* const* outputs,int channels,int frames,double sa
                     const auto& e=v.midiEvents[v.midiCursor++]; auto& count=v.heldNotes[(size_t)((e.status&15)*128+e.pitch)];
                     const bool on=(e.status&0xf0)==0x90;
                     if (on) ++count; else if (count) --count;
-                    if (v.midiSink && !v.rowMuted && (on || count==0)) v.midiSink->emit(v.midiRoute,e.status,e.pitch,e.velocity,i);
+                    if (v.midiSink && !v.rowMuted && !v.columnMuted && (on || count==0))
+                        v.midiSink->emit(v.midiRoute,e.status,e.pitch,e.velocity,i);
                 }
                 v.position+=1.0/sampleRate;
                 if (v.position>=v.midiDuration-1.0e-10) {
@@ -416,7 +417,8 @@ std::unique_ptr<RenderState> makeRenderState(const Show& show,const ClipMap& cli
       state->rows.push_back({row.id}); state->rows.back().stopOnNext=row.stopOnNext;
       for (size_t i=0; i<row.cells.size() && i<show.columns.size(); ++i) {
         const auto& c=row.cells[i];
-        Voice v; v.cellId=c.id; v.rowId=row.id; v.output=show.columns[i].output; v.columnIndex=(int)i;
+        Voice v; v.cellId=c.id; v.rowId=row.id; v.output=show.columns[i].output;
+        v.columnIndex=(int)i; v.columnId=show.columns[i].id;
         v.columnMeter=state->columnMeters[i].second;
         if (show.columns[i].type==ColumnType::midi && c.midi) {
             v.isMidi=true; v.midiOutputId=show.columns[i].midiOutputId;
@@ -511,7 +513,7 @@ void AudioEngine::publish(std::unique_ptr<RenderState> state,bool preservePlayba
     columnPeaks=std::move(nextColumnPeaks);
     std::map<int, PlaybackEntry> nextPlayback;
     for (auto& v:state->voices) {
-        if (v.isMidi) { v.midiRoute=midiRouter.route(v.midiOutputId); v.midiSink=&midiRouter; v.midiStream=midiRouter.stream(v.cellId,v.midiRoute); }
+        if (v.isMidi) { v.midiRoute=midiRouter.route(v.midiOutputId); v.midiSink=&midiRouter; v.midiStream=midiRouter.stream(v.cellId,v.midiRoute,v.columnId); }
         if (v.isOsc) {
             v.oscRoute=oscRouter.configure(v.oscColumnId,v.oscHost,v.oscPort);
             v.oscSink=&oscRouter; v.oscStream=oscRouter.stream(v.cellId,v.oscRoute);
@@ -604,7 +606,8 @@ void AudioEngine::processBlock(float* const* outputs,int channels,int frames,dou
                     if (next->preservePlayback && next->minimumCommandRevision==current->minimumCommandRevision)
                         for (auto& v:next->voices) if (v.cellId==old.cellId && v.isMidi && v.midiHash==old.midiHash && v.midiOutputId==old.midiOutputId) {
                             transferred=true;
-                            if (v.startSeconds!=old.startSeconds || v.rowMuted!=old.rowMuted) {
+                            if (v.startSeconds!=old.startSeconds || v.rowMuted!=old.rowMuted ||
+                                v.columnMuted!=old.columnMuted) {
                                 current->releaseMidi(old); v.heldNotes.fill(0); v.midiNeedsSync=true;
                             }
                             break;
@@ -617,7 +620,8 @@ void AudioEngine::processBlock(float* const* outputs,int channels,int frames,dou
                         for (auto& v:next->voices) if (v.cellId==old.cellId && v.isOsc
                             && v.oscHash==old.oscHash && v.oscColumnId==old.oscColumnId) {
                             transferred=true;
-                            if (v.startSeconds!=old.startSeconds) current->releaseMidi(old);
+                            if (v.startSeconds!=old.startSeconds ||
+                                v.columnMuted!=old.columnMuted) current->releaseMidi(old);
                             break;
                         }
                     if (!transferred) current->releaseMidi(old);
