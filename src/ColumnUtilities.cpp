@@ -171,6 +171,13 @@ struct ColumnUtilities::Strip final : juce::Component {
         controlEdit.setBounds(8,44,w-16,32);
     }
     void paint(juce::Graphics& g) override {
+        const auto colType=owner.show.columns[(size_t)index].type;
+        const auto inset=juce::Rectangle<float>(4.0f,4.0f,
+            (float)std::max(1,getWidth()-8),(float)std::max(1,getHeight()-8));
+        g.setColour(palette::raised.withAlpha(.58f));g.fillRoundedRectangle(inset,8.0f);
+        g.setColour(palette::line);g.drawRoundedRectangle(inset,8.0f,1.0f);
+        g.setColour(palette::type((int)colType));
+        g.fillRoundedRectangle(9.0f,3.0f,(float)std::max(1,getWidth()-18),3.0f,1.5f);
         g.setColour(palette::line); g.drawVerticalLine(0,0,(float)getHeight());
         if (owner.show.columns[(size_t)index].type==ColumnType::control) {
             const auto& col=owner.show.columns[(size_t)index];
@@ -226,8 +233,14 @@ void ColumnUtilities::resized() {
         strips[i]->setBounds(CueGrid::nameWidth+(int)i*CueGrid::columnWidth-scrollX,1,CueGrid::columnWidth,getHeight()-2);
 }
 void ColumnUtilities::paint(juce::Graphics& g) {
-    g.fillAll(palette::panel); g.setColour(palette::line); g.drawHorizontalLine(0,0,(float)getWidth());
-    label(g,"MASTER AUDIO",{14-scrollX,10,CueGrid::nameWidth-28,20},12,palette::teal,true);
+    g.fillAll(palette::panel);
+    g.setColour(palette::line); g.drawHorizontalLine(0,0,(float)getWidth());
+    const auto card=juce::Rectangle<float>((float)8-scrollX,4.0f,
+        (float)CueGrid::nameWidth-16,(float)std::max(1,getHeight()-8));
+    g.setColour(palette::raised.withAlpha(.55f)); g.fillRoundedRectangle(card,8.0f);
+    g.setColour(palette::line);g.drawRoundedRectangle(card,8.0f,1.0f);
+    g.setColour(palette::teal);g.fillRoundedRectangle((float)14-scrollX,4.0f,95.0f,3.0f,1.5f);
+    label(g,"MASTER AUDIO",{14-scrollX,10,CueGrid::nameWidth-28,20},13,palette::teal,true);
     label(g,"PAN",{213-scrollX,91,55,16},11,palette::muted,true,juce::Justification::centred);
     const auto pan=owner.show.masterPan;
     label(g,std::abs(pan)<.005f ? juce::String("C") : juce::String(pan<0?"L ":"R ")
