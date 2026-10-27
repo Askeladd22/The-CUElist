@@ -220,7 +220,7 @@ struct ColumnUtilities::Strip final : juce::Component {
         routingDirect=col.directOutputEnabled; routingType=col.type;
         output.clear(juce::dontSendNotification); output.setEnabled(col.type==ColumnType::audio);
         if (col.type!=ColumnType::audio) {
-            output.addItem(col.type==ColumnType::midi ? "MIDI – planned" : "OSC – planned",1);
+            output.addItem(col.type==ColumnType::midi ? "MIDI - planned" : "OSC - planned",1);
             output.setSelectedId(1,juce::dontSendNotification); return;
         }
         output.addItem("Direct Off",1);
