@@ -25,18 +25,20 @@ void controlsV4Tests() {
     });
     test("column output combo reroutes actual PCM live without changing inspector drafts", [] {
         MainComponent ui(false); ui.show.columns[0].output=2;
+        ui.show.columns[0].directOutputEnabled=true;
+        ui.show.columns[0].masterSend=false;
         auto clip=std::make_shared<AudioClip>(); clip->sampleRate=4; clip->samples.setSize(1,8);
         for (int s=0;s<8;++s) clip->samples.setSample(0,s,.1f*(s+1));
         const int id=ui.show.rows[0].cells[0].id; ui.clips[id]=clip;
         ui.engine.connected.store(true); ui.engine.publish(makeRenderState(ui.show,ui.clips));
         auto* utilities=find<ColumnUtilities>(ui); utilities->refresh();
         auto* output=dynamic_cast<juce::ComboBox*>(controlsV3::named(*utilities,"columnOutput"));
-        check(output->getSelectedId()==3,"Saved absent route lost");
+        check(output->getSelectedId()==4,"Saved absent direct route lost");
         ui.triggerCell(); juce::AudioBuffer<float> out(4,1);
         auto block=[&] { ui.engine.collectRetired(); ui.engine.processBlock(out.getArrayOfWritePointers(),4,1,4); };
         block(); near(out.getSample(0,0),0); near(out.getSample(2,0),.1);
         auto* name=dynamic_cast<juce::TextEditor*>(controlsV3::named(ui,"cueName")); name->setText("Draft preserved",false);
-        output->setSelectedId(1,juce::sendNotificationSync); block();
+        output->setSelectedId(2,juce::sendNotificationSync); block();
         near(out.getSample(0,0),.2); near(out.getSample(2,0),0); near(ui.engine.getCellPlayback(id).positionSeconds,.5);
         check(name->getText()=="Draft preserved","Routing discarded inspector text");
         check(ui.show.columns[0].output==0 && ui.hasUnsavedChanges(),"Routing model not updated");
