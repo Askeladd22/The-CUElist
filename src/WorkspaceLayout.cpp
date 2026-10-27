@@ -6,8 +6,8 @@ namespace {
 constexpr int inspectorWidth=288;
 constexpr int inspectorInnerWidth=236;
 constexpr int inspectorScaleOriginY=160;
-constexpr int cueLeft=184;
-constexpr int cueTop=78;
+constexpr int cueLeft=182;
+constexpr int cueTop=74;
 constexpr int cueRightGap=8;
 constexpr int cueGridTail=44;
 constexpr int minimumGridHeight=310;
@@ -45,10 +45,21 @@ WorkspaceLayout calculateWorkspaceLayout(const WorkspaceLayoutInput& input) {
     const int maximumDockHeight=std::max(0,input.height-
         (dockBaseY+minimumGridHeight+minimumTimelineHeight+statusFooterGap));
     result.effectiveDockHeight=std::clamp(input.activeDockHeight,0,maximumDockHeight);
-    const int gridHeight=std::max(minimumGridHeight,input.height-400-result.effectiveDockHeight);
+    const int baseGridHeight=std::max(minimumGridHeight,
+        input.height-400-result.effectiveDockHeight);
+    const int baseTimelineHeight=std::max(minimumTimelineHeight,
+        input.height-baseGridHeight-result.effectiveDockHeight-215);
+    // The upper workspace and the lower Timeline have separate resize
+    // budgets. Dragging the Timeline redistributes height without changing
+    // the cue header, scrolling behaviour, or audio editor's dock height.
+    result.effectiveTimelineAdjustment=std::clamp(input.timelineHeightAdjustment,
+        -(baseTimelineHeight-minimumTimelineHeight),
+        baseGridHeight-minimumGridHeight);
+    const int gridHeight=baseGridHeight-result.effectiveTimelineAdjustment;
     const int utilityHeight=input.height<800 ? 180 : 208;
     // The fixed BPM/Auto Stop band is OUTSIDE the scrollable column region.
-    const int cueWidth=result.editorX-cueRightGap-cueLeft-input.pinnedMetricsWidth;
+    const int lowerWidth=result.editorX-cueRightGap-cueLeft;
+    const int cueWidth=lowerWidth-input.pinnedMetricsWidth;
     const int utilityY=154+gridHeight-utilityHeight;
     result.viewport={cueLeft,cueTop,cueWidth,utilityY-cueTop};
     result.utilities={cueLeft,utilityY,cueWidth,utilityHeight};
@@ -57,16 +68,18 @@ WorkspaceLayout calculateWorkspaceLayout(const WorkspaceLayoutInput& input) {
     result.dockResize={std::max(700,result.editorX-245),result.dockY-8,94,11};
     result.dockCollapse={522,result.dockY+4,86,26};
     result.dockClose={615,result.dockY+4,82,26};
-    result.dockEditor={cueLeft,result.dockY,cueWidth,result.effectiveDockHeight};
-    result.timeline={cueLeft,result.dockY+result.effectiveDockHeight,cueWidth,
+    result.dockEditor={cueLeft,result.dockY,lowerWidth,result.effectiveDockHeight};
+    result.timeline={cueLeft,result.dockY+result.effectiveDockHeight,lowerWidth,
         std::max(minimumTimelineHeight,input.height-gridHeight-result.effectiveDockHeight-215)};
 
+    result.timelineResize={cueLeft+(lowerWidth-104)/2,
+        result.timeline.getY()-7,104,12};
     result.metrics={result.viewport.getRight(),result.viewport.getY(),
         input.pinnedMetricsWidth,result.viewport.getHeight()};
     result.cueHeaders={result.viewport.getX(),result.viewport.getY(),
         input.pinnedHeaderWidth,result.viewport.getHeight()};
 
-    result.inspectorPanel={result.editorX,84,inspectorWidth-20,input.height-132};
+    result.inspectorPanel={result.editorX,76,inspectorWidth-20,input.height-124};
     result.inspectorCueCard={result.inspectorLeft-7,162,inspectorInnerWidth+14,245};
     result.inspectorCellCard={result.inspectorLeft-7,412,inspectorInnerWidth+14,337};
 
