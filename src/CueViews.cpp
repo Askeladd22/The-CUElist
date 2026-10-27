@@ -451,7 +451,7 @@ void CueMetricsOverlay::paint(juce::Graphics& g) {
     g.fillAll(palette::raised);
     g.setColour(palette::teal);g.fillRect(0,0,3,getHeight());
     label(g,"BPM",{7,18,50,23},11,palette::text,true);
-    label(g,"AUTO STOP",{72,18,76,23},10,palette::text,true);
+    label(g,"AUTO STOP",{80,18,78,23},10,palette::text,true);
     const int scroll=owner.viewport.getViewPositionY();
     const int first=std::max(0,(scroll-CueGrid::headerHeight)/CueGrid::rowHeight);
     const int last=std::min((int)owner.show.rows.size(),
@@ -467,14 +467,14 @@ void CueMetricsOverlay::paint(juce::Graphics& g) {
         }
         label(g,juce::String(row.tempo.front().bpm,1),{7,y+14,61,24},14,palette::text,true);
         g.setColour(row.stopOnNext?palette::teal.withAlpha(.3f):palette::muted.withAlpha(.2f));
-        g.fillRoundedRectangle(77.f,(float)y+12,31.f,19.f,9.f);
+        g.fillRoundedRectangle(85.f,(float)y+12,31.f,19.f,9.f);
         g.setColour(row.stopOnNext?palette::teal:palette::muted);
-        g.fillEllipse(row.stopOnNext?93.f:80.f,(float)y+15,13.f,13.f);
-        label(g,row.stopOnNext?"ON":"OFF",{111,y+11,34,22},10,
+        g.fillEllipse(row.stopOnNext?101.f:88.f,(float)y+15,13.f,13.f);
+        label(g,row.stopOnNext?"ON":"OFF",{119,y+11,34,22},10,
               row.stopOnNext?palette::teal:palette::muted,true);
         const bool details=owner.grid.autoStopDetailsVisible(row.id);
         label(g,details?"-":"+",
-              {89,y+36,24,20},15,details?palette::amber:palette::muted,true,
+              {97,y+36,24,20},15,details?palette::amber:palette::muted,true,
               juce::Justification::centred);
         g.setColour(palette::line);
         g.drawHorizontalLine(y+CueGrid::rowHeight-1,0,(float)getWidth());
