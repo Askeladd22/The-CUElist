@@ -1,6 +1,6 @@
 # The Cuelist — Stabilization (0.7) and transport foundations (0.8)
 
-**Current development version:** 0.9.0-beta.2, **show format:** v10. A successful build is not certification for unattended or safety-critical show operation.
+**Current development version:** 0.9.0-beta.5, **show format:** v10. A successful build is not certification for unattended or safety-critical show operation.
 
 ## Implemented in the stabilization preview
 
@@ -9,7 +9,7 @@
 - Preparation before activation: when opening a show, decode, load media and check the memory budget before interrupting playback. MIDI output handles are selected after those checks.
 - Transport telemetry: counters for local audio command overflow, MIDI input drops, MIDI output sent/dropped messages, OSC UDP sent/dropped packets and output-worker dispatches exceeding 10 ms past their scheduled timestamp; a visible Diagnostics report. The 10 ms counters describe local scheduling delays, not measured physical-interface or network-receiver latency.
 - Compiler cleanliness: shadowed `cursor` and `dockHeight` locals renamed.
-- Tests: recovery atomicity/corruption, preflight failures and no false positive OSC reachability, offline audio callback stress, sample timestamp consistency at common rates. Windows CI also extracts and smoke-launches the portable program.
+- Tests: recovery atomicity/corruption, preflight failures and no false positive OSC reachability, offline audio callback stress, sample timestamp consistency at common rates. The manual portable-packaging workflow additionally extracts and smoke-launches the package; ordinary PR CI only builds and runs automated tests.
 
 ## Operator recovery procedure
 
