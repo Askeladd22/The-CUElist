@@ -384,11 +384,30 @@ juce::String encodeShow(const Show& show) {
     const auto controls=object({{"midiInputId",show.controls.midiInputId},
         {"nextId",show.controls.nextId},{"presets",presets},
         {"bindings",bindings},{"templates",templates}});
+    juce::Array<juce::var> cuelistObjects;
+    for (size_t n=0;n<show.cuelists.size();++n) {
+        // The live rows are canonical; the active snapshot may lag until a
+        // tab switch. Inactive rows reuse the same proven v10 row serializer.
+        juce::var encodedRows;
+        if ((int)n==show.activeCuelist)
+            encodedRows=juce::var(rows);
+        else {
+            Show inactive=show;
+            inactive.cuelists.clear();
+            inactive.activeCuelist=0;
+            inactive.rows=show.cuelists[n].rows;
+            const auto document=juce::JSON::parse(encodeShow(inactive));
+            encodedRows=document.getProperty("rows",{});
+        }
+        cuelistObjects.add(object({{"name",show.cuelists[n].name},
+                                 {"rows",encodedRows}}));
+    }
     return juce::JSON::toString(object({{"format","TheCuelist"},{"version",10},
         {"name",show.name},{"masterGain",show.masterGain},{"masterPan",show.masterPan},
         {"masterMuted",show.masterMuted},{"masterOutput",show.masterOutput},
         {"safetyLimiterEnabled",show.safetyLimiterEnabled},{"nextId",show.nextId},
-        {"columns",columns},{"rows",rows},{"controls",controls}}));
+        {"columns",columns},{"rows",rows},{"controls",controls},
+        {"cuelists",cuelistObjects},{"activeCuelist",show.activeCuelist}}));
 }
 juce::Result decodeShow(const juce::String& text, Show& destination) {
     if (text.length() > 32*1024*1024) return juce::Result::fail("Project too large (maximum 32 MB). ");
@@ -577,6 +596,32 @@ juce::Result decodeShow(const juce::String& text, Show& destination) {
                 row.cells.push_back(cell);
             }
             show.rows.push_back(std::move(row));
+        }
+        if (root.hasProperty("cuelists")) {
+            const auto lists=array(root,"cuelists");
+            if (lists.isEmpty() || lists.size()>12)
+                return juce::Result::fail("Invalid Cuelist count.");
+            show.activeCuelist=integer(root,"activeCuelist");
+            if (show.activeCuelist<0 || show.activeCuelist>=lists.size())
+                return juce::Result::fail("Invalid active Cuelist.");
+            for (const auto& list:lists) {
+                // Parse dormant rows through the same cell/MIDI/OSC/control
+                // validation as regular v10 rows, never a second parser.
+                auto isolated=juce::JSON::parse(juce::JSON::toString(root));
+                isolated.getDynamicObject()->removeProperty("cuelists");
+                isolated.getDynamicObject()->removeProperty("activeCuelist");
+                isolated.getDynamicObject()->setProperty("rows",required(list,"rows"));
+                Show dormant;
+                if (auto result=decodeShow(juce::JSON::toString(isolated),dormant);
+                    result.failed()) return result;
+                show.cuelists.push_back({string(list,"name"),std::move(dormant.rows)});
+            }
+            // Root rows remain authoritative for the active list.
+            show.cuelists[(size_t)show.activeCuelist].rows=show.rows;
+        } else {
+            // All historical v1-v10 files represent one Cuelist.
+            show.cuelists.push_back({"Cuelist 1",show.rows});
+            show.activeCuelist=0;
         }
         auto valid = validateShow(show); if (valid.failed()) return valid;
         destination=std::move(show); return juce::Result::ok();
