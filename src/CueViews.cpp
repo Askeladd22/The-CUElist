@@ -116,7 +116,7 @@ void CueGrid::paint(juce::Graphics& g) {
     const auto activeName=show.cuelists.empty()
         ? juce::String("Cuelist 1")
         : show.cuelists[(size_t)show.activeCuelist].name;
-    label(g,"CUE LIST / "+activeName,{22,8,nameWidth-114,23},
+    label(g,activeName,{22,8,nameWidth-114,23},
           13,palette::teal,true);
     label(g,juce::String((int)show.rows.size())+" cues  /  "+
           juce::String(owner.visibleClipCount)+" clips",
