@@ -13,6 +13,7 @@
 #include "Theme.h"
 namespace cuelist {
 class MainComponent;
+class GuideWindow;
 class PianoRollEditor;
 class OscClipEditor;
 class ControlPanel;
@@ -303,6 +304,7 @@ private:
     juce::TextButton undoButton{"Undo"},redoButton{"Redo"};
     void refreshCuelistTabs();
     void showCuelistOverflowMenu();
+    std::unique_ptr<GuideWindow> userGuideWindow;
     void openUserGuide();
     void showAbout();
     juce::TextButton importButton{"Import WAV / MP3"},playCellButton{"Play cell"},stopCellButton{"Stop"},clearButton{"Remove audio"};
