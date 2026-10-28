@@ -391,24 +391,36 @@ void MainComponent::paint(juce::Graphics& g) {
     meter(34,systemCpuPercent,palette::teal);
     meter(50,systemRamPercent,palette::amber);
 
-    // Audio availability is distinct from actual MIDI/OSC traffic.
-    const int statusX=w-363;
-    g.setColour(palette::line.withAlpha(.52f));
-    g.drawVerticalLine(statusX,9.0f,66.0f);
-    g.setColour(engine.connected.load() ? palette::teal : palette::red);
-    g.fillEllipse((float)w-185,13.0f,8.0f,8.0f);
-    label(g,engine.connected.load() ? "Audio Available" : "Audio Unavailable",
-          {w-171,5,169,25},11,palette::muted,true);
+    // A compact but prominent shared signal monitor: 2x2 traffic
+    // indicators and independent audio availability, all inside one card.
+    // The values are real counters (OSC RX stays inactive: no listener).
+    const int statusX=w-365;
+    const auto monitor=juce::Rectangle<float>((float)statusX,8.0f,354.0f,56.0f);
+    g.setColour(palette::panel);
+    g.fillRoundedRectangle(monitor,5.0f);
+    g.setColour(palette::line.withAlpha(.85f));
+    g.drawRoundedRectangle(monitor,5.0f,1.0f);
+    g.drawVerticalLine(w-153,13.0f,59.0f);
+    label(g,"MIDI / OSC ACTIVITY",{statusX+10,11,197,14},
+          10,palette::muted,true);
     const double now=juce::Time::getMillisecondCounterHiRes();
     const auto activity=[&](int x,int y,const juce::String& title,bool active) {
-        g.setColour(active ? palette::teal : palette::line);
-        g.fillEllipse((float)x,(float)y+7.0f,6.0f,6.0f);
-        label(g,title,{x+10,y,72,21},9,active ? palette::text : palette::muted,true);
+        g.setColour(active ? palette::teal : palette::line.brighter(.22f));
+        g.fillEllipse((float)x,(float)y+4.0f,8.0f,8.0f);
+        label(g,title,{x+14,y,83,17},11,
+              active ? palette::text : palette::muted,true);
     };
-    activity(w-346,28,"MIDI RX",now<midiRxUntil);
-    activity(w-250,28,"MIDI TX",now<midiTxUntil);
-    activity(w-346,49,"OSC RX",false); // No OSC input endpoint yet.
-    activity(w-250,49,"OSC TX",now<oscTxUntil);
+    activity(statusX+12,26,"MIDI RX",now<midiRxUntil);
+    activity(statusX+112,26,"MIDI TX",now<midiTxUntil);
+    activity(statusX+12,44,"OSC RX",false); // No OSC input endpoint yet.
+    activity(statusX+112,44,"OSC TX",now<oscTxUntil);
+    const bool audioConnected=engine.connected.load();
+    label(g,"AUDIO",{w-137,13,119,16},10,palette::muted,true);
+    g.setColour(audioConnected ? palette::teal : palette::red);
+    g.fillEllipse((float)w-139,37.0f,9.0f,9.0f);
+    label(g,audioConnected ? "AVAILABLE" : "UNAVAILABLE",
+          {w-125,30,108,24},11,
+          audioConnected ? palette::teal : palette::red,true);
     label(g,"WORKSPACE",{20,118,140,17},11,palette::muted,true);
     g.setColour(palette::teal.withAlpha(0.19f)); g.fillRoundedRectangle(12,131,156,45,8);
     g.setColour(palette::teal); g.fillRoundedRectangle(12,137,4,34,2);
