@@ -175,8 +175,10 @@ MainComponent::MainComponent(bool startAudio) {
     masterSlider.setMaximumDb(faderCeilingDb);
     preferencesButton.onClick=[this] {
         juce::PopupMenu menu;
+        menu.setLookAndFeel(&theme);
         menu.addItem(1,"Pre-flight"); menu.addItem(2,"Diagnostics");
         juce::PopupMenu faderMenu;
+        faderMenu.setLookAndFeel(&theme);
         faderMenu.addItem(3,"-∞ dB / +6 dB",true,faderCeilingDb==6);
         faderMenu.addItem(4,"-∞ dB / 0 dB",true,faderCeilingDb==0);
         menu.addSubMenu("Fader Range",faderMenu);
@@ -221,6 +223,7 @@ MainComponent::MainComponent(bool startAudio) {
     cuelistTab2.onClick=[this] {
         if (show.cuelists.size()<=3) {activateCuelist(2);return;}
         juce::PopupMenu menu;
+        menu.setLookAndFeel(&theme);
         for (int i=2;i<(int)show.cuelists.size();++i)
             menu.addItem(100+i,show.cuelists[(size_t)i].name,true,
                          i==show.activeCuelist);
