@@ -325,6 +325,7 @@ private:
     juce::File projectFile;
     juce::String status="Ready. Select an Audio cell and import a WAV file.";
     bool dirty=false;
+    int visibleClipCount=0;
     float systemCpuPercent=-1.f,systemRamPercent=-1.f;
     int systemTelemetryTicks=0;
     uint64_t previousIdleTime=0,previousKernelTime=0,previousUserTime=0;
