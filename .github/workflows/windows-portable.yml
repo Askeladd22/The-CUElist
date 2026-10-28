@@ -1,12 +1,6 @@
 name: Windows CI (portable package on demand)
 
 on:
-  push:
-    branches:
-      - feat/desktop-foundation
-  pull_request:
-    branches:
-      - feat/desktop-foundation
   workflow_dispatch:
 
 permissions:
