@@ -168,7 +168,7 @@ MainComponent::MainComponent(bool startAudio) {
     helpButton.onClick=[this] {
         juce::PopupMenu menu;
         menu.setLookAndFeel(&theme);
-        menu.addItem(1,"User Guide");
+        menu.addItem(1,"Help");
         menu.addItem(2,"About The Cuelist");
         auto safe=juce::Component::SafePointer<MainComponent>(this);
         menu.showMenuAsync(
