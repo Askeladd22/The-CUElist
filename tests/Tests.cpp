@@ -183,10 +183,20 @@ int main() {
     });
     test("Escape in inspector bubbles to the Panic handler", [] {
         MainComponent ui(false); int editors=0;
+        bool foundNotes=false;
         for (auto* child : ui.getChildren()) if (auto* edit=dynamic_cast<juce::TextEditor*>(child)) {
-            ++editors; check(!edit->keyPressed(juce::KeyPress(juce::KeyPress::escapeKey)),"Editor swallowed Escape");
+            ++editors;
+            if (edit->getName()=="cueNotes") {
+                foundNotes=true;
+                check(edit->isMultiLine(),"Cue notes lost multiline input");
+            }
+            check(!edit->keyPressed(juce::KeyPress(juce::KeyPress::escapeKey)),
+                  "Editor swallowed Escape instead of allowing global Panic");
         }
-        check(editors==4,"Missing inspector fields, including numeric Gain");
+        check(editors==5 && foundNotes,
+              "Expected cue name, cell name, BPM, Gain and multiline notes fields");
+        check(ui.keyPressed(juce::KeyPress(juce::KeyPress::escapeKey)),
+              "MainComponent no longer handles Escape as Panic");
     });
     test("WAV import and atomic project save work on disk with previous-version backup", [] {
         const auto folder=juce::File::getSpecialLocation(juce::File::currentExecutableFile).getParentDirectory().getChildFile("test-artifacts");
