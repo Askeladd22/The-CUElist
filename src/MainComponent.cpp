@@ -28,11 +28,11 @@ MainComponent::MainComponent(bool startAudio) {
     setLookAndFeel(&theme); setWantsKeyboardFocus(true); setSize(1440,900);
     for (juce::Component* c : std::initializer_list<juce::Component*>{&openButton,&saveButton,&newButton,&addRowButton,&addColumnButton,
          &goButton,&panicButton,&deviceButton,&controlButton,&collapseAllButton,&inspectorSideTab,
-         &cuelistTab0,&cuelistTab1,&cuelistTab2,&addCuelistButton,&dockResize,&timelineResize,&importButton,&midiEditButton,&oscEditButton,&playCellButton,&stopCellButton,&clearButton,&tempoButton,&applyButton,
+         &cuelistOverflowButton,&addCuelistButton,&dockResize,&timelineResize,&importButton,&midiEditButton,&oscEditButton,&playCellButton,&stopCellButton,&clearButton,&tempoButton,&applyButton,
          &cellTab,&rowTab,&rowGain,&rowBehaviour,&rowMute,&rowLoop,&rowName,&cellName,&bpm,&cueNotes,&behaviour,&follow,&loop,&cellAutoStop,&gainDb,&viewport,&timeline,&utilities,
          &clipCollapseButton,&clipCloseButton,&cueHeaders,&cueMetrics,&preflightButton,&diagnosticsButton,&preferencesButton,&projectNameLabel}) addAndMakeVisible(c);
     for (auto* b : {&openButton,&saveButton,&newButton,&addRowButton,&addColumnButton,&goButton,&panicButton,&deviceButton,&controlButton,&collapseAllButton,&inspectorSideTab,
-                    &cuelistTab0,&cuelistTab1,&cuelistTab2,&addCuelistButton,
+                    &cuelistOverflowButton,&addCuelistButton,
                     &importButton,&midiEditButton,&oscEditButton,&playCellButton,&stopCellButton,&clearButton,&tempoButton,&applyButton,
                     &preflightButton,&diagnosticsButton,&preferencesButton}) b->setWantsKeyboardFocus(false);
     viewport.setViewedComponent(&grid,false); viewport.setScrollBarsShown(true,true);
@@ -213,27 +213,29 @@ MainComponent::MainComponent(bool startAudio) {
     addColumnButton.onClick=[this] { showColumnMenu(addColumnButton.getScreenBounds().getCentre()); };
     goButton.onClick=[this] { goNext(); }; panicButton.onClick=[this] { stopAll(); };
     deviceButton.onClick=[this] { showDevices(); };
-    cuelistTab0.setName("cuelistTab0");
-    cuelistTab1.setName("cuelistTab1");
-    cuelistTab2.setName("cuelistTab2");
+    // Each tab is a genuine Cuelist selector. The third tab must never
+    // double as an overflow popup: the overflow appears only when needed.
+    for (int i=0;i<(int)cuelistTabs.size();++i) {
+        cuelistTabs[(size_t)i]=std::make_unique<juce::TextButton>();
+        cuelistCloseButtons[(size_t)i]=std::make_unique<juce::TextButton>("x");
+        auto& tab=*cuelistTabs[(size_t)i];
+        auto& close=*cuelistCloseButtons[(size_t)i];
+        tab.setName("cuelistTab"+juce::String(i));
+        close.setName("deleteCuelist"+juce::String(i));
+        tab.setWantsKeyboardFocus(false);
+        close.setWantsKeyboardFocus(false);
+        tab.onClick=[this,i] {activateCuelist(i);};
+        close.onClick=[this,i] {requestDeleteCuelist(i);};
+        tab.setVisible(false);
+        close.setVisible(false);
+        addAndMakeVisible(tab);
+        addAndMakeVisible(close);
+    }
+    cuelistOverflowButton.setName("cuelistOverflow");
+    cuelistOverflowButton.setTooltip("Other Cuelists that do not fit in the tab bar.");
+    cuelistOverflowButton.onClick=[this] {showCuelistOverflowMenu();};
     addCuelistButton.setName("newCuelist");
     addCuelistButton.setTooltip("Create another Cuelist in this show.");
-    cuelistTab0.onClick=[this] {activateCuelist(0);};
-    cuelistTab1.onClick=[this] {activateCuelist(1);};
-    cuelistTab2.onClick=[this] {
-        if (show.cuelists.size()<=3) {activateCuelist(2);return;}
-        juce::PopupMenu menu;
-        menu.setLookAndFeel(&theme);
-        for (int i=2;i<(int)show.cuelists.size();++i)
-            menu.addItem(100+i,show.cuelists[(size_t)i].name,true,
-                         i==show.activeCuelist);
-        auto safe=juce::Component::SafePointer<MainComponent>(this);
-        menu.showMenuAsync(
-            juce::PopupMenu::Options().withTargetComponent(&cuelistTab2),
-            [safe](int choice) {
-                if (safe && choice>=102) safe->activateCuelist(choice-100);
-            });
-    };
     addCuelistButton.onClick=[this] {createCuelist();};
     controlButton.setName("controlMapping");
     controlButton.setTooltip("MIDI input, MIDI Learn, and global/per-cue mappings.");
@@ -414,8 +416,6 @@ void MainComponent::paint(juce::Graphics& g) {
           "END OF SHOW",{20,h-314,148,24},17,palette::text,true);
     // Output meter removed from the sidebar; audio peak telemetry remains
     // available in the Master and channel meters.
-    label(g,"SPACE   Next cue",{20,h-84,150,20},12,palette::muted);
-    label(g,"ESC          Panic",{20,h-61,150,20},12,palette::muted);
     // Continue the non-scrollable metrics surface beneath the mixer. This
     // rightmost band is never a hidden extension of audio/MIDI/OSC strips.
     g.setColour(palette::panel);
@@ -480,32 +480,85 @@ void MainComponent::paint(juce::Graphics& g) {
     }
     label(g,status,{geometry.viewport.getX(),h-35,std::max(1,geometry.editorX-200),25},12,palette::muted);
 }
+void MainComponent::showCuelistOverflowMenu() {
+    juce::PopupMenu menu;
+    menu.setLookAndFeel(&theme);
+    for (int i=0;i<(int)show.cuelists.size();++i)
+        if (!cuelistTabs[(size_t)i]->isVisible())
+            menu.addItem(100+i,show.cuelists[(size_t)i].name,true,
+                         i==show.activeCuelist);
+
+    // Off-screen tabs must remain manageable, not just selectable.
+    juce::PopupMenu deleteMenu;
+    deleteMenu.setLookAndFeel(&theme);
+    if (show.cuelists.size()>1)
+        for (int i=0;i<(int)show.cuelists.size();++i)
+            if (!cuelistTabs[(size_t)i]->isVisible())
+                deleteMenu.addItem(200+i,"Delete "+show.cuelists[(size_t)i].name);
+    if (deleteMenu.getNumItems()>0) {
+        menu.addSeparator();
+        menu.addSubMenu("Delete hidden Cuelist...",deleteMenu);
+    }
+    if (menu.getNumItems()==0) return;
+    auto safe=juce::Component::SafePointer<MainComponent>(this);
+    menu.showMenuAsync(
+        juce::PopupMenu::Options().withTargetComponent(&cuelistOverflowButton),
+        [safe](int choice) {
+            if (!safe) return;
+            if (choice>=100 && choice<112) safe->activateCuelist(choice-100);
+            if (choice>=200 && choice<212) safe->requestDeleteCuelist(choice-200);
+        });
+}
+
 void MainComponent::refreshCuelistTabs() {
-    // Three compact tabs fit alongside the clock at the minimum 1180px
-    // window width. The third tab acts as an overflow selector when needed.
-    juce::TextButton* tabs[]={&cuelistTab0,&cuelistTab1,&cuelistTab2};
+    // setSize() can call resized() before dynamic tab allocation in the ctor.
+    if (!cuelistTabs[0]) return;
+
+    constexpr int left=190,slot=84,buttonHeight=27;
     const int count=(int)show.cuelists.size();
-    const int visible=std::min(3,count);
-    for (int i=0;i<3;++i) {
-        auto* tab=tabs[i];
-        tab->setVisible(i<visible);
-        if (i>=visible) continue;
-        int target=i;
-        if (i==2 && count>3 && show.activeCuelist>=2)
-            target=show.activeCuelist;
-        juce::String name=show.cuelists[(size_t)target].name;
-        if (i==2 && count>3) name+="  +";
-        tab->setButtonText(name);
-        tab->setBounds(190+i*96,43,92,27);
-        const bool current=show.activeCuelist==target;
-        tab->setColour(juce::TextButton::buttonColourId,
-                       current ? palette::selectedTab : palette::panel);
-        tab->setTooltip(i==2 && count>3
-            ? "Choose another Cuelist from the menu."
-            : "Switch Cuelist. Playback will stop before changing lists.");
+    // Stop tabs before the fixed clock/CPU panels. This gives nine real tabs
+    // at 1647px, three at 1180px, and overflows only when space runs out.
+    const int available=std::max(150,getWidth()-650-8-left);
+    const int plusWidth=count<12 ? 32 : 0;
+    const bool overflow=count*slot+plusWidth>available;
+    const int overflowWidth=overflow ? 42 : 0;
+    const int displayed=overflow
+        ? juce::jlimit(1,count,(available-plusWidth-overflowWidth)/slot)
+        : count;
+    // Keep displayed indices contiguous, including the active Cuelist.
+    const int first=overflow
+        ? juce::jlimit(0,count-displayed,show.activeCuelist-displayed+1)
+        : 0;
+    for (int i=0;i<(int)cuelistTabs.size();++i) {
+        auto& tab=*cuelistTabs[(size_t)i];
+        auto& close=*cuelistCloseButtons[(size_t)i];
+        const bool visible=i>=first && i<first+displayed && i<count;
+        tab.setVisible(visible);
+        close.setVisible(visible && count>1);
+        if (!visible) continue;
+
+        const int x=left+(i-first)*slot;
+        const bool active=i==show.activeCuelist;
+        const auto colour=active ? palette::selectedTab : palette::panel;
+        auto name=show.cuelists[(size_t)i].name;
+        tab.setButtonText(name.length()>13 ? name.substring(0,11)+"..." : name);
+        tab.setTooltip(name+" - select Cuelist (playback stops on switch).");
+        tab.setColour(juce::TextButton::buttonColourId,colour);
+        tab.setBounds(x,43,count>1 ? 64 : 81,buttonHeight);
+        close.setColour(juce::TextButton::buttonColourId,colour);
+        close.setColour(juce::TextButton::textColourOffId,palette::muted);
+        close.setBounds(x+64,43,18,buttonHeight);
+        close.setTooltip("Delete "+name+" (confirmation required).");
+        close.toFront(false);
+    }
+    const int trailingX=left+displayed*slot;
+    cuelistOverflowButton.setVisible(overflow);
+    if (overflow) {
+        cuelistOverflowButton.setBounds(trailingX,43,38,buttonHeight);
+        cuelistOverflowButton.setColour(juce::TextButton::buttonColourId,palette::raised);
     }
     addCuelistButton.setVisible(count<12);
-    addCuelistButton.setBounds(190+visible*96,43,28,27);
+    if (count<12) addCuelistButton.setBounds(trailingX+overflowWidth,43,28,buttonHeight);
 }
 
 void MainComponent::resized() {

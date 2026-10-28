@@ -31,8 +31,12 @@ void uiRefinementTests() {
         juce::Image pixels(juce::Image::ARGB,220,120,true);
         juce::Graphics g(pixels);
         theme.drawPopupMenuBackground(g,220,120);
-        check(pixels.getPixelAt(80,15)==palette::panel &&
-              pixels.getPixelAt(0,0)!=palette::panel,
+        // Verify the interior fill, not the outermost border pixel: JUCE
+        // can rasterise a 1px border differently across renderers and DPI.
+        const auto interior=pixels.getPixelAt(80,15);
+        check(std::abs(interior.getRed()-palette::panel.getRed())<=1 &&
+              std::abs(interior.getGreen()-palette::panel.getGreen())<=1 &&
+              std::abs(interior.getBlue()-palette::panel.getBlue())<=1,
               "Popup background is not the Midnight Slate surface");
         theme.drawPopupMenuItem(g,{0,28,220,34},
                                 false,true,true,true,true,
