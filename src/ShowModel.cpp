@@ -393,21 +393,20 @@ juce::String encodeShow(const Show& show) {
         {"bindings",bindings},{"templates",templates}});
     juce::Array<juce::var> cuelistObjects;
     for (size_t n=0;n<show.cuelists.size();++n) {
-        // The live rows are canonical; the active snapshot may lag until a
-        // tab switch. Inactive rows reuse the same proven v10 row serializer.
-        juce::var encodedRows;
-        if ((int)n==show.activeCuelist)
-            encodedRows=juce::var(rows);
-        else {
-            Show inactive=show;
-            inactive.cuelists.clear();
-            inactive.activeCuelist=0;
-            inactive.rows=show.cuelists[n].rows;
-            const auto document=juce::JSON::parse(encodeShow(inactive));
-            encodedRows=document.getProperty("rows",{});
+        // The active Cuelist already lives at root.rows. Never duplicate
+        // its clips/notes: large v10 projects must remain within the 32MB
+        // document size budget even after this extension.
+        if ((int)n==show.activeCuelist) {
+            cuelistObjects.add(object({{"name",show.cuelists[n].name}}));
+            continue;
         }
+        Show inactive=show;
+        inactive.cuelists.clear();
+        inactive.activeCuelist=0;
+        inactive.rows=show.cuelists[n].rows;
+        const auto document=juce::JSON::parse(encodeShow(inactive));
         cuelistObjects.add(object({{"name",show.cuelists[n].name},
-                                 {"rows",encodedRows}}));
+                                 {"rows",document.getProperty("rows",{})}}));
     }
     return juce::JSON::toString(object({{"format","TheCuelist"},{"version",10},
         {"name",show.name},{"masterGain",show.masterGain},{"masterPan",show.masterPan},
@@ -611,7 +610,14 @@ juce::Result decodeShow(const juce::String& text, Show& destination) {
             show.activeCuelist=integer(root,"activeCuelist");
             if (show.activeCuelist<0 || show.activeCuelist>=lists.size())
                 return juce::Result::fail("Invalid active Cuelist.");
-            for (const auto& list:lists) {
+            for (int n=0;n<lists.size();++n) {
+                const auto& list=lists.getReference(n);
+                // Active cue data is root.rows. Its lightweight tab record
+                // intentionally has no second copy of the row array.
+                if (n==show.activeCuelist) {
+                    show.cuelists.push_back({string(list,"name"),show.rows});
+                    continue;
+                }
                 // Parse dormant rows through the same cell/MIDI/OSC/control
                 // validation as regular v10 rows, never a second parser.
                 auto isolated=juce::JSON::parse(juce::JSON::toString(root));
