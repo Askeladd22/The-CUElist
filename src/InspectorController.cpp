@@ -25,7 +25,9 @@ void MainComponent::refreshInspector() {
     safetyLimiter.setToggleState(show.safetyLimiterEnabled,juce::dontSendNotification);
     engine.monitoredRowId.store(row.id);
     rowName.setTextToShowWhenEmpty("Cue name",palette::muted);
-    rowName.setText(row.name,false); cellName.setText(c.name,false); cellName.setTextToShowWhenEmpty("Cell name",palette::muted);
+    rowName.setText(row.name,false); cellName.setText(c.name,false);
+    cueNotes.setText(row.notes,false);
+    cellName.setTextToShowWhenEmpty("Cell name",palette::muted);
     bpm.setText(juce::String(row.tempo.front().bpm,1),false);
     behaviour.setSelectedId((int)c.behaviour+1,juce::dontSendNotification);
     follow.setToggleState(c.followsRow,juce::dontSendNotification); loop.setToggleState(c.loop,juce::dontSendNotification);
@@ -44,7 +46,7 @@ void MainComponent::refreshInspector() {
          &playCellButton,&stopCellButton,&clearButton,&applyButton})
         component->setVisible(false);
     for(juce::Component* component:std::initializer_list<juce::Component*>{
-         &rowName,&bpm,&tempoButton,&rowLoop,&cellName,&follow,&loop})
+         &rowName,&bpm,&tempoButton,&rowLoop,&cellName,&follow,&loop,&cueNotes})
         component->setVisible(true);
     const bool audio=col.type==ColumnType::audio;
     const bool midi=col.type==ColumnType::midi;
@@ -66,7 +68,8 @@ void MainComponent::refreshInspector() {
 
 bool MainComponent::inspectorDiffers() const {
     const auto& row=show.rows[selectedRow]; const auto& cell=row.cells[selectedColumn];
-    if (rowName.getText().trim()!=row.name || bpm.getText()!=juce::String(row.tempo.front().bpm,1)) return true;
+    if (rowName.getText().trim()!=row.name || bpm.getText()!=juce::String(row.tempo.front().bpm,1)
+        || cueNotes.getText()!=row.notes) return true;
     if(rowLoop.getToggleState()!=row.loop) return true;
     if (show.columns[selectedColumn].collapsed) return false;
     if (show.columns[selectedColumn].type==ColumnType::audio) {
@@ -83,6 +86,7 @@ bool MainComponent::applyInspector() {
     if (!inspectorDiffers()) return true;
     auto candidate=show; auto& row=candidate.rows[selectedRow]; auto& cell=row.cells[selectedColumn];
     row.name=rowName.getText().trim();
+    row.notes=cueNotes.getText();
     row.loop=rowLoop.getToggleState();
     if (bpm.getText()!=juce::String(row.tempo.front().bpm,1)) row.tempo.front().bpm=bpm.getText().getDoubleValue();
     if (!candidate.columns[(size_t)selectedColumn].collapsed) {
