@@ -64,6 +64,13 @@ void MainComponent::refreshInspector() {
     for(juce::Component* component:std::initializer_list<juce::Component*>{
         &cellName,&follow,&loop,&gainDb,&importButton,&midiEditButton,&oscEditButton})
         component->setEnabled(!col.collapsed && !(control && col.controlLocked && component!=&oscEditButton));
+    // Refresh can happen while the Inspector is closed (GO, cue selection,
+    // autosave, mapping changes). Never allow a refresh to reveal its fields.
+    if (!inspectorVisible)
+        for (juce::Component* component:std::initializer_list<juce::Component*>{
+             &rowName,&bpm,&tempoButton,&rowLoop,&cellName,&follow,&loop,
+             &cueNotes,&gainDb,&importButton,&midiEditButton,&oscEditButton})
+            component->setVisible(false);
 }
 
 bool MainComponent::inspectorDiffers() const {

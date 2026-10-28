@@ -27,11 +27,11 @@ juce::String duration(double seconds) {
 MainComponent::MainComponent(bool startAudio) {
     setLookAndFeel(&theme); setWantsKeyboardFocus(true); setSize(1440,900);
     for (juce::Component* c : std::initializer_list<juce::Component*>{&openButton,&saveButton,&newButton,&addRowButton,&addColumnButton,
-         &goButton,&panicButton,&deviceButton,&controlButton,&collapseAllButton,
+         &goButton,&panicButton,&deviceButton,&controlButton,&collapseAllButton,&inspectorSideTab,
          &cuelistTab0,&cuelistTab1,&cuelistTab2,&addCuelistButton,&dockResize,&timelineResize,&importButton,&midiEditButton,&oscEditButton,&playCellButton,&stopCellButton,&clearButton,&tempoButton,&applyButton,
          &cellTab,&rowTab,&rowGain,&rowBehaviour,&rowMute,&rowLoop,&rowName,&cellName,&bpm,&cueNotes,&behaviour,&follow,&loop,&cellAutoStop,&gainDb,&viewport,&timeline,&utilities,
          &clipCollapseButton,&clipCloseButton,&cueHeaders,&cueMetrics,&preflightButton,&diagnosticsButton,&preferencesButton,&projectNameLabel}) addAndMakeVisible(c);
-    for (auto* b : {&openButton,&saveButton,&newButton,&addRowButton,&addColumnButton,&goButton,&panicButton,&deviceButton,&controlButton,&collapseAllButton,
+    for (auto* b : {&openButton,&saveButton,&newButton,&addRowButton,&addColumnButton,&goButton,&panicButton,&deviceButton,&controlButton,&collapseAllButton,&inspectorSideTab,
                     &cuelistTab0,&cuelistTab1,&cuelistTab2,&addCuelistButton,
                     &importButton,&midiEditButton,&oscEditButton,&playCellButton,&stopCellButton,&clearButton,&tempoButton,&applyButton,
                     &preflightButton,&diagnosticsButton,&preferencesButton}) b->setWantsKeyboardFocus(false);
@@ -103,6 +103,19 @@ MainComponent::MainComponent(bool startAudio) {
     cueNotes.setTextToShowWhenEmpty("Technical notes, instructions, stage reminders...",palette::muted);
     cueNotes.setTooltip("Operational notes saved with this cue. Focus change commits your edits.");
     cueNotes.onFocusLost=[this] { if (inspectorDiffers()) applyInspector(); };
+    inspectorSideTab.setName("inspectorSideToggle");
+    inspectorSideTab.setTooltip("Collapse Inspector to the right and expand the cue workspace.");
+    inspectorSideTab.setColour(juce::TextButton::buttonColourId,palette::raised);
+    inspectorSideTab.setColour(juce::TextButton::textColourOffId,palette::teal);
+    inspectorSideTab.onClick=[this] {
+        // Commit all pending edits (including cue notepad) before hiding.
+        // Invalid edits keep the Inspector open so the operator can fix them.
+        if (inspectorVisible && !applyInspector()) return;
+        inspectorVisible=!inspectorVisible;
+        refreshInspector();
+        resized();
+        repaint();
+    };
     collapseAllButton.setName("toggleAllColumns");
     collapseAllButton.setTooltip("Collapse or expand all columns. Audio/MIDI/OSC playback is unaffected.");
     collapseAllButton.onClick=[this] {
@@ -295,7 +308,7 @@ WorkspaceLayout MainComponent::workspaceLayout() const {
     return calculateWorkspaceLayout({getWidth(),getHeight(),activeDockHeight,
         grid.columnX((int)show.columns.size()),(int)show.rows.size(),
         CueGrid::headerHeight,CueGrid::rowHeight,CueMetricsOverlay::width,
-        CueGrid::nameWidth,timelineHeightAdjustment});
+        CueGrid::nameWidth,timelineHeightAdjustment,inspectorVisible});
 }
 
 void MainComponent::paint(juce::Graphics& g) {
@@ -405,6 +418,15 @@ void MainComponent::paint(juce::Graphics& g) {
     g.setColour(palette::line);
     g.drawVerticalLine(geometry.metrics.getX(),(float)geometry.utilities.getY(),
                        (float)geometry.utilities.getBottom());
+    if (!inspectorVisible) {
+        // A slim, permanently visible rail provides a full-height spatial
+        // cue for reopening without stealing any BPM/Auto Stop hit targets.
+        g.setColour(palette::panel);
+        g.fillRect(geometry.editorX,76,w-geometry.editorX,h-123);
+        g.setColour(palette::line);
+        g.drawVerticalLine(geometry.editorX,76.0f,(float)h-47.0f);
+    }
+    if (inspectorVisible) {
     const int inspectorInner=geometry.inspectorInnerWidth;
     auto panel=geometry.inspectorPanel;
     g.setColour(palette::panel); g.fillRoundedRectangle(panel.toFloat(),9);
@@ -449,6 +471,7 @@ void MainComponent::paint(juce::Graphics& g) {
                            (float)notesHeight,7.0f,1.0f);
     label(g,"NOTES  /  CUE "+juce::String(selectedRow+1).paddedLeft('0',2),
           {x+3,notesTop+5,inspectorInner-6,20},11,palette::teal,true);
+    }
     label(g,status,{geometry.viewport.getX(),h-35,std::max(1,geometry.editorX-200),25},12,palette::muted);
 }
 void MainComponent::refreshCuelistTabs() {
@@ -494,6 +517,15 @@ void MainComponent::resized() {
     const bool allCollapsed=std::all_of(show.columns.begin(),show.columns.end(),
         [](const Column& col){return col.collapsed;});
     collapseAllButton.setButtonText(allCollapsed ? "Expand all" : "Collapse all");
+    // Expanded: tab overlaps the Inspector edge by 13px. Collapsed: it
+    // sits entirely inside the 26px rail, not on top of BPM/Auto Stop.
+    const int tabX=inspectorVisible ? geometry.editorX-13 : geometry.editorX;
+    const int tabY=juce::jlimit(150,std::max(150,h-135),h/2-43);
+    inspectorSideTab.setBounds(tabX,tabY,26,86);
+    inspectorSideTab.setButtonText(inspectorVisible ? ">" : "<");
+    inspectorSideTab.setTooltip(inspectorVisible
+        ? "Collapse Inspector to the right"
+        : "Expand Inspector to the left");
 
     preflightButton.setVisible(false); diagnosticsButton.setVisible(false);
     addRowButton.setVisible(false); addColumnButton.setVisible(false);
@@ -562,6 +594,7 @@ void MainComponent::resized() {
     cueMetrics.setBounds(geometry.metrics);
     cueMetrics.toFront(false);
     collapseAllButton.toFront(false);
+    inspectorSideTab.toFront(false);
 }
 void MainComponent::refresh() {
     selectedRow=juce::jlimit(0,(int)show.rows.size()-1,selectedRow);

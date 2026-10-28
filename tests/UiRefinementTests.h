@@ -3,6 +3,63 @@
 #include "OscEditor.h"
 void uiRefinementTests() {
     using namespace cueViewFixtures;
+    test("Inspector edge tab collapses right and restores unsaved cue notes",[] {
+        MainComponent ui(false);
+        ui.setSize(1440,900);
+        auto* tab=dynamic_cast<juce::TextButton*>(
+            controlsV3::named(ui,"inspectorSideToggle"));
+        auto* cueName=dynamic_cast<juce::TextEditor*>(
+            controlsV3::named(ui,"cueName"));
+        auto* notes=dynamic_cast<juce::TextEditor*>(
+            controlsV3::named(ui,"cueNotes"));
+        auto* gain=controlsV3::named(ui,"cellGainDb");
+        auto* timeline=find<Timeline>(ui);
+        auto* metrics=find<CueMetricsOverlay>(ui);
+        auto* utilities=find<ColumnUtilities>(ui);
+        juce::Viewport* view=nullptr;
+        for (auto* component:ui.getChildren())
+            if (auto* candidate=dynamic_cast<juce::Viewport*>(component))
+                view=candidate;
+        check(tab && cueName && notes && gain && timeline && metrics &&
+              utilities && view,"Inspector toggle or workspace component missing");
+        const int originalView=view->getWidth();
+        const int originalTimeline=timeline->getWidth();
+        const int originalUtility=utilities->getWidth();
+        const int originalMetrics=metrics->getX();
+        check(tab->isVisible() && tab->getRight()>metrics->getRight() &&
+              tab->getX()<metrics->getRight(),
+              "Inspector side tab is not placed across the right boundary");
+        cueName->setText("Opening cue",false);
+        notes->setText("Remember the stage blackout",false);
+        click(*tab,12.0f,22.0f);
+        check(!cueName->isVisible() && !notes->isVisible() &&
+              !gain->isVisible() && ui.show.rows[0].name=="Opening cue" &&
+              ui.show.rows[0].notes=="Remember the stage blackout",
+              "Inspector collapse lost pending fields or left them visible");
+        check(view->getWidth()==originalView+262 &&
+              timeline->getWidth()==originalTimeline+262 &&
+              utilities->getWidth()==originalUtility+262 &&
+              metrics->getX()==originalMetrics+262 &&
+              metrics->getRight()==ui.getWidth()-26 &&
+              tab->getX()==ui.getWidth()-26 &&
+              tab->getRight()==ui.getWidth(),
+              "Inspector collapse did not reclaim width or keep its reopen tab visible");
+        ui.refresh();
+        check(!cueName->isVisible() && !notes->isVisible() &&
+              !gain->isVisible(),
+              "Inspector fields reappeared after a show refresh");
+        click(*tab,12.0f,22.0f);
+        check(cueName->isVisible() && notes->isVisible() &&
+              gain->isVisible() && cueName->getText()=="Opening cue" &&
+              notes->getText()=="Remember the stage blackout" &&
+              view->getWidth()==originalView &&
+              timeline->getWidth()==originalTimeline &&
+              metrics->getX()==originalMetrics &&
+              utilities->getWidth()==originalUtility,
+              "Reopening Inspector failed to restore content or geometry");
+        check(ui.show.rows[0].cells[0].gain==1.0f,
+              "Collapsing Inspector unexpectedly changed audio gain");
+    });
     test("Ctrl+C/V style cell clipboard preserves target identity and copies audio media", [] {
         MainComponent ui(false); addRow(ui.show,"Next");
         auto media=std::make_shared<AudioClip>(); media->sampleRate=48000;

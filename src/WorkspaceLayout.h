@@ -16,6 +16,7 @@ struct WorkspaceLayoutInput {
     int pinnedMetricsWidth=184;
     int pinnedHeaderWidth=290;
     int timelineHeightAdjustment=0; // user drag, positive enlarges Timeline
+    bool inspectorVisible=true; // collapsed Inspector leaves a 26px reopen rail
 };
 
 struct WorkspaceLayout {

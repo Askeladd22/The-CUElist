@@ -2,6 +2,38 @@
 #include "WorkspaceLayout.h"
 
 void workspaceLayoutTests() {
+    test("Inspector side rail reclaims cue, mixer and Timeline space",[] {
+        for (const auto dimensions:std::initializer_list<juce::Point<int>>{
+                 {1180,820},{1440,900},{1647,895},{1920,1080}}) {
+            WorkspaceLayoutInput input;
+            input.width=dimensions.x;
+            input.height=dimensions.y;
+            input.columnEndX=290+8*152;
+            input.rowCount=24;
+            const auto opened=calculateWorkspaceLayout(input);
+            input.inspectorVisible=false;
+            const auto closed=calculateWorkspaceLayout(input);
+            check(opened.editorX==dimensions.x-288 &&
+                  closed.editorX==dimensions.x-26 &&
+                  closed.inspectorPanel.getX()==closed.editorX,
+                  "Collapsed Inspector must leave exactly one 26px reopen rail");
+            check(closed.viewport.getWidth()==opened.viewport.getWidth()+262 &&
+                  closed.utilities.getWidth()==opened.utilities.getWidth()+262 &&
+                  closed.timeline.getWidth()==opened.timeline.getWidth()+262 &&
+                  closed.dockEditor.getWidth()==opened.dockEditor.getWidth()+262,
+                  "Inspector collapse failed to return space to the workspace");
+            check(closed.metrics.getX()==closed.viewport.getRight() &&
+                  closed.metrics.getWidth()==184 &&
+                  closed.metrics.getRight()==dimensions.x-26 &&
+                  closed.utilities.getRight()==closed.metrics.getX() &&
+                  closed.timeline.getRight()==closed.editorX,
+                  "Pinned BPM/Auto Stop or Timeline escaped the new right edge");
+            check(closed.cueHeaders==opened.cueHeaders &&
+                  closed.timeline.getBottom()<=dimensions.y-47 &&
+                  closed.gridSize.x>=closed.viewport.getWidth()-14,
+                  "Inspector collapse damaged pinned headers, scrolling or footer");
+        }
+    });
     test("Workspace geometry preserves the 0.9 desktop cue/mixer/timeline arrangement",[] {
         const auto geometry=calculateWorkspaceLayout({1647,895,0,467,1,72,62,184});
         check(geometry.editorX==1359 &&
