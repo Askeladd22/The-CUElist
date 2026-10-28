@@ -713,12 +713,12 @@ juce::Result loadShow(const juce::File& file, Show& destination) {
         return juce::Result::ok();
     };
     for (auto& row:loaded.rows) for (auto& cell:row.cells)
-        if (auto result=resolveMedia(cell);result.failed()) return result;
+        if (auto resolved=resolveMedia(cell);resolved.failed()) return resolved;
     for (size_t n=0;n<loaded.cuelists.size();++n)
         if ((int)n!=loaded.activeCuelist)
             for (auto& row:loaded.cuelists[n].rows)
                 for (auto& cell:row.cells)
-                    if (auto result=resolveMedia(cell);result.failed()) return result;
+                    if (auto resolved=resolveMedia(cell);resolved.failed()) return resolved;
     loaded.cuelists[(size_t)loaded.activeCuelist].rows=loaded.rows;
     destination = std::move(loaded);
     return juce::Result::ok();
