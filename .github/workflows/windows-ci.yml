@@ -1,9 +1,6 @@
 name: Windows Release and tests (no portable package)
 
 on:
-  push:
-    branches:
-      - feature/gui-mockup-workspace-and-cue-notes
   pull_request:
     branches:
       - main
