@@ -42,7 +42,7 @@ struct Cell {
     std::optional<ControlSet> controlSet;
 };
 struct Row {
-    int id = 0; juce::String name; std::vector<TempoPoint> tempo {{}}; std::vector<Cell> cells;
+    int id = 0; juce::String name; juce::String notes; std::vector<TempoPoint> tempo {{}}; std::vector<Cell> cells;
     float gain = 1.0f;
     int mappingPresetId=0;
     int colour=0; // 0=automatic; 1..7 are operator cue colours
