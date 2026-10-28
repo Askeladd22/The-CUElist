@@ -88,6 +88,8 @@ See the [release acceptance checklist](docs/0.9-release-checklist.md) and [stabi
 
 ## License
 
-The Cuelist is **proprietary software, all rights reserved; it is not open source**. The single [LICENSE](LICENSE) contains the authoritative Italian terms and an English reference translation. Separate third-party obligations, including JUCE, are described in [NOTICE.md](NOTICE.md).
+The Cuelist is **proprietary software — all rights reserved, not open source**. The [LICENSE](LICENSE) (v1.1) expressly reserves rights to reproduce, modify, incorporate, sublicense, relicense or distribute its original source code and binaries, including noncommercial reuse without authorization. It preserves mandatory statutory rights and the limited viewing/forking permissions granted by GitHub's public-repository terms. The Italian text is authoritative; an English reference translation follows it in the same file.
 
-Public access to this repository does not grant permission to redistribute or commercially reuse its original code. Before distributing a proprietary binary, verify the relevant JUCE license and other applicable third-party terms.
+**Visibility is not permission to reuse code.** While the repository is public, visitors can read and fork it through GitHub's functionality. To reduce the risk of future source-code copying, the rights holder should make the repository **private** and distribute only authorized binaries, while recognizing that existing public forks, clones and copies may remain accessible. See [GitHub's visibility documentation](https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/managing-repository-settings/setting-repository-visibility).
+
+Independent third-party rights, particularly JUCE, remain governed by [NOTICE.md](NOTICE.md) and the corresponding vendor licence. A proprietary binary must not be distributed without appropriate third-party permissions.
