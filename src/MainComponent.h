@@ -1,4 +1,5 @@
 #pragma once
+#include <array>
 #include "AudioEngine.h"
 #include "ProjectSafety.h"
 #include "ProjectMediaLoader.h"
@@ -198,6 +199,8 @@ public:
     void setAllColumnsCollapsed(bool collapsed);
     void activateCuelist(int index);
     void createCuelist();
+    void deleteCuelist(int index);
+    void requestDeleteCuelist(int index);
     void renameActiveCuelist();
     void setCellAutoStop(int row,int column,bool enabled);
     void renameTitle(bool column,int index);
@@ -241,9 +244,13 @@ private:
     juce::TextButton goButton{"GO  /  SPACE"},panicButton{"PANIC  /  ESC"},deviceButton{"Audio devices"},controlButton{"CONTROL MAPPING"};
     juce::TextButton collapseAllButton{"Collapse all"};
     juce::TextButton inspectorSideTab{">"};
-    juce::TextButton cuelistTab0{"Cuelist 1"},cuelistTab1{"Cuelist 2"},
-                     cuelistTab2{"Cuelist 3"},addCuelistButton{"+"};
+    // Up to twelve independent Cuelists; only the physically fitting tabs
+    // are displayed. Their tab and close controls have stable identity.
+    std::array<std::unique_ptr<juce::TextButton>,12> cuelistTabs;
+    std::array<std::unique_ptr<juce::TextButton>,12> cuelistCloseButtons;
+    juce::TextButton cuelistOverflowButton{"..."},addCuelistButton{"+"};
     void refreshCuelistTabs();
+    void showCuelistOverflowMenu();
     juce::TextButton importButton{"Import WAV / MP3"},playCellButton{"Play cell"},stopCellButton{"Stop"},clearButton{"Remove audio"};
     juce::TextButton midiEditButton{"Create MIDI clip"};
     juce::TextButton oscEditButton{"Create OSC clip"};
