@@ -44,7 +44,9 @@ void uiRefinementTests() {
               tab->getX()==ui.getWidth()-26 &&
               tab->getRight()==ui.getWidth(),
               "Inspector collapse did not reclaim width or keep its reopen tab visible");
-        ui.refresh();
+        // Exercise the public selection path: it refreshes the Inspector
+        // without exposing its private refresh() implementation to tests.
+        check(ui.select(0,0),"Public cue selection failed with Inspector collapsed");
         check(!cueName->isVisible() && !notes->isVisible() &&
               !gain->isVisible(),
               "Inspector fields reappeared after a show refresh");
