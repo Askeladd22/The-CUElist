@@ -292,7 +292,7 @@ private:
     juce::TextButton preferencesButton{"Preferences"},helpButton{"Help"};
     juce::Label projectNameLabel;
     juce::TextButton preflightButton{"Preflight"},diagnosticsButton{"Diagnostics"};
-    juce::TextButton goButton{"GO  /  SPACE"},panicButton{"PANIC  /  ESC"},deviceButton{"Audio devices"},controlButton{"CONTROL MAPPING"};
+    juce::TextButton goButton{"GO  /  SPACE"},panicButton{"PANIC  /  ESC"},deviceButton{"Audio devices"},controlButton{"Control Mapping"};
     juce::TextButton collapseAllButton{"Collapse all"};
     InspectorGripButton inspectorSideTab;
     // Up to twelve independent Cuelists; only the physically fitting tabs
