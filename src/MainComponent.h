@@ -196,6 +196,9 @@ public:
     void setRowColour(int row,int colour);
     void toggleColumnCollapsed(int column);
     void setAllColumnsCollapsed(bool collapsed);
+    void activateCuelist(int index);
+    void createCuelist();
+    void renameActiveCuelist();
     void setCellAutoStop(int row,int column,bool enabled);
     void renameTitle(bool column,int index);
     void reorderRow(int index,int delta);
@@ -237,6 +240,9 @@ private:
     juce::TextButton preflightButton{"Preflight"},diagnosticsButton{"Diagnostics"};
     juce::TextButton goButton{"GO  /  SPACE"},panicButton{"PANIC  /  ESC"},deviceButton{"Audio devices"},controlButton{"CONTROL MAPPING"};
     juce::TextButton collapseAllButton{"Collapse all"};
+    juce::TextButton cuelistTab0{"Cuelist 1"},cuelistTab1{"Cuelist 2"},
+                     cuelistTab2{"Cuelist 3"},addCuelistButton{"+"};
+    void refreshCuelistTabs();
     juce::TextButton importButton{"Import WAV / MP3"},playCellButton{"Play cell"},stopCellButton{"Stop"},clearButton{"Remove audio"};
     juce::TextButton midiEditButton{"Create MIDI clip"};
     juce::TextButton oscEditButton{"Create OSC clip"};
