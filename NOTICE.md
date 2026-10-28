@@ -1,6 +1,6 @@
 # The Cuelist — License Notices
 
-The original application code, scripts, and tests are proprietary: all rights reserved. See the single bilingual [LICENSE](LICENSE), whose Italian text is authoritative. No open-source license applies to the project's original code.
+The original application code, scripts, tests, UI, original images and documentation are **proprietary and all rights reserved**. The unified bilingual [LICENSE](LICENSE) (v1.1) expressly restricts unauthorized copying, modification, incorporation into third-party projects and distribution, whether commercial or not. Public hosting allows the viewing and forking functionality provided by GitHub's Terms of Service; it is not a general licence to reuse or sublicense the code. Mandatory legal exceptions remain applicable. The Italian licence text prevails over its English reference translation. No open-source licence is offered for the project's original code.
 
 ## JUCE and Third-Party Components
 
