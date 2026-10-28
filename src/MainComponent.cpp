@@ -96,6 +96,9 @@ MainComponent::MainComponent(bool startAudio) {
     rowName.setName("cueName"); cellName.setName("cellName"); bpm.setName("cueBpm");
     cueNotes.setName("cueNotes");
     cueNotes.setMultiLine(true,true);
+    // Escape must bubble to MainComponent::keyPressed so Panic works even
+    // when the operator is typing in the multiline cue notepad.
+    cueNotes.setEscapeAndReturnKeysConsumed(false);
     cueNotes.setReturnKeyStartsNewLine(true);
     cueNotes.setScrollbarsShown(true);
     cueNotes.setInputRestrictions(8192);
