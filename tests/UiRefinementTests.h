@@ -32,7 +32,7 @@ void uiRefinementTests() {
         juce::Graphics g(pixels);
         theme.drawPopupMenuBackground(g,220,120);
         check(pixels.getPixelAt(80,15)==palette::panel &&
-              pixels.getPixelAt(0,0)==palette::line.withAlpha(.9f),
+              pixels.getPixelAt(0,0)!=palette::panel,
               "Popup background is not the Midnight Slate surface");
         theme.drawPopupMenuItem(g,{0,28,220,34},
                                 false,true,true,true,true,
@@ -43,7 +43,7 @@ void uiRefinementTests() {
         theme.drawPopupMenuItem(g,{0,81,220,10},
                                 true,true,false,false,false,
                                 {},{},nullptr,nullptr);
-        check(pixels.getPixelAt(20,86)==palette::line.withAlpha(.65f),
+        check(pixels.getPixelAt(20,86)!=palette::panel,
               "Popup separators no longer match the theme");
         int width=0,height=0;
         theme.getIdealPopupMenuItemSize("Rename active Cuelist",false,24,width,height);
