@@ -208,9 +208,10 @@ MainComponent::MainComponent(bool startAudio) {
         for (int i=2;i<(int)show.cuelists.size();++i)
             menu.addItem(100+i,show.cuelists[(size_t)i].name,true,
                          i==show.activeCuelist);
+        auto safe=juce::Component::SafePointer<MainComponent>(this);
         menu.showMenuAsync(
             juce::PopupMenu::Options().withTargetComponent(&cuelistTab2),
-            [safe=juce::Component::SafePointer<MainComponent>(this)](int choice) {
+            [safe](int choice) {
                 if (safe && choice>=102) safe->activateCuelist(choice-100);
             });
     };
