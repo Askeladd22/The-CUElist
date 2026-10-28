@@ -8,6 +8,12 @@
 #include "MidiClip.h"
 #include "BinaryData.h"
 #include <cmath>
+#if JUCE_WINDOWS
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#include <windows.h>
+#endif
 
 namespace cuelist {
 namespace {
@@ -20,10 +26,10 @@ juce::String duration(double seconds) {
 MainComponent::MainComponent(bool startAudio) {
     setLookAndFeel(&theme); setWantsKeyboardFocus(true); setSize(1440,900);
     for (juce::Component* c : std::initializer_list<juce::Component*>{&openButton,&saveButton,&newButton,&addRowButton,&addColumnButton,
-         &goButton,&panicButton,&deviceButton,&controlButton,&dockResize,&timelineResize,&importButton,&midiEditButton,&oscEditButton,&playCellButton,&stopCellButton,&clearButton,&tempoButton,&applyButton,
-         &cellTab,&rowTab,&rowGain,&rowBehaviour,&rowMute,&rowLoop,&rowName,&cellName,&bpm,&behaviour,&follow,&loop,&cellAutoStop,&gainDb,&viewport,&timeline,&utilities,
+         &goButton,&panicButton,&deviceButton,&controlButton,&collapseAllButton,&dockResize,&timelineResize,&importButton,&midiEditButton,&oscEditButton,&playCellButton,&stopCellButton,&clearButton,&tempoButton,&applyButton,
+         &cellTab,&rowTab,&rowGain,&rowBehaviour,&rowMute,&rowLoop,&rowName,&cellName,&bpm,&cueNotes,&behaviour,&follow,&loop,&cellAutoStop,&gainDb,&viewport,&timeline,&utilities,
          &clipCollapseButton,&clipCloseButton,&cueHeaders,&cueMetrics,&preflightButton,&diagnosticsButton,&preferencesButton,&projectNameLabel}) addAndMakeVisible(c);
-    for (auto* b : {&openButton,&saveButton,&newButton,&addRowButton,&addColumnButton,&goButton,&panicButton,&deviceButton,&controlButton,
+    for (auto* b : {&openButton,&saveButton,&newButton,&addRowButton,&addColumnButton,&goButton,&panicButton,&deviceButton,&controlButton,&collapseAllButton,
                     &importButton,&midiEditButton,&oscEditButton,&playCellButton,&stopCellButton,&clearButton,&tempoButton,&applyButton,
                     &preflightButton,&diagnosticsButton,&preferencesButton}) b->setWantsKeyboardFocus(false);
     viewport.setViewedComponent(&grid,false); viewport.setScrollBarsShown(true,true);
@@ -85,6 +91,22 @@ MainComponent::MainComponent(bool startAudio) {
     rowTab.setVisible(false);
     rowName.setSelectAllWhenFocused(true); cellName.setSelectAllWhenFocused(true); bpm.setInputRestrictions(6,"0123456789.");
     rowName.setName("cueName"); cellName.setName("cellName"); bpm.setName("cueBpm");
+    cueNotes.setName("cueNotes");
+    cueNotes.setMultiLine(true,true);
+    cueNotes.setReturnKeyStartsNewLine(true);
+    cueNotes.setScrollbarsShown(true);
+    cueNotes.setInputRestrictions(8192);
+    cueNotes.setFont(font(12.5f));
+    cueNotes.setTextToShowWhenEmpty("Technical notes, instructions, stage reminders...",palette::muted);
+    cueNotes.setTooltip("Operational notes saved with this cue. Focus change commits your edits.");
+    cueNotes.onFocusLost=[this] { if (inspectorDiffers()) applyInspector(); };
+    collapseAllButton.setName("toggleAllColumns");
+    collapseAllButton.setTooltip("Collapse or expand all columns. Audio/MIDI/OSC playback is unaffected.");
+    collapseAllButton.onClick=[this] {
+        const bool allCollapsed=std::all_of(show.columns.begin(),show.columns.end(),
+            [](const Column& col){return col.collapsed;});
+        setAllColumnsCollapsed(!allCollapsed);
+    };
     for (auto* editor : {&rowName,&cellName,&bpm}) editor->setEscapeAndReturnKeysConsumed(false);
     for (auto* editor : {&rowName,&cellName,&bpm})
         editor->setFont(font(14.0f));
@@ -167,6 +189,7 @@ MainComponent::MainComponent(bool startAudio) {
     addColumnButton.onClick=[this] { showColumnMenu(addColumnButton.getScreenBounds().getCentre()); };
     goButton.onClick=[this] { goNext(); }; panicButton.onClick=[this] { stopAll(); };
     deviceButton.onClick=[this] { showDevices(); };
+    controlButton.setName("controlMapping");
     controlButton.setTooltip("MIDI input, MIDI Learn, and global/per-cue mappings.");
     controlButton.onClick=[this] {
         if (show.columns[(size_t)selectedColumn].type==ColumnType::control)
@@ -359,7 +382,12 @@ void MainComponent::resized() {
     projectNameLabel.setBounds(28,138,132,30);
     deviceButton.setBounds(20,188,140,33);
     preferencesButton.setBounds(20,227,140,31);
-    controlButton.setBounds(std::max(506,w-666),22,144,30);
+    controlButton.setBounds(20,264,140,33);
+    collapseAllButton.setBounds(geometry.cueHeaders.getX()+CueGrid::nameWidth-84,
+                                geometry.cueHeaders.getY()+9,77,24);
+    const bool allCollapsed=std::all_of(show.columns.begin(),show.columns.end(),
+        [](const Column& col){return col.collapsed;});
+    collapseAllButton.setButtonText(allCollapsed ? "Expand all" : "Collapse all");
 
     preflightButton.setVisible(false); diagnosticsButton.setVisible(false);
     addRowButton.setVisible(false); addColumnButton.setVisible(false);
@@ -409,6 +437,12 @@ void MainComponent::resized() {
     midiEditButton.setBounds(x,648,inner,33);
     oscEditButton.setBounds(x,648,inner,33);
     importButton.setBounds(x,691,inner,33);
+    // Place notes below the existing Inspector actions at every supported
+    // height, without changing the safe minimum hitboxes of those actions.
+    const int notesAfterActions=geometry.scaleInspectorControl({0,728,1,25}).getBottom()+8;
+    const int notesTop=std::max(notesAfterActions,geometry.inspectorPanel.getBottom()-167);
+    cueNotes.setBounds(x,notesTop+27,inner,
+        std::max(38,geometry.inspectorPanel.getBottom()-notesTop-38));
     // Compact inspector on smaller displays, keeping all actions reachable.
     {
         for (juce::Component* c : std::initializer_list<juce::Component*>{&rowLoop,&rowName,&bpm,&tempoButton,&cellName,&follow,&loop,&gainDb,&importButton,&midiEditButton,&oscEditButton})
@@ -421,10 +455,19 @@ void MainComponent::resized() {
     cueHeaders.toFront(false);
     cueMetrics.setBounds(geometry.metrics);
     cueMetrics.toFront(false);
+    collapseAllButton.toFront(false);
 }
 void MainComponent::refresh() {
     selectedRow=juce::jlimit(0,(int)show.rows.size()-1,selectedRow);
     selectedColumn=juce::jlimit(0,(int)show.columns.size()-1,selectedColumn);
+    visibleClipCount=0;
+    for (const auto& row:show.rows)
+        for (size_t c=0;c<row.cells.size() && c<show.columns.size();++c)
+            if (show.columns[c].type!=ColumnType::control) {
+                const auto& cell=row.cells[c];
+                if (cell.midi || cell.osc || cell.file.isNotEmpty() ||
+                    clips.find(cell.id)!=clips.end()) ++visibleClipCount;
+            }
     syncClipEditor(); syncOscEditor(); refreshInspector(); utilities.refresh(); resized();
     cueHeaders.repaint();
     if (!projectNameLabel.isBeingEdited() && projectNameLabel.getText()!=show.name)
