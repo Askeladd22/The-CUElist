@@ -649,7 +649,7 @@ juce::Result saveShow(const Show& show,const juce::File& file) {
         if (cell.file.isEmpty()) return juce::Result::ok();
         if (!juce::File::isAbsolutePath(cell.file)) return juce::Result::fail("Load the project before saving it: relative media path.");
         auto found = copied.find(cell.file);
-        if (found != copied.end()) { cell.file = found->second; continue; }
+        if (found != copied.end()) { cell.file = found->second; return juce::Result::ok(); }
         const juce::File source(cell.file);
         if (!source.existsAsFile()) return juce::Result::fail("Missing media: " + cell.file);
         if (!createdGeneration) {
