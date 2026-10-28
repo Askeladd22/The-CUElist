@@ -16,6 +16,8 @@ New-Item -ItemType Directory -Path $dist -Force | Out-Null
 Copy-Item -LiteralPath $exe -Destination (Join-Path $package 'The Cuelist.exe')
 Copy-Item -LiteralPath (Join-Path $repo 'Avvia.cmd') -Destination $package
 Copy-Item -LiteralPath (Join-Path $repo 'README.md') -Destination $package
+New-Item -ItemType Directory -Path (Join-Path $package 'docs') -Force | Out-Null
+Copy-Item -LiteralPath (Join-Path $repo 'docs\complete-user-guide.md') -Destination (Join-Path $package 'docs\complete-user-guide.md')
 Copy-Item -LiteralPath (Join-Path $repo 'LICENSE') -Destination $package
 Copy-Item -LiteralPath (Join-Path $repo 'NOTICE.md') -Destination $package
 Copy-Item -LiteralPath (Join-Path $repo 'vendor\JUCE\LICENSE.md') -Destination (Join-Path $package 'JUCE-LICENSE.md')
