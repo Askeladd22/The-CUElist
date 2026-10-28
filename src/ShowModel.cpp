@@ -611,6 +611,9 @@ juce::Result decodeShow(const juce::String& text, Show& destination) {
                 isolated.getDynamicObject()->removeProperty("cuelists");
                 isolated.getDynamicObject()->removeProperty("activeCuelist");
                 isolated.getDynamicObject()->setProperty("rows",required(list,"rows"));
+                auto controlsCopy=isolated.getProperty("controls",{});
+                if (auto* fields=controlsCopy.getDynamicObject())
+                    fields->setProperty("bindings",juce::Array<juce::var>{});
                 Show dormant;
                 if (auto result=decodeShow(juce::JSON::toString(isolated),dormant);
                     result.failed()) return result;
@@ -642,8 +645,8 @@ juce::Result saveShow(const Show& show,const juce::File& file) {
         juce::File folder; bool& created; bool committed = false;
         ~Cleanup() { if (created && !committed) folder.deleteRecursively(); }
     } cleanup { generation, createdGeneration };
-    for (auto& row : portable.rows) for (auto& cell : row.cells) {
-        if (cell.file.isEmpty()) continue;
+    const auto copyMedia=[&](Cell& cell)->juce::Result {
+        if (cell.file.isEmpty()) return juce::Result::ok();
         if (!juce::File::isAbsolutePath(cell.file)) return juce::Result::fail("Load the project before saving it: relative media path.");
         auto found = copied.find(cell.file);
         if (found != copied.end()) { cell.file = found->second; continue; }
@@ -657,7 +660,15 @@ juce::Result saveShow(const Show& show,const juce::File& file) {
         if (target.exists() || !source.copyFileTo(target)) return juce::Result::fail("Could not copy media.");
         const auto relative = target.getRelativePathFrom(parent).replaceCharacter('\\','/');
         copied.emplace(cell.file, relative); cell.file = relative;
-    }
+        return juce::Result::ok();
+    };
+    for (auto& row:portable.rows) for (auto& cell:row.cells)
+        if (auto result=copyMedia(cell);result.failed()) return result;
+    for (size_t n=0;n<portable.cuelists.size();++n)
+        if ((int)n!=portable.activeCuelist)
+            for (auto& row:portable.cuelists[n].rows)
+                for (auto& cell:row.cells)
+                    if (auto result=copyMedia(cell);result.failed()) return result;
     juce::TemporaryFile temp(file);
     if (!temp.getFile().replaceWithText(encodeShow(portable))) return juce::Result::fail("Could not write temporary file.");
     const auto backup = file.getSiblingFile(file.getFileName()+".bak");
@@ -679,13 +690,23 @@ juce::Result loadShow(const juce::File& file, Show& destination) {
     if (!file.existsAsFile() || file.getSize() > 32*1024*1024) return juce::Result::fail("Project missing or too large.");
     Show loaded;
     auto result = decodeShow(file.loadFileAsString(), loaded); if (result.failed()) return result;
-    for (auto& row : loaded.rows) for (auto& cell : row.cells) {
-        if (cell.file.isEmpty() || juce::File::isAbsolutePath(cell.file)) continue;
+    const auto resolveMedia=[&](Cell& cell)->juce::Result {
+        if (cell.file.isEmpty() || juce::File::isAbsolutePath(cell.file))
+            return juce::Result::ok();
         if (!safeRelative(cell.file)) return juce::Result::fail("Unsafe relative path.");
         const auto resolved = file.getParentDirectory().getChildFile(cell.file);
         if (!contained(resolved, file.getParentDirectory())) return juce::Result::fail("Media path escapes the project folder.");
         cell.file = resolved.getFullPathName();
-    }
+        return juce::Result::ok();
+    };
+    for (auto& row:loaded.rows) for (auto& cell:row.cells)
+        if (auto result=resolveMedia(cell);result.failed()) return result;
+    for (size_t n=0;n<loaded.cuelists.size();++n)
+        if ((int)n!=loaded.activeCuelist)
+            for (auto& row:loaded.cuelists[n].rows)
+                for (auto& cell:row.cells)
+                    if (auto result=resolveMedia(cell);result.failed()) return result;
+    loaded.cuelists[(size_t)loaded.activeCuelist].rows=loaded.rows;
     destination = std::move(loaded);
     return juce::Result::ok();
 }
