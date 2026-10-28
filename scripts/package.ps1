@@ -20,6 +20,9 @@ New-Item -ItemType Directory -Path (Join-Path $package 'docs') -Force | Out-Null
 Copy-Item -LiteralPath (Join-Path $repo 'docs\complete-user-guide.md') -Destination (Join-Path $package 'docs\complete-user-guide.md')
 Copy-Item -LiteralPath (Join-Path $repo 'LICENSE') -Destination $package
 Copy-Item -LiteralPath (Join-Path $repo 'NOTICE.md') -Destination $package
+New-Item -ItemType Directory -Path (Join-Path $package 'fonts') -Force | Out-Null
+Copy-Item -LiteralPath (Join-Path $repo 'assets\fonts\Exo2-OFL.txt') -Destination (Join-Path $package 'fonts\Exo2-OFL.txt')
+Copy-Item -LiteralPath (Join-Path $repo 'assets\fonts\Hind-OFL.txt') -Destination (Join-Path $package 'fonts\Hind-OFL.txt')
 Copy-Item -LiteralPath (Join-Path $repo 'vendor\JUCE\LICENSE.md') -Destination (Join-Path $package 'JUCE-LICENSE.md')
 @"
 THE CUELIST $version - WINDOWS x64
