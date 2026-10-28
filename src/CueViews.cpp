@@ -303,7 +303,7 @@ void CueGrid::showCellMenu(int row,int column,juce::Point<int> screenPoint) {
         }
     });
 }
-void CueGrid::showRowMenu(int row,juce::Point<int> screenPoint,int cellColumn) {
+void CueGrid::showRowMenu(int row,juce::Point<int> screenPoint,int /*cellColumn*/) {
     if (row<0 || row>=(int)owner.show.rows.size()) return;
     const int rowId=owner.show.rows[(size_t)row].id;
     const auto& model=owner.show;
@@ -325,7 +325,7 @@ void CueGrid::showRowMenu(int row,juce::Point<int> screenPoint,int cellColumn) {
     menu.showMenuAsync(juce::PopupMenu::Options().withTargetScreenArea(
         {screenPoint.x,screenPoint.y,1,1}),[safe,rowId](int item) {
         if (!safe || item==0) return;
-        int r=-1,c=-1;
+        int r=-1;
         for (int i=0;i<(int)safe->show.rows.size();++i)
             if (safe->show.rows[(size_t)i].id==rowId) r=i;
         if (r<0) return;
