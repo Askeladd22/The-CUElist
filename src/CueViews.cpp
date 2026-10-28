@@ -112,9 +112,15 @@ void CueGrid::paint(juce::Graphics& g) {
     g.setColour(palette::raised);g.fillRect(0,0,getWidth(),headerHeight);
     g.setColour(palette::line);g.drawHorizontalLine(headerHeight-1,0,(float)getWidth());
     g.setColour(palette::teal);g.fillRoundedRectangle(10.f,8.f,3.f,49.f,1.5f);
-    label(g,"CUE LIST",{22,9,160,22},14,palette::teal,true);
-    label(g,"SEQUENCE  /  GO  /  NAME",{22,35,nameWidth-40,20},11,palette::muted,true);
     const auto& show=owner.show;
+    const auto activeName=show.cuelists.empty()
+        ? juce::String("Cuelist 1")
+        : show.cuelists[(size_t)show.activeCuelist].name;
+    label(g,"CUE LIST / "+activeName,{22,8,nameWidth-114,23},
+          13,palette::teal,true);
+    label(g,juce::String((int)show.rows.size())+" cues  /  "+
+          juce::String(owner.visibleClipCount)+" clips",
+          {22,35,nameWidth-40,20},11,palette::muted,true);
     for (int c=0;c<(int)show.columns.size();++c) {
         const auto& col=show.columns[(size_t)c];
         const int x=columnX(c),w=columnWidthAt(c);
