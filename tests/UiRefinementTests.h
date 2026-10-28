@@ -396,6 +396,26 @@ void uiRefinementTests() {
               view->getY()==74 && ui.getWidth()-288-overlay->getRight()==0,
               "Compact cue-list positioning broke at smaller window size");
     });
+    test("Sidebar navigation has breathing room without overlapping On Deck",[] {
+        MainComponent ui(false);
+        for (const auto dimension:std::initializer_list<juce::Point<int>>{
+                {1180,820},{1440,900},{1647,895},{1920,1080}}) {
+            ui.setSize(dimension.x,dimension.y);
+            ui.resized();
+            auto* title=controlsV3::named(ui,"projectName");
+            auto* preferences=controlsV3::named(ui,"projectPreferences");
+            auto* mapping=controlsV3::named(ui,"controlMapping");
+            check(title && preferences && mapping,
+                  "Sidebar title, Settings or Control Mapping is missing");
+            check(title->getBottom()+22<=preferences->getY() &&
+                  preferences->getBottom()+14<=mapping->getY() &&
+                  mapping->getBottom()<=373 &&
+                  mapping->getBottom()+20<=dimension.y-339-12,
+                  "Sidebar spacing overlaps navigation or the emergency controls");
+            check(mapping->getRight()<=180 && mapping->getHeight()>=33,
+                  "Expanded spacing reduced the clickable Control Mapping target");
+        }
+    });
     test("Project title is editable and survives v10 serialization",[] {
         MainComponent ui(false);
         auto* title=dynamic_cast<juce::Label*>(controlsV3::named(ui,"projectName"));

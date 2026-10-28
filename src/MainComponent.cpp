@@ -347,7 +347,7 @@ void MainComponent::paint(juce::Graphics& g) {
     // Keep the project card, but remove the redundant static ENGINES panel.
     // Engine controls, routing and the live audio-status indicator are unchanged.
     g.setColour(palette::background.withAlpha(.30f));
-    g.fillRoundedRectangle(10.0f,311.0f,160.0f,114.0f,8.0f);
+    g.fillRoundedRectangle(10.0f,373.0f,160.0f,96.0f,8.0f);
     static const auto appIcon=juce::ImageFileFormat::loadFrom(
         BinaryData::thecuelist_icon_png,BinaryData::thecuelist_icon_pngSize);
     if (appIcon.isValid())
@@ -421,15 +421,15 @@ void MainComponent::paint(juce::Graphics& g) {
     label(g,audioConnected ? "AVAILABLE" : "UNAVAILABLE",
           {w-125,30,108,24},11,
           audioConnected ? palette::teal : palette::red,true);
-    label(g,"WORKSPACE",{20,118,140,17},11,palette::muted,true);
-    g.setColour(palette::teal.withAlpha(0.19f)); g.fillRoundedRectangle(12,131,156,45,8);
-    g.setColour(palette::teal); g.fillRoundedRectangle(12,137,4,34,2);
+    label(g,"WORKSPACE",{20,130,140,17},11,palette::muted,true);
+    g.setColour(palette::teal.withAlpha(0.19f)); g.fillRoundedRectangle(12,148,156,54,8);
+    g.setColour(palette::teal); g.fillRoundedRectangle(12,155,4,40,2);
     // The editable project title is a JUCE Label over this card.
-    label(g,"PROJECT",{20,319,140,18},11,palette::muted,true);
+    label(g,"PROJECT",{20,382,140,18},11,palette::muted,true);
     label(g,juce::String((int)show.rows.size())+" cues / "+juce::String((int)show.columns.size())+" columns",
-          {20,347,150,22},13,palette::muted);
+          {20,412,150,22},13,palette::muted);
     label(g,hasUnsavedChanges() ? "Unsaved changes" : "No changes",
-          {20,379,153,22},11,hasUnsavedChanges() ? palette::amber : palette::muted);
+          {20,441,153,22},11,hasUnsavedChanges() ? palette::amber : palette::muted);
     g.setColour(palette::amber.withAlpha(.11f));
     g.fillRoundedRectangle(12.0f,(float)h-339,156.0f,51.0f,8.0f);
     label(g,"ON DECK",{20,h-333,145,16},11,palette::amber,true);
@@ -597,10 +597,10 @@ void MainComponent::resized() {
     const auto geometry=workspaceLayout();
     editorX=geometry.editorX;
     newButton.setBounds(13,86,49,29); openButton.setBounds(67,86,49,29); saveButton.setBounds(121,86,49,29);
-    projectNameLabel.setBounds(28,138,132,30);
-    deviceButton.setBounds(20,188,140,33);
-    preferencesButton.setBounds(20,227,140,31);
-    controlButton.setBounds(20,264,140,33);
+    projectNameLabel.setBounds(28,158,132,34);
+    deviceButton.setBounds(20,218,140,34);
+    preferencesButton.setBounds(20,267,140,34);
+    controlButton.setBounds(20,316,140,34);
     refreshCuelistTabs();
     // Undo/Redo live in the unused upper-right band before the clock,
     // separate from the 43px-high Cuelist tab row.
