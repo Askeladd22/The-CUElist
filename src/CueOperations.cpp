@@ -2,6 +2,7 @@
 #include "ShowEditOperations.h"
 #include <algorithm>
 #include <sstream>
+#include <set>
 
 namespace cuelist {
 namespace {
@@ -77,13 +78,14 @@ void MainComponent::createCuelist() {
     if (show.cuelists.size()>=12) {message("A show supports up to 12 Cuelists.");return;}
     if (!applyInspector()) return;
     const int index=(int)show.cuelists.size();
-    auto name="Cuelist "+juce::String(index+1);
-    for (int trial=index+1;trial<50;++trial) {
-        name="Cuelist "+juce::String(trial+1);
-        bool duplicate=false;
-        for (const auto& item:show.cuelists)
-            if (item.name.equalsIgnoreCase(name)) {duplicate=true;break;}
-        if (!duplicate) break;
+    // Fill the first free sequence number, starting at 1. The previous
+    // algorithm started at index+2 and created Cuelist 3 after Cuelist 1.
+    juce::String name;
+    for (int number=1;number<=50;++number) {
+        const auto candidate="Cuelist "+juce::String(number);
+        const auto used=std::any_of(show.cuelists.begin(),show.cuelists.end(),
+            [&](const Cuelist& item){return item.name.equalsIgnoreCase(candidate);});
+        if (!used) {name=candidate;break;}
     }
     Row first;
     first.id=show.nextId++;
@@ -94,6 +96,75 @@ void MainComponent::createCuelist() {
     Cuelist created;created.name=name;created.rows.push_back(std::move(first));
     show.cuelists.push_back(std::move(created));
     activateCuelist(index);
+}
+
+void MainComponent::deleteCuelist(int index) {
+    // Deleting a list is a structural, undo-boundary operation. It never
+    // deletes source media files; only its cue data and decoded PCM cache.
+    if (index<0 || index>=(int)show.cuelists.size() ||
+        show.cuelists.size()<=1 || !applyInspector()) return;
+
+    Show candidate=show;
+    candidate.cuelists[(size_t)candidate.activeCuelist].rows=candidate.rows;
+    const auto removedName=candidate.cuelists[(size_t)index].name;
+    std::set<int> removedRows,removedCells;
+    for (const auto& row:candidate.cuelists[(size_t)index].rows) {
+        removedRows.insert(row.id);
+        for (const auto& cell:row.cells) removedCells.insert(cell.id);
+    }
+
+    candidate.cuelists.erase(candidate.cuelists.begin()+index);
+    if (index<candidate.activeCuelist) --candidate.activeCuelist;
+    else if (index==candidate.activeCuelist)
+        candidate.activeCuelist=std::min(index,(int)candidate.cuelists.size()-1);
+    candidate.rows=candidate.cuelists[(size_t)candidate.activeCuelist].rows;
+
+    auto& bindings=candidate.controls.bindings;
+    bindings.erase(std::remove_if(bindings.begin(),bindings.end(),
+        [&](const ControlBinding& binding) {
+            return binding.scope==ControlScope::cue &&
+                   removedRows.count(binding.scopeId)!=0;
+        }),bindings.end());
+    for (auto& column:candidate.columns)
+        if (removedRows.count(column.controlDefaultSourceRowId)!=0)
+            column.controlDefaultSourceRowId=0;
+
+    if (auto valid=validateShow(candidate);valid.failed()) {
+        message("Cannot delete Cuelist: "+valid.getErrorMessage());
+        return; // The original show and its audio remain untouched.
+    }
+
+    if (projectLoader) projectLoader->cancel();
+    stopAll();closeMidiClip();closeOscClip();
+    editHistory.clearUndoHistory();
+    show=std::move(candidate);
+    for (int cellId:removedCells) clips.erase(cellId);
+    selectedRow=selectedColumn=nextCue=0;
+    copiedRow.reset();copiedRowAudio.clear();copiedCell.reset();copiedAudio.reset();
+    resetActiveMapping();
+    refreshControlSettings();
+    engine.publish(makeRenderState(show,clips));
+    viewport.setViewPosition(0,0);
+    dirty=true;
+    status="Deleted "+removedName+". Original media files retained.";
+    refresh();
+}
+
+void MainComponent::requestDeleteCuelist(int index) {
+    if (index<0 || index>=(int)show.cuelists.size() ||
+        show.cuelists.size()<=1) return;
+    const auto name=show.cuelists[(size_t)index].name;
+    auto* dialog=new juce::AlertWindow(
+        "Delete "+name+"?",
+        "Delete this Cuelist and all its cues from the show? This cannot be "
+        "undone. Source audio files on disk will not be removed.",
+        juce::MessageBoxIconType::WarningIcon,this);
+    dialog->addButton("Delete Cuelist",1);
+    dialog->addButton("Cancel",0,juce::KeyPress(juce::KeyPress::escapeKey));
+    dialog->enterModalState(true,juce::ModalCallbackFunction::create(
+        [safe=juce::Component::SafePointer<MainComponent>(this),index](int choice) {
+            if (safe && choice==1) safe->deleteCuelist(index);
+        }),true);
 }
 
 void MainComponent::renameActiveCuelist() {
