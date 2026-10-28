@@ -4,6 +4,7 @@
 namespace cuelist {
 namespace {
 constexpr int inspectorWidth=288;
+constexpr int collapsedInspectorRail=26;
 constexpr int inspectorInnerWidth=236;
 constexpr int inspectorScaleOriginY=160;
 constexpr int cueLeft=182;
@@ -37,7 +38,7 @@ juce::Rectangle<int> WorkspaceLayout::scaleInspectorControl(
 
 WorkspaceLayout calculateWorkspaceLayout(const WorkspaceLayoutInput& input) {
     WorkspaceLayout result;
-    result.editorX=input.width-inspectorWidth;
+    result.editorX=input.width-(input.inspectorVisible ? inspectorWidth : collapsedInspectorRail);
     result.inspectorLeft=result.editorX+16;
     result.inspectorInnerWidth=inspectorInnerWidth;
     result.inspectorScale=std::clamp((float)(input.height-232)/730.0f,0.72f,0.92f);
