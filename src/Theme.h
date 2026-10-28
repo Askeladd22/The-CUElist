@@ -172,7 +172,7 @@ public:
         }
         height=juce::jmax(30,standardHeight);
         width=juce::jmax(110,
-             (int)std::ceil(font(13.0f).getStringWidthFloat(title))+65);
+             (int)std::ceil(juce::GlyphArrangement::getStringWidth(font(13.0f),title))+65);
     }
 
     void drawComboBox(juce::Graphics& g,int width,int height,bool isButtonDown,
