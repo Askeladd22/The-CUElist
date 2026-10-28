@@ -346,8 +346,20 @@ void MainComponent::paint(juce::Graphics& g) {
                   juce::String(systemCpuPercent,0)+"%";
     const auto ram=systemRamPercent<0 ? juce::String("N/A") :
                   juce::String(systemRamPercent,0)+"%";
-    label(g,"CPU "+cpu,{cpuX+9,29,115,16},11,palette::text,true);
-    label(g,"RAM "+ram,{cpuX+9,45,115,16},11,palette::text,true);
+    label(g,"CPU "+cpu,{cpuX+9,29,76,16},11,palette::text,true);
+    label(g,"RAM "+ram,{cpuX+9,45,76,16},11,palette::text,true);
+    const auto meter=[&](int y,float percentage,juce::Colour colour) {
+        constexpr float width=33.0f;
+        g.setColour(palette::line);
+        g.fillRoundedRectangle((float)cpuX+90,(float)y,width,5.0f,2.0f);
+        if (percentage>=0) {
+            g.setColour(colour);
+            g.fillRoundedRectangle((float)cpuX+90,(float)y,
+                width*juce::jlimit(0.0f,1.0f,percentage/100.0f),5.0f,2.0f);
+        }
+    };
+    meter(34,systemCpuPercent,palette::teal);
+    meter(50,systemRamPercent,palette::amber);
 
     // Audio availability is distinct from actual MIDI/OSC traffic.
     const int statusX=w-363;
