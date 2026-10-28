@@ -275,6 +275,7 @@ void CueGrid::showCellMenu(int row,int column,juce::Point<int> screenPoint) {
     const int rowId=owner.show.rows[(size_t)row].id;
     const int columnId=col.id;
     juce::PopupMenu menu;
+    menu.setLookAndFeel(&getLookAndFeel());
     menu.addItem(1,"Delete cell  Backspace",!locked);
     menu.addItem(2,"Cut  Ctrl+X",!locked);
     menu.addItem(3,"Copy  Ctrl+C",!locked);
@@ -309,12 +310,14 @@ void CueGrid::showRowMenu(int row,juce::Point<int> screenPoint,int /*cellColumn*
     const auto& model=owner.show;
 
     juce::PopupMenu menu;
+    menu.setLookAndFeel(&getLookAndFeel());
     menu.addItem(1,"Copy cue");
     menu.addItem(2,"Paste cue below",owner.copiedRow.has_value() &&
         owner.copiedRow->cells.size()==model.columns.size());
     menu.addItem(3,"Duplicate cue");
     menu.addSeparator();
     juce::PopupMenu colours;
+    colours.setLookAndFeel(&getLookAndFeel());
     const char* labels[]={"Default","Turquoise","Amber","Red","Purple","Blue","Green","Orange"};
     for (int i=0;i<8;++i)
         colours.addItem(100+i,labels[i],true,model.rows[(size_t)row].colour==i);

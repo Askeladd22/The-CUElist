@@ -167,6 +167,7 @@ void MainComponent::addCue() {
 void MainComponent::showColumnMenu(juce::Point<int> screenPoint) {
     if (!applyInspector()) return;
     juce::PopupMenu menu;
+    menu.setLookAndFeel(&theme);
     menu.addItem(1,"Audio"); menu.addItem(2,"MIDI");
     menu.addItem(3,"OSC / UDP"); menu.addItem(4,"Control");
     auto safe=juce::Component::SafePointer<MainComponent>(this);
