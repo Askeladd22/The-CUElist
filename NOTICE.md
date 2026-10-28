@@ -1,6 +1,6 @@
 # The Cuelist — License Notices
 
-The original application code, scripts, and tests are proprietary: all rights reserved. See the authoritative [Italian LICENSE](LICENSE) or the [English reference translation](LICENSE.en.md). No open-source license applies to the project's original code.
+The original application code, scripts, and tests are proprietary: all rights reserved. See the single bilingual [LICENSE](LICENSE), whose Italian text is authoritative. No open-source license applies to the project's original code.
 
 ## JUCE and Third-Party Components
 
@@ -12,6 +12,6 @@ The original application code, scripts, and tests are proprietary: all rights re
 
 ## Portable Package
 
-The local package includes `LICENSE`, this notice, and `JUCE-LICENSE.md`. It does not include the application's or framework's source code. Packaging does not certify that distribution is covered by the necessary licenses.
+The local package includes one `LICENSE` document (Italian original and English reference translation), this notice, and the separate `JUCE-LICENSE.md` required for third-party terms. It does not include the application's or framework's source code. Packaging does not certify that distribution is covered by the necessary licenses.
 
 User-created or imported WAV/MP3 files and projects retain their respective rights. The fixture `tests/fixtures/tone.mp3` is a synthetic tone generated for project tests.
