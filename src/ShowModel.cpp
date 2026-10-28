@@ -47,11 +47,19 @@ void addColumn(Show& show, ColumnType type, const juce::String& name) {
     created.masterSend=(type==ColumnType::audio);
     show.columns.push_back(std::move(created));
     for (auto& row : show.rows) { Cell c; c.id = show.nextId++; row.cells.push_back(c); }
+    // An operator can add columns at any moment, including with multiple
+    // Cuelists. Keep inactive cue matrices rectangular as well.
+    for (size_t n=0;n<show.cuelists.size();++n)
+        if ((int)n!=show.activeCuelist)
+            for (auto& row:show.cuelists[n].rows) {
+                Cell c; c.id=show.nextId++; row.cells.push_back(c);
+            }
 }
 Show makeShow() {
     Show show;
     addColumn(show, ColumnType::audio, {});
     addRow(show, {});
+    show.cuelists.push_back({"Cuelist 1",show.rows});
     return show;
 }
 double secondsAtBeat(const std::vector<TempoPoint>& points, double beat) {
@@ -119,6 +127,36 @@ juce::Result validateShow(const Show& show) {
                 return fail("Invalid cell.");
             if (c.file.isNotEmpty() && (show.columns[i].type != ColumnType::audio || (!juce::File::isAbsolutePath(c.file) && !safeRelative(c.file))))
                 return fail("Invalid audio path or non-Audio column.");
+        }
+    }
+    // Validate dormant Cuelists without asking the transport or current
+    // cue mapping to interpret a different list's row IDs.
+    if (!show.cuelists.empty()) {
+        if (show.cuelists.size()>12 || show.activeCuelist<0 ||
+            show.activeCuelist>=(int)show.cuelists.size())
+            return fail("Invalid Cuelist selection or count.");
+        int totalRows=(int)show.rows.size();
+        for (size_t n=0;n<show.cuelists.size();++n) {
+            const auto& list=show.cuelists[n];
+            if (list.name.trim().isEmpty() || list.name.length()>64)
+                return fail("Invalid Cuelist name.");
+            if ((int)n==show.activeCuelist) continue;
+            totalRows+=(int)list.rows.size();
+            if (totalRows>10000) return fail("Too many cues across Cuelists.");
+            Show independent=show;
+            independent.cuelists.clear();
+            independent.activeCuelist=0;
+            independent.rows=list.rows;
+            // Scoped cue mappings belong to the active list, so checking
+            // dormant media/cell geometry must not resolve them against it.
+            independent.controls.bindings.clear();
+            if (auto validation=validateShow(independent);validation.failed())
+                return validation;
+            for (const auto& dormantRow:list.rows) {
+                if (!unique(dormantRow.id)) return fail("Duplicate cue ID across Cuelists.");
+                for (const auto& cell:dormantRow.cells)
+                    if (!unique(cell.id)) return fail("Duplicate cell ID across Cuelists.");
+            }
         }
     }
     if (show.nextId <= *ids.rbegin() || show.nextId >= 1000000000) return fail("Invalid identifier counter.");
