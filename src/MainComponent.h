@@ -240,6 +240,7 @@ private:
     juce::TextButton preflightButton{"Preflight"},diagnosticsButton{"Diagnostics"};
     juce::TextButton goButton{"GO  /  SPACE"},panicButton{"PANIC  /  ESC"},deviceButton{"Audio devices"},controlButton{"CONTROL MAPPING"};
     juce::TextButton collapseAllButton{"Collapse all"};
+    juce::TextButton inspectorSideTab{">"};
     juce::TextButton cuelistTab0{"Cuelist 1"},cuelistTab1{"Cuelist 2"},
                      cuelistTab2{"Cuelist 3"},addCuelistButton{"+"};
     void refreshCuelistTabs();
@@ -331,6 +332,7 @@ private:
     juce::File projectFile;
     juce::String status="Ready. Select an Audio cell and import a WAV file.";
     bool dirty=false;
+    bool inspectorVisible=true; // UI-only; never persisted in the Show file
     int visibleClipCount=0;
     float systemCpuPercent=-1.f,systemRamPercent=-1.f;
     int systemTelemetryTicks=0;
