@@ -80,6 +80,33 @@ void uiRefinementTests() {
         }
     });
 
+    test("Help menu and versioned About stay accessible at minimum window width",[] {
+        MainComponent ui(false);
+        auto* help=dynamic_cast<juce::TextButton*>(
+            controlsV3::named(ui,"showHelpMenu"));
+        auto* undo=dynamic_cast<juce::TextButton*>(
+            controlsV3::named(ui,"showUndo"));
+        auto* tab=dynamic_cast<juce::TextButton*>(
+            controlsV3::named(ui,"inspectorSideToggle"));
+        check(help && undo && tab,"Help, Undo or Inspector grip missing");
+        check(juce::String(THE_CUELIST_VERSION).startsWith("0.9.0-beta."),
+              "About version is not bound to VERSION.txt in the build");
+        for (const auto size:std::initializer_list<juce::Point<int>>{
+                 {1180,820},{1440,900},{1647,895},{1920,1080}}) {
+            ui.setSize(size.x,size.y);
+            ui.resized();
+            check(help->isVisible() && help->getRight()+5<=undo->getX() &&
+                  help->getY()>=0 && help->getBottom()<43,
+                  "Help overlaps Undo or Cuelist tab strip");
+            check(tab->getButtonText().isEmpty() &&
+                  tab->getWidth()==20 && tab->getHeight()==46,
+                  "Inspector grip must use directional vector symbols");
+            auto icon=tab->createComponentSnapshot(tab->getLocalBounds());
+            check(icon.isValid() && icon.getWidth()==20 && icon.getHeight()==46,
+                  "Inspector vector symbol failed to render");
+        }
+    });
+
     test("Inspector edge tab collapses right and restores unsaved cue notes",[] {
         MainComponent ui(false);
         ui.setSize(1440,900);
