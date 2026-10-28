@@ -3,6 +3,31 @@
 #include "OscEditor.h"
 void uiRefinementTests() {
     using namespace cueViewFixtures;
+    test("Exo 2 small text and Hind headings use embedded OFL typefaces",[] {
+        check(appTypefaces().exo2!=nullptr &&
+              appTypefaces().hind!=nullptr &&
+              appTypefaces().hindSemibold!=nullptr,
+              "Embedded typography assets were not loaded");
+        auto compact=font(9.0f,true);
+        auto body=font(14.5f);
+        auto heading=font(18.0f,true);
+        check(compact.getPointHeight()>=10.0f &&
+              body.getPointHeight()>=10.0f,
+              "Small typography must never be below 10 pt");
+        check(compact.getTypefaceName().containsIgnoreCase("Exo") &&
+              body.getTypefaceName().containsIgnoreCase("Exo") &&
+              heading.getTypefaceName().containsIgnoreCase("Hind"),
+              "Typography typeface routing differs from Exo 2 / Hind");
+        Theme theme;
+        juce::TextButton sample;
+        juce::ComboBox combo;
+        check(theme.getPopupMenuFont().getTypefaceName().containsIgnoreCase("Exo") &&
+              theme.getTextButtonFont(sample,24).getPointHeight()>=10.0f &&
+              theme.getTextButtonFont(sample,32).getTypefaceName().containsIgnoreCase("Hind") &&
+              theme.getComboBoxFont(combo).getPointHeight()>=10.0f,
+              "Native controls bypass the shared typography hierarchy");
+    });
+
     test("Midnight Slate palette preserves layered dark surfaces and safety accents",[] {
         const auto brightness=[](juce::Colour colour) {
             return 0.2126f*(float)colour.getRed()+

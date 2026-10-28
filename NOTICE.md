@@ -10,6 +10,17 @@ The original application code, scripts, tests, interface, artwork and documentat
 - Check JUCE licensing before distributing to third parties: https://juce.com/get-juce/
 - `vendor/JUCE/LICENSE.md` describes the framework's and dependencies' terms. Those notices remain applicable and are not superseded by the application's proprietary license.
 
+## Embedded User-Interface Fonts (SIL Open Font License 1.1)
+
+The Cuelist embeds the following Google Fonts under their **own** SIL Open Font License, Version 1.1 (OFL). The fonts are not relicensed under The Cuelist's proprietary copyright notice.
+
+- **Exo 2** — copyright 2013 The Exo 2 Project Authors; small text and instrumentation (minimum 10 pt). Upstream: https://github.com/google/fonts/tree/main/ofl/exo2
+- **Hind** — copyright 2014 Indian Type Foundry; larger labels, headings and titles. Upstream: https://github.com/google/fonts/tree/main/ofl/hind
+- The exact typeface files are fetched from Google Fonts commit `9862abc066c9b83bf84c3e8ed1fc2d8d48f9bbf0` when configuring CMake, then embedded in the executable. No fonts need to be installed on Windows and no runtime download is required.
+- Full upstream notices and OFL terms are preserved at [assets/fonts/Exo2-OFL.txt](assets/fonts/Exo2-OFL.txt) and [assets/fonts/Hind-OFL.txt](assets/fonts/Hind-OFL.txt). Copies are included in portable packages under `fonts/`.
+
+The OFL permits embedding the fonts in proprietary applications, provided the font copyright and license notices are kept with distribution.
+
 ## Portable Package
 
 The local package includes one English-language `LICENSE` copyright notice, this `NOTICE.md`, and the separate `JUCE-LICENSE.md` required for third-party terms. It does not include the application's or framework's source code. Packaging does not certify that distribution is covered by the necessary licenses.

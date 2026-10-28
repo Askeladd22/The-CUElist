@@ -1,5 +1,6 @@
 #pragma once
 #include <juce_gui_basics/juce_gui_basics.h>
+#include "BinaryData.h"
 #include <cmath>
 namespace cuelist {
 namespace palette {
@@ -25,8 +26,39 @@ inline juce::Colour type(int i) {
            juce::Colour(0xff82baf4);
 }
 }
-// Segoe UI is shipped with supported Windows versions, with JUCE fallback.
-inline juce::Font font(float size, bool bold=false) { return juce::Font(juce::FontOptions("Segoe UI",size,bold ? juce::Font::bold : juce::Font::plain)); }
+// Embedded OFL typefaces are registered once and kept alive for the app's
+// lifetime. No user-installed fonts, startup network or Windows font state.
+struct AppTypefaces {
+    juce::Typeface::Ptr exo2=juce::Typeface::createSystemTypefaceFor(
+        BinaryData::Exo2_ttf,BinaryData::Exo2_ttfSize);
+    juce::Typeface::Ptr hind=juce::Typeface::createSystemTypefaceFor(
+        BinaryData::Hind_Regular_ttf,BinaryData::Hind_Regular_ttfSize);
+    juce::Typeface::Ptr hindSemibold=juce::Typeface::createSystemTypefaceFor(
+        BinaryData::Hind_SemiBold_ttf,BinaryData::Hind_SemiBold_ttfSize);
+};
+inline const AppTypefaces& appTypefaces() {
+    static const AppTypefaces faces;
+    return faces;
+}
+
+// Historical design sizes are JUCE logical pixels, not typographic points.
+// 1 pt = 4/3 logical px at the Windows 96-DPI reference scale. Preserve the
+// intended layout while enforcing Exo 2 at >=10 actual points for small text.
+inline constexpr float smallTextCutoff=14.5f;
+inline juce::Font font(float size,bool bold=false) {
+    const auto& faces=appTypefaces();
+    const bool small=size<=smallTextCutoff;
+    const auto face=small ? faces.exo2 : (bold ? faces.hindSemibold : faces.hind);
+    const auto pt=juce::jmax(10.0f,size*0.75f);
+    if (face!=nullptr) {
+        auto options=juce::FontOptions(face).withPointHeight(pt);
+        if (small && bold) options=options.withStyleFlags(juce::Font::bold);
+        return juce::Font(options);
+    }
+    // Last resort only (e.g. a corrupt embedded font), never default behavior.
+    return juce::Font(juce::FontOptions("Segoe UI",size,
+        bold ? juce::Font::bold : juce::Font::plain).withPointHeight(pt));
+}
 inline void label(juce::Graphics& g,const juce::String& s,juce::Rectangle<int> r,float size=14,juce::Colour colour=palette::text,bool bold=false,int align=juce::Justification::centredLeft) {
     g.setColour(colour); g.setFont(font(size,bold)); g.drawText(s,r,align,true);
 }
@@ -64,6 +96,13 @@ public:
         return font(height<26 ? 12.5f : 15.0f,true);
     }
     juce::Font getComboBoxFont(juce::ComboBox&) override { return font(14.5f); }
+    juce::Font getLabelFont(juce::Label& l) override {
+        return font(l.getFont().getHeight(),l.getFont().isBold());
+    }
+    juce::Font getAlertWindowTitleFont() override { return font(22.0f,true); }
+    juce::Font getAlertWindowMessageFont() override { return font(15.0f); }
+    juce::Font getAlertWindowFont() override { return font(14.0f); }
+    juce::Font getSliderPopupFont(juce::Slider&) override { return font(14.0f); }
     void drawButtonBackground(juce::Graphics& g,juce::Button& b,const juce::Colour& colour,bool over,bool down) override {
         const auto r=b.getLocalBounds().toFloat().reduced(0.8f);
         const auto fill=colour.withMultipliedBrightness(down ? 0.87f : over ? 1.14f : 1.0f);
