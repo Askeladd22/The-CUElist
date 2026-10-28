@@ -11,8 +11,8 @@ void uiRefinementTests() {
         auto compact=font(9.0f,true);
         auto body=font(14.5f);
         auto heading=font(18.0f,true);
-        check(compact.getPointHeight()>=10.0f &&
-              body.getPointHeight()>=10.0f,
+        check(compact.getHeightInPoints()>=10.0f &&
+              body.getHeightInPoints()>=10.0f,
               "Small typography must never be below 10 pt");
         check(compact.getTypefaceName().containsIgnoreCase("Exo") &&
               body.getTypefaceName().containsIgnoreCase("Exo") &&
@@ -22,9 +22,9 @@ void uiRefinementTests() {
         juce::TextButton sample;
         juce::ComboBox combo;
         check(theme.getPopupMenuFont().getTypefaceName().containsIgnoreCase("Exo") &&
-              theme.getTextButtonFont(sample,24).getPointHeight()>=10.0f &&
+              theme.getTextButtonFont(sample,24).getHeightInPoints()>=10.0f &&
               theme.getTextButtonFont(sample,32).getTypefaceName().containsIgnoreCase("Hind") &&
-              theme.getComboBoxFont(combo).getPointHeight()>=10.0f,
+              theme.getComboBoxFont(combo).getHeightInPoints()>=10.0f,
               "Native controls bypass the shared typography hierarchy");
     });
 
