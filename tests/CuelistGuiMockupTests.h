@@ -1,4 +1,5 @@
 #pragma once
+#include "ProjectMediaLoader.h"
 
 void cuelistGuiMockupTests() {
     using namespace cueViewFixtures;
