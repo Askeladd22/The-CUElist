@@ -1,8 +1,40 @@
 #pragma once
 #include "GainMeterFader.h"
+#include "HelpGuide.h"
 #include "OscEditor.h"
 void uiRefinementTests() {
     using namespace cueViewFixtures;
+    test("Native Guide renders Markdown and supports section search",[] {
+        GuideDocument document;
+        document.setMarkdown("# The Cuelist\n\n## 1. Introduction\n"
+                             "Welcome to the **Cuelist** guide.\n"
+                             "- First cue\n- Second cue\n"
+                             "| Action | Behavior |\n| --- | --- |\n"
+                             "| GO | Plays the next cue |\n"
+                             "```text\nhello\n```");
+        document.layoutAtWidth(620);
+        check(document.blockCount()>=8 && document.getHeight()>120,
+              "Markdown guide sections were not laid out");
+        const int intro=document.findNext("Introduction");
+        const int cue=document.findNext("Second cue");
+        check(intro>=0 && cue>intro &&
+              document.blockTop(cue)>document.blockTop(intro),
+              "In-app guide search cannot navigate ordered sections");
+        check(document.findPrevious("Introduction",cue)==intro &&
+              document.findNext("not in guide")==-1,
+              "Guide navigation should wrap safely and report no matches");
+        juce::Image canvas(juce::Image::ARGB,620,220,true);
+        {
+            juce::Graphics g(canvas);
+            document.paint(g);
+        }
+        check(canvas.isValid(),"Native guide document failed to render");
+        GuideViewer reader("# The Cuelist\n## Getting started\nGo.");
+        reader.setSize(900,610);
+        check(reader.getDocument().findNext("Getting started")>=0,
+              "Guide viewer lost its Markdown content");
+    });
+
     test("Exo 2 small text and Hind headings use embedded OFL typefaces",[] {
         check(appTypefaces().exo2!=nullptr &&
               appTypefaces().hind!=nullptr &&
