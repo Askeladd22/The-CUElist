@@ -21,6 +21,10 @@ The Cuelist is a desktop application for preparing and executing cue-based live 
 | **Workspace** | Zoomable Timeline; fixed BPM/Auto Stop; collapse/expand of the Inspector and columns; cue-specific notepad; configurable editor dock; Undo/Redo for supported MIDI/OSC edits. |
 | **Operations** | Preflight, Diagnostics, crash-recovery checkpoints, transactional project loading, offline tests and an optional hardware inventory utility. |
 
+### Typography
+
+The native interface uses **Exo 2** for compact operational labels (no smaller than **10 pt**) and **Hind** for larger type, headings and titles. Fonts are embedded from pinned Google Fonts sources under SIL OFL 1.1; they are not dependent on the fonts installed on the operator's Windows computer. See [NOTICE.md](NOTICE.md) for font copyrights and license terms.
+
 ### The workspace
 
 The left sidebar contains New, Open, Save, Audio devices, Preferences, Control Mapping, the next-cue indicator and GO/Panic. The upper bar displays the current Cuelist tabs, Undo/Redo, a 24-hour clock, CPU/RAM telemetry and MIDI/OSC activity indicators.
