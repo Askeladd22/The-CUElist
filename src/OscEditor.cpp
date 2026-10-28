@@ -511,6 +511,7 @@ void OscClipEditor::showContext(const juce::MouseEvent& e) {
             if (p>=0) {
                 selectedPoint=p;
                 juce::PopupMenu pointMenu;
+                pointMenu.setLookAndFeel(&getLookAndFeel());
                 pointMenu.addItem(10,"Delete point",p>0 && p+1<(int)clip.automations[(size_t)hit].points.size());
                 auto safe=juce::Component::SafePointer<OscClipEditor>(this);
                 pointMenu.showMenuAsync(juce::PopupMenu::Options().withTargetComponent(this),
@@ -522,6 +523,7 @@ void OscClipEditor::showContext(const juce::MouseEvent& e) {
         if (track>=0 && track<(int)clip.tracks.size()) selectedTrack=track;
     }
     juce::PopupMenu menu;
+    menu.setLookAndFeel(&getLookAndFeel());
     menu.addItem(1,"Edit",selectedEvent>=0 || selectedAutomation>=0);
     menu.addItem(2,"Duplicate",selectedEvent>=0 || selectedAutomation>=0);
     menu.addItem(3,"Delete",selectedEvent>=0 || selectedAutomation>=0);
