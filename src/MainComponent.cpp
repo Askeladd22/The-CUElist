@@ -28,11 +28,11 @@ MainComponent::MainComponent(bool startAudio) {
     setLookAndFeel(&theme); setWantsKeyboardFocus(true); setSize(1440,900);
     for (juce::Component* c : std::initializer_list<juce::Component*>{&openButton,&saveButton,&newButton,&addRowButton,&addColumnButton,
          &goButton,&panicButton,&deviceButton,&controlButton,&collapseAllButton,&inspectorSideTab,
-         &cuelistOverflowButton,&addCuelistButton,&undoButton,&redoButton,&dockResize,&timelineResize,&importButton,&midiEditButton,&oscEditButton,&playCellButton,&stopCellButton,&clearButton,&tempoButton,&applyButton,
+         &cuelistOverflowButton,&addCuelistButton,&undoButton,&redoButton,&helpButton,&dockResize,&timelineResize,&importButton,&midiEditButton,&oscEditButton,&playCellButton,&stopCellButton,&clearButton,&tempoButton,&applyButton,
          &cellTab,&rowTab,&rowGain,&rowBehaviour,&rowMute,&rowLoop,&rowName,&cellName,&bpm,&cueNotes,&behaviour,&follow,&loop,&cellAutoStop,&gainDb,&viewport,&timeline,&utilities,
          &clipCollapseButton,&clipCloseButton,&cueHeaders,&cueMetrics,&preflightButton,&diagnosticsButton,&preferencesButton,&projectNameLabel}) addAndMakeVisible(c);
     for (auto* b : {&openButton,&saveButton,&newButton,&addRowButton,&addColumnButton,&goButton,&panicButton,&deviceButton,&controlButton,&collapseAllButton,&inspectorSideTab,
-                    &cuelistOverflowButton,&addCuelistButton,&undoButton,&redoButton,
+                    &cuelistOverflowButton,&addCuelistButton,&undoButton,&redoButton,&helpButton,
                     &importButton,&midiEditButton,&oscEditButton,&playCellButton,&stopCellButton,&clearButton,&tempoButton,&applyButton,
                     &preflightButton,&diagnosticsButton,&preferencesButton}) b->setWantsKeyboardFocus(false);
     viewport.setViewedComponent(&grid,false); viewport.setScrollBarsShown(true,true);
@@ -162,6 +162,22 @@ MainComponent::MainComponent(bool startAudio) {
         if(name!=show.name) {
             show.name=name; dirty=true; status="Project renamed (save to persist)."; repaint();
         }
+    };
+    helpButton.setName("showHelpMenu");
+    helpButton.setTooltip("User Guide and About The Cuelist.");
+    helpButton.onClick=[this] {
+        juce::PopupMenu menu;
+        menu.setLookAndFeel(&theme);
+        menu.addItem(1,"User Guide");
+        menu.addItem(2,"About The Cuelist");
+        auto safe=juce::Component::SafePointer<MainComponent>(this);
+        menu.showMenuAsync(
+            juce::PopupMenu::Options().withTargetComponent(&helpButton),
+            [safe](int choice) {
+                if (!safe) return;
+                if (choice==1) safe->openUserGuide();
+                else if (choice==2) safe->showAbout();
+            });
     };
     preferencesButton.setName("projectPreferences");
     preferencesButton.setTooltip("Pre-flight, diagnostics and fader display range.");
@@ -604,6 +620,7 @@ void MainComponent::resized() {
     refreshCuelistTabs();
     // Undo/Redo live in the unused upper-right band before the clock,
     // separate from the 43px-high Cuelist tab row.
+    helpButton.setBounds(getWidth()-831,10,61,25);
     undoButton.setBounds(getWidth()-764,10,51,25);
     redoButton.setBounds(getWidth()-709,10,51,25);
     collapseAllButton.setBounds(geometry.cueHeaders.getX()+CueGrid::nameWidth-84,
@@ -619,7 +636,7 @@ void MainComponent::resized() {
                                    : geometry.editorX+3;
     const int tabY=juce::jlimit(150,std::max(150,h-135),h/2-gripHeight/2);
     inspectorSideTab.setBounds(tabX,tabY,gripWidth,gripHeight);
-    inspectorSideTab.setButtonText(inspectorVisible ? ">" : "<");
+    inspectorSideTab.setInspectorOpen(inspectorVisible);
     inspectorSideTab.setTooltip(inspectorVisible
         ? "Collapse Inspector to the right"
         : "Expand Inspector to the left");
