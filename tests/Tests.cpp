@@ -23,6 +23,7 @@ void test(const char* name, const std::function<void()>& body) {
 #include "ModelV3Tests.h"
 #include "TimelineV3Tests.h"
 #include "ControlsV3Tests.h"
+#include "CuelistGuiMockupTests.h"
 #include "EngineV4Tests.h"
 #include "ControlsV4Tests.h"
 #include "PianoRollTests.h"
@@ -69,6 +70,7 @@ int main() {
     controlColumnTests();
     stabilityV7Tests();
     architectureV8Tests();
+    cuelistGuiMockupTests();
     test("MIDI columns accept file drops and enable their importer", [] {
         MainComponent ui(false); addColumn(ui.show,ColumnType::midi,{}); ui.select(0,1);
         auto* grid=cueViewFixtures::find<CueGrid>(ui);
