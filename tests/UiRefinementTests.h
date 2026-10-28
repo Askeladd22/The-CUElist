@@ -26,6 +26,30 @@ void uiRefinementTests() {
               palette::selectedTab!=palette::panel,
               "GO, Panic, active tabs or live-state accents lost their distinction");
     });
+    test("Popup menus use Midnight Slate with readable hover and separator",[] {
+        Theme theme;
+        juce::Image pixels(juce::Image::ARGB,220,120,true);
+        juce::Graphics g(pixels);
+        theme.drawPopupMenuBackground(g,220,120);
+        check(pixels.getPixelAt(80,15)==palette::panel &&
+              pixels.getPixelAt(0,0)==palette::line.withAlpha(.9f),
+              "Popup background is not the Midnight Slate surface");
+        theme.drawPopupMenuItem(g,{0,28,220,34},
+                                false,true,true,true,true,
+                                "Fader Range",{},nullptr,nullptr);
+        check(pixels.getPixelAt(4,44)==palette::teal &&
+              pixels.getPixelAt(12,31)==palette::raised,
+              "Popup hover lost its teal selection rail or raised surface");
+        theme.drawPopupMenuItem(g,{0,81,220,10},
+                                true,true,false,false,false,
+                                {},{},nullptr,nullptr);
+        check(pixels.getPixelAt(20,86)==palette::line.withAlpha(.65f),
+              "Popup separators no longer match the theme");
+        int width=0,height=0;
+        theme.getIdealPopupMenuItemSize("Rename active Cuelist",false,24,width,height);
+        check(width>=140 && height>=30,
+              "Popup row dimensions are too small for clear stage use");
+    });
     test("Inspector edge tab collapses right and restores unsaved cue notes",[] {
         MainComponent ui(false);
         ui.setSize(1440,900);
