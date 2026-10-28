@@ -416,9 +416,6 @@ private:
     bool activateProject(Show candidate,const juce::File& source,bool recovering);
     bool commitPreparedProject(Show candidate,const juce::File& source,bool recovering,
                                PreparedShowMedia prepared);
-    void showHelpMenu();
-    void openUserGuide();
-    void showAboutDialog();
     void showPreflight();
     void showDiagnostics();
     void showColumnMenu(juce::Point<int> screenPoint);
