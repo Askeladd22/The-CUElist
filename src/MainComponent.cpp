@@ -743,6 +743,38 @@ void MainComponent::changed(const juce::String& text,bool stopPlayback) {
     engine.publish(makeRenderState(show,clips),!stopPlayback);
     dirty=true; status=text; refresh();
 }
+void MainComponent::openUserGuide() {
+    // The markdown guide is deployed beside both the compiled EXE and the
+    // extracted portable package. Never depend on a network connection.
+    const auto directory=juce::File::getSpecialLocation(
+        juce::File::currentExecutableFile).getParentDirectory();
+    const auto guide=directory.getChildFile("docs")
+                              .getChildFile("complete-user-guide.md");
+    if (!guide.existsAsFile()) {
+        message("User Guide not found next to the executable. "
+                "Rebuild the application or verify that "
+                "docs/complete-user-guide.md is included with the package.");
+        return;
+    }
+    if (!guide.startAsProcess())
+        message("Windows could not open the User Guide. "
+                "Open docs/complete-user-guide.md from the program folder "
+                "with a Markdown-capable editor.");
+}
+
+void MainComponent::showAbout() {
+    const juce::String info=
+        "Version: "+juce::String(THE_CUELIST_VERSION)+"\n"
+        "Copyright (c) 2026 Davide Salvatore and Riccardo D'Ambrosio.\n"
+        "All rights reserved.\n\n"
+        "License: Proprietary software - no public software license.\n"
+        "Copyright holders: Davide Salvatore and Riccardo D'Ambrosio.\n\n"
+        "See LICENSE for the copyright notice and NOTICE.md "
+        "for third-party licenses, including JUCE.";
+    juce::AlertWindow::showMessageBoxAsync(
+        juce::MessageBoxIconType::InfoIcon,"About The Cuelist",info,"Close",this);
+}
+
 void MainComponent::message(const juce::String& text) { status=text; repaint(); juce::AlertWindow::showMessageBoxAsync(juce::MessageBoxIconType::WarningIcon,"The Cuelist",text,"OK",this); }
 bool MainComponent::memoryFits(const ClipMap& collection) const {
     return withinPcmBudget(collection);
