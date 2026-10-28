@@ -80,6 +80,46 @@ void cuelistGuiMockupTests() {
             check(plus->getRight()<window.x-650,
                   "Cuelist tabs overlapped the clock");
         }
+        auto* plusButton=dynamic_cast<juce::TextButton*>(plus);
+        check(plusButton!=nullptr,"Cuelist plus must be a real button");
+        click(*plusButton,12.f,12.f);
+        check(ui.show.cuelists.size()==2 && ui.show.activeCuelist==1,
+              "Top-bar plus did not create and select a Cuelist");
+    });
+
+    test("Multiple Cuelists preserve inactive audio on actual disk save and reload",[] {
+        auto directory=juce::File::getSpecialLocation(juce::File::tempDirectory)
+            .getChildFile("cuelist-multi-test-"+juce::Uuid().toString());
+        check(directory.createDirectory().wasOk(),"Cannot create temporary test folder");
+        const auto first=directory.getChildFile("pres.mp3");
+        const auto second=directory.getChildFile("mus.mp3");
+        check(first.replaceWithText("audio fixture 1") &&
+              second.replaceWithText("audio fixture 2"),
+              "Cannot create temporary media files");
+        auto show=makeShow();
+        show.cuelists[0].name="Preshow";
+        show.rows[0].cells[0].file=first.getFullPathName();
+        show.rows[0].notes="First notes";
+        Cuelist secondList;
+        secondList.name="Musical";
+        Row other;other.id=show.nextId++;other.notes="Second notes";
+        Cell cell;cell.id=show.nextId++;cell.file=second.getFullPathName();
+        other.cells.push_back(cell);secondList.rows.push_back(other);
+        show.cuelists.push_back(secondList);
+        const auto target=directory.getChildFile("performance.cuelist");
+        check(saveShow(show,target).wasOk(),"Multi-Cuelist save failed");
+        Show loaded;
+        check(loadShow(target,loaded).wasOk(),"Multi-Cuelist load failed");
+        check(loaded.cuelists.size()==2 &&
+              loaded.cuelists[0].name=="Preshow" &&
+              loaded.cuelists[1].name=="Musical" &&
+              loaded.rows[0].notes=="First notes" &&
+              loaded.cuelists[1].rows[0].notes=="Second notes",
+              "Cuelist names or notes were lost on disk");
+        check(juce::File(loaded.rows[0].cells[0].file).existsAsFile() &&
+              juce::File(loaded.cuelists[1].rows[0].cells[0].file).existsAsFile(),
+              "Inactive Cuelist media was not copied into the project folder");
+        check(directory.deleteRecursively(),"Cannot clean temporary Cuelist test");
     });
 
     test("Inactive Cuelist audio is decoded with the same PCM budget", [] {
