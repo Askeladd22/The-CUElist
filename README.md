@@ -38,7 +38,7 @@ Undo/Redo use the existing MIDI/OSC edit history; they are **not** a universal u
 5. Use **GO** (Space) to trigger the next cue, and **Panic** (Esc) to stop playback. Test both before connecting to production equipment.
 6. Save the show to a `.cuelist` file; keep its accompanying `_media` folder when transferring the show.
 
-For detailed operation, device behavior, MIDI/OSC editors and the project format, read the **[Complete User Guide](docs/guida-completa.md)**.
+For detailed operation, device behavior, MIDI/OSC editors and the project format, read the **[Complete User Guide](docs/complete-user-guide.md)**.
 
 ## Build from source
 
@@ -88,6 +88,8 @@ See the [release acceptance checklist](docs/0.9-release-checklist.md) and [stabi
 
 ## License
 
-The Cuelist is **proprietary software, all rights reserved; it is not open source**. The single [LICENSE](LICENSE) contains the authoritative Italian terms and an English reference translation. Separate third-party obligations, including JUCE, are described in [NOTICE.md](NOTICE.md).
+The Cuelist is **proprietary software; all rights reserved**. The single [LICENSE](LICENSE) contains a conventional copyright reservation rather than an improvised end-user licence agreement. No public licence to reproduce, modify, build derivatives from or redistribute the original source is granted by publishing this repository. Any already-granted individual licence agreement remains governed by its own terms. A future commercial end-user licence must be prepared separately and professionally reviewed.
 
-Public access to this repository does not grant permission to redistribute or commercially reuse its original code. Before distributing a proprietary binary, verify the relevant JUCE license and other applicable third-party terms.
+GitHub confirms that **without an open-source licence**, copyright remains with the rights holder; public repository visibility nevertheless permits other users to view and fork through GitHub's functionality. See [GitHub's licensing guidance](https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/licensing-a-repository) and [GitHub's Terms of Service](https://docs.github.com/en/site-policy/github-terms/github-terms-of-service). To restrict *future* access to the source, the owner should consider making the repository private. Existing forks and local copies may remain accessible.
+
+Third-party rights, particularly JUCE, remain subject to [NOTICE.md](NOTICE.md) and the respective vendor licences. Commercial binary distribution requires verification of those separate rights.

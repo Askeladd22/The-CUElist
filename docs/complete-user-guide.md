@@ -50,9 +50,11 @@ The sidebar provides **New**, **Open**, **Save**, the editable show title, **Aud
 
 The shortcut hints formerly shown at the bottom of the sidebar have been removed; the keyboard shortcuts still work.
 
-### 3.2 Top bar and operational telemetry
+### 3.2 Top bar, Help, and operational telemetry
 
 The top row contains named **Cuelist tabs**, the **+** action, **Undo/Redo**, a 24-hour clock, Windows CPU/RAM usage and a compact MIDI RX/TX / OSC RX/TX / audio-availability monitor.
+
+The **Help** button in the top toolbar opens a menu with **Help** and **About The Cuelist**. The Help entry opens the local `docs/complete-user-guide.md` document with the system's associated Markdown viewer (an offline copy is included beside the compiled EXE and in portable packages). About displays the current version derived from `VERSION.txt`, the proprietary copyright notice and the two credited co-authors, **Davide Salvatore** and **Riccardo D'Ambrosio**.
 
 - **Undo/Redo** use the existing MIDI/OSC clip-edit history; they are not general-purpose undo for show deletion, tab management or every mixer action.
 - **CPU/RAM** report system-level usage, not per-plugin or per-clip estimates. Unsupported telemetry displays N/A.
@@ -274,4 +276,4 @@ The executable is written to `build/TheCuelist_artefacts/Release/The Cuelist.exe
 
 This prerelease does not provide native video playback, LTC/MTC, motorized MIDI controller feedback or guaranteed sample-accurate external MIDI/OSC delivery. The application still has UI-thread work in some import/save operations and needs hardware stress testing before a public production release. Prefer independent backups and a tested fallback.
 
-The Cuelist is **proprietary software, not open source**. The single [LICENSE](../LICENSE) contains the authoritative Italian license and a reference English translation. See [NOTICE.md](../NOTICE.md) for independent JUCE and third-party license obligations. A proprietary binary must not be distributed without verifying suitable rights for JUCE and any other included dependencies.
+The Cuelist is **proprietary software; all rights reserved, not open source**. The [LICENSE](../LICENSE) is an English-only conventional copyright reservation, **not a complete commercial end-user licence agreement**. Individual licences already lawfully granted continue under their own terms; any new paid distribution requires separately prepared licence and sales conditions. See [NOTICE.md](../NOTICE.md) for independent JUCE and other third-party obligations. Do not distribute a proprietary binary without securing all applicable third-party rights.

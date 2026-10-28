@@ -19,6 +19,45 @@ class ControlPanel;
 class MidiUndoAction;
 // A tab supports direct double-click renaming while preserving normal
 // single-click selection (and its transport-stop safety semantics).
+// Vector panel-state icons stay crisp at Windows display scaling and avoid
+// font glyph fallback. The two directions are intentionally distinct:
+ // open -> collapse right; collapsed -> expand left.
+class InspectorGripButton final : public juce::TextButton {
+public:
+    void setInspectorOpen(bool open) { inspectorOpen=open; repaint(); }
+    void paintButton(juce::Graphics& g,bool hovered,bool pressed) override {
+        const auto background=palette::raised.withMultipliedBrightness(
+            pressed ? .9f : hovered ? 1.17f : 1.0f);
+        const auto r=getLocalBounds().toFloat().reduced(.5f);
+        g.setColour(background);
+        g.fillRoundedRectangle(r,4.0f);
+        g.setColour(palette::line);
+        g.drawRoundedRectangle(r,4.0f,1.0f);
+
+        const auto cx=r.getCentreX(), cy=r.getCentreY();
+        // Small right-side panel frame and rail, derived from the supplied
+        // open/close panel icon references, instead of text characters.
+        g.setColour(palette::muted);
+        g.drawRoundedRectangle(cx-7.0f,cy-8.0f,14.0f,16.0f,2.0f,1.1f);
+        g.drawLine(cx+2.0f,cy-8.0f,cx+2.0f,cy+8.0f,1.1f);
+        juce::Path chevron;
+        if (inspectorOpen) {
+            chevron.startNewSubPath(cx-4.8f,cy-3.3f);
+            chevron.lineTo(cx-1.6f,cy);
+            chevron.lineTo(cx-4.8f,cy+3.3f);
+        } else {
+            chevron.startNewSubPath(cx-1.5f,cy-3.3f);
+            chevron.lineTo(cx-4.8f,cy);
+            chevron.lineTo(cx-1.5f,cy+3.3f);
+        }
+        g.setColour(palette::teal);
+        g.strokePath(chevron,juce::PathStrokeType(1.65f,
+            juce::PathStrokeType::curved,juce::PathStrokeType::rounded));
+    }
+private:
+    bool inspectorOpen=true;
+};
+
 class CuelistTabButton final : public juce::TextButton {
 public:
     std::function<void()> onRename;
@@ -250,12 +289,12 @@ private:
     CueGrid grid{*this}; PinnedCueHeaders cueHeaders{*this}; CueMetricsOverlay cueMetrics{*this}; Timeline timeline{*this}; juce::Viewport viewport;
     ColumnUtilities utilities{*this};
     juce::TextButton openButton{"Open"},saveButton{"Save"},newButton{"New"},addRowButton{"+"},addColumnButton{"+"};
-    juce::TextButton preferencesButton{"Preferences"};
+    juce::TextButton preferencesButton{"Preferences"},helpButton{"Help"};
     juce::Label projectNameLabel;
     juce::TextButton preflightButton{"Preflight"},diagnosticsButton{"Diagnostics"};
     juce::TextButton goButton{"GO  /  SPACE"},panicButton{"PANIC  /  ESC"},deviceButton{"Audio devices"},controlButton{"CONTROL MAPPING"};
     juce::TextButton collapseAllButton{"Collapse all"};
-    juce::TextButton inspectorSideTab{">"};
+    InspectorGripButton inspectorSideTab;
     // Up to twelve independent Cuelists; only the physically fitting tabs
     // are displayed. Their tab and close controls have stable identity.
     std::array<std::unique_ptr<CuelistTabButton>,12> cuelistTabs;
@@ -264,6 +303,8 @@ private:
     juce::TextButton undoButton{"Undo"},redoButton{"Redo"};
     void refreshCuelistTabs();
     void showCuelistOverflowMenu();
+    void openUserGuide();
+    void showAbout();
     juce::TextButton importButton{"Import WAV / MP3"},playCellButton{"Play cell"},stopCellButton{"Stop"},clearButton{"Remove audio"};
     juce::TextButton midiEditButton{"Create MIDI clip"};
     juce::TextButton oscEditButton{"Create OSC clip"};

@@ -13,6 +13,9 @@ foreach ($file in @('The Cuelist.exe', 'Avvia.cmd', 'README-WINDOWS.txt', 'READM
     if (!(Test-Path -LiteralPath (Join-Path $package $file))) { throw "Missing file: $file" }
 }
 if (Test-Path -LiteralPath (Join-Path $package 'Sorgenti.zip')) { throw 'Unexpected source archive in the proprietary package.' }
+$guide = 'docs\complete-user-guide.md'
+if (!(Test-Path -LiteralPath (Join-Path $package $guide))) { throw "Missing offline User Guide: $guide" }
+if ((Get-FileHash -LiteralPath (Join-Path $repo $guide)).Hash -ne (Get-FileHash -LiteralPath (Join-Path $package $guide)).Hash) { throw 'Outdated bundled User Guide.' }
 foreach ($file in @('README.md','LICENSE','NOTICE.md')) {
     if ((Get-FileHash -LiteralPath (Join-Path $repo $file)).Hash -ne (Get-FileHash -LiteralPath (Join-Path $package $file)).Hash) { throw "Outdated document: $file" }
 }

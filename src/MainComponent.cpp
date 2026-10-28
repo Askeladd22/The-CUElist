@@ -28,11 +28,11 @@ MainComponent::MainComponent(bool startAudio) {
     setLookAndFeel(&theme); setWantsKeyboardFocus(true); setSize(1440,900);
     for (juce::Component* c : std::initializer_list<juce::Component*>{&openButton,&saveButton,&newButton,&addRowButton,&addColumnButton,
          &goButton,&panicButton,&deviceButton,&controlButton,&collapseAllButton,&inspectorSideTab,
-         &cuelistOverflowButton,&addCuelistButton,&undoButton,&redoButton,&dockResize,&timelineResize,&importButton,&midiEditButton,&oscEditButton,&playCellButton,&stopCellButton,&clearButton,&tempoButton,&applyButton,
+         &cuelistOverflowButton,&addCuelistButton,&undoButton,&redoButton,&helpButton,&dockResize,&timelineResize,&importButton,&midiEditButton,&oscEditButton,&playCellButton,&stopCellButton,&clearButton,&tempoButton,&applyButton,
          &cellTab,&rowTab,&rowGain,&rowBehaviour,&rowMute,&rowLoop,&rowName,&cellName,&bpm,&cueNotes,&behaviour,&follow,&loop,&cellAutoStop,&gainDb,&viewport,&timeline,&utilities,
          &clipCollapseButton,&clipCloseButton,&cueHeaders,&cueMetrics,&preflightButton,&diagnosticsButton,&preferencesButton,&projectNameLabel}) addAndMakeVisible(c);
-    for (auto* b : {&openButton,&saveButton,&newButton,&addRowButton,&addColumnButton,&goButton,&panicButton,&deviceButton,&controlButton,&collapseAllButton,&inspectorSideTab,
-                    &cuelistOverflowButton,&addCuelistButton,&undoButton,&redoButton,
+    for (juce::TextButton* b : std::initializer_list<juce::TextButton*>{&openButton,&saveButton,&newButton,&addRowButton,&addColumnButton,&goButton,&panicButton,&deviceButton,&controlButton,&collapseAllButton,&inspectorSideTab,
+                    &cuelistOverflowButton,&addCuelistButton,&undoButton,&redoButton,&helpButton,
                     &importButton,&midiEditButton,&oscEditButton,&playCellButton,&stopCellButton,&clearButton,&tempoButton,&applyButton,
                     &preflightButton,&diagnosticsButton,&preferencesButton}) b->setWantsKeyboardFocus(false);
     viewport.setViewedComponent(&grid,false); viewport.setScrollBarsShown(true,true);
@@ -162,6 +162,22 @@ MainComponent::MainComponent(bool startAudio) {
         if(name!=show.name) {
             show.name=name; dirty=true; status="Project renamed (save to persist)."; repaint();
         }
+    };
+    helpButton.setName("showHelpMenu");
+    helpButton.setTooltip("User Guide and About The Cuelist.");
+    helpButton.onClick=[this] {
+        juce::PopupMenu menu;
+        menu.setLookAndFeel(&theme);
+        menu.addItem(1,"Help");
+        menu.addItem(2,"About The Cuelist");
+        auto safe=juce::Component::SafePointer<MainComponent>(this);
+        menu.showMenuAsync(
+            juce::PopupMenu::Options().withTargetComponent(&helpButton),
+            [safe](int choice) {
+                if (!safe) return;
+                if (choice==1) safe->openUserGuide();
+                else if (choice==2) safe->showAbout();
+            });
     };
     preferencesButton.setName("projectPreferences");
     preferencesButton.setTooltip("Pre-flight, diagnostics and fader display range.");
@@ -604,6 +620,7 @@ void MainComponent::resized() {
     refreshCuelistTabs();
     // Undo/Redo live in the unused upper-right band before the clock,
     // separate from the 43px-high Cuelist tab row.
+    helpButton.setBounds(getWidth()-831,10,61,25);
     undoButton.setBounds(getWidth()-764,10,51,25);
     redoButton.setBounds(getWidth()-709,10,51,25);
     collapseAllButton.setBounds(geometry.cueHeaders.getX()+CueGrid::nameWidth-84,
@@ -611,12 +628,15 @@ void MainComponent::resized() {
     const bool allCollapsed=std::all_of(show.columns.begin(),show.columns.end(),
         [](const Column& col){return col.collapsed;});
     collapseAllButton.setButtonText(allCollapsed ? "Expand all" : "Collapse all");
-    // Expanded: tab overlaps the Inspector edge by 13px. Collapsed: it
-    // sits entirely inside the 26px rail, not on top of BPM/Auto Stop.
-    const int tabX=inspectorVisible ? geometry.editorX-13 : geometry.editorX;
-    const int tabY=juce::jlimit(150,std::max(150,h-135),h/2-43);
-    inspectorSideTab.setBounds(tabX,tabY,26,86);
-    inspectorSideTab.setButtonText(inspectorVisible ? ">" : "<");
+    // A minimal edge grip: 20 x 46px instead of the oversized 26 x 86px
+    // handle. The 26px collapsed rail remains unchanged to preserve all
+    // pinned metrics, mixer and Timeline geometry.
+    constexpr int gripWidth=20,gripHeight=46;
+    const int tabX=inspectorVisible ? geometry.editorX-gripWidth/2
+                                   : geometry.editorX+3;
+    const int tabY=juce::jlimit(150,std::max(150,h-135),h/2-gripHeight/2);
+    inspectorSideTab.setBounds(tabX,tabY,gripWidth,gripHeight);
+    inspectorSideTab.setInspectorOpen(inspectorVisible);
     inspectorSideTab.setTooltip(inspectorVisible
         ? "Collapse Inspector to the right"
         : "Expand Inspector to the left");
@@ -723,6 +743,38 @@ void MainComponent::changed(const juce::String& text,bool stopPlayback) {
     engine.publish(makeRenderState(show,clips),!stopPlayback);
     dirty=true; status=text; refresh();
 }
+void MainComponent::openUserGuide() {
+    // The markdown guide is deployed beside both the compiled EXE and the
+    // extracted portable package. Never depend on a network connection.
+    const auto directory=juce::File::getSpecialLocation(
+        juce::File::currentExecutableFile).getParentDirectory();
+    const auto guide=directory.getChildFile("docs")
+                              .getChildFile("complete-user-guide.md");
+    if (!guide.existsAsFile()) {
+        message("User Guide not found next to the executable. "
+                "Rebuild the application or verify that "
+                "docs/complete-user-guide.md is included with the package.");
+        return;
+    }
+    if (!guide.startAsProcess())
+        message("Windows could not open the User Guide. "
+                "Open docs/complete-user-guide.md from the program folder "
+                "with a Markdown-capable editor.");
+}
+
+void MainComponent::showAbout() {
+    const juce::String info=
+        "Version: "+juce::String(THE_CUELIST_VERSION)+"\n"
+        "Copyright (c) 2026 Davide Salvatore and Riccardo D'Ambrosio.\n"
+        "All rights reserved.\n\n"
+        "License: Proprietary software - no public software license.\n"
+        "Copyright holders: Davide Salvatore and Riccardo D'Ambrosio.\n\n"
+        "See LICENSE for the copyright notice and NOTICE.md "
+        "for third-party licenses, including JUCE.";
+    juce::AlertWindow::showMessageBoxAsync(
+        juce::MessageBoxIconType::InfoIcon,"About The Cuelist",info,"Close",this);
+}
+
 void MainComponent::message(const juce::String& text) { status=text; repaint(); juce::AlertWindow::showMessageBoxAsync(juce::MessageBoxIconType::WarningIcon,"The Cuelist",text,"OK",this); }
 bool MainComponent::memoryFits(const ClipMap& collection) const {
     return withinPcmBudget(collection);

@@ -22,6 +22,7 @@ endif()
 enable_testing()
 add_executable(CuelistTests tests/Tests.cpp src/ControlUI.cpp src/ControlRuntime.cpp src/MainComponent.cpp src/InspectorController.cpp src/ProjectLifecycle.cpp src/CueOperations.cpp src/CellOperations.cpp src/WorkspaceLayout.cpp src/CueViews.cpp src/Timeline.cpp src/ColumnUtilities.cpp src/GainMeterFader.cpp src/PianoRoll.cpp src/MidiUI.cpp src/OscEditor.cpp src/OscUI.cpp)
 target_link_libraries(CuelistTests PRIVATE CuelistCore CuelistAssets)
+target_compile_definitions(CuelistTests PRIVATE THE_CUELIST_VERSION=\"${THE_CUELIST_DISPLAY_VERSION}\")
 add_test(NAME CuelistTests COMMAND CuelistTests)
 # Optional operator-side hardware inventory and OSC 127.0.0.1 self-test.
 # Never run physical I/O tests automatically on cloud CI hardware.
@@ -34,3 +35,10 @@ target_link_libraries(TheCuelist PRIVATE CuelistCore CuelistAssets)
 
 # Product version and distributable name are derived from VERSION.txt.
 target_compile_definitions(TheCuelist PRIVATE THE_CUELIST_VERSION=\"${THE_CUELIST_DISPLAY_VERSION}\")
+# Stage the offline guide beside the compiled Windows executable.
+add_custom_command(TARGET TheCuelist POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:TheCuelist>/docs"
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "${CMAKE_CURRENT_SOURCE_DIR}/docs/complete-user-guide.md"
+        "$<TARGET_FILE_DIR:TheCuelist>/docs/complete-user-guide.md"
+    COMMENT "Copy offline user guide next to The Cuelist executable")

@@ -80,6 +80,33 @@ void uiRefinementTests() {
         }
     });
 
+    test("Help menu and versioned About stay accessible at minimum window width",[] {
+        MainComponent ui(false);
+        auto* help=dynamic_cast<juce::TextButton*>(
+            controlsV3::named(ui,"showHelpMenu"));
+        auto* undo=dynamic_cast<juce::TextButton*>(
+            controlsV3::named(ui,"showUndo"));
+        auto* tab=dynamic_cast<juce::TextButton*>(
+            controlsV3::named(ui,"inspectorSideToggle"));
+        check(help && undo && tab,"Help, Undo or Inspector grip missing");
+        check(juce::String(THE_CUELIST_VERSION).startsWith("0.9.0-beta."),
+              "About version is not bound to VERSION.txt in the build");
+        for (const auto size:std::initializer_list<juce::Point<int>>{
+                 {1180,820},{1440,900},{1647,895},{1920,1080}}) {
+            ui.setSize(size.x,size.y);
+            ui.resized();
+            check(help->isVisible() && help->getRight()+5<=undo->getX() &&
+                  help->getY()>=0 && help->getBottom()<43,
+                  "Help overlaps Undo or Cuelist tab strip");
+            check(tab->getButtonText().isEmpty() &&
+                  tab->getWidth()==20 && tab->getHeight()==46,
+                  "Inspector grip must use directional vector symbols");
+            auto icon=tab->createComponentSnapshot(tab->getLocalBounds());
+            check(icon.isValid() && icon.getWidth()==20 && icon.getHeight()==46,
+                  "Inspector vector symbol failed to render");
+        }
+    });
+
     test("Inspector edge tab collapses right and restores unsaved cue notes",[] {
         MainComponent ui(false);
         ui.setSize(1440,900);
@@ -104,8 +131,9 @@ void uiRefinementTests() {
         const int originalUtility=utilities->getWidth();
         const int originalMetrics=metrics->getX();
         check(tab->isVisible() && tab->getRight()>metrics->getRight() &&
-              tab->getX()<metrics->getRight(),
-              "Inspector side tab is not placed across the right boundary");
+              tab->getX()<metrics->getRight() &&
+              tab->getWidth()==20 && tab->getHeight()==46,
+              "Compact Inspector grip must straddle the panel boundary");
         cueName->setText("Opening cue",false);
         notes->setText("Remember the stage blackout",false);
         click(*tab,12.0f,22.0f);
@@ -118,9 +146,10 @@ void uiRefinementTests() {
               utilities->getWidth()==originalUtility+262 &&
               metrics->getX()==originalMetrics+262 &&
               metrics->getRight()==ui.getWidth()-26 &&
-              tab->getX()==ui.getWidth()-26 &&
-              tab->getRight()==ui.getWidth(),
-              "Inspector collapse did not reclaim width or keep its reopen tab visible");
+              tab->getX()==ui.getWidth()-23 &&
+              tab->getRight()==ui.getWidth()-3 &&
+              tab->getHeight()==46,
+              "Inspector collapse did not reclaim width or keep compact grip inside rail");
         // Exercise the public selection path: it refreshes the Inspector
         // without exposing its private refresh() implementation to tests.
         check(ui.select(0,0),"Public cue selection failed with Inspector collapsed");
@@ -138,6 +167,15 @@ void uiRefinementTests() {
               "Reopening Inspector failed to restore content or geometry");
         check(ui.show.rows[0].cells[0].gain==1.0f,
               "Collapsing Inspector unexpectedly changed audio gain");
+        for (const auto dimensions:std::initializer_list<juce::Point<int>>{
+                 {1180,820},{1440,900},{1647,895},{1920,1080}}) {
+            ui.setSize(dimensions.x,dimensions.y);
+            ui.resized();
+            check(tab->getWidth()==20 && tab->getHeight()==46 &&
+                  tab->getX()==ui.getWidth()-288-10 &&
+                  tab->getRight()>metrics->getRight(),
+                  "Compact side tab escaped the Inspector edge on window resize");
+        }
     });
     test("Ctrl+C/V style cell clipboard preserves target identity and copies audio media", [] {
         MainComponent ui(false); addRow(ui.show,"Next");
