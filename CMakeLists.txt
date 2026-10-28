@@ -11,7 +11,47 @@ if(NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/vendor/JUCE/CMakeLists.txt")
   message(FATAL_ERROR "JUCE missing. Run scripts/build.ps1 to download the pinned version.")
 endif()
 add_subdirectory(vendor/JUCE EXCLUDE_FROM_ALL)
-juce_add_binary_data(CuelistAssets SOURCES assets/thecuelist_icon.png)
+# Embed pinned Google Fonts under the SIL Open Font License 1.1.
+# Binary fonts are build inputs (not installed Windows fonts). A cached,
+# previously verified download works without network access on subsequent builds.
+set(THE_CUELIST_FONT_COMMIT "9862abc066c9b83bf84c3e8ed1fc2d8d48f9bbf0")
+set(THE_CUELIST_FONT_CACHE "${CMAKE_BINARY_DIR}/google-fonts")
+file(MAKE_DIRECTORY "${THE_CUELIST_FONT_CACHE}")
+
+function(cuelist_fetch_font target family source expected_size)
+  set(destination "${THE_CUELIST_FONT_CACHE}/${target}")
+  set(download_required TRUE)
+  if(EXISTS "${destination}")
+    file(SIZE "${destination}" local_size)
+    if(local_size EQUAL expected_size)
+      set(download_required FALSE)
+    else()
+      file(REMOVE "${destination}")
+    endif()
+  endif()
+  if(download_required)
+    set(url "https://raw.githubusercontent.com/google/fonts/${THE_CUELIST_FONT_COMMIT}/ofl/${family}/${source}")
+    file(DOWNLOAD "${url}" "${destination}" STATUS result TIMEOUT 120 TLS_VERIFY ON)
+    list(GET result 0 code)
+    if(NOT code EQUAL 0)
+      file(REMOVE "${destination}")
+      message(FATAL_ERROR "Could not download pinned ${target} from Google Fonts: ${result}")
+    endif()
+  endif()
+  file(SIZE "${destination}" downloaded_size)
+  if(NOT downloaded_size EQUAL expected_size)
+    message(FATAL_ERROR "Pinned Google Font ${target} has unexpected size: ${downloaded_size}")
+  endif()
+endfunction()
+
+cuelist_fetch_font("Exo2.ttf" "exo2" "Exo2%5Bwght%5D.ttf" 303940)
+cuelist_fetch_font("Hind-Regular.ttf" "hind" "Hind-Regular.ttf" 299532)
+cuelist_fetch_font("Hind-SemiBold.ttf" "hind" "Hind-SemiBold.ttf" 281940)
+juce_add_binary_data(CuelistAssets SOURCES
+    assets/thecuelist_icon.png
+    "${THE_CUELIST_FONT_CACHE}/Exo2.ttf"
+    "${THE_CUELIST_FONT_CACHE}/Hind-Regular.ttf"
+    "${THE_CUELIST_FONT_CACHE}/Hind-SemiBold.ttf")
 add_library(CuelistCore STATIC src/MidiSessionPolicy.cpp src/ShowModel.cpp src/ControlDispatchPolicy.cpp src/ControlLayerBuilder.cpp src/ShowEditOperations.cpp src/ProjectSafety.cpp src/ProjectMediaLoader.cpp src/AudioEngine.cpp src/MidiClip.cpp src/MidiOutputRouter.cpp src/OscClip.cpp src/OscOutputRouter.cpp src/ControlOutputRouter.cpp)
 target_include_directories(CuelistCore PUBLIC src vendor/JUCE/modules)
 target_compile_definitions(CuelistCore PUBLIC JUCE_GLOBAL_MODULE_SETTINGS_INCLUDED=1 JUCE_WEB_BROWSER=0 JUCE_USE_CURL=0 JUCE_MODAL_LOOPS_PERMITTED=0 JUCE_ASIO=0 JUCE_USE_MP3AUDIOFORMAT=1)
