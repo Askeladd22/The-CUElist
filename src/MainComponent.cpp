@@ -1,4 +1,5 @@
 #include "MainComponent.h"
+#include "HelpGuide.h"
 #include "MidiSessionPolicy.h"
 #include "ProjectSafety.h"
 #include "ProjectMediaLoader.h"
@@ -744,8 +745,9 @@ void MainComponent::changed(const juce::String& text,bool stopPlayback) {
     dirty=true; status=text; refresh();
 }
 void MainComponent::openUserGuide() {
-    // The markdown guide is deployed beside both the compiled EXE and the
-    // extracted portable package. Never depend on a network connection.
+    // Keep the Markdown file as the source of truth, but display it in a
+    // native non-modal JUCE window so the operator is never sent to a
+    // browser or an external text editor.
     const auto directory=juce::File::getSpecialLocation(
         juce::File::currentExecutableFile).getParentDirectory();
     const auto guide=directory.getChildFile("docs")
@@ -756,10 +758,18 @@ void MainComponent::openUserGuide() {
                 "docs/complete-user-guide.md is included with the package.");
         return;
     }
-    if (!guide.startAsProcess())
-        message("Windows could not open the User Guide. "
-                "Open docs/complete-user-guide.md from the program folder "
-                "with a Markdown-capable editor.");
+    const auto contents=guide.loadFileAsString();
+    if (contents.trim().isEmpty()) {
+        message("The bundled User Guide is empty or could not be read.");
+        return;
+    }
+    if (!userGuideWindow)
+        userGuideWindow=std::make_unique<GuideWindow>(contents);
+    else
+        userGuideWindow->setMarkdown(contents);
+
+    userGuideWindow->setVisible(true);
+    userGuideWindow->toFront(true);
 }
 
 void MainComponent::showAbout() {
