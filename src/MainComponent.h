@@ -17,6 +17,16 @@ class PianoRollEditor;
 class OscClipEditor;
 class ControlPanel;
 class MidiUndoAction;
+// A tab supports direct double-click renaming while preserving normal
+// single-click selection (and its transport-stop safety semantics).
+class CuelistTabButton final : public juce::TextButton {
+public:
+    std::function<void()> onRename;
+    void mouseDoubleClick(const juce::MouseEvent& e) override {
+        if (e.mods.isLeftButtonDown() && onRename) onRename();
+        else juce::TextButton::mouseDoubleClick(e);
+    }
+};
 class CueGrid final : public juce::Component, public juce::FileDragAndDropTarget {
 public:
     explicit CueGrid(MainComponent& parent) : owner(parent) {}
@@ -202,6 +212,8 @@ public:
     void deleteCuelist(int index);
     void requestDeleteCuelist(int index);
     void renameActiveCuelist();
+    void renameCuelist(int index);
+    bool setCuelistName(int index,const juce::String& name);
     void setCellAutoStop(int row,int column,bool enabled);
     void renameTitle(bool column,int index);
     void reorderRow(int index,int delta);
@@ -246,9 +258,10 @@ private:
     juce::TextButton inspectorSideTab{">"};
     // Up to twelve independent Cuelists; only the physically fitting tabs
     // are displayed. Their tab and close controls have stable identity.
-    std::array<std::unique_ptr<juce::TextButton>,12> cuelistTabs;
+    std::array<std::unique_ptr<CuelistTabButton>,12> cuelistTabs;
     std::array<std::unique_ptr<juce::TextButton>,12> cuelistCloseButtons;
     juce::TextButton cuelistOverflowButton{"..."},addCuelistButton{"+"};
+    juce::TextButton undoButton{"Undo"},redoButton{"Redo"};
     void refreshCuelistTabs();
     void showCuelistOverflowMenu();
     juce::TextButton importButton{"Import WAV / MP3"},playCellButton{"Play cell"},stopCellButton{"Stop"},clearButton{"Remove audio"};

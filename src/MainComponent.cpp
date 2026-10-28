@@ -28,11 +28,11 @@ MainComponent::MainComponent(bool startAudio) {
     setLookAndFeel(&theme); setWantsKeyboardFocus(true); setSize(1440,900);
     for (juce::Component* c : std::initializer_list<juce::Component*>{&openButton,&saveButton,&newButton,&addRowButton,&addColumnButton,
          &goButton,&panicButton,&deviceButton,&controlButton,&collapseAllButton,&inspectorSideTab,
-         &cuelistOverflowButton,&addCuelistButton,&dockResize,&timelineResize,&importButton,&midiEditButton,&oscEditButton,&playCellButton,&stopCellButton,&clearButton,&tempoButton,&applyButton,
+         &cuelistOverflowButton,&addCuelistButton,&undoButton,&redoButton,&dockResize,&timelineResize,&importButton,&midiEditButton,&oscEditButton,&playCellButton,&stopCellButton,&clearButton,&tempoButton,&applyButton,
          &cellTab,&rowTab,&rowGain,&rowBehaviour,&rowMute,&rowLoop,&rowName,&cellName,&bpm,&cueNotes,&behaviour,&follow,&loop,&cellAutoStop,&gainDb,&viewport,&timeline,&utilities,
          &clipCollapseButton,&clipCloseButton,&cueHeaders,&cueMetrics,&preflightButton,&diagnosticsButton,&preferencesButton,&projectNameLabel}) addAndMakeVisible(c);
     for (auto* b : {&openButton,&saveButton,&newButton,&addRowButton,&addColumnButton,&goButton,&panicButton,&deviceButton,&controlButton,&collapseAllButton,&inspectorSideTab,
-                    &cuelistOverflowButton,&addCuelistButton,
+                    &cuelistOverflowButton,&addCuelistButton,&undoButton,&redoButton,
                     &importButton,&midiEditButton,&oscEditButton,&playCellButton,&stopCellButton,&clearButton,&tempoButton,&applyButton,
                     &preflightButton,&diagnosticsButton,&preferencesButton}) b->setWantsKeyboardFocus(false);
     viewport.setViewedComponent(&grid,false); viewport.setScrollBarsShown(true,true);
@@ -216,7 +216,7 @@ MainComponent::MainComponent(bool startAudio) {
     // Each tab is a genuine Cuelist selector. The third tab must never
     // double as an overflow popup: the overflow appears only when needed.
     for (int i=0;i<(int)cuelistTabs.size();++i) {
-        cuelistTabs[(size_t)i]=std::make_unique<juce::TextButton>();
+        cuelistTabs[(size_t)i]=std::make_unique<CuelistTabButton>();
         cuelistCloseButtons[(size_t)i]=std::make_unique<juce::TextButton>("x");
         auto& tab=*cuelistTabs[(size_t)i];
         auto& close=*cuelistCloseButtons[(size_t)i];
@@ -225,6 +225,7 @@ MainComponent::MainComponent(bool startAudio) {
         tab.setWantsKeyboardFocus(false);
         close.setWantsKeyboardFocus(false);
         tab.onClick=[this,i] {activateCuelist(i);};
+        tab.onRename=[this,i] {renameCuelist(i);};
         close.onClick=[this,i] {requestDeleteCuelist(i);};
         tab.setVisible(false);
         close.setVisible(false);
@@ -237,6 +238,14 @@ MainComponent::MainComponent(bool startAudio) {
     addCuelistButton.setName("newCuelist");
     addCuelistButton.setTooltip("Create another Cuelist in this show.");
     addCuelistButton.onClick=[this] {createCuelist();};
+    undoButton.setName("showUndo");
+    redoButton.setName("showRedo");
+    undoButton.setTooltip("Undo the last MIDI/OSC clip edit (Ctrl+Z).");
+    redoButton.setTooltip("Redo the last MIDI/OSC clip edit (Ctrl+Shift+Z).");
+    undoButton.onClick=[this] {undoEdit();};
+    redoButton.onClick=[this] {redoEdit();};
+    undoButton.setEnabled(false);
+    redoButton.setEnabled(false);
     controlButton.setName("controlMapping");
     controlButton.setTooltip("MIDI input, MIDI Learn, and global/per-cue mappings.");
     controlButton.onClick=[this] {
@@ -382,24 +391,36 @@ void MainComponent::paint(juce::Graphics& g) {
     meter(34,systemCpuPercent,palette::teal);
     meter(50,systemRamPercent,palette::amber);
 
-    // Audio availability is distinct from actual MIDI/OSC traffic.
-    const int statusX=w-363;
-    g.setColour(palette::line.withAlpha(.52f));
-    g.drawVerticalLine(statusX,9.0f,66.0f);
-    g.setColour(engine.connected.load() ? palette::teal : palette::red);
-    g.fillEllipse((float)w-185,13.0f,8.0f,8.0f);
-    label(g,engine.connected.load() ? "Audio Available" : "Audio Unavailable",
-          {w-171,5,169,25},11,palette::muted,true);
+    // A compact but prominent shared signal monitor: 2x2 traffic
+    // indicators and independent audio availability, all inside one card.
+    // The values are real counters (OSC RX stays inactive: no listener).
+    const int statusX=w-365;
+    const auto monitor=juce::Rectangle<float>((float)statusX,8.0f,354.0f,56.0f);
+    g.setColour(palette::panel);
+    g.fillRoundedRectangle(monitor,5.0f);
+    g.setColour(palette::line.withAlpha(.85f));
+    g.drawRoundedRectangle(monitor,5.0f,1.0f);
+    g.drawVerticalLine(w-153,13.0f,59.0f);
+    label(g,"MIDI / OSC ACTIVITY",{statusX+10,11,197,14},
+          10,palette::muted,true);
     const double now=juce::Time::getMillisecondCounterHiRes();
     const auto activity=[&](int x,int y,const juce::String& title,bool active) {
-        g.setColour(active ? palette::teal : palette::line);
-        g.fillEllipse((float)x,(float)y+7.0f,6.0f,6.0f);
-        label(g,title,{x+10,y,72,21},9,active ? palette::text : palette::muted,true);
+        g.setColour(active ? palette::teal : palette::line.brighter(.22f));
+        g.fillEllipse((float)x,(float)y+4.0f,8.0f,8.0f);
+        label(g,title,{x+14,y,83,17},11,
+              active ? palette::text : palette::muted,true);
     };
-    activity(w-346,28,"MIDI RX",now<midiRxUntil);
-    activity(w-250,28,"MIDI TX",now<midiTxUntil);
-    activity(w-346,49,"OSC RX",false); // No OSC input endpoint yet.
-    activity(w-250,49,"OSC TX",now<oscTxUntil);
+    activity(statusX+12,26,"MIDI RX",now<midiRxUntil);
+    activity(statusX+112,26,"MIDI TX",now<midiTxUntil);
+    activity(statusX+12,44,"OSC RX",false); // No OSC input endpoint yet.
+    activity(statusX+112,44,"OSC TX",now<oscTxUntil);
+    const bool audioConnected=engine.connected.load();
+    label(g,"AUDIO",{w-137,13,119,16},10,palette::muted,true);
+    g.setColour(audioConnected ? palette::teal : palette::red);
+    g.fillEllipse((float)w-139,37.0f,9.0f,9.0f);
+    label(g,audioConnected ? "AVAILABLE" : "UNAVAILABLE",
+          {w-125,30,108,24},11,
+          audioConnected ? palette::teal : palette::red,true);
     label(g,"WORKSPACE",{20,118,140,17},11,palette::muted,true);
     g.setColour(palette::teal.withAlpha(0.19f)); g.fillRoundedRectangle(12,131,156,45,8);
     g.setColour(palette::teal); g.fillRoundedRectangle(12,137,4,34,2);
@@ -489,6 +510,15 @@ void MainComponent::showCuelistOverflowMenu() {
                          i==show.activeCuelist);
 
     // Off-screen tabs must remain manageable, not just selectable.
+    juce::PopupMenu renameMenu;
+    renameMenu.setLookAndFeel(&theme);
+    for (int i=0;i<(int)show.cuelists.size();++i)
+        if (!cuelistTabs[(size_t)i]->isVisible())
+            renameMenu.addItem(300+i,"Rename "+show.cuelists[(size_t)i].name);
+    if (renameMenu.getNumItems()>0) {
+        menu.addSeparator();
+        menu.addSubMenu("Rename hidden Cuelist...",renameMenu);
+    }
     juce::PopupMenu deleteMenu;
     deleteMenu.setLookAndFeel(&theme);
     if (show.cuelists.size()>1)
@@ -507,6 +537,7 @@ void MainComponent::showCuelistOverflowMenu() {
             if (!safe) return;
             if (choice>=100 && choice<112) safe->activateCuelist(choice-100);
             if (choice>=200 && choice<212) safe->requestDeleteCuelist(choice-200);
+            if (choice>=300 && choice<312) safe->renameCuelist(choice-300);
         });
 }
 
@@ -542,7 +573,7 @@ void MainComponent::refreshCuelistTabs() {
         const auto colour=active ? palette::selectedTab : palette::panel;
         auto name=show.cuelists[(size_t)i].name;
         tab.setButtonText(name.length()>13 ? name.substring(0,11)+"..." : name);
-        tab.setTooltip(name+" - select Cuelist (playback stops on switch).");
+        tab.setTooltip(name+" - click to select; double-click to rename.");
         tab.setColour(juce::TextButton::buttonColourId,colour);
         tab.setBounds(x,43,count>1 ? 64 : 81,buttonHeight);
         close.setColour(juce::TextButton::buttonColourId,colour);
@@ -571,6 +602,10 @@ void MainComponent::resized() {
     preferencesButton.setBounds(20,227,140,31);
     controlButton.setBounds(20,264,140,33);
     refreshCuelistTabs();
+    // Undo/Redo live in the unused upper-right band before the clock,
+    // separate from the 43px-high Cuelist tab row.
+    undoButton.setBounds(getWidth()-764,10,51,25);
+    redoButton.setBounds(getWidth()-709,10,51,25);
     collapseAllButton.setBounds(geometry.cueHeaders.getX()+CueGrid::nameWidth-84,
                                 geometry.cueHeaders.getY()+9,77,24);
     const bool allCollapsed=std::all_of(show.columns.begin(),show.columns.end(),
@@ -961,6 +996,9 @@ void MainComponent::refreshSystemTelemetry() {
 }
 
 void MainComponent::timerCallback() {
+    const bool canUndo=editHistory.canUndo(),canRedo=editHistory.canRedo();
+    if (undoButton.isEnabled()!=canUndo) undoButton.setEnabled(canUndo);
+    if (redoButton.isEnabled()!=canRedo) redoButton.setEnabled(canRedo);
     // Keep system telemetry sampled at approximately one second intervals,
     // rather than polling Windows counters on each 25 Hz GUI refresh.
     if (++systemTelemetryTicks>=25) {

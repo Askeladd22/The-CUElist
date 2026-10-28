@@ -167,27 +167,43 @@ void MainComponent::requestDeleteCuelist(int index) {
         }),true);
 }
 
+bool MainComponent::setCuelistName(int index,const juce::String& proposed) {
+    if (index<0 || index>=(int)show.cuelists.size()) return false;
+    const auto name=proposed.trim();
+    if (name.isEmpty() || name.length()>64) return false;
+    for (int i=0;i<(int)show.cuelists.size();++i)
+        if (i!=index && show.cuelists[(size_t)i].name.equalsIgnoreCase(name))
+            return false;
+    if (show.cuelists[(size_t)index].name==name) return true;
+    // Both tab labels and the pinned Cue List header render directly from
+    // this single persisted name. Never rename an independent UI copy.
+    show.cuelists[(size_t)index].name=name;
+    dirty=true;
+    status="Cuelist renamed to "+name+". Save to persist.";
+    refreshCuelistTabs();
+    cueHeaders.repaint();
+    grid.repaint();
+    repaint();
+    return true;
+}
+
 void MainComponent::renameActiveCuelist() {
-    if (show.cuelists.empty()) return;
-    const int index=show.activeCuelist;
+    renameCuelist(show.activeCuelist);
+}
+
+void MainComponent::renameCuelist(int index) {
+    if (index<0 || index>=(int)show.cuelists.size()) return;
     auto* dialog=new juce::AlertWindow("Rename Cuelist",
-        "Rename only this Cuelist; the project and media paths stay unchanged.",
+        "Rename the tab and its Cue List header together.",
         juce::MessageBoxIconType::NoIcon,this);
     dialog->addTextEditor("name",show.cuelists[(size_t)index].name,"Name");
     dialog->addButton("Rename",1);
     dialog->addButton("Cancel",0,juce::KeyPress(juce::KeyPress::escapeKey));
     dialog->enterModalState(true,juce::ModalCallbackFunction::create(
         [safe=juce::Component::SafePointer<MainComponent>(this),dialog,index](int choice) {
-            if (!safe || choice!=1 || index>=(int)safe->show.cuelists.size()) return;
-            const auto name=dialog->getTextEditorContents("name").trim();
-            if (name.isEmpty() || name.length()>64) {
-                safe->message("Cuelist names must contain 1–64 characters.");
-                return;
-            }
-            safe->show.cuelists[(size_t)index].name=name;
-            safe->dirty=true;
-            safe->status="Cuelist renamed. Save to persist.";
-            safe->refresh();
+            if (!safe || choice!=1) return;
+            if (!safe->setCuelistName(index,dialog->getTextEditorContents("name")))
+                safe->message("Use a unique Cuelist name of 1–64 characters.");
         }),true);
     dialog->getTextEditor("name")->selectAll();
 }

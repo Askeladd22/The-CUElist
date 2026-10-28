@@ -457,7 +457,9 @@ void CueGrid::mouseDoubleClick(const juce::MouseEvent& e) {
     if (e.mods.isPopupMenu() || e.x<0 || e.y<0) return;
     const int column=columnAt(e.x);
     if (e.y<headerHeight) {
-        if (column>=0 && !owner.show.columns[(size_t)column].collapsed &&
+        if (column<0 && e.x>=18 && e.x<nameWidth-114 && e.y<33)
+            owner.renameActiveCuelist();
+        else if (column>=0 && !owner.show.columns[(size_t)column].collapsed &&
             e.y>=34 && e.x-columnX(column)<columnWidthAt(column)-28)
             owner.renameTitle(true,column);
         return;
@@ -524,6 +526,11 @@ void PinnedCueHeaders::mouseDown(const juce::MouseEvent& e) {
 }
 void PinnedCueHeaders::mouseDoubleClick(const juce::MouseEvent& e) {
     const int y=e.y+owner.viewport.getViewPositionY();
+    if (e.mods.isLeftButtonDown() && y>=0 && y<33 &&
+        e.x>=18 && e.x<CueGrid::nameWidth-114) {
+        owner.renameActiveCuelist();
+        return;
+    }
     const int row=y>=CueGrid::headerHeight ?
         (y-CueGrid::headerHeight)/CueGrid::rowHeight : -1;
     if (row>=0 && row<(int)owner.show.rows.size() &&

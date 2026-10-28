@@ -54,6 +54,30 @@ void uiRefinementTests() {
         check(width>=140 && height>=30,
               "Popup row dimensions are too small for clear stage use");
     });
+    test("Undo and Redo controls fit before Clock without covering Cuelist tabs",[] {
+        MainComponent ui(false);
+        auto* undo=dynamic_cast<juce::TextButton*>(
+            controlsV3::named(ui,"showUndo"));
+        auto* redo=dynamic_cast<juce::TextButton*>(
+            controlsV3::named(ui,"showRedo"));
+        check(undo && redo,"Global Undo/Redo controls missing");
+        check(!undo->isEnabled() && !redo->isEnabled(),
+              "Undo/Redo must be disabled when the edit history is empty");
+        for (const auto dimensions:std::initializer_list<juce::Point<int>>{
+                 {1180,820},{1440,900},{1647,895},{1920,1080}}) {
+            ui.setSize(dimensions.x,dimensions.y);
+            ui.resized();
+            check(undo->isVisible() && redo->isVisible() &&
+                  undo->getX()>=190 && redo->getX()>undo->getRight() &&
+                  redo->getRight()<=dimensions.x-650 &&
+                  undo->getY()<40 && redo->getBottom()<43,
+                  "Undo/Redo obscured the tabs or the fixed Clock");
+            const auto image=ui.createComponentSnapshot({dimensions.x-365,8,354,56});
+            check(image.isValid() && image.getHeight()==56,
+                  "The compact MIDI/OSC/Audio monitor failed to render");
+        }
+    });
+
     test("Inspector edge tab collapses right and restores unsaved cue notes",[] {
         MainComponent ui(false);
         ui.setSize(1440,900);

@@ -35,6 +35,38 @@ void cuelistGuiMockupTests() {
               "Cuelist names, selection or cue notes failed round-trip");
     });
 
+    test("Cuelist names update active tab and Cue List header bidirectionally",[] {
+        MainComponent ui(false);
+        ui.createCuelist();
+        check(ui.setCuelistName(1,"Act I - Musical"),
+              "Active Cuelist rename was rejected");
+        auto* second=dynamic_cast<juce::TextButton*>(
+            controlsV3::named(ui,"cuelistTab1"));
+        check(second && second->getButtonText().startsWith("Act I") &&
+              ui.show.cuelists[1].name=="Act I - Musical",
+              "Renaming the active heading did not update the selected tab");
+        check(ui.setCuelistName(0,"Pre-show"),
+              "An inactive Cuelist could not be renamed from its tab");
+        auto* first=dynamic_cast<juce::TextButton*>(
+            controlsV3::named(ui,"cuelistTab0"));
+        check(first && first->getButtonText()=="Pre-show",
+              "Renaming an inactive tab did not update its label");
+        ui.activateCuelist(0);
+        check(ui.show.cuelists[ui.show.activeCuelist].name=="Pre-show",
+              "Switching to the renamed tab did not update the Cue List heading");
+        check(!ui.setCuelistName(0,"Act I - Musical") &&
+              !ui.setCuelistName(0,"  ") &&
+              !ui.setCuelistName(0,juce::String::repeatedString("X",65)),
+              "Duplicate, blank or oversized Cuelist names should be rejected");
+        check(ui.show.cuelists[0].name=="Pre-show",
+              "Invalid rename overwrote the original name");
+        Show restored;
+        check(decodeShow(encodeShow(ui.show),restored).wasOk() &&
+              restored.cuelists[0].name=="Pre-show" &&
+              restored.cuelists[1].name=="Act I - Musical",
+              "Bidirectional Cuelist names did not persist to the project");
+    });
+
     test("Cuelist tabs stay consecutive and inline until the real width limit",[] {
         MainComponent ui(false);
         check(ui.show.cuelists.size()==1 &&
