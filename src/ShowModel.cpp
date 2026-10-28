@@ -47,11 +47,19 @@ void addColumn(Show& show, ColumnType type, const juce::String& name) {
     created.masterSend=(type==ColumnType::audio);
     show.columns.push_back(std::move(created));
     for (auto& row : show.rows) { Cell c; c.id = show.nextId++; row.cells.push_back(c); }
+    // An operator can add columns at any moment, including with multiple
+    // Cuelists. Keep inactive cue matrices rectangular as well.
+    for (size_t n=0;n<show.cuelists.size();++n)
+        if ((int)n!=show.activeCuelist)
+            for (auto& row:show.cuelists[n].rows) {
+                Cell c; c.id=show.nextId++; row.cells.push_back(c);
+            }
 }
 Show makeShow() {
     Show show;
     addColumn(show, ColumnType::audio, {});
     addRow(show, {});
+    show.cuelists.push_back({"Cuelist 1",show.rows});
     return show;
 }
 double secondsAtBeat(const std::vector<TempoPoint>& points, double beat) {
@@ -89,6 +97,7 @@ juce::Result validateShow(const Show& show) {
                 (!column.controlLocked && column.controlPriority==1)))) return fail("Invalid column.");
     }
     for (const auto& row : show.rows) {
+        if (row.notes.length()>8192) return fail("Cue notes must not exceed 8192 characters.");
         if (!unique(row.id) || row.cells.size()!=show.columns.size() || row.tempo.empty()
             || row.colour<0 || row.colour>7 || !std::isfinite(row.gain) || row.gain < 0 || row.gain > 4 || (int)row.behaviour < 0 || (int)row.behaviour > 3) return fail("Invalid row.");
         double previous = -1;
@@ -120,6 +129,36 @@ juce::Result validateShow(const Show& show) {
                 return fail("Invalid audio path or non-Audio column.");
         }
     }
+    // Validate dormant Cuelists without asking the transport or current
+    // cue mapping to interpret a different list's row IDs.
+    if (!show.cuelists.empty()) {
+        if (show.cuelists.size()>12 || show.activeCuelist<0 ||
+            show.activeCuelist>=(int)show.cuelists.size())
+            return fail("Invalid Cuelist selection or count.");
+        int totalRows=(int)show.rows.size();
+        for (size_t n=0;n<show.cuelists.size();++n) {
+            const auto& list=show.cuelists[n];
+            if (list.name.trim().isEmpty() || list.name.length()>64)
+                return fail("Invalid Cuelist name.");
+            if ((int)n==show.activeCuelist) continue;
+            totalRows+=(int)list.rows.size();
+            if (totalRows>10000) return fail("Too many cues across Cuelists.");
+            Show independent=show;
+            independent.cuelists.clear();
+            independent.activeCuelist=0;
+            independent.rows=list.rows;
+            // Scoped cue mappings belong to the active list, so checking
+            // dormant media/cell geometry must not resolve them against it.
+            independent.controls.bindings.clear();
+            if (auto validation=validateShow(independent);validation.failed())
+                return validation;
+            for (const auto& dormantRow:list.rows) {
+                if (!unique(dormantRow.id)) return fail("Duplicate cue ID across Cuelists.");
+                for (const auto& cell:dormantRow.cells)
+                    if (!unique(cell.id)) return fail("Duplicate cell ID across Cuelists.");
+            }
+        }
+    }
     if (show.nextId <= *ids.rbegin() || show.nextId >= 1000000000) return fail("Invalid identifier counter.");
     std::vector<int> rowIds,columnIds;
     for (const auto& row:show.rows) {
@@ -129,6 +168,13 @@ juce::Result validateShow(const Show& show) {
                 [&](const auto& p){ return p.id==row.mappingPresetId; }))
             return fail("Cue references a missing mapping preset.");
     }
+    // Legacy cue-scoped mappings may refer to a dormant Cuelist. Accept
+    // those stable row IDs in the document while the runtime still dispatches
+    // only the currently selected Cuelist's GO and Control Set.
+    for (size_t n=0;n<show.cuelists.size();++n)
+        if ((int)n!=show.activeCuelist)
+            for (const auto& row:show.cuelists[n].rows)
+                rowIds.push_back(row.id);
     for (const auto& column:show.columns) columnIds.push_back(column.id);
     if (auto controlResult=validateControls(show.controls,rowIds,columnIds); controlResult.failed())
         return controlResult;
@@ -322,7 +368,7 @@ juce::String encodeShow(const Show& show) {
                 {"loop",c.loop},{"stopOnNext",c.stopOnNext},{"gain",c.gain},{"startSeconds",c.startSeconds},{"behaviour",(int)c.behaviour},{"midi",midi},{"osc",osc},
                 {"controlSet",c.controlSet ? controlSetObject(*c.controlSet) : juce::var()}}));
         }
-        rows.add(object({{"id",r.id},{"name",r.name},{"tempo",tempo},{"cells",cells},{"gain",r.gain},
+        rows.add(object({{"id",r.id},{"name",r.name},{"notes",r.notes},{"tempo",tempo},{"cells",cells},{"gain",r.gain},
             {"muted",r.muted},{"loop",r.loop},{"overrideBehaviour",r.overrideBehaviour},{"behaviour",(int)r.behaviour},{"stopOnNext",r.stopOnNext},
             {"mappingPresetId",r.mappingPresetId},{"colour",r.colour}}));
     }
@@ -345,11 +391,29 @@ juce::String encodeShow(const Show& show) {
     const auto controls=object({{"midiInputId",show.controls.midiInputId},
         {"nextId",show.controls.nextId},{"presets",presets},
         {"bindings",bindings},{"templates",templates}});
+    juce::Array<juce::var> cuelistObjects;
+    for (size_t n=0;n<show.cuelists.size();++n) {
+        // The active Cuelist already lives at root.rows. Never duplicate
+        // its clips/notes: large v10 projects must remain within the 32MB
+        // document size budget even after this extension.
+        if ((int)n==show.activeCuelist) {
+            cuelistObjects.add(object({{"name",show.cuelists[n].name}}));
+            continue;
+        }
+        Show inactive=show;
+        inactive.cuelists.clear();
+        inactive.activeCuelist=0;
+        inactive.rows=show.cuelists[n].rows;
+        const auto document=juce::JSON::parse(encodeShow(inactive));
+        cuelistObjects.add(object({{"name",show.cuelists[n].name},
+                                 {"rows",document.getProperty("rows",{})}}));
+    }
     return juce::JSON::toString(object({{"format","TheCuelist"},{"version",10},
         {"name",show.name},{"masterGain",show.masterGain},{"masterPan",show.masterPan},
         {"masterMuted",show.masterMuted},{"masterOutput",show.masterOutput},
         {"safetyLimiterEnabled",show.safetyLimiterEnabled},{"nextId",show.nextId},
-        {"columns",columns},{"rows",rows},{"controls",controls}}));
+        {"columns",columns},{"rows",rows},{"controls",controls},
+        {"cuelists",cuelistObjects},{"activeCuelist",show.activeCuelist}}));
 }
 juce::Result decodeShow(const juce::String& text, Show& destination) {
     if (text.length() > 32*1024*1024) return juce::Result::fail("Project too large (maximum 32 MB). ");
@@ -438,7 +502,9 @@ juce::Result decodeShow(const juce::String& text, Show& destination) {
             show.columns.push_back(column);
         }
         for (auto& r : array(root,"rows")) {
-            Row row; row.id = integer(r,"id"); row.name = string(r,"name"); row.tempo.clear();
+            Row row; row.id = integer(r,"id"); row.name = string(r,"name");
+            if (r.hasProperty("notes")) row.notes=string(r,"notes");
+            row.tempo.clear();
             if (version>=10) row.mappingPresetId=integer(r,"mappingPresetId");
             if (r.hasProperty("colour")) row.colour=integer(r,"colour");
             if (version >= 4) row.stopOnNext=boolean(r,"stopOnNext");
@@ -537,6 +603,42 @@ juce::Result decodeShow(const juce::String& text, Show& destination) {
             }
             show.rows.push_back(std::move(row));
         }
+        if (root.hasProperty("cuelists")) {
+            const auto lists=array(root,"cuelists");
+            if (lists.isEmpty() || lists.size()>12)
+                return juce::Result::fail("Invalid Cuelist count.");
+            show.activeCuelist=integer(root,"activeCuelist");
+            if (show.activeCuelist<0 || show.activeCuelist>=lists.size())
+                return juce::Result::fail("Invalid active Cuelist.");
+            for (int n=0;n<lists.size();++n) {
+                const auto& list=lists.getReference(n);
+                // Active cue data is root.rows. Its lightweight tab record
+                // intentionally has no second copy of the row array.
+                if (n==show.activeCuelist) {
+                    show.cuelists.push_back({string(list,"name"),show.rows});
+                    continue;
+                }
+                // Parse dormant rows through the same cell/MIDI/OSC/control
+                // validation as regular v10 rows, never a second parser.
+                auto isolated=juce::JSON::parse(juce::JSON::toString(root));
+                isolated.getDynamicObject()->removeProperty("cuelists");
+                isolated.getDynamicObject()->removeProperty("activeCuelist");
+                isolated.getDynamicObject()->setProperty("rows",required(list,"rows"));
+                auto controlsCopy=isolated.getProperty("controls",{});
+                if (auto* fields=controlsCopy.getDynamicObject())
+                    fields->setProperty("bindings",juce::Array<juce::var>{});
+                Show dormant;
+                if (auto result=decodeShow(juce::JSON::toString(isolated),dormant);
+                    result.failed()) return result;
+                show.cuelists.push_back({string(list,"name"),std::move(dormant.rows)});
+            }
+            // Root rows remain authoritative for the active list.
+            show.cuelists[(size_t)show.activeCuelist].rows=show.rows;
+        } else {
+            // All historical v1-v10 files represent one Cuelist.
+            show.cuelists.push_back({"Cuelist 1",show.rows});
+            show.activeCuelist=0;
+        }
         auto valid = validateShow(show); if (valid.failed()) return valid;
         destination=std::move(show); return juce::Result::ok();
     } catch (const std::exception& e) { return juce::Result::fail(juce::String("Invalid project: ")+e.what()); }
@@ -556,11 +658,11 @@ juce::Result saveShow(const Show& show,const juce::File& file) {
         juce::File folder; bool& created; bool committed = false;
         ~Cleanup() { if (created && !committed) folder.deleteRecursively(); }
     } cleanup { generation, createdGeneration };
-    for (auto& row : portable.rows) for (auto& cell : row.cells) {
-        if (cell.file.isEmpty()) continue;
+    const auto copyMedia=[&](Cell& cell)->juce::Result {
+        if (cell.file.isEmpty()) return juce::Result::ok();
         if (!juce::File::isAbsolutePath(cell.file)) return juce::Result::fail("Load the project before saving it: relative media path.");
         auto found = copied.find(cell.file);
-        if (found != copied.end()) { cell.file = found->second; continue; }
+        if (found != copied.end()) { cell.file = found->second; return juce::Result::ok(); }
         const juce::File source(cell.file);
         if (!source.existsAsFile()) return juce::Result::fail("Missing media: " + cell.file);
         if (!createdGeneration) {
@@ -571,7 +673,15 @@ juce::Result saveShow(const Show& show,const juce::File& file) {
         if (target.exists() || !source.copyFileTo(target)) return juce::Result::fail("Could not copy media.");
         const auto relative = target.getRelativePathFrom(parent).replaceCharacter('\\','/');
         copied.emplace(cell.file, relative); cell.file = relative;
-    }
+        return juce::Result::ok();
+    };
+    for (auto& row:portable.rows) for (auto& cell:row.cells)
+        if (auto result=copyMedia(cell);result.failed()) return result;
+    for (size_t n=0;n<portable.cuelists.size();++n)
+        if ((int)n!=portable.activeCuelist)
+            for (auto& row:portable.cuelists[n].rows)
+                for (auto& cell:row.cells)
+                    if (auto result=copyMedia(cell);result.failed()) return result;
     juce::TemporaryFile temp(file);
     if (!temp.getFile().replaceWithText(encodeShow(portable))) return juce::Result::fail("Could not write temporary file.");
     const auto backup = file.getSiblingFile(file.getFileName()+".bak");
@@ -593,13 +703,23 @@ juce::Result loadShow(const juce::File& file, Show& destination) {
     if (!file.existsAsFile() || file.getSize() > 32*1024*1024) return juce::Result::fail("Project missing or too large.");
     Show loaded;
     auto result = decodeShow(file.loadFileAsString(), loaded); if (result.failed()) return result;
-    for (auto& row : loaded.rows) for (auto& cell : row.cells) {
-        if (cell.file.isEmpty() || juce::File::isAbsolutePath(cell.file)) continue;
+    const auto resolveMedia=[&](Cell& cell)->juce::Result {
+        if (cell.file.isEmpty() || juce::File::isAbsolutePath(cell.file))
+            return juce::Result::ok();
         if (!safeRelative(cell.file)) return juce::Result::fail("Unsafe relative path.");
         const auto resolved = file.getParentDirectory().getChildFile(cell.file);
         if (!contained(resolved, file.getParentDirectory())) return juce::Result::fail("Media path escapes the project folder.");
         cell.file = resolved.getFullPathName();
-    }
+        return juce::Result::ok();
+    };
+    for (auto& row:loaded.rows) for (auto& cell:row.cells)
+        if (auto resolved=resolveMedia(cell);resolved.failed()) return resolved;
+    for (size_t n=0;n<loaded.cuelists.size();++n)
+        if ((int)n!=loaded.activeCuelist)
+            for (auto& row:loaded.cuelists[n].rows)
+                for (auto& cell:row.cells)
+                    if (auto resolved=resolveMedia(cell);resolved.failed()) return resolved;
+    loaded.cuelists[(size_t)loaded.activeCuelist].rows=loaded.rows;
     destination = std::move(loaded);
     return juce::Result::ok();
 }

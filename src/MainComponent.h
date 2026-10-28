@@ -195,6 +195,10 @@ public:
     void setAutoStop(int row,bool enabled);
     void setRowColour(int row,int colour);
     void toggleColumnCollapsed(int column);
+    void setAllColumnsCollapsed(bool collapsed);
+    void activateCuelist(int index);
+    void createCuelist();
+    void renameActiveCuelist();
     void setCellAutoStop(int row,int column,bool enabled);
     void renameTitle(bool column,int index);
     void reorderRow(int index,int delta);
@@ -235,12 +239,16 @@ private:
     juce::Label projectNameLabel;
     juce::TextButton preflightButton{"Preflight"},diagnosticsButton{"Diagnostics"};
     juce::TextButton goButton{"GO  /  SPACE"},panicButton{"PANIC  /  ESC"},deviceButton{"Audio devices"},controlButton{"CONTROL MAPPING"};
+    juce::TextButton collapseAllButton{"Collapse all"};
+    juce::TextButton cuelistTab0{"Cuelist 1"},cuelistTab1{"Cuelist 2"},
+                     cuelistTab2{"Cuelist 3"},addCuelistButton{"+"};
+    void refreshCuelistTabs();
     juce::TextButton importButton{"Import WAV / MP3"},playCellButton{"Play cell"},stopCellButton{"Stop"},clearButton{"Remove audio"};
     juce::TextButton midiEditButton{"Create MIDI clip"};
     juce::TextButton oscEditButton{"Create OSC clip"};
     juce::TextButton cellTab{"Cell"},rowTab{"Entire cue"};
     juce::TextButton tempoButton{"Tempo map"},applyButton{"Apply changes"};
-    juce::TextEditor rowName,cellName,bpm;
+    juce::TextEditor rowName,cellName,bpm,cueNotes;
     juce::ComboBox behaviour;
     juce::ToggleButton follow{"Include in row GO"},loop{"Loop playback"};
     juce::ToggleButton cellAutoStop{"Stop on next cue GO"};
@@ -323,6 +331,11 @@ private:
     juce::File projectFile;
     juce::String status="Ready. Select an Audio cell and import a WAV file.";
     bool dirty=false;
+    int visibleClipCount=0;
+    float systemCpuPercent=-1.f,systemRamPercent=-1.f;
+    int systemTelemetryTicks=0;
+    uint64_t previousIdleTime=0,previousKernelTime=0,previousUserTime=0;
+    void refreshSystemTelemetry();
     WorkspaceLayout workspaceLayout() const;
     int editorX=0;
     float displayPeak=0;

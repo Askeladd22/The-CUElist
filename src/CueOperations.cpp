@@ -48,6 +48,96 @@ void MainComponent::toggleColumnCollapsed(int column) {
     refresh();
 }
 
+void MainComponent::activateCuelist(int index) {
+    if (index<0 || index>=(int)show.cuelists.size() ||
+        index==show.activeCuelist || !applyInspector()) return;
+    // A tab switch never carries live playback, a pending MIDI/OSC editor
+    // or a stale mapping preset into a different cue order. A background
+    // project-open request must not replace the newly selected Cuelist later.
+    if (projectLoader) projectLoader->cancel();
+    stopAll();
+    closeMidiClip();closeOscClip();
+    editHistory.clearUndoHistory();
+    show.cuelists[(size_t)show.activeCuelist].rows=show.rows;
+    show.rows=show.cuelists[(size_t)index].rows;
+    show.activeCuelist=index;
+    selectedRow=selectedColumn=nextCue=0;
+    copiedRow.reset();copiedRowAudio.clear();copiedCell.reset();copiedAudio.reset();
+    resetActiveMapping();
+    refreshControlSettings();
+    engine.publish(makeRenderState(show,clips));
+    dirty=true; // Active tab is persisted with the project.
+    status="Cuelist selected: "+show.cuelists[(size_t)index].name+
+           ". Playback stopped before switching.";
+    viewport.setViewPosition(0,0);
+    refresh();
+}
+
+void MainComponent::createCuelist() {
+    if (show.cuelists.size()>=12) {message("A show supports up to 12 Cuelists.");return;}
+    if (!applyInspector()) return;
+    const int index=(int)show.cuelists.size();
+    auto name="Cuelist "+juce::String(index+1);
+    for (int trial=index+1;trial<50;++trial) {
+        name="Cuelist "+juce::String(trial+1);
+        bool duplicate=false;
+        for (const auto& item:show.cuelists)
+            if (item.name.equalsIgnoreCase(name)) {duplicate=true;break;}
+        if (!duplicate) break;
+    }
+    Row first;
+    first.id=show.nextId++;
+    for (size_t i=0;i<show.columns.size();++i) {
+        Cell cell;cell.id=show.nextId++;
+        first.cells.push_back(std::move(cell));
+    }
+    Cuelist created;created.name=name;created.rows.push_back(std::move(first));
+    show.cuelists.push_back(std::move(created));
+    activateCuelist(index);
+}
+
+void MainComponent::renameActiveCuelist() {
+    if (show.cuelists.empty()) return;
+    const int index=show.activeCuelist;
+    auto* dialog=new juce::AlertWindow("Rename Cuelist",
+        "Rename only this Cuelist; the project and media paths stay unchanged.",
+        juce::MessageBoxIconType::NoIcon,this);
+    dialog->addTextEditor("name",show.cuelists[(size_t)index].name,"Name");
+    dialog->addButton("Rename",1);
+    dialog->addButton("Cancel",0,juce::KeyPress(juce::KeyPress::escapeKey));
+    dialog->enterModalState(true,juce::ModalCallbackFunction::create(
+        [safe=juce::Component::SafePointer<MainComponent>(this),dialog,index](int choice) {
+            if (!safe || choice!=1 || index>=(int)safe->show.cuelists.size()) return;
+            const auto name=dialog->getTextEditorContents("name").trim();
+            if (name.isEmpty() || name.length()>64) {
+                safe->message("Cuelist names must contain 1–64 characters.");
+                return;
+            }
+            safe->show.cuelists[(size_t)index].name=name;
+            safe->dirty=true;
+            safe->status="Cuelist renamed. Save to persist.";
+            safe->refresh();
+        }),true);
+    dialog->getTextEditor("name")->selectAll();
+}
+
+void MainComponent::setAllColumnsCollapsed(bool collapsed) {
+    if (!applyInspector()) return;
+    bool modified=false;
+    for (auto& column:show.columns) if(column.collapsed!=collapsed) {
+        column.collapsed=collapsed;
+        modified=true;
+    }
+    if (!modified) return;
+    // Layout-only state: do not stop playing cues, invalidate media, or
+    // change mixer routing. Preserve selection and each column's type.
+    dirty=true;
+    status=collapsed ? "All columns collapsed; playback unchanged." :
+                       "All columns expanded; playback unchanged.";
+    refreshControlSettings();
+    refresh();
+}
+
 void MainComponent::setAutoStop(int row,bool enabled) {
     if (row<0 || row>=(int)show.rows.size()) return;
     show.rows[row].stopOnNext=enabled; dirty=true; engine.publish(makeRenderState(show,clips));

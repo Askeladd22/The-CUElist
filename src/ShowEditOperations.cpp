@@ -22,9 +22,18 @@ juce::Result swapCueColumns(Show& show, int source, int destination) {
     for (const auto& row:show.rows)
         if (row.cells.size()!=show.columns.size())
             return juce::Result::fail("Cannot reorder nonrectangular cue cells.");
+    for (size_t i=0;i<show.cuelists.size();++i)
+        if ((int)i!=show.activeCuelist)
+            for (const auto& row:show.cuelists[i].rows)
+                if (row.cells.size()!=show.columns.size())
+                    return juce::Result::fail("Cannot reorder a nonrectangular Cuelist.");
     std::swap(show.columns[(size_t)source],show.columns[(size_t)destination]);
     for (auto& row:show.rows)
         std::swap(row.cells[(size_t)source],row.cells[(size_t)destination]);
+    for (size_t i=0;i<show.cuelists.size();++i)
+        if ((int)i!=show.activeCuelist)
+            for (auto& row:show.cuelists[i].rows)
+                std::swap(row.cells[(size_t)source],row.cells[(size_t)destination]);
     return juce::Result::ok();
 }
 
@@ -124,6 +133,14 @@ juce::Result prepareDeletedColumn(const Show& current, int index,
         removed.push_back(row.cells[(size_t)index].id);
         row.cells.erase(row.cells.begin()+index);
     }
+    for (size_t n=0;n<prepared.cuelists.size();++n)
+        if ((int)n!=prepared.activeCuelist)
+            for (auto& row:prepared.cuelists[n].rows) {
+                if (row.cells.size()!=current.columns.size())
+                    return juce::Result::fail("Cannot delete a nonrectangular Cuelist column.");
+                removed.push_back(row.cells[(size_t)index].id);
+                row.cells.erase(row.cells.begin()+index);
+            }
 
     prepared.columns.erase(prepared.columns.begin()+index);
     if (prepared.columns.empty()) addColumn(prepared,ColumnType::audio,{});
@@ -133,6 +150,11 @@ juce::Result prepareDeletedColumn(const Show& current, int index,
         purgeColumnTargets(column.controlDefaultSet,removedId);
     for (auto& row:prepared.rows) for (auto& cell:row.cells)
         if (cell.controlSet) purgeColumnTargets(*cell.controlSet,removedId);
+    for (size_t n=0;n<prepared.cuelists.size();++n)
+        if ((int)n!=prepared.activeCuelist)
+            for (auto& row:prepared.cuelists[n].rows)
+                for (auto& cell:row.cells)
+                    if (cell.controlSet) purgeColumnTargets(*cell.controlSet,removedId);
     for (auto& item:prepared.controls.templates)
         purgeColumnTargets(item.set,removedId);
 

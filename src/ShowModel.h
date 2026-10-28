@@ -42,14 +42,32 @@ struct Cell {
     std::optional<ControlSet> controlSet;
 };
 struct Row {
-    int id = 0; juce::String name; std::vector<TempoPoint> tempo {{}}; std::vector<Cell> cells;
+    int id = 0; juce::String name; juce::String notes; std::vector<TempoPoint> tempo {{}}; std::vector<Cell> cells;
     float gain = 1.0f;
     int mappingPresetId=0;
     int colour=0; // 0=automatic; 1..7 are operator cue colours
     bool muted = false, loop = false, overrideBehaviour = false, stopOnNext = true;
     Behaviour behaviour = Behaviour::retrigger;
 };
-struct Show { juce::String name = "Show 001"; float masterGain=1.0f, masterPan=0.0f; bool masterMuted=false; int masterOutput=0; bool safetyLimiterEnabled=true; int nextId = 1; std::vector<Column> columns; std::vector<Row> rows; ControlSettings controls; };
+// Cuelists share output columns, mix routing and control configuration, while
+// their cue order, content and technical notes are independent.
+struct Cuelist {
+    juce::String name="Cuelist 1";
+    std::vector<Row> rows;
+};
+struct Show {
+    juce::String name = "Show 001";
+    float masterGain=1.0f, masterPan=0.0f;
+    bool masterMuted=false;
+    int masterOutput=0;
+    bool safetyLimiterEnabled=true;
+    int nextId = 1;
+    std::vector<Column> columns;
+    std::vector<Row> rows; // currently selected Cuelist; operational source of truth
+    ControlSettings controls;
+    std::vector<Cuelist> cuelists;
+    int activeCuelist=0;
+};
 Show makeShow();
 void addRow(Show&, const juce::String&);
 void addColumn(Show&, ColumnType, const juce::String&);
