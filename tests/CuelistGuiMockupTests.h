@@ -35,6 +35,78 @@ void cuelistGuiMockupTests() {
               "Cuelist names, selection or cue notes failed round-trip");
     });
 
+    test("Cuelist tabs stay consecutive and inline until the real width limit",[] {
+        MainComponent ui(false);
+        check(ui.show.cuelists.size()==1 &&
+              ui.show.cuelists[0].name=="Cuelist 1","Default tab name incorrect");
+        for (int i=2;i<=9;++i) {
+            ui.createCuelist();
+            check(ui.show.cuelists.back().name=="Cuelist "+juce::String(i),
+                  "Cuelist numbering skipped a value");
+        }
+        ui.setSize(1647,895);
+        ui.resized();
+        int previousX=-1;
+        for (int i=0;i<9;++i) {
+            auto* tab=controlsV3::named(ui,"cuelistTab"+juce::String(i));
+            auto* close=controlsV3::named(ui,"deleteCuelist"+juce::String(i));
+            check(tab && close && tab->isVisible() && close->isVisible(),
+                  "Every one of nine Cuelists must have a real tab and a close button");
+            check(tab->getX()>previousX,"Cuelist tabs did not appear side by side");
+            previousX=tab->getX();
+        }
+        auto* overflow=controlsV3::named(ui,"cuelistOverflow");
+        check(overflow && !overflow->isVisible(),
+              "Overflow menu appeared despite room for nine inline tabs");
+        ui.setSize(1180,820);
+        ui.resized();
+        check(overflow->isVisible(),"Narrow windows must retain access to hidden Cuelists");
+        check(controlsV3::named(ui,"cuelistTab8")->isVisible(),
+              "Currently active Cuelist must remain visible when tabs overflow");
+        ui.activateCuelist(0);
+        check(controlsV3::named(ui,"cuelistTab0")->isVisible() &&
+              controlsV3::named(ui,"cuelistTab1")->isVisible(),
+              "Overflow scrolling skipped sequential Cuelists");
+    });
+
+    test("Deleting Cuelists protects data and reuses the first free number",[] {
+        MainComponent ui(false);
+        ui.createCuelist();
+        ui.createCuelist();
+        check(ui.show.cuelists.size()==3 && ui.show.activeCuelist==2,
+              "Test could not create three Cuelists");
+        const auto originalId=ui.show.cuelists[0].rows[0].id;
+        const auto deletedId=ui.show.cuelists[1].rows[0].id;
+        const auto deletedCellId=ui.show.cuelists[1].rows[0].cells[0].id;
+        ui.deleteCuelist(1);
+        check(ui.show.cuelists.size()==2 &&
+              ui.show.cuelists[0].name=="Cuelist 1" &&
+              ui.show.cuelists[1].name=="Cuelist 3" &&
+              ui.show.activeCuelist==1 &&
+              ui.show.rows[0].id==ui.show.cuelists[1].rows[0].id,
+              "Delete did not update active index and preserve other Cuelists");
+        check(ui.show.cuelists[0].rows[0].id==originalId &&
+              ui.show.cuelists[0].rows[0].id!=deletedId &&
+              ui.show.cuelists[0].rows[0].cells[0].id!=deletedCellId,
+              "Deleting a Cuelist damaged surviving cue identities");
+        ui.createCuelist();
+        check(ui.show.cuelists.back().name=="Cuelist 2",
+              "A deleted numbered slot was not reused");
+        ui.deleteCuelist(ui.show.activeCuelist);
+        check(ui.show.cuelists.size()==2 &&
+              ui.show.activeCuelist>=0 &&
+              ui.show.activeCuelist<(int)ui.show.cuelists.size() &&
+              validateShow(ui.show).wasOk(),
+              "Deleting the active Cuelist left the show invalid");
+        ui.deleteCuelist(1);
+        const auto copy=encodeShow(ui.show);
+        ui.deleteCuelist(0);
+        check(ui.show.cuelists.size()==1 && encodeShow(ui.show)==copy,
+              "The final remaining Cuelist must not be deletable");
+        Show restored;
+        check(decodeShow(copy,restored).wasOk(),
+              "Cuelist deletion left an invalid persisted project");
+    });
     test("Historical projects without notes or Cuelists remain readable", [] {
         auto root=juce::JSON::parse(encodeShow(makeShow()));
         root.getDynamicObject()->removeProperty("cuelists");
