@@ -32,9 +32,9 @@ struct AppTypefaces {
     juce::Typeface::Ptr exo2=juce::Typeface::createSystemTypefaceFor(
         BinaryData::Exo2_ttf,BinaryData::Exo2_ttfSize);
     juce::Typeface::Ptr hind=juce::Typeface::createSystemTypefaceFor(
-        BinaryData::Hind_Regular_ttf,BinaryData::Hind_Regular_ttfSize);
+        BinaryData::HindRegular_ttf,BinaryData::HindRegular_ttfSize);
     juce::Typeface::Ptr hindSemibold=juce::Typeface::createSystemTypefaceFor(
-        BinaryData::Hind_SemiBold_ttf,BinaryData::Hind_SemiBold_ttfSize);
+        BinaryData::HindSemiBold_ttf,BinaryData::HindSemiBold_ttfSize);
 };
 inline const AppTypefaces& appTypefaces() {
     static const AppTypefaces faces;
@@ -51,9 +51,10 @@ inline juce::Font font(float size,bool bold=false) {
     const auto face=small ? faces.exo2 : (bold ? faces.hindSemibold : faces.hind);
     const auto pt=juce::jmax(10.0f,size*0.75f);
     if (face!=nullptr) {
-        auto options=juce::FontOptions(face).withPointHeight(pt);
-        if (small && bold) options=options.withStyleFlags(juce::Font::bold);
-        return juce::Font(options);
+        const juce::Font embedded(juce::FontOptions(face).withPointHeight(pt));
+        // JUCE 8 FontOptions has no withStyleFlags() member. Bold the
+        // embedded Exo 2 face using the supported juce::Font API.
+        return small && bold ? embedded.boldened() : embedded;
     }
     // Last resort only (e.g. a corrupt embedded font), never default behavior.
     return juce::Font(juce::FontOptions("Segoe UI",size,
