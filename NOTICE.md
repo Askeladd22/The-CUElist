@@ -12,6 +12,6 @@ The original application code, scripts, tests, interface, artwork and documentat
 
 ## Portable Package
 
-The local package includes one `LICENSE` document (Italian original and English reference translation), this notice, and the separate `JUCE-LICENSE.md` required for third-party terms. It does not include the application's or framework's source code. Packaging does not certify that distribution is covered by the necessary licenses.
+The local package includes one English-language `LICENSE` copyright notice, this `NOTICE.md`, and the separate `JUCE-LICENSE.md` required for third-party terms. It does not include the application's or framework's source code. Packaging does not certify that distribution is covered by the necessary licenses.
 
 User-created or imported WAV/MP3 files and projects retain their respective rights. The fixture `tests/fixtures/tone.mp3` is a synthetic tone generated for project tests.
