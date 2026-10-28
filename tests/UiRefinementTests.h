@@ -3,6 +3,29 @@
 #include "OscEditor.h"
 void uiRefinementTests() {
     using namespace cueViewFixtures;
+    test("Midnight Slate palette preserves layered dark surfaces and safety accents",[] {
+        const auto brightness=[](juce::Colour colour) {
+            return 0.2126f*(float)colour.getRed()+
+                   0.7152f*(float)colour.getGreen()+
+                   0.0722f*(float)colour.getBlue();
+        };
+        check(brightness(palette::background)<brightness(palette::input) &&
+              brightness(palette::input)<brightness(palette::panel) &&
+              brightness(palette::panel)<brightness(palette::toolbar) &&
+              brightness(palette::toolbar)<brightness(palette::raised) &&
+              brightness(palette::raised)<brightness(palette::line),
+              "Palette no longer separates canvas, fields, panels and toolbar");
+        check(brightness(palette::text)-brightness(palette::panel)>160.0f &&
+              brightness(palette::muted)-brightness(palette::raised)>100.0f,
+              "Text and secondary labels are too dim against console surfaces");
+        check(palette::teal.getGreen()>palette::teal.getRed() &&
+              palette::teal.getGreen()>palette::teal.getBlue() &&
+              palette::red.getRed()>palette::red.getGreen() &&
+              palette::amber.getRed()>palette::amber.getBlue() &&
+              palette::go!=palette::panic &&
+              palette::selectedTab!=palette::panel,
+              "GO, Panic, active tabs or live-state accents lost their distinction");
+    });
     test("Inspector edge tab collapses right and restores unsaved cue notes",[] {
         MainComponent ui(false);
         ui.setSize(1440,900);

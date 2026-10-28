@@ -2,10 +2,27 @@
 #include <juce_gui_basics/juce_gui_basics.h>
 namespace cuelist {
 namespace palette {
-// Midnight Console: deliberate luminance steps keep adjacent dark surfaces legible.
-inline const juce::Colour background{0xff09131f}, panel{0xff16283a}, raised{0xff253d54}, line{0xff3a536a};
-inline const juce::Colour text{0xfff1f6fa}, muted{0xffb1c4d4}, teal{0xff30ead2}, amber{0xffffc96d}, purple{0xffb399f4}, red{0xffff7881};
-inline juce::Colour type(int i) { return i==0 ? teal : i==1 ? amber : i==2 ? purple : juce::Colour(0xff79b8ff); }
+// Midnight Slate: balanced between the darker redesign reference and the
+// brighter original. Five restrained luminance steps preserve panel hierarchy
+// without making the empty cue workspace pure black or the mixer too blue.
+// These roles are shared by Cue List, Inspector, mixer, Timeline and dialogs.
+inline const juce::Colour background{0xff071725}, // main canvas
+                          input{0xff0b1d2c},      // editable fields
+                          panel{0xff102536},      // sidebar, mixer, Inspector
+                          toolbar{0xff162c40},    // global navigation
+                          raised{0xff1c354a},     // buttons, cards, cue headers
+                          line{0xff36536b};       // muted structural separators
+
+// Functional accents must remain readily distinguishable in a live show.
+inline const juce::Colour text{0xffedf5fa}, muted{0xffabc2d2},
+                          teal{0xff27ddc8}, amber{0xfff9c76e},
+                          purple{0xffb49cf0}, red{0xfffb7e8b},
+                          go{0xff0b786f}, panic{0xff913d4e},
+                          selectedTab{0xff0b686c};
+inline juce::Colour type(int i) {
+    return i==0 ? teal : i==1 ? amber : i==2 ? purple :
+           juce::Colour(0xff82baf4);
+}
 }
 // Segoe UI is shipped with supported Windows versions, with JUCE fallback.
 inline juce::Font font(float size, bool bold=false) { return juce::Font(juce::FontOptions("Segoe UI",size,bold ? juce::Font::bold : juce::Font::plain)); }
@@ -17,13 +34,13 @@ public:
     Theme() {
         setColour(juce::TextButton::buttonColourId,palette::raised);
         setColour(juce::TextButton::textColourOffId,palette::text);
-        setColour(juce::ComboBox::backgroundColourId,palette::background);
+        setColour(juce::ComboBox::backgroundColourId,palette::input);
         setColour(juce::ComboBox::textColourId,palette::text);
         setColour(juce::ComboBox::outlineColourId,palette::line);
         setColour(juce::PopupMenu::backgroundColourId,palette::panel);
         setColour(juce::PopupMenu::textColourId,palette::text);
         setColour(juce::PopupMenu::highlightedBackgroundColourId,palette::raised);
-        setColour(juce::TextEditor::backgroundColourId,palette::background);
+        setColour(juce::TextEditor::backgroundColourId,palette::input);
         setColour(juce::TextEditor::textColourId,palette::text);
         setColour(juce::TextEditor::outlineColourId,palette::line);
         setColour(juce::TextEditor::focusedOutlineColourId,palette::teal);
