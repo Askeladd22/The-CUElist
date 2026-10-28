@@ -1,60 +1,93 @@
-# The CUElist
+# The Cuelist
 
-**The CUElist** is a Windows desktop application for **controlling audio and MIDI cues in theatre productions, concerts, and live events**. It lets operators arrange, start, stop, and overlap sound cues from a single interface.
+**Native Windows show control for audio, MIDI and OSC.**
 
-It is designed for show playback control without requiring a full digital audio workstation (DAW).
+The Cuelist is a desktop application for preparing and executing cue-based live productions, theatre performances, concerts and installations. It brings audio playback, MIDI sequences, OSC events and MIDI-controller mappings into one operator-focused workspace. It is not a digital audio workstation and does not include native video or timecode playback.
 
-## Main features
+**Current development version:** `0.9.0-beta.5` · **Platform:** Windows x64 · **Project format:** `.cuelist` JSON schema v10 · **Technology:** C++17, JUCE 8.0.12 · **License:** proprietary.
 
-- **Cue list:** row-and-column cue grid with GO, Stop, and Panic; cell copy/paste (Ctrl+C/V); row menus for copying, pasting, duplicating, and deleting cues; directly editable cue BPM; and selective Auto Stop options beneath each row's toggle.
-- **Audio:** WAV/MP3 playback, loops, compact channel strips with an integrated stereo GainMeterFader (L/R dBFS meters, dB gain slider, shared vertical scale), rotary pan and output routing. The Master in the utilities area has the same integrated fader, plus Master Pan and Mute, and does not affect MIDI/OSC.
-- **MIDI:** import and create note clips using the built-in Piano Roll, with external MIDI output selection.
-- **OSC (0.7 UX revision):** unified vertical scrolling across EVENTS and automation tracks; shared horizontal zoom/pan for ruler, events and ramps; persistent address/argument tracks containing multiple nonoverlapping segments; one-second 0→1 ramps on double-click; point editing/deletion, independent endpoints and non-stretch resize; typed OSC arguments (int/float/string/bool), Undo/Redo and per-column UDP destinations.
-- **Timeline:** clip placement and zoom, right-edge resizing of MIDI/OSC clips, independent BPM grid visibility and beat snapping.
-- **Control Columns (Road to 0.7):** create multiple Control columns in the cue grid, each with one or more cue-specific Control Sets. **Lock** a column to promote the current cue's set to a low-priority default for every cue; unlock to restore cue-specific sets. Unlocked columns support **Medium**, **High**, and **Maximum** priorities; mappings override only the same physical MIDI input, leaving unrelated faders inherited from lower layers. Equal-priority conflicts resolve to the rightmost Control Column. Edits are activated by confirmed **GO**, not merely selecting a cue. Control Sets support audio/master gain and pan, MIDI CC, OSC float, GO and Panic through MIDI Learn. The floating editor provides range limits, Linear/Ease In/Ease Out curves, Pickup/Jump takeover, mapping updates, inherited/override previews and a reusable Save Set / Apply Set library.
-- **Control Mapping (initial implementation):** manually selected physical MIDI input, MIDI Learn for CC, notes and Pitch Bend, cue presets, cue/preset/column/global mapping priorities, Pickup/Jump takeover, and targets for Master, Audio column gain, GO, Panic, MIDI CC, and OSC Float.
-- **Branding:** approved transparent icon included as `assets/thecuelist_icon.png` and embedded in the GUI/executable.
-- **Portable projects:** save shows as `.cuelist` files, alongside their media folder and backups.
-- **0.7 stability preview:** periodic validated crash-recovery checkpoints (prompt on next launch); explicit Preflight report for media and device readiness; Diagnostics for local audio/MIDI/OSC counts; show preparation before interrupting currently loaded playback; a CI portable startup/shutdown smoke test.
-- **0.8 architecture/integration preview:** a dedicated project media loader with immutable PCM deduplication and transactional memory checks, a bounded background recovery checkpoint writer, shared block timing for MIDI/OSC, timestamp-delay counters, exact-ID reconnection for both MIDI input and output, and real loopback UDP integration tests. An optional Windows hardware inventory tool is supplied for on-site checks; real hardware soak and latency tests are still required.
+> **Beta software — not production certified.** Run Preflight, verify each actual audio/MIDI/OSC device and rehearse every transition on the intended show computer. A successful automated test suite does not establish physical-device reliability or end-to-end timing guarantees.
 
-**Development status:** **0.9.0-beta.2 (release-hardening preview)**; product, Windows package and release identifiers use the single `VERSION.txt` source. The 0.9 work moves project opening/media preparation and crash-recovery JSON serialization off the UI thread, but this is still a beta, not a stable release. Show format **v10** with optional Control Column fields can load projects from v1–v9 and earlier v10 documents. Windows CI builds and automated tests have succeeded, but a complete test on live production hardware has not been carried out. Video, timecode, and MIDI controller feedback are not yet implemented. Control Mapping remains experimental: do not use it in a live show without thorough rehearsal and validation.
+## Capabilities
 
-For license terms, see the [English reference translation](LICENSE.en.md) and the authoritative [Italian original](LICENSE).
+| Area | Current functionality |
+| --- | --- |
+| **Cuelists** | Up to 12 named Cuelists within a show, independent cue sequences, tabs with rename/delete, overflow navigation and safe transport stop when switching. |
+| **Cue control** | Row and cell GO, Stop, Pause/Resume, Panic, overlapping playback, loop, inclusion in Row GO and per-row/per-cell Auto Stop. |
+| **Audio** | WAV/MP3; independent audio columns, gain, pan, mute, phase inversion, output routing, Master Send, Direct Out with PRE/POST selection and an optional Master peak limiter. |
+| **MIDI** | MIDI note-clip creation/import, built-in Piano Roll, named output selection, cue tempo mapping, editing and transport. |
+| **OSC** | Timed UDP events, typed arguments and automation ramps with editable control points; per-column destination. |
+| **Control Mapping** | MIDI Learn, global/column/preset/cue mappings and layered Control Sets with priorities, takeover modes, curves and selected audio/MIDI/OSC targets. |
+| **Workspace** | Zoomable Timeline; fixed BPM/Auto Stop; collapse/expand of the Inspector and columns; cue-specific notepad; configurable editor dock; Undo/Redo for supported MIDI/OSC edits. |
+| **Operations** | Preflight, Diagnostics, crash-recovery checkpoints, transactional project loading, offline tests and an optional hardware inventory utility. |
 
-See [the complete user guide](docs/guida-completa.md) for operating instructions, build details, and limits.
+### The workspace
 
-## Recovery, safety and release maturity
+The left sidebar contains New, Open, Save, Audio devices, Preferences, Control Mapping, the next-cue indicator and GO/Panic. The upper bar displays the current Cuelist tabs, Undo/Redo, a 24-hour clock, CPU/RAM telemetry and MIDI/OSC activity indicators.
 
-This is a **0.9.0-beta.2 preview**, not a certified production release. Click **Preflight** before rehearsals to inspect missing files and configured device availability; click **Diagnostics** to examine local counters. The app creates an atomic recovery checkpoint approximately every 20 seconds while the project is marked unsaved. If the process crashes, the next launch offers **Restore**, **Discard checkpoint**, or **Later**. Restoring never starts playback or overwrites the original file. Save the recovered show explicitly to keep it. Clean shutdown clears the checkpoint; a deferred checkpoint can be retained using **Later**.
+The cue grid keeps BPM and Auto Stop accessible while columns scroll horizontally. **Double-click a Cuelist tab or the “CUE LIST / …” header to rename it**; both always show the same saved name. The `×` action deletes a Cuelist after confirmation, but the last remaining Cuelist cannot be deleted. A separate overflow menu appears only when tabs no longer fit. The Inspector can collapse into a narrow right-side tab and reopen without losing committed edits. Cue notes are saved with their cue.
 
-For background, limitations and hardware validation procedures, read [Stabilization & MIDI/OSC Timing](docs/stability-and-timing.md). The checkpoint records model edits that have been applied to the project; text still typed into an uncommitted Inspector field is not independently captured. Local OSC “sent” does not guarantee reception by another program.
+Undo/Redo use the existing MIDI/OSC edit history; they are **not** a universal undo system for every action in the application.
 
-**0.9 release-hardening:** loading a show now prepares/decompresses its media on a cancellable, single background worker. The existing show keeps playing until the newly prepared project passes validation and PCM memory checks. Newer load requests and cue edits invalidate obsolete results. Recovery checkpoint JSON encoding now runs on the writer thread using an owned model snapshot. Windows CI compiles and tests on every push; portable ZIP creation is available by manually dispatching the workflow. See [0.9 release checklist](docs/0.9-release-checklist.md).
+## Getting started
 
-**Version rule:** the human-facing prerelease version is stored in `VERSION.txt`, synchronized with CMake's numeric version and consumed by the Windows packaging scripts. Keep those files consistent for future prereleases. The serialized project schema remains v10, independent of the application version.
+1. Obtain a compiled Windows x64 build or build from source using the instructions below.
+2. Launch **The Cuelist.exe** (or `Avvia.cmd` from a properly extracted package).
+3. Open **Audio devices**, select the intended device and confirm its output configuration.
+4. Import a WAV/MP3 clip into an Audio cell, or add MIDI/OSC columns and configure their outputs.
+5. Use **GO** (Space) to trigger the next cue, and **Panic** (Esc) to stop playback. Test both before connecting to production equipment.
+6. Save the show to a `.cuelist` file; keep its accompanying `_media` folder when transferring the show.
 
-## Local 0.8 hardware checks
+For detailed operation, device behavior, MIDI/OSC editors and the project format, read the **[Complete User Guide](docs/guida-completa.md)**.
 
-On the actual show PC, run `powershell -ExecutionPolicy Bypass -File scripts/hardware-check.ps1` to compile and run a read-only inventory of audio/MIDI devices. Add `-OscLoopback` to test UDP transmission to the local machine (never to external targets). Reports are stored under `build/hardware-reports/`. Follow the [0.8 integration checklist](docs/0.8-implementation.md) for manual GO/PANIC, MIDI unplug/reconnect and OSC target tests. No test suite on a GitHub runner can certify the physical interfaces used at your venue.
+## Build from source
 
-## Mixer and routing — 0.9 audio-bus update
+**Requirements:** Windows x64, Visual Studio 2022 / Build Tools with *Desktop development with C++*, Windows SDK and CMake tools. Git is used when the pinned JUCE dependency is not yet present in `vendor/JUCE`. The build script retrieves **JUCE 8.0.12** if required.
 
-Audio Columns now have independent **L/R Master Send** (post-strip fader), **Direct Out** (off or a selected physical stereo pair) and **PRE/POST Direct** (PRE bypasses the strip fader only; post-fader Master Send never changes). The Master has its own Main Out, gain/pan/mute, a stereo **pre-limiter** meter and an optional fixed -1 dBFS safety peak limiter (instantaneous attack, 150 ms release) with a red activity LED. Direct routes are never multiplied by Master gain/mute. A direct route that shares the Master Main Out is a *summing collision*: after the Master limiter, the two streams can clip; preflight warns about this. The output stage still clamps each device channel to [-1,+1]. The .cuelist JSON format stays at schema v10, with optional fields and migration for legacy audio routing (default output 1/2 goes through Master, higher output pairs stay direct). MIDI, OSC and cue logic are unchanged. See [routing test cases](tests/MasterBusRoutingTests.h).
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build.ps1
+```
 
-## Utility mixer pass — 0.9 beta.3
+Or run `Compila.cmd`. The Release executable is written to:
 
-- A collapsed Audio Column keeps a narrow working gain/meter fader and Mute at the bottom; expanding it restores the original integrated stereo GainMeterFader.
-- Audio Out and PRE/POST are lowered together by four pixels, keeping their widths; MIDI Out spans the full strip width. L/R Master Send is smaller and separated from Phase Invert.
-- MIDI and OSC columns now have an independent **output data Mute** using their existing persisted `Column::muted` field. Cue state and playhead continue; MIDI note-on dispatch is blocked when muted and changing mute while notes are sounding invalidates pending MIDI messages and releases existing notes. The OSC dispatcher also invalidates packets queued before a mute transition.
-- MIDI Output TX indicator lights green briefly only when the MIDI output worker actually calls the device send for that column. It is not a MIDI input meter and does not report merely queued/pending events; the operating system/device may still fail downstream.
-- Master has one compact `Limit` toggle: OFF (empty LED), ON idle (dim red), ON reducing gain (bright red). The limiter DSP settings and Master routing remain unchanged.
+```text
+build/TheCuelist_artefacts/Release/The Cuelist.exe
+```
 
-## Transport and Inspector UX — 0.9.0-beta.4
+The script configures CMake, compiles the application and test targets, then runs CTest. Use `scripts/build.ps1 -TestOnly` for the test binary only, `-Run` to launch after a successful build, and `--offline` when manually starting the executable without opening an audio device.
 
-- Safety Limiter visual intensity now follows **current** Master gain reduction rather than a latched per-block peak. The limiter DSP and Master/Direct routing are unchanged.
-- MIDI and OSC retain output Mute and real-dispatch activity LEDs in compressed Utilities, with aligned compact Mute controls in the extended layout.
-- Vertical row reorder arrows. Added row Play/Pause (next to Stop and the row context menu): pauses/resumes existing row-mode audio/MIDI/OSC voices and their position through the existing callback command queue, without restarting the row.
-- Right-clicking a cell now opens a **cell-only** menu (delete, cut, copy, paste, loop, Row GO inclusion). The cue menu remains separate. Ctrl+X cuts and Backspace deletes the selected cell while respecting focused text editors, locked Control columns and the existing clipboard identity rules.
-- Inspector: Entire Q and Cell appear together. Retained cue name, BPM/tempo map and Loop All Clips, followed by cell name, Clip Gain (audio), Include in Row GO, Loop Playback, Import MIDI and Piano Roll/OSC editing. Removed redundant tabs, playback modes, apply, transport and per-type removal controls from the displayed panel; legacy show fields remain stored for backward compatibility.
-- Cells show a red dot when excluded from Row GO and a small loop glyph when Loop Playback is enabled, including compressed cells.
+### Portable Windows package
+
+Package creation is a **separate, explicit release operation**, not part of a standard local build or pull-request CI check:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts/package.ps1 -SkipBuild
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts/check-package.ps1 -SmokeLaunch
+```
+
+The `Windows CI (portable package on demand)` workflow can also be started manually from GitHub Actions. The ordinary `Windows Release and tests` workflow only builds and tests. No GitHub Release is implied by the presence of a source branch or passing CI.
+
+The ZIP contains the executable, launcher, README, **one application `LICENSE`**, `NOTICE.md` and the separate **JUCE third-party license notice**. Packaging does **not** establish that the rights holder has secured a commercial JUCE distribution license.
+
+## Projects, backups and recovery
+
+Projects use JSON schema **v10**, independent of the application's `0.9.0-beta.5` number. The loader retains compatibility with earlier project versions. Cuelist names, per-cue notes and additional mixer/control data are saved as optional v10 fields.
+
+Save collects referenced audio into the project's sibling `<show-name>_media` directory; keep the project and media together. Overwrites preserve a backup. Project opening prepares and validates media before replacing the running show. Recovery checkpoints periodically protect applied unsaved model changes, but **are not a substitute for manual saves** and may not contain text still being edited.
+
+See the [release acceptance checklist](docs/0.9-release-checklist.md) and [stability and timing notes](docs/stability-and-timing.md) for test scope and remaining limitations.
+
+## Development status and known limitations
+
+- This is **0.9.0-beta.5**, not a stable release or certified live-show system.
+- MIDI/OSC dispatch counters describe local software activity, **not confirmed delivery** or end-to-end latency. OSC UDP offers no acknowledgement by default.
+- Hardware MIDI controller feedback, native video playback, LTC and MTC are not implemented.
+- File import and project save can still involve blocking work; long-duration, real-device stress tests remain necessary.
+- Control Mapping should be rehearsed carefully with the actual controller, especially Pickup/Jump, connection changes and layered priorities.
+- JUCE's licensing terms apply independently of the application's proprietary license.
+
+## License
+
+The Cuelist is **proprietary software, all rights reserved; it is not open source**. The single [LICENSE](LICENSE) contains the authoritative Italian terms and an English reference translation. Separate third-party obligations, including JUCE, are described in [NOTICE.md](NOTICE.md).
+
+Public access to this repository does not grant permission to redistribute or commercially reuse its original code. Before distributing a proprietary binary, verify the relevant JUCE license and other applicable third-party terms.
