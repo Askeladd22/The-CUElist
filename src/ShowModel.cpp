@@ -168,6 +168,13 @@ juce::Result validateShow(const Show& show) {
                 [&](const auto& p){ return p.id==row.mappingPresetId; }))
             return fail("Cue references a missing mapping preset.");
     }
+    // Legacy cue-scoped mappings may refer to a dormant Cuelist. Accept
+    // those stable row IDs in the document while the runtime still dispatches
+    // only the currently selected Cuelist's GO and Control Set.
+    for (size_t n=0;n<show.cuelists.size();++n)
+        if ((int)n!=show.activeCuelist)
+            for (const auto& row:show.cuelists[n].rows)
+                rowIds.push_back(row.id);
     for (const auto& column:show.columns) columnIds.push_back(column.id);
     if (auto controlResult=validateControls(show.controls,rowIds,columnIds); controlResult.failed())
         return controlResult;
