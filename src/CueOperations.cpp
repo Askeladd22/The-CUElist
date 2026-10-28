@@ -48,6 +48,23 @@ void MainComponent::toggleColumnCollapsed(int column) {
     refresh();
 }
 
+void MainComponent::setAllColumnsCollapsed(bool collapsed) {
+    if (!applyInspector()) return;
+    bool modified=false;
+    for (auto& column:show.columns) if(column.collapsed!=collapsed) {
+        column.collapsed=collapsed;
+        modified=true;
+    }
+    if (!modified) return;
+    // Layout-only state: do not stop playing cues, invalidate media, or
+    // change mixer routing. Preserve selection and each column's type.
+    dirty=true;
+    status=collapsed ? "All columns collapsed; playback unchanged." :
+                       "All columns expanded; playback unchanged.";
+    refreshControlSettings();
+    refresh();
+}
+
 void MainComponent::setAutoStop(int row,bool enabled) {
     if (row<0 || row>=(int)show.rows.size()) return;
     show.rows[row].stopOnNext=enabled; dirty=true; engine.publish(makeRenderState(show,clips));
