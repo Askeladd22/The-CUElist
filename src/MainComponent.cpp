@@ -771,7 +771,43 @@ bool MainComponent::keyPressed(const juce::KeyPress& key) {
     if (key==juce::KeyPress::downKey) { select(std::min(selectedRow+1,(int)show.rows.size()-1),selectedColumn); return true; }
     if (key==juce::KeyPress::upKey) { select(std::max(0,selectedRow-1),selectedColumn); return true; } return false;
 }
+void MainComponent::refreshSystemTelemetry() {
+#if JUCE_WINDOWS
+    // Query OS counters on the UI thread at 1 Hz only; never in the audio
+    // callback or MIDI dispatch path. Kernel time includes idle time.
+    FILETIME idle{},kernel{},user{};
+    const auto ticks=[](const FILETIME& t)->uint64_t {
+        return (uint64_t(t.dwHighDateTime)<<32) | uint64_t(t.dwLowDateTime);
+    };
+    if (::GetSystemTimes(&idle,&kernel,&user)) {
+        const auto i=ticks(idle),k=ticks(kernel),u=ticks(user);
+        if (previousKernelTime>0 && k>=previousKernelTime &&
+            u>=previousUserTime && i>=previousIdleTime) {
+            const uint64_t deltaTotal=k-previousKernelTime+u-previousUserTime;
+            const uint64_t deltaIdle=i-previousIdleTime;
+            if (deltaTotal>0)
+                systemCpuPercent=(float)juce::jlimit(0.0,100.0,
+                    100.0*(1.0-double(deltaIdle)/double(deltaTotal)));
+        }
+        previousIdleTime=i;previousKernelTime=k;previousUserTime=u;
+    }
+    MEMORYSTATUSEX memory{};
+    memory.dwLength=sizeof(memory);
+    if (::GlobalMemoryStatusEx(&memory))
+        systemRamPercent=(float)memory.dwMemoryLoad;
+#else
+    // Unsupported hosts display N/A, never invented telemetry.
+    systemCpuPercent=-1.f;systemRamPercent=-1.f;
+#endif
+}
+
 void MainComponent::timerCallback() {
+    // Keep system telemetry sampled at approximately one second intervals,
+    // rather than polling Windows counters on each 25 Hz GUI refresh.
+    if (++systemTelemetryTicks>=25) {
+        systemTelemetryTicks=0;
+        refreshSystemTelemetry();
+    }
     engine.collectRetired();
     if (projectLoader) {
         PreparedProject prepared;
