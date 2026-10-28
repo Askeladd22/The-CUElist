@@ -93,6 +93,7 @@ struct ColumnUtilities::Strip final : juce::Component {
         controlPriority.onClick=[this] {
             if (owner.show.columns[(size_t)index].controlLocked) return;
             juce::PopupMenu menu;
+            menu.setLookAndFeel(&getLookAndFeel());
             menu.addItem(2,"Medium"); menu.addItem(3,"High"); menu.addItem(4,"Maximum");
             auto safe=juce::Component::SafePointer<MainComponent>(&owner);
             const int columnId=id;
