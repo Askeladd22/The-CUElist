@@ -503,7 +503,7 @@ void MainComponent::refreshCuelistTabs() {
 }
 
 void MainComponent::resized() {
-    const int w=getWidth(),h=getHeight();
+    const int h=getHeight();
     const auto geometry=workspaceLayout();
     editorX=geometry.editorX;
     newButton.setBounds(13,86,49,29); openButton.setBounds(67,86,49,29); saveButton.setBounds(121,86,49,29);
