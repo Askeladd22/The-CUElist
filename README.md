@@ -38,7 +38,7 @@ Undo/Redo use the existing MIDI/OSC edit history; they are **not** a universal u
 5. Use **GO** (Space) to trigger the next cue, and **Panic** (Esc) to stop playback. Test both before connecting to production equipment.
 6. Save the show to a `.cuelist` file; keep its accompanying `_media` folder when transferring the show.
 
-For detailed operation, device behavior, MIDI/OSC editors and the project format, read the **[Complete User Guide](docs/guida-completa.md)**.
+For detailed operation, device behavior, MIDI/OSC editors and the project format, read the **[Complete User Guide](docs/complete-user-guide.md)**.
 
 ## Build from source
 
