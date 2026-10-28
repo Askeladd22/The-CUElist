@@ -21,15 +21,15 @@ juce::Result prepareShowMedia(const Show& show,PreparedShowMedia& destination,
     if(!load || maxBytes<0) return juce::Result::fail("Invalid media loader or PCM limit.");
     PreparedShowMedia prepared;
     std::map<juce::String,std::shared_ptr<const AudioClip>> cache;
-    for(const auto& row:show.rows) for(const auto& cell:row.cells) {
+    const auto prepareCell=[&](const Cell& cell)->juce::Result {
         if(cancelled && cancelled()) return juce::Result::fail("Project preparation cancelled.");
-        if(cell.file.isEmpty()) continue;
+        if(cell.file.isEmpty()) return juce::Result::ok();
         if(!juce::File::isAbsolutePath(cell.file))
             return juce::Result::fail("Resolve relative audio paths before preparing a show.");
         const auto found=cache.find(cell.file);
         if(found!=cache.end()) {
             prepared.clips[cell.id]=found->second;
-            continue;
+            return juce::Result::ok();
         }
         std::shared_ptr<const AudioClip> clip;
         const auto result=load(juce::File(cell.file),clip);
@@ -37,14 +37,22 @@ juce::Result prepareShowMedia(const Show& show,PreparedShowMedia& destination,
         if(result.failed() || !clip) {
             prepared.issues.add(result.failed()?result.getErrorMessage():
                                 "Decoder produced no audio: "+cell.file);
-            continue;
+            return juce::Result::ok();
         }
         prepared.clips[cell.id]=clip;
         cache.emplace(cell.file,clip);
         prepared.pcmBytes=uniquePcmBytes(prepared.clips);
         if(prepared.pcmBytes>maxBytes)
             return juce::Result::fail("Show exceeds the configured PCM memory budget.");
-    }
+        return juce::Result::ok();
+    };
+    for (const auto& row:show.rows) for (const auto& cell:row.cells)
+        if (auto result=prepareCell(cell);result.failed()) return result;
+    for (size_t i=0;i<show.cuelists.size();++i)
+        if ((int)i!=show.activeCuelist)
+            for (const auto& row:show.cuelists[i].rows)
+                for (const auto& cell:row.cells)
+                    if (auto result=prepareCell(cell);result.failed()) return result;
     // Only publish a fully prepared result. On failure, the caller's existing
     // prepared state and the running show remain unchanged.
     if(cancelled && cancelled()) return juce::Result::fail("Project preparation cancelled.");
