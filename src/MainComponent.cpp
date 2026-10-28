@@ -611,11 +611,14 @@ void MainComponent::resized() {
     const bool allCollapsed=std::all_of(show.columns.begin(),show.columns.end(),
         [](const Column& col){return col.collapsed;});
     collapseAllButton.setButtonText(allCollapsed ? "Expand all" : "Collapse all");
-    // Expanded: tab overlaps the Inspector edge by 13px. Collapsed: it
-    // sits entirely inside the 26px rail, not on top of BPM/Auto Stop.
-    const int tabX=inspectorVisible ? geometry.editorX-13 : geometry.editorX;
-    const int tabY=juce::jlimit(150,std::max(150,h-135),h/2-43);
-    inspectorSideTab.setBounds(tabX,tabY,26,86);
+    // A minimal edge grip: 20 x 46px instead of the oversized 26 x 86px
+    // handle. The 26px collapsed rail remains unchanged to preserve all
+    // pinned metrics, mixer and Timeline geometry.
+    constexpr int gripWidth=20,gripHeight=46;
+    const int tabX=inspectorVisible ? geometry.editorX-gripWidth/2
+                                   : geometry.editorX+3;
+    const int tabY=juce::jlimit(150,std::max(150,h-135),h/2-gripHeight/2);
+    inspectorSideTab.setBounds(tabX,tabY,gripWidth,gripHeight);
     inspectorSideTab.setButtonText(inspectorVisible ? ">" : "<");
     inspectorSideTab.setTooltip(inspectorVisible
         ? "Collapse Inspector to the right"
