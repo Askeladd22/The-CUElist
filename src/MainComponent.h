@@ -250,7 +250,7 @@ private:
     CueGrid grid{*this}; PinnedCueHeaders cueHeaders{*this}; CueMetricsOverlay cueMetrics{*this}; Timeline timeline{*this}; juce::Viewport viewport;
     ColumnUtilities utilities{*this};
     juce::TextButton openButton{"Open"},saveButton{"Save"},newButton{"New"},addRowButton{"+"},addColumnButton{"+"};
-    juce::TextButton preferencesButton{"Preferences"};
+    juce::TextButton preferencesButton{"Preferences"},helpButton{"Help"};
     juce::Label projectNameLabel;
     juce::TextButton preflightButton{"Preflight"},diagnosticsButton{"Diagnostics"};
     juce::TextButton goButton{"GO  /  SPACE"},panicButton{"PANIC  /  ESC"},deviceButton{"Audio devices"},controlButton{"CONTROL MAPPING"};
@@ -375,6 +375,9 @@ private:
     bool activateProject(Show candidate,const juce::File& source,bool recovering);
     bool commitPreparedProject(Show candidate,const juce::File& source,bool recovering,
                                PreparedShowMedia prepared);
+    void showHelpMenu();
+    void openUserGuide();
+    void showAboutDialog();
     void showPreflight();
     void showDiagnostics();
     void showColumnMenu(juce::Point<int> screenPoint);
