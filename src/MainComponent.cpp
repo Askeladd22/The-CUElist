@@ -8,6 +8,7 @@
 #include "MidiClip.h"
 #include "BinaryData.h"
 #include <cmath>
+#include <algorithm>
 #if JUCE_WINDOWS
 #ifndef NOMINMAX
 #define NOMINMAX
@@ -290,7 +291,7 @@ void MainComponent::paint(juce::Graphics& g) {
     // Keep the project card, but remove the redundant static ENGINES panel.
     // Engine controls, routing and the live audio-status indicator are unchanged.
     g.setColour(palette::background.withAlpha(.30f));
-    g.fillRoundedRectangle(10.0f,284.0f,160.0f,114.0f,8.0f);
+    g.fillRoundedRectangle(10.0f,311.0f,160.0f,114.0f,8.0f);
     static const auto appIcon=juce::ImageFileFormat::loadFrom(
         BinaryData::thecuelist_icon_png,BinaryData::thecuelist_icon_pngSize);
     if (appIcon.isValid())
@@ -301,29 +302,54 @@ void MainComponent::paint(juce::Graphics& g) {
     }
     label(g,"The Cuelist",{60,14,165,32},24,palette::text,true);
     label(g,"SHOW CONTROL",{61,45,130,16},11,palette::muted,true);
-    g.setColour(palette::teal); g.fillRect(232,69,65,3);
-    label(g,"CONTROL / MAPPING v10",{310,25,185,22},12,palette::muted);
+    // Keep the left half free for cue-list tabs. Telemetry panels are
+    // fixed to the right and never cover the source/utility workspace.
+    g.setColour(palette::teal); g.fillRect(190,70,122,2);
+    const int clockX=w-650, cpuX=w-516;
+    g.setColour(palette::panel);
+    g.fillRoundedRectangle((float)clockX,8.0f,124.0f,56.0f,5.0f);
+    g.fillRoundedRectangle((float)cpuX,8.0f,132.0f,56.0f,5.0f);
+    g.setColour(palette::line.withAlpha(.85f));
+    g.drawRoundedRectangle((float)clockX,8.0f,124.0f,56.0f,5.0f,1.0f);
+    g.drawRoundedRectangle((float)cpuX,8.0f,132.0f,56.0f,5.0f,1.0f);
+    label(g,"CLOCK  /  24H",{clockX+10,11,104,17},10,palette::muted,true);
+    label(g,juce::Time::getCurrentTime().formatted("%H:%M:%S"),
+          {clockX+10,29,104,28},19,palette::text,true);
+    label(g,"CPU / RAM METER",{cpuX+9,11,115,16},10,palette::muted,true);
+    const auto cpu=systemCpuPercent<0 ? juce::String("N/A") :
+                  juce::String(systemCpuPercent,0)+"%";
+    const auto ram=systemRamPercent<0 ? juce::String("N/A") :
+                  juce::String(systemRamPercent,0)+"%";
+    label(g,"CPU "+cpu,{cpuX+9,29,115,16},11,palette::text,true);
+    label(g,"RAM "+ram,{cpuX+9,45,115,16},11,palette::text,true);
 
+    // Audio availability is distinct from actual MIDI/OSC traffic.
+    const int statusX=w-363;
+    g.setColour(palette::line.withAlpha(.52f));
+    g.drawVerticalLine(statusX,9.0f,66.0f);
     g.setColour(engine.connected.load() ? palette::teal : palette::red);
-    g.fillEllipse((float)w-195,23,9,9);
-    label(g,engine.connected.load() ? "Audio Available" : "Audio Unavailable",{w-180,14,173,26},12,palette::muted);
+    g.fillEllipse((float)w-185,13.0f,8.0f,8.0f);
+    label(g,engine.connected.load() ? "Audio Available" : "Audio Unavailable",
+          {w-171,5,169,25},11,palette::muted,true);
     const double now=juce::Time::getMillisecondCounterHiRes();
-    const auto activity=[&](int x,const juce::String& title,bool active) {
+    const auto activity=[&](int x,int y,const juce::String& title,bool active) {
         g.setColour(active ? palette::teal : palette::line);
-        g.fillEllipse((float)x,52.0f,7.0f,7.0f);
-        label(g,title,{x+12,44,77,24},10,active ? palette::text : palette::muted,true);
+        g.fillEllipse((float)x,(float)y+7.0f,6.0f,6.0f);
+        label(g,title,{x+10,y,72,21},9,active ? palette::text : palette::muted,true);
     };
-    activity(w-412,"MIDI RX",now<midiRxUntil);
-    activity(w-309,"MIDI TX",now<midiTxUntil);
-    activity(w-206,"OSC RX",false); // No OSC input endpoint currently exists.
-    activity(w-103,"OSC TX",now<oscTxUntil);
+    activity(w-346,28,"MIDI RX",now<midiRxUntil);
+    activity(w-250,28,"MIDI TX",now<midiTxUntil);
+    activity(w-346,49,"OSC RX",false); // No OSC input endpoint yet.
+    activity(w-250,49,"OSC TX",now<oscTxUntil);
     label(g,"WORKSPACE",{20,118,140,17},11,palette::muted,true);
     g.setColour(palette::teal.withAlpha(0.19f)); g.fillRoundedRectangle(12,131,156,45,8);
     g.setColour(palette::teal); g.fillRoundedRectangle(12,137,4,34,2);
     // The editable project title is a JUCE Label over this card.
-    label(g,"PROJECT",{20,294,140,18},11,palette::muted,true);
-    label(g,juce::String((int)show.rows.size())+" cues / "+juce::String((int)show.columns.size())+" columns",{20,321,150,22},13,palette::muted);
-    label(g,hasUnsavedChanges() ? "Unsaved changes" : "No changes",{20,352,153,22},11,hasUnsavedChanges() ? palette::amber : palette::muted);
+    label(g,"PROJECT",{20,319,140,18},11,palette::muted,true);
+    label(g,juce::String((int)show.rows.size())+" cues / "+juce::String((int)show.columns.size())+" columns",
+          {20,347,150,22},13,palette::muted);
+    label(g,hasUnsavedChanges() ? "Unsaved changes" : "No changes",
+          {20,379,153,22},11,hasUnsavedChanges() ? palette::amber : palette::muted);
     g.setColour(palette::amber.withAlpha(.11f));
     g.fillRoundedRectangle(12.0f,(float)h-339,156.0f,51.0f,8.0f);
     label(g,"ON DECK",{20,h-333,145,16},11,palette::amber,true);
@@ -372,6 +398,19 @@ void MainComponent::paint(juce::Graphics& g) {
     if(col.type==ColumnType::osc)
         label(g,"UDP destination in column Utility",{x,645,inspectorInner,18},10,palette::muted);
     g.restoreState();
+    // A dedicated cue-scoped notepad; it is never superimposed on the
+    // audio gain, MIDI/OSC editor buttons or row-level switches.
+    const int notesAfterActions=geometry.scaleInspectorControl({0,728,1,25}).getBottom()+8;
+    const int notesTop=std::max(notesAfterActions,geometry.inspectorPanel.getBottom()-167);
+    const int notesHeight=std::max(45,geometry.inspectorPanel.getBottom()-notesTop-5);
+    g.setColour(palette::raised.withAlpha(.52f));
+    g.fillRoundedRectangle((float)x-6,(float)notesTop,(float)inspectorInner+12,
+                           (float)notesHeight,7.0f);
+    g.setColour(palette::line.withAlpha(.8f));
+    g.drawRoundedRectangle((float)x-6,(float)notesTop,(float)inspectorInner+12,
+                           (float)notesHeight,7.0f,1.0f);
+    label(g,"NOTES  /  CUE "+juce::String(selectedRow+1).paddedLeft('0',2),
+          {x+3,notesTop+5,inspectorInner-6,20},11,palette::teal,true);
     label(g,status,{geometry.viewport.getX(),h-35,std::max(1,geometry.editorX-200),25},12,palette::muted);
 }
 void MainComponent::resized() {
