@@ -89,6 +89,7 @@ juce::Result validateShow(const Show& show) {
                 (!column.controlLocked && column.controlPriority==1)))) return fail("Invalid column.");
     }
     for (const auto& row : show.rows) {
+        if (row.notes.length()>8192) return fail("Cue notes must not exceed 8192 characters.");
         if (!unique(row.id) || row.cells.size()!=show.columns.size() || row.tempo.empty()
             || row.colour<0 || row.colour>7 || !std::isfinite(row.gain) || row.gain < 0 || row.gain > 4 || (int)row.behaviour < 0 || (int)row.behaviour > 3) return fail("Invalid row.");
         double previous = -1;
@@ -322,7 +323,7 @@ juce::String encodeShow(const Show& show) {
                 {"loop",c.loop},{"stopOnNext",c.stopOnNext},{"gain",c.gain},{"startSeconds",c.startSeconds},{"behaviour",(int)c.behaviour},{"midi",midi},{"osc",osc},
                 {"controlSet",c.controlSet ? controlSetObject(*c.controlSet) : juce::var()}}));
         }
-        rows.add(object({{"id",r.id},{"name",r.name},{"tempo",tempo},{"cells",cells},{"gain",r.gain},
+        rows.add(object({{"id",r.id},{"name",r.name},{"notes",r.notes},{"tempo",tempo},{"cells",cells},{"gain",r.gain},
             {"muted",r.muted},{"loop",r.loop},{"overrideBehaviour",r.overrideBehaviour},{"behaviour",(int)r.behaviour},{"stopOnNext",r.stopOnNext},
             {"mappingPresetId",r.mappingPresetId},{"colour",r.colour}}));
     }
@@ -438,7 +439,9 @@ juce::Result decodeShow(const juce::String& text, Show& destination) {
             show.columns.push_back(column);
         }
         for (auto& r : array(root,"rows")) {
-            Row row; row.id = integer(r,"id"); row.name = string(r,"name"); row.tempo.clear();
+            Row row; row.id = integer(r,"id"); row.name = string(r,"name");
+            if (r.hasProperty("notes")) row.notes=string(r,"notes");
+            row.tempo.clear();
             if (version>=10) row.mappingPresetId=integer(r,"mappingPresetId");
             if (r.hasProperty("colour")) row.colour=integer(r,"colour");
             if (version >= 4) row.stopOnNext=boolean(r,"stopOnNext");
