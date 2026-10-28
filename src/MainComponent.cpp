@@ -28,11 +28,11 @@ MainComponent::MainComponent(bool startAudio) {
     setLookAndFeel(&theme); setWantsKeyboardFocus(true); setSize(1440,900);
     for (juce::Component* c : std::initializer_list<juce::Component*>{&openButton,&saveButton,&newButton,&addRowButton,&addColumnButton,
          &goButton,&panicButton,&deviceButton,&controlButton,&collapseAllButton,&inspectorSideTab,
-         &cuelistOverflowButton,&addCuelistButton,&dockResize,&timelineResize,&importButton,&midiEditButton,&oscEditButton,&playCellButton,&stopCellButton,&clearButton,&tempoButton,&applyButton,
+         &cuelistOverflowButton,&addCuelistButton,&undoButton,&redoButton,&dockResize,&timelineResize,&importButton,&midiEditButton,&oscEditButton,&playCellButton,&stopCellButton,&clearButton,&tempoButton,&applyButton,
          &cellTab,&rowTab,&rowGain,&rowBehaviour,&rowMute,&rowLoop,&rowName,&cellName,&bpm,&cueNotes,&behaviour,&follow,&loop,&cellAutoStop,&gainDb,&viewport,&timeline,&utilities,
          &clipCollapseButton,&clipCloseButton,&cueHeaders,&cueMetrics,&preflightButton,&diagnosticsButton,&preferencesButton,&projectNameLabel}) addAndMakeVisible(c);
     for (auto* b : {&openButton,&saveButton,&newButton,&addRowButton,&addColumnButton,&goButton,&panicButton,&deviceButton,&controlButton,&collapseAllButton,&inspectorSideTab,
-                    &cuelistOverflowButton,&addCuelistButton,
+                    &cuelistOverflowButton,&addCuelistButton,&undoButton,&redoButton,
                     &importButton,&midiEditButton,&oscEditButton,&playCellButton,&stopCellButton,&clearButton,&tempoButton,&applyButton,
                     &preflightButton,&diagnosticsButton,&preferencesButton}) b->setWantsKeyboardFocus(false);
     viewport.setViewedComponent(&grid,false); viewport.setScrollBarsShown(true,true);
@@ -216,7 +216,7 @@ MainComponent::MainComponent(bool startAudio) {
     // Each tab is a genuine Cuelist selector. The third tab must never
     // double as an overflow popup: the overflow appears only when needed.
     for (int i=0;i<(int)cuelistTabs.size();++i) {
-        cuelistTabs[(size_t)i]=std::make_unique<juce::TextButton>();
+        cuelistTabs[(size_t)i]=std::make_unique<CuelistTabButton>();
         cuelistCloseButtons[(size_t)i]=std::make_unique<juce::TextButton>("x");
         auto& tab=*cuelistTabs[(size_t)i];
         auto& close=*cuelistCloseButtons[(size_t)i];
@@ -225,6 +225,7 @@ MainComponent::MainComponent(bool startAudio) {
         tab.setWantsKeyboardFocus(false);
         close.setWantsKeyboardFocus(false);
         tab.onClick=[this,i] {activateCuelist(i);};
+        tab.onRename=[this,i] {renameCuelist(i);};
         close.onClick=[this,i] {requestDeleteCuelist(i);};
         tab.setVisible(false);
         close.setVisible(false);
@@ -237,6 +238,14 @@ MainComponent::MainComponent(bool startAudio) {
     addCuelistButton.setName("newCuelist");
     addCuelistButton.setTooltip("Create another Cuelist in this show.");
     addCuelistButton.onClick=[this] {createCuelist();};
+    undoButton.setName("showUndo");
+    redoButton.setName("showRedo");
+    undoButton.setTooltip("Undo the last MIDI/OSC clip edit (Ctrl+Z).");
+    redoButton.setTooltip("Redo the last MIDI/OSC clip edit (Ctrl+Shift+Z).");
+    undoButton.onClick=[this] {undoEdit();};
+    redoButton.onClick=[this] {redoEdit();};
+    undoButton.setEnabled(false);
+    redoButton.setEnabled(false);
     controlButton.setName("controlMapping");
     controlButton.setTooltip("MIDI input, MIDI Learn, and global/per-cue mappings.");
     controlButton.onClick=[this] {
@@ -489,6 +498,15 @@ void MainComponent::showCuelistOverflowMenu() {
                          i==show.activeCuelist);
 
     // Off-screen tabs must remain manageable, not just selectable.
+    juce::PopupMenu renameMenu;
+    renameMenu.setLookAndFeel(&theme);
+    for (int i=0;i<(int)show.cuelists.size();++i)
+        if (!cuelistTabs[(size_t)i]->isVisible())
+            renameMenu.addItem(300+i,"Rename "+show.cuelists[(size_t)i].name);
+    if (renameMenu.getNumItems()>0) {
+        menu.addSeparator();
+        menu.addSubMenu("Rename hidden Cuelist...",renameMenu);
+    }
     juce::PopupMenu deleteMenu;
     deleteMenu.setLookAndFeel(&theme);
     if (show.cuelists.size()>1)
@@ -507,6 +525,7 @@ void MainComponent::showCuelistOverflowMenu() {
             if (!safe) return;
             if (choice>=100 && choice<112) safe->activateCuelist(choice-100);
             if (choice>=200 && choice<212) safe->requestDeleteCuelist(choice-200);
+            if (choice>=300 && choice<312) safe->renameCuelist(choice-300);
         });
 }
 
@@ -542,7 +561,7 @@ void MainComponent::refreshCuelistTabs() {
         const auto colour=active ? palette::selectedTab : palette::panel;
         auto name=show.cuelists[(size_t)i].name;
         tab.setButtonText(name.length()>13 ? name.substring(0,11)+"..." : name);
-        tab.setTooltip(name+" - select Cuelist (playback stops on switch).");
+        tab.setTooltip(name+" - click to select; double-click to rename.");
         tab.setColour(juce::TextButton::buttonColourId,colour);
         tab.setBounds(x,43,count>1 ? 64 : 81,buttonHeight);
         close.setColour(juce::TextButton::buttonColourId,colour);
@@ -571,6 +590,10 @@ void MainComponent::resized() {
     preferencesButton.setBounds(20,227,140,31);
     controlButton.setBounds(20,264,140,33);
     refreshCuelistTabs();
+    // Undo/Redo live in the unused upper-right band before the clock,
+    // separate from the 43px-high Cuelist tab row.
+    undoButton.setBounds(getWidth()-764,10,51,25);
+    redoButton.setBounds(getWidth()-709,10,51,25);
     collapseAllButton.setBounds(geometry.cueHeaders.getX()+CueGrid::nameWidth-84,
                                 geometry.cueHeaders.getY()+9,77,24);
     const bool allCollapsed=std::all_of(show.columns.begin(),show.columns.end(),
@@ -961,6 +984,9 @@ void MainComponent::refreshSystemTelemetry() {
 }
 
 void MainComponent::timerCallback() {
+    const bool canUndo=editHistory.canUndo(),canRedo=editHistory.canRedo();
+    if (undoButton.isEnabled()!=canUndo) undoButton.setEnabled(canUndo);
+    if (redoButton.isEnabled()!=canRedo) redoButton.setEnabled(canRedo);
     // Keep system telemetry sampled at approximately one second intervals,
     // rather than polling Windows counters on each 25 Hz GUI refresh.
     if (++systemTelemetryTicks>=25) {
