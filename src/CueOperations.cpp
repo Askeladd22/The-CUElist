@@ -52,7 +52,9 @@ void MainComponent::activateCuelist(int index) {
     if (index<0 || index>=(int)show.cuelists.size() ||
         index==show.activeCuelist || !applyInspector()) return;
     // A tab switch never carries live playback, a pending MIDI/OSC editor
-    // or a stale mapping preset into a different cue order.
+    // or a stale mapping preset into a different cue order. A background
+    // project-open request must not replace the newly selected Cuelist later.
+    if (projectLoader) projectLoader->cancel();
     stopAll();
     closeMidiClip();closeOscClip();
     editHistory.clearUndoHistory();
