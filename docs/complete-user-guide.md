@@ -50,9 +50,11 @@ The sidebar provides **New**, **Open**, **Save**, the editable show title, **Aud
 
 The shortcut hints formerly shown at the bottom of the sidebar have been removed; the keyboard shortcuts still work.
 
-### 3.2 Top bar and operational telemetry
+### 3.2 Top bar, Help, and operational telemetry
 
 The top row contains named **Cuelist tabs**, the **+** action, **Undo/Redo**, a 24-hour clock, Windows CPU/RAM usage and a compact MIDI RX/TX / OSC RX/TX / audio-availability monitor.
+
+The **Help** button in the top toolbar opens a menu with **User Guide** and **About The Cuelist**. User Guide opens the local `docs/complete-user-guide.md` document with the system's associated Markdown viewer (an offline copy is included beside the compiled EXE and in portable packages). About displays the current version derived from `VERSION.txt`, the proprietary copyright notice and the two credited co-authors, **Davide Salvatore** and **Riccardo D'Ambrosio**.
 
 - **Undo/Redo** use the existing MIDI/OSC clip-edit history; they are not general-purpose undo for show deletion, tab management or every mixer action.
 - **CPU/RAM** report system-level usage, not per-plugin or per-clip estimates. Unsupported telemetry displays N/A.
