@@ -1,146 +1,245 @@
-THE CUELIST — UNIFIED PROPRIETARY SOFTWARE LICENSE
-Version 1.0 — October 26, 2026
+THE CUELIST — PROPRIETARY SOFTWARE AND SOURCE CODE LICENSE
+Version 1.1 — 28 October 2026
 
-This single document contains the original Italian license and its English
-translation. The Italian text is the legally authoritative version. The English
-translation is provided for understanding and does not modify the license.
+Copyright © 2026 the respective lawful owners of The Cuelist's original code,
+documentation, interface and original assets. All rights reserved.
 
-The Cuelist is proprietary software, NOT an open-source project. The public
-availability of source code on GitHub grants no additional permissions.
-
-===============================================================================
-PART I — TESTO ORIGINALE IN ITALIANO (PREVALENTE)
-===============================================================================
-
-THE CUELIST — LICENZA PROPRIETARIA D'USO
-Versione 1.0 — 26 ottobre 2026
-
-Copyright © 2026 titolari dei diritti di The Cuelist.
-Tutti i diritti riservati.
-
-1. TITOLARITÀ
-The Cuelist, inclusi codice originale, interfaccia, documentazione e risorse
-originali, è software proprietario, non distribuito sotto una licenza open
-source. La disponibilità pubblica dei sorgenti su GitHub non concede di per
-sé il diritto di utilizzare, modificare o redistribuire il software.
-
-2. LICENZA D'USO PERPETUA
-A chi acquista regolarmente The Cuelist o riceve un'autorizzazione esplicita
-dal titolare viene concessa una licenza non esclusiva, a tempo indeterminato,
-per utilizzare la versione legittimamente ottenuta, per finalità personali
-o professionali.
-
-Per le licenze commerciali il corrispettivo è pagato una sola volta: non è
-previsto un abbonamento periodico obbligatorio per continuare a utilizzare
-la versione acquistata. L'acquisto non trasferisce la proprietà del codice
-né i diritti d'autore. La licenza è riferita al singolo acquirente (persona
-fisica o organizzazione) e consente l'installazione su un massimo di due
-computer sotto il suo controllo, senza uso simultaneo, salvo diverse
-condizioni esplicitamente concordate per iscritto.
-
-3. USI CONSENTITI E LIMITAZIONI
-Sono consentiti l'esecuzione del programma, l'utilizzo negli spettacoli e
-nelle attività lavorative e le copie strettamente necessarie all'installazione
-o al backup.
-
-Salvo consenso scritto del titolare o diritti inderogabili riconosciuti
-dalla legge, non è consentito:
-- distribuire o mettere a disposizione di terzi copie del programma;
-- pubblicare, riutilizzare commercialmente o sublicenziare i sorgenti;
-- rimuovere gli avvisi di copyright e di attribuzione;
-- modificare o decompilare il programma oltre quanto permesso dalla legge.
-
-Restano impregiudicati gli eventuali diritti di trasferimento della copia
-e gli altri diritti inderogabili previsti dalla normativa applicabile.
-
-4. VERSIONI E AGGIORNAMENTI
-Il diritto di utilizzo della versione acquistata non scade. Le nuove
-versioni principali possono essere offerte separatamente e a pagamento.
-Sono garantiti gli aggiornamenti, anche di sicurezza, e i rimedi richiesti
-dalla legge applicabile e dalle condizioni dell'offerta di acquisto.
-Questo testo non promette gratuitamente tutte le future versioni del
-software.
-
-5. FILE E CONTENUTI DELL'UTENTE
-I file audio, MIDI e gli show creati o importati dall'utente restano di
-proprietà dei rispettivi titolari. Questa licenza non trasferisce a The
-Cuelist i relativi diritti né autorizza l'impiego di contenuti di terzi
-senza i necessari permessi.
-
-6. SOFTWARE DI TERZE PARTI
-The Cuelist utilizza JUCE e altre componenti di terzi, soggette alle
-rispettive licenze. Questa licenza si applica soltanto alle parti originali
-di The Cuelist e non sostituisce né modifica i termini di JUCE.
-Consultare NOTICE.md e JUCE-LICENSE.md nel pacchetto distribuito.
-Prima di commercializzare o distribuire il programma, il titolare deve
-verificare e assicurare una licenza JUCE idonea.
-
-7. CONFORMITÀ, RESPONSABILITÀ E UTILIZZO DAL VIVO
-Il software può contenere difetti; prima dell'impiego durante eventi dal
-vivo è opportuno verificarne il funzionamento con i dispositivi utilizzati
-e predisporre procedure di emergenza. Niente in questo documento esclude
-o limita i diritti inderogabili dei consumatori, la garanzia legale di
-conformità, le responsabilità che non possono essere escluse per legge
-o gli eventuali obblighi contrattuali del venditore.
-
-8. CONDIZIONI DI VENDITA
-Identità e recapiti del venditore, prezzo, modalità di pagamento, consegna,
-assistenza, recesso e altre informazioni precontrattuali sono comunicati
-separatamente prima dell'acquisto, secondo la normativa applicabile.
-Eventuali autorizzazioni per prove e beta testing possono prevedere
-condizioni aggiuntive esplicitamente comunicate.
-
-Questa licenza non costituisce una licenza commerciale di JUCE e non
-certifica, da sola, che una specifica distribuzione sia autorizzata.
+The Cuelist is NOT open-source software. This document does not grant any
+general licence to copy, adapt, distribute or commercially exploit its source.
+It comprises an authoritative Italian text and an English translation for
+reference. In the event of disagreement, the Italian text prevails.
 
 ===============================================================================
-PART II — ENGLISH TRANSLATION (NON-AUTHORITATIVE)
+PARTE I — LICENZA IN ITALIANO (TESTO PREVALENTE)
 ===============================================================================
 
-Copyright © 2026 The Cuelist rights holders.
-All rights reserved.
+1. OGGETTO, TITOLARITÀ E RISERVA DEI DIRITTI
 
-## 1. Ownership
+The Cuelist, nelle sue componenti originali (codice sorgente, codice oggetto,
+progetto, interfaccia, grafica e documentazione), è software proprietario
+protetto dalle norme applicabili sul diritto d'autore, incluse le disposizioni
+sui programmi per elaboratore della legge 22 aprile 1941, n. 633.
 
-The Cuelist, including its original code, interface, documentation, and original assets, is proprietary software and is not distributed under an open-source license. The public availability of its source code on GitHub does not itself grant permission to use, modify, or redistribute the software.
+Ogni diritto non espressamente concesso rimane riservato ai rispettivi titolari
+legittimi. La pubblicazione o consultabilità del repository, dei file e delle
+singole revisioni non equivale alla concessione di una licenza open source, a
+una rinuncia ai diritti o a un'autorizzazione per utilizzi ulteriori.
 
-## 2. Perpetual License to Use
+La presente licenza riguarda soltanto le parti originali legittimamente
+controllate dai titolari di The Cuelist, senza attribuire loro diritti su JUCE,
+su altri componenti di terzi o sui contributi di autori diversi eventualmente
+disciplinati da propri termini.
 
-A person who lawfully purchases The Cuelist or receives explicit authorization from the rights holder is granted a non-exclusive license of indefinite duration to use the lawfully obtained version for personal or professional purposes.
+2. CONSULTAZIONE DEI SORGENTI SU GITHUB
 
-For commercial licenses, payment is made once: there is no mandatory recurring subscription to continue using the purchased version. Purchase does not transfer ownership of the code or copyright. The license applies to the individual buyer (person or organization) and permits installation on up to two computers under the buyer's control, without simultaneous use, unless different terms have been expressly agreed in writing.
+Quando il repository è pubblico, la visibilità e le funzionalità proprie di
+GitHub possono consentire la visualizzazione e la creazione di fork nell'ambito
+dei Termini di servizio della piattaforma. Tali facoltà, e le copie
+tecnicamente necessarie ad esercitarle nei limiti dei termini applicabili,
+non costituiscono una licenza ulteriore a sfruttare, incorporare, vendere o
+redistribuire il software al di fuori di quei limiti.
 
-## 3. Permitted Uses and Restrictions
+In particolare, la disponibilità dei sorgenti non attribuisce di per sé
+un'autorizzazione a compilare e distribuire versioni del programma, a
+ripubblicare il codice come progetto proprio, a usarlo come base di prodotti,
+servizi o librerie, né ad applicargli una licenza diversa.
 
-Running the program, using it at performances and in professional activities, and making copies strictly necessary for installation or backup are permitted.
+3. RIPRODUZIONE, MODIFICA E RIUTILIZZO: DIVIETI
 
-Unless authorized in writing by the rights holder or permitted under mandatory applicable law, the following are prohibited:
+Salva autorizzazione preventiva ed esplicita del titolare dei diritti,
+oppure nei limiti dei diritti previsti da norme inderogabili o dai Termini
+di servizio della piattaforma applicabili, è vietato:
 
-- distributing or making copies of the program available to third parties;
-- publishing, commercially reusing, or sublicensing source code;
-- removing copyright and attribution notices;
-- modifying or decompiling the program beyond what the law permits.
+a) copiare, pubblicare, trasmettere, condividere o redistribuire, in tutto
+   o in parte, il codice originale o sue parti sostanziali, anche se
+   gratuitamente o con nomi diversi;
+b) modificare, tradurre, adattare, elaborare, fare il porting, creare
+   versioni derivate o incorporare il codice originale in programmi,
+   prodotti, servizi, repository o librerie di terzi;
+c) compilare, confezionare, commercializzare, sublicenziare, vendere,
+   noleggiare o distribuire copie non autorizzate dei sorgenti o dei binari;
+d) far apparire come propria l'opera altrui, cancellare o falsificare
+   indicazioni di titolarità, avvisi di copyright e altre attribuzioni;
+e) concedere a terzi permessi sui sorgenti o applicare al codice originale
+   una licenza open source o altra licenza senza il consenso del titolare.
 
-Any mandatory rights concerning transfer of a copy and other non-waivable rights under applicable law remain unaffected.
+Questi divieti si applicano anche agli usi non commerciali, salvo le
+eccezioni appena indicate. Le idee, i principi e gli elementi non tutelabili
+come espressione del software non diventano esclusiva del titolare per il
+solo effetto di questa licenza.
 
-## 4. Versions and Updates
+4. LICENZA D'USO DELLA VERSIONE LEGITTIMAMENTE ACQUISITA
 
-The right to use a purchased version does not expire. New major versions may be offered separately for a fee. Updates, including security updates, and remedies required by applicable law and the terms of the purchase offer are guaranteed. This text does not promise all future versions of the software free of charge.
+A chi acquista regolarmente una versione di The Cuelist o ottiene una specifica
+autorizzazione viene concesso, alle condizioni comunicategli, un diritto
+personale o organizzativo non esclusivo e a tempo indeterminato di utilizzare
+la versione legittimamente acquisita per finalità personali o professionali.
 
-## 5. User Files and Content
+Salvo diverso accordo scritto, la licenza commerciale è pagata una sola volta
+e permette l'installazione su un massimo di due computer sotto il controllo
+del singolo acquirente, senza utilizzo simultaneo. Non è richiesto un
+abbonamento periodico per continuare a usare la versione acquistata.
+L'acquisto non trasferisce la proprietà del codice né concede i diritti
+indicati all'articolo 3.
 
-Audio files, MIDI files, and shows created or imported by users remain the property of their respective rights holders. This license does not transfer those rights to The Cuelist or authorize the use of third-party content without the necessary permissions.
+Le copie necessarie all'uso e al backup restano consentite nei termini
+previsti dalla legge. Nuove versioni principali possono essere offerte
+separatamente; restano dovuti gli aggiornamenti, i rimedi e le garanzie
+imposti dalle norme applicabili e dall'offerta contrattuale.
 
-## 6. Third-Party Software
+5. AUTORIZZAZIONI AGGIUNTIVE E DIRITTI INDEROGABILI
 
-The Cuelist uses JUCE and other third-party components subject to their respective licenses. This license applies only to the original portions of The Cuelist and does not replace or amend JUCE's terms. Consult NOTICE.md and JUCE-LICENSE.md in the distributed package. Before commercializing or distributing the program, the rights holder must verify and secure a suitable JUCE license.
+Ogni permesso di riutilizzare o distribuire sorgenti, modifiche o binari al
+di fuori della normale licenza d'uso richiede un accordo esplicito con il
+titolare legittimo, con indicazione di ambito, destinatari e condizioni.
 
-## 7. Compliance, Liability, and Live Use
+Nulla in questa licenza limita i diritti inderogabili riconosciuti dalla
+normativa applicabile, tra cui, nei casi previsti, quelli relativi alla copia
+di riserva, allo studio del funzionamento e all'interoperabilità (articoli
+64-ter e 64-quater della legge n. 633/1941), né i diritti dei consumatori,
+l'esaurimento della distribuzione nei casi previsti e le altre eccezioni di
+legge. Non si intende vietare ciò che la legge non consente di vietare.
 
-The software may contain defects. Before using it at live events, users should test its operation with the intended equipment and establish emergency procedures. Nothing in this document excludes or restricts mandatory consumer rights, statutory conformity warranties, liabilities that cannot lawfully be excluded, or any contractual obligations of the seller.
+6. CONTENUTI DEGLI UTENTI E MATERIALI DI TERZI
 
-## 8. Terms of Sale
+I file WAV/MP3, MIDI, i progetti di spettacolo e gli altri materiali degli
+utenti conservano la titolarità dei rispettivi aventi diritto. Questa licenza
+non concede permessi su opere musicali, registrazioni o materiali importati.
 
-The seller's identity and contact details, price, payment terms, delivery, support, withdrawal rights, and other pre-contractual information are provided separately before purchase as required by applicable law. Authorizations for trials and beta testing may be subject to additional terms that are expressly communicated.
+JUCE e gli eventuali altri componenti di terzi rimangono regolati dalle
+proprie licenze, consultabili negli avvisi di terze parti (NOTICE.md e
+JUCE-LICENSE.md nel pacchetto pertinente). La presente licenza non altera
+tali termini. Chi distribuisce il software deve prima assicurarsi di
+disporre dei diritti necessari anche rispetto a JUCE; la mera presenza
+di questo documento non ne certifica l'esistenza.
 
-This license is not a commercial JUCE license and does not, by itself, certify that any particular distribution is authorized.
+7. AFFIDABILITÀ, GARANZIE E CONDIZIONI DI VENDITA
+
+The Cuelist può presentare difetti e deve essere provato con le effettive
+apparecchiature e procedure di emergenza prima dell'uso in uno spettacolo.
+Restano integri tutti i diritti inderogabili dei consumatori, le garanzie
+legali e le responsabilità che non possono essere escluse per legge.
+
+Identità e recapiti del venditore, prezzo, consegna, recesso, assistenza
+e informazioni precontrattuali saranno comunicati separatamente nei casi
+richiesti dalla legge. Beta testing e distribuzioni autorizzate possono
+essere soggetti a condizioni specifiche comunicate agli interessati.
+
+8. PROTEZIONE DEI DIRITTI
+
+La copia o distribuzione non autorizzata delle componenti originali può
+violare i diritti d'autore e dare luogo ai rimedi previsti dalla legge,
+indipendentemente dall'uso commerciale o dall'indicazione del nome
+dell'autore. L'assenza di un avviso su un singolo file non costituisce
+rinuncia ai diritti. Il titolare può valutare le opportune iniziative,
+incluse le segnalazioni previste dalla piattaforma e la tutela giudiziaria.
+
+===============================================================================
+PART II — ENGLISH REFERENCE TRANSLATION (ITALIAN TEXT PREVAILS)
+===============================================================================
+
+1. SCOPE, OWNERSHIP AND RESERVATION OF RIGHTS
+
+The Cuelist's original source code, object code, project, interface, artwork
+and documentation are proprietary copyrighted works, subject to applicable
+law, including Italian Law No. 633 of 22 April 1941 on computer programs.
+
+All rights not expressly granted are reserved to their respective lawful
+owners. Public availability of the repository, files or revision history is
+not an open-source licence, a waiver or permission for additional uses.
+This licence applies only to original material lawfully controlled by the
+relevant rights holders. It does not claim ownership of JUCE, third-party
+components or independently licensed contributions.
+
+2. VIEWING SOURCE CODE ON GITHUB
+
+When the repository is public, GitHub's Terms of Service may permit viewing
+and forking through GitHub's functionality, together with copies necessary
+within the relevant platform permissions. Those rights are not an additional
+licence to exploit, incorporate, sell or redistribute the software outside
+the permitted scope.
+
+Source availability alone does not authorize building and distributing
+copies, republishing the code as one's own, developing products or services
+from it, or replacing its proprietary licence with another licence.
+
+3. PROHIBITED COPYING, MODIFICATION AND REUSE
+
+Without the lawful rights holder's prior, explicit authorization, except
+where mandatory law or applicable platform terms provide otherwise, it is
+prohibited to:
+
+(a) copy, publish, transmit, share or redistribute all or substantial
+    portions of the original code, even without payment or under a new name;
+(b) modify, translate, adapt, port, create derivatives of, or incorporate
+    original code into other programs, products, services, repositories or
+    libraries;
+(c) build, package, market, sublicense, sell, rent or distribute unauthorized
+    copies of the source or executable software;
+(d) misrepresent authorship or remove or falsify ownership, copyright and
+    attribution notices;
+(e) purport to license the original source to third parties or relicense
+    it under open-source or other terms without the rights holder's consent.
+
+These restrictions apply to noncommercial uses too, subject to the stated
+exceptions. This licence does not create an exclusive right in unprotected
+ideas, principles or other noncopyrightable elements of software.
+
+4. LAWFULLY ACQUIRED COPY: LICENCE TO USE
+
+An authorized buyer or person with specific authorization obtains a
+non-exclusive licence of indefinite duration to use the lawfully obtained
+version for personal or professional purposes, under the supplied terms.
+
+Unless otherwise agreed in writing, a commercial licence is purchased once
+and allows installation on no more than two computers controlled by one
+purchaser, without simultaneous use. There is no mandatory recurring
+subscription to keep using the purchased version. Purchase does not transfer
+copyright or grant the source-code permissions prohibited in Section 3.
+
+Legally required operational and backup copies remain permitted. New major
+versions may be priced separately, subject to mandatory updates, warranties
+and remedies required by law and the sales offer.
+
+5. ADDITIONAL PERMISSIONS AND MANDATORY RIGHTS
+
+Further source-code reuse, modification or redistribution requires explicit
+authorization from the lawful rights holder, defining scope and conditions.
+
+Nothing here excludes non-waivable rights under applicable law, including
+where applicable backup copies, studying how a program functions, and
+interoperability under Articles 64-ter and 64-quater of Italian Law No. 633/1941,
+consumer rights, lawful exhaustion or other statutory exceptions. No term
+seeks to prohibit activities that applicable law does not permit to prohibit.
+
+6. USER CONTENT AND THIRD-PARTY MATERIALS
+
+User WAV/MP3, MIDI, show projects and other materials remain owned by their
+respective rights holders. This licence does not grant permissions for
+imported music, recordings or other works.
+
+JUCE and other third-party components remain subject to their own licences
+(see NOTICE.md and the relevant package's JUCE-LICENSE.md). These conditions
+do not override those terms. A distributor must secure all necessary JUCE
+rights separately; the existence of this document is not proof of them.
+
+7. RELIABILITY, WARRANTIES AND SALES TERMS
+
+The software may contain defects and must be tested with actual equipment
+and emergency procedures before live use. All mandatory consumer rights,
+statutory warranties and non-excludable liabilities remain unaffected.
+
+Seller identity and contact details, pricing, delivery, withdrawal, support
+and other required pre-contractual information are provided separately as
+required by law. Authorized beta testing may be subject to additional
+expressly communicated terms.
+
+8. ENFORCEMENT
+
+Unauthorized copying or distribution of original protected components may
+infringe copyright and lead to remedies available under the law, regardless
+of commercial gain or attribution. Absence of a notice in an individual file
+does not waive copyright. The rights holder may consider appropriate
+platform reporting and legal remedies.
+
+This English translation is for convenience only. The Italian text controls.
