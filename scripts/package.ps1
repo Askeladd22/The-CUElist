@@ -17,7 +17,6 @@ Copy-Item -LiteralPath $exe -Destination (Join-Path $package 'The Cuelist.exe')
 Copy-Item -LiteralPath (Join-Path $repo 'Avvia.cmd') -Destination $package
 Copy-Item -LiteralPath (Join-Path $repo 'README.md') -Destination $package
 Copy-Item -LiteralPath (Join-Path $repo 'LICENSE') -Destination $package
-Copy-Item -LiteralPath (Join-Path $repo 'LICENSE.en.md') -Destination $package
 Copy-Item -LiteralPath (Join-Path $repo 'NOTICE.md') -Destination $package
 Copy-Item -LiteralPath (Join-Path $repo 'vendor\JUCE\LICENSE.md') -Destination (Join-Path $package 'JUCE-LICENSE.md')
 @"
