@@ -1,5 +1,6 @@
 #pragma once
 #include <juce_gui_basics/juce_gui_basics.h>
+#include <cmath>
 namespace cuelist {
 namespace palette {
 // Midnight Slate: balanced between the darker redesign reference and the
@@ -39,7 +40,9 @@ public:
         setColour(juce::ComboBox::outlineColourId,palette::line);
         setColour(juce::PopupMenu::backgroundColourId,palette::panel);
         setColour(juce::PopupMenu::textColourId,palette::text);
+        setColour(juce::PopupMenu::headerTextColourId,palette::teal);
         setColour(juce::PopupMenu::highlightedBackgroundColourId,palette::raised);
+        setColour(juce::PopupMenu::highlightedTextColourId,palette::text);
         setColour(juce::TextEditor::backgroundColourId,palette::input);
         setColour(juce::TextEditor::textColourId,palette::text);
         setColour(juce::TextEditor::outlineColourId,palette::line);
@@ -69,6 +72,130 @@ public:
         g.setColour(b.hasKeyboardFocus(false) ? palette::teal :
                     over && b.isEnabled() ? palette::muted : palette::line);
         g.drawRoundedRectangle(r,6.0f,b.hasKeyboardFocus(false) ? 1.6f : 1.0f);
+    }
+
+    // JUCE PopupMenu is a separate desktop window. Explicitly attach this
+    // LookAndFeel when constructing a menu (not only to its target button),
+    // otherwise Windows can render it using the default grey theme.
+    juce::Font getPopupMenuFont() override { return font(13.0f); }
+
+    void drawPopupMenuBackground(juce::Graphics& g,int width,int height) override {
+        g.fillAll(palette::panel);
+        g.setColour(palette::line.withAlpha(.9f));
+        g.drawRect(0,0,width,height,1);
+    }
+
+    void drawPopupMenuItem(juce::Graphics& g,const juce::Rectangle<int>& area,
+                           bool separator,bool active,bool highlighted,bool ticked,
+                           bool hasSubMenu,const juce::String& title,
+                           const juce::String& shortcut,const juce::Drawable* icon,
+                           const juce::Colour* customTextColour) override {
+        if (separator) {
+            g.setColour(palette::line.withAlpha(.65f));
+            g.fillRect(area.getX()+12,area.getCentreY(),
+                       juce::jmax(1,area.getWidth()-24),1);
+            return;
+        }
+
+        const auto hover=highlighted && active;
+        if (hover) {
+            const auto surface=area.reduced(3,1).toFloat();
+            g.setColour(palette::raised);
+            g.fillRoundedRectangle(surface,4.0f);
+            g.setColour(palette::teal);
+            g.fillRoundedRectangle((float)area.getX()+3.0f,
+                                   (float)area.getY()+4.0f,
+                                   2.5f,(float)juce::jmax(1,area.getHeight()-8),1.0f);
+        }
+
+        const auto ink=customTextColour!=nullptr ? *customTextColour : palette::text;
+        g.setColour(active ? (hover ? palette::text : ink)
+                           : palette::muted.withAlpha(.48f));
+        g.setFont(font(13.0f));
+
+        auto content=area.reduced(10,0);
+        const auto iconArea=content.removeFromLeft(20).toFloat();
+        if (icon!=nullptr)
+            icon->drawWithin(g,iconArea,
+                juce::RectanglePlacement::centred |
+                juce::RectanglePlacement::onlyReduceInSize,active ? 1.0f : .48f);
+        else if (ticked) {
+            g.setColour(active ? palette::teal : palette::muted.withAlpha(.48f));
+            juce::Path tick;
+            tick.startNewSubPath(iconArea.getX()+3.0f,iconArea.getCentreY());
+            tick.lineTo(iconArea.getX()+8.0f,iconArea.getCentreY()+4.0f);
+            tick.lineTo(iconArea.getX()+16.0f,iconArea.getCentreY()-5.0f);
+            g.strokePath(tick,juce::PathStrokeType(1.9f,
+                juce::PathStrokeType::curved,juce::PathStrokeType::rounded));
+        }
+        content.removeFromLeft(4);
+        if (hasSubMenu) {
+            const float cx=(float)content.getRight()-7.0f;
+            const float cy=(float)content.getCentreY();
+            juce::Path chevron;
+            chevron.startNewSubPath(cx-3.0f,cy-4.0f);
+            chevron.lineTo(cx+1.0f,cy);
+            chevron.lineTo(cx-3.0f,cy+4.0f);
+            g.setColour(active ? palette::teal : palette::muted.withAlpha(.48f));
+            g.strokePath(chevron,juce::PathStrokeType(1.6f,
+                juce::PathStrokeType::curved,juce::PathStrokeType::rounded));
+            content.removeFromRight(19);
+        }
+        if (shortcut.isNotEmpty()) content.removeFromRight(70);
+        g.setColour(active ? (hover ? palette::text : ink)
+                           : palette::muted.withAlpha(.48f));
+        g.drawFittedText(title,content,juce::Justification::centredLeft,1);
+        if (shortcut.isNotEmpty()) {
+            g.setColour(active ? palette::muted : palette::muted.withAlpha(.48f));
+            g.setFont(font(10.5f));
+            const auto shortcutArea=area.reduced(12,0).removeFromRight(69);
+            g.drawFittedText(shortcut,shortcutArea,
+                             juce::Justification::centredRight,1);
+        }
+    }
+
+    void drawPopupMenuSectionHeader(juce::Graphics& g,
+                                    const juce::Rectangle<int>& area,
+                                    const juce::String& section) override {
+        g.setColour(palette::teal);
+        g.setFont(font(11.0f,true));
+        g.drawFittedText(section,area.reduced(12,2),
+                         juce::Justification::centredLeft,1);
+    }
+
+    void getIdealPopupMenuItemSize(const juce::String& title,bool separator,
+                                    int standardHeight,int& width,int& height) override {
+        if (separator) {
+            width=28;
+            height=9;
+            return;
+        }
+        height=juce::jmax(30,standardHeight);
+        width=juce::jmax(110,
+             (int)std::ceil(font(13.0f).getStringWidthFloat(title))+65);
+    }
+
+    void drawComboBox(juce::Graphics& g,int width,int height,bool isButtonDown,
+                      int buttonX,int buttonY,int buttonW,int buttonH,
+                      juce::ComboBox& combo) override {
+        const auto r=juce::Rectangle<float>(0.5f,0.5f,
+                          (float)width-1.0f,(float)height-1.0f);
+        g.setColour(combo.isEnabled() ? palette::input
+                                      : palette::input.withAlpha(.5f));
+        g.fillRoundedRectangle(r,5.0f);
+        g.setColour(combo.hasKeyboardFocus(true) ? palette::teal :
+                    isButtonDown ? palette::muted : palette::line);
+        g.drawRoundedRectangle(r,5.0f,
+                               combo.hasKeyboardFocus(true) ? 1.4f : 1.0f);
+        const auto cx=(float)buttonX+(float)buttonW*.5f;
+        const auto cy=(float)buttonY+(float)buttonH*.5f;
+        juce::Path arrow;
+        arrow.startNewSubPath(cx-4.0f,cy-2.0f);
+        arrow.lineTo(cx,cy+2.0f);
+        arrow.lineTo(cx+4.0f,cy-2.0f);
+        g.setColour(combo.isEnabled() ? palette::teal : palette::muted.withAlpha(.5f));
+        g.strokePath(arrow,juce::PathStrokeType(1.6f,
+            juce::PathStrokeType::curved,juce::PathStrokeType::rounded));
     }
 };
 }
