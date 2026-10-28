@@ -1,0 +1,30 @@
+name: Windows Release and tests (no portable package)
+
+on:
+  push:
+    branches:
+      - feature/gui-mockup-workspace-and-cue-notes
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  windows:
+    name: Compile application and run CTest
+    runs-on: windows-2022
+    timeout-minutes: 60
+    env:
+      CMAKE_GENERATOR: Visual Studio 17 2022
+      CMAKE_GENERATOR_PLATFORM: x64
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Windows Release and all tests
+        shell: powershell
+        run: .\scripts\build.ps1
