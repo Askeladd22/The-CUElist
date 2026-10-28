@@ -1,263 +1,277 @@
-# The Cuelist — Complete Guide
+# The Cuelist — Complete User Guide
 
-This page describes current 0.8.0-alpha.1 behavior and retains historical context for earlier features. See the [0.8 architecture/integration notes](0.8-implementation.md) for new reliability features and hardware testing.
+**Current prerelease:** `0.9.0-beta.5` · **Windows:** x64 · **Project schema:** v10 · **JUCE:** 8.0.12 · **License:** proprietary
 
-**0.8.0-alpha.1 · Windows x64 · Portable · C++17 / JUCE 8 · Proprietary license**
+This English guide covers the software currently implemented in this repository. It replaces the legacy 0.8-alpha instructions. For an executive overview, see the [README](../README.md).
 
-The Cuelist controls live performances through a cue grid, audio clips, and a timeline. It plays WAV and MP3 files but does not support video. It also supports MIDI note clips with a built-in piano roll. OSC columns send UDP messages to a host/IP address and port configured in the column utilities. OSC clips may contain timed events in seconds or beats, with typed integer, float, string, and boolean arguments.
+> **Important:** The Cuelist is beta software, not certified for show-critical use. Always rehearse with the actual audio interface, controllers and OSC receivers, run Preflight, check backups and maintain a tested emergency procedure. A green CI build is not proof of hardware reliability or end-to-end timing accuracy.
 
-## Quick Start
+## 1. Concepts and project structure
 
-1. Extract **all** files from `The-Cuelist-0.8.0-alpha.1-Windows-x64.zip` into a writable folder.
-2. Open **The Cuelist.exe** or **Avvia.cmd**.
-3. Choose a device in **Audio devices**, import a WAV/MP3 file, and select the column's **Out** destination in its utilities.
+A **Show** contains shared output columns, device and mixer configuration, Control Mapping settings, and one to twelve **Cuelists**. Every Cuelist has its own ordered cue rows, clip contents and technical notes. Switching Cuelists deliberately stops playback so that a cue from the previous sequence cannot continue unintentionally.
 
-You do **not** need Visual Studio, Build Tools, CMake, Git, or Python to *run* the program, and there is no installer. A source-only archive does not automatically contain a compiled executable. Use the portable package from the `dist` folder.
+Each cue is a row; each column represents a kind of material:
+- **Audio:** mono/stereo WAV or MP3 files with per-cell, cue and strip gain and playback settings.
+- **MIDI:** note clips played via a selected hardware/software MIDI output, synchronized to the cue tempo map.
+- **OSC:** timed UDP messages and numeric automation curves sent to a configured OSC destination.
+- **Control:** MIDI input mappings associated with a cue or promoted to a column default; these are control rules, not media playback clips.
 
-The C/C++ runtime is statically linked; the verified executable depends only on Windows DLLs. `Avvia.cmd` looks for the executable next to the launcher, in `portable`, or in a local build folder. It never compiles the program.
+An individual **cell** can be played independently. **Row GO** triggers the participating cells together. Multiple rows may overlap until stopped manually or by an Auto Stop rule. BPM and Auto Stop remain in a pinned area of the cue grid.
 
-## Downloading the Portable Executable from GitHub Actions
+## 2. Starting and configuring The Cuelist
 
-The **Build Windows portable** workflow builds on Windows x64, runs automated tests, creates the ZIP, and verifies the archive contents and checksums. The pipeline performs an offline GUI startup/shutdown check (`--offline`) with `scripts/check-package.ps1 -SmokeLaunch`. Visual Studio is not required to *use* the package.
+### 2.1 Running an existing build
 
-1. Open the repository's **Actions** tab and select **Build Windows portable**.
-2. Open a successful run (green check mark). Under **Artifacts**, download **The-Cuelist-Windows-x64-portable**.
-3. Extract the downloaded artifact. It contains **The-Cuelist-0.8.0-alpha.1-Windows-x64.zip** and a `.sha256` checksum.
-4. Extract that second ZIP to any folder, including a USB drive, and open **The Cuelist.exe**. No installation is required.
+Extract the entire Windows x64 package. Open `The Cuelist.exe` or `Avvia.cmd`; the launcher does not compile or install software. A GitHub source-code archive does not contain a ready-to-run EXE.
 
-The workflow runs on commits to `feat/desktop-foundation`, pull requests targeting that branch, or manual dispatches from Actions. GitHub artifacts expire after 30 days; download the ZIP for long-term storage.
+A properly packaged build does not require Visual Studio, Git or CMake to run. Keep the included `LICENSE`, `NOTICE.md` and JUCE license notices with the package. The command-line option `--offline` starts the interface without opening the audio device and is intended for diagnostics and smoke tests.
 
-**Data portability:** the program does not require a user profile to store shows. Save to an accessible location, such as a folder near the executable. Always copy the `.cuelist` file *together with* its `_media` directory. Media paths within the show are relative. Audio/MIDI device configuration may depend on the PC hardware, while Windows and its drivers may store separate system settings.
+### 2.2 First rehearsal
 
-## Control Columns and Control Sets (Road to 0.7)
+1. Open **Audio devices** in the left sidebar and choose the intended audio interface and output configuration.
+2. Open an existing `.cuelist` or create a new show. Verify the media referenced by each cue.
+3. Configure audio routing, MIDI ports and OSC host/port under the individual Column Utilities.
+4. Connect any MIDI controller and select its actual input device under **Control Mapping**; verify MIDI Learn only after physical input is present.
+5. Select **Preferences → Pre-flight**, read the warnings and resolve missing files, routes and devices.
+6. Test cell Play/Stop, **GO**, **Panic**, loop and Auto Stop with the connected equipment before relying on the show sequence.
+7. Save the show and make a separate external backup.
 
-A **Control Column** is a fourth column type, alongside Audio, MIDI and OSC. Its cells contain **Control Sets** (collections of physical MIDI-input mappings), not playback clips. Control Columns do not introduce another transport: they select mappings for the cue currently confirmed by GO, using the existing input worker, control mapping engine and audio/MIDI/OSC output paths.
+## 3. Workspace overview
 
-1. Click **+ Column → Control**; create more than one Control Column if you need layers. Click a Control cell, double-click it, or use **Edit Q set** under its Column Utilities to open the floating editor. The toolbar **CONTROL MAPPING** also edits the selected set while a Control Column is selected; from other columns, it opens the legacy mapping view.
-2. Select the physical MIDI device and choose **MIDI Learn**. Move a fader or press a button to capture its ID, message kind, channel and CC/note number. The status line identifies the selected mapping, or indicates that you are learning a new mapping. Choose the target (Audio/Master gain or pan, GO, Panic, MIDI CC, OSC Float), range, response curve (**Linear, Ease in, Ease out**), inversion and **Pickup / Jump**. **Add mapping** adds to this cell's set without removing other mappings. Select a rule in the list to change its parameters and use **Update selected**, or **Remove selected** to delete it.
-3. To create a default, select the cue cell containing the desired set, then click **Lock** under that column. A copy becomes the column's default and takes effect across **all cues**; the priority automatically becomes **Low**. Cue-specific sets are kept as dormant data for future unlocking. Unlock re-enables cue-specific editing. Locked cells display **DEFAULT / LOCKED** and their set is edited through **Edit default**.
-4. Other, unlocked Control Columns have **Medium, High, or Maximum** priority, selected in the column utilities. A higher-priority set overrides **only the same physical input** (device, MIDI kind, channel and number). Unmentioned inputs inherit mappings from lower-priority Control Columns. A second Control Column can therefore remap one fader for Q5 while the other three continue to control their original channels.
-5. **Equal-priority rule:** if two columns map the same physical input with the same priority, the **rightmost Control Column in the visible cue grid wins**. Reordering the columns changes this tie-breaker. Priority always wins before column order.
-6. The floating editor's **effective mapping preview** shows the selected cue (marked **PREVIEW** until GO actually activates it), each winning input, its source Control Column, priority and whether it is **LOCAL** or **INHERITED**. This preview does **not** activate a cue. Actual mapping changes occur only after GO has been acknowledged by the audio transport.
-7. Enter a name under **Reusable Set name** and click **Save Set** to store a reusable configuration in the project's Control Set library, independently of columns and cue positioning. Choose it from **Choose saved set** and click **Apply Set** to copy that content into the selected cell (or the locked column default). Reused bindings receive fresh IDs. Ctrl+C / Ctrl+V also supports copying Control cells into other Control cells when unlocked.
+### 3.1 Left sidebar
 
-**Takeover:** **Jump** immediately applies the physical control's current value. **Pickup** waits for the physical value to meet/cross the current destination's value; this protects against abrupt fader jumps when changing cues. Curves and inversion are applied to the mapped value, independently of the captured physical input. A row click alone never changes live mapping.
+The sidebar provides **New**, **Open**, **Save**, the editable show title, **Audio devices**, **Preferences**, **Control Mapping** and a project overview. Near the bottom, **On Deck** identifies the next cue; **GO / SPACE** and **PANIC / ESC** remain accessible at all times.
 
-**OSC example:** a MIDI fader can send an OSC float to `/composition/opacity` using the OSC column's configured UDP host and port. This does **not** mean that native video playback or native video opacity is implemented inside The Cuelist; the actual receiver (for example, show-control software) interprets the OSC message.
+- **New** starts a fresh show and warns if current changes would be discarded.
+- **Open** loads an existing project, subject to preparation and validation before activation.
+- **Save** writes the project and collects referenced media.
+- **Preferences** contains Pre-flight, Diagnostics, Fader Range and Rename active Cuelist.
+- **Control Mapping** opens the controller configuration view. Depending on selection, this can expose the Control Set editor or legacy MIDI mapping interface.
 
-**Compatibility and limits:** the show remains JSON `.cuelist` v10. The new column, optional cell/control-template fields and optional response-curve parameter are additive; older v10 projects load with empty Control Columns and a linear curve by default. Files containing new Control Column types require a version of The Cuelist that understands them. MIDI input selection and output routing still depend on the computer's hardware. The system is experimental: test pickup, OSC destination, physical fader latency and controller disconnects before live use. No automatic motorized-controller feedback or sample-accurate parameter automation is promised.
+The shortcut hints formerly shown at the bottom of the sidebar have been removed; the keyboard shortcuts still work.
 
-## Control & Mapping (Initial Implementation)
+### 3.2 Top bar and operational telemetry
 
-**CONTROL MAPPING** in the top bar opens the physical-controller mapping panel. This subsystem is separate from MIDI and OSC clips. It responds to events received through an explicitly selected MIDI input. The current UI is an initial implementation: creating a mapping requires a connected controller and MIDI Learn.
+The top row contains named **Cuelist tabs**, the **+** action, **Undo/Redo**, a 24-hour clock, Windows CPU/RAM usage and a compact MIDI RX/TX / OSC RX/TX / audio-availability monitor.
 
-1. Connect a MIDI controller, open **CONTROL MAPPING**, and explicitly choose its port under *MIDI input*. **Refresh ports** reloads the available devices. Disconnecting a device does not automatically select a substitute.
-2. Click **MIDI Learn** and move a fader, turn an encoder, or press a pad/button. The system recognizes **CC**, **Note On/Off**, and **Pitch Bend**, displaying the channel and number. The hardware callback uses a fixed-capacity queue and does not perform GUI or network operations.
-3. Set the **scope** to Global, Column, Preset, or Single cue. Under **Cue preset**, create a shared preset (for example, `House Lights`) and assign it to the selected cue. Selecting a different grid row does not activate its mapping; a successful GO is required.
-4. Choose a **destination**: Master Audio, Audio column gain, GO, PANIC, MIDI CC, or OSC Float. Select a compatible column for column-specific targets. For MIDI CC, set the outgoing CC number; for OSC, enter the target address. MIDI and OSC mapping targets use outputs already configured in the column utilities.
-5. Use **Pickup** to prevent gain jumps when a physical fader's position differs from the current gain, or **Jump** to apply its value immediately. The panel also supports inversion. Click **Add mapping** to save a rule; select an existing rule to remove it.
+- **Undo/Redo** use the existing MIDI/OSC clip-edit history; they are not general-purpose undo for show deletion, tab management or every mixer action.
+- **CPU/RAM** report system-level usage, not per-plugin or per-clip estimates. Unsupported telemetry displays N/A.
+- **MIDI RX/TX** indicate local traffic; **OSC TX** indicates local transmission. OSC RX remains inactive because a native OSC input endpoint is not implemented.
+- **Audio Available** reports local device availability, not an assertion that speakers or downstream equipment are functioning.
 
-**Priority:** single-cue override, then cue preset, column mapping, and finally global mapping. GO/PANIC button actions do not repeat until the button is released; switching cues does not reset physical-button debounce.
+### 3.3 Cue grid, Inspector, mixer and Timeline
 
-**Active cue:** a cue becomes active only when GO accepts its command. Selecting a row or starting an individual cell does not change the active preset. Panic disables cue-specific mappings but leaves global mappings available. Commands enter the audio transport and are processed in its callback: GO execution may be delayed by one audio block. Sample-accurate control alignment remains future work.
+The central cue grid has row controls on the left and columns for Audio/MIDI/OSC/Control. The **BPM** and **Auto Stop** strip is pinned to the right of the cue grid, including during horizontal scrolling. Column Utilities and the Master Audio strip occupy the lower working area; a Timeline with zoom/grid/snap controls is underneath.
 
-**Generic outputs:** outgoing MIDI CC is sent by the existing MIDI worker, without opening a second instance of the port. Mapping OSC is sent over UDP by a separate worker with a bounded queue; delivery is not guaranteed. Panic cancels pending sends, but cannot retract messages already received by hardware.
+The **Inspector** on the right edits the selected cue and cell separately. Use its narrow edge tab to collapse the Inspector toward the right, increasing the width of the workspace; click the tab again to reopen. The same area contains a cue-specific multiline **Notes** field.
 
-**Current limitations:** audio-level mapping still rebuilds render state through 25 Hz GUI updates. Atomic audio parameters and load tests will be needed before using high-frequency physical faders live. Automatic value recall on scene changes, LED/motorized feedback, and advanced multi-mapping editing are not yet implemented. No comprehensive live-hardware acceptance test has been completed.
+Columns can be collapsed individually or together with **Collapse all** in the cue grid header. Collapsing is a layout choice; it does not stop running media or change audio routing.
 
-**Persistence:** mappings, presets, the selected MIDI input, and cue-to-preset associations are stored in `.cuelist` **v10**. Opening v1–v9 shows initializes empty mapping settings. Device names and IDs depend on the computer.
+## 4. Managing multiple Cuelists
 
-## Cues and Playback
+### 4.1 Creating, selecting and removing
 
-A new session starts with one cue and one Audio column, without user-defined names. **+ Cue** and **+ Column** expand the grid.
+- Click **+** next to the Cuelist tabs to create a new list. A newly created list starts with an independent blank cue.
+- The application uses the first available `Cuelist N` name, including numbers freed by deletion, rather than skipping numbers.
+- Click a tab to select a list. The current transport is stopped before switching, and the Cue List, Timeline and Inspector reflect the new list.
+- Tabs continue side by side while there is space; a separate overflow menu provides access to hidden tabs and their rename/delete actions when the bar is too narrow.
+- Use the **×** beside a visible tab to delete a Cuelist. A confirmation dialog explains that its cues are removed from the show. Source audio files are not deleted from disk.
+- The last remaining Cuelist cannot be deleted.
 
-| Command | Effect |
+Deleting a Cuelist is a structural operation and is not an Undo/Redo action. Save a backup before reorganizing a live show.
+
+### 4.2 Renaming — synchronized in both directions
+
+**Double-click either the Cuelist tab or the Cuelist name in the pinned cue-grid header** to rename it. The alternative **Preferences → Rename active Cuelist** remains available.
+
+The tab and the grid header are two views of the **same saved Cuelist name**. Renaming either updates both immediately, and the name persists when you save the `.cuelist` file. Names must be unique, nonempty and no longer than 64 characters.
+
+The grid heading displays the current name only; it does not need an additional `CUE LIST /` prefix.
+
+### 4.3 Shared and independent settings
+
+Cuelists share column definitions, routing and the overall show settings. They do **not** share their cue ordering, cell contents or per-cue technical notes. Adding, moving or removing a column updates the corresponding cell structure across all lists; removing a Cuelist never removes a shared column.
+
+## 5. Playing and editing cues
+
+| Action | Behavior |
 | --- | --- |
-| Import WAV / MP3 or drop a file onto a cell | Load mono or stereo audio |
-| Cell Play or double-click a clip | Start the cell according to its selected playback behavior |
-| Cell Stop | Stop and reset that clip |
-| Row GO | Trigger participating cells and select the following cue |
-| Space / side GO | Trigger the indicated next cue; do not wrap around at the end |
-| Stop next to the cue title | Stop every clip in the row, including cells excluded from GO |
-| Esc / PANIC | Stop all playback |
+| **GO / Space** | Launches the armed next cue; it does not wrap to the beginning at the end of a sequence. |
+| **Row GO** | Starts cells included in that row's GO. |
+| **Cell Play** | Starts or resumes the individual cell according to its playback behavior. |
+| **Cell Stop** | Stops and resets that cell. |
+| **Row Stop** | Stops the cue's cells, including cells excluded from Row GO. |
+| **Row Play/Pause** | Pauses or resumes row playback without restarting the cue where supported. |
+| **PANIC / Esc** | Stops active audio, MIDI and OSC playback. |
+| **Ctrl+C / Ctrl+V** | Copies/pastes compatible selected cells; row operations are also available through cue context menus. |
+| **Ctrl+X / Backspace** | Cuts or removes the selected cell where allowed, without intercepting normal text editing. |
 
-Selecting a row re-arms the sequence from that cue. Cell Play/Stop and row Stop do not change the next-cue selection. Space does not trigger a cue while you are typing in a text field.
+Space does not launch a cue while typing into a text input. Escape is intended to remain available for Panic even from the Inspector note editor; check the behavior with your connected devices.
 
-### Mixer and Audio Master
+Click a cue to make it the next armed cue. Use the row menu to **Copy**, **Paste below**, **Duplicate** or **Delete** a whole cue. The cell context menu covers cell-specific copy, paste, cut, delete, loop and inclusion in Row GO. Duplicated rows and cells receive appropriate new identities; imported audio can share decoded PCM in memory when safe.
 
-Under **Column Utilities**, each Audio column has a compact strip with an **integrated GainMeterFader**: a dB gain slider and two L/R peak meters in dBFS sharing a vertical −60 to +12 dB scale, a mid-sized rotary pan control with L/C/R markings, and **Mute** and **Phase Invert** buttons. Audio, MIDI, and OSC destinations are configured separately; MIDI columns show the MIDI port and OSC columns show their UDP destination, not audio gain controls.
+Use the arrow controls to reorder cue rows. Changes that affect the structure or timing may stop transport to preserve deterministic cue state.
 
-Each column's stereo meter measures left and right channels separately, using the sum of clips currently playing in that column, after cell/row/column gains, pan, and mute, but **before the Master**. Slider gain is expressed in **dB** while peak levels are in **dBFS**: 0 dB gain is neutral, but 0 dBFS is digital full scale. Their tick positions align without equating these different quantities. Each channel has a peak indicator with short hold and release. This is not an RMS meter or a limiter. Double-click resets gain to 0 dB; arrow keys adjust by 0.1 dB (1 dB with Shift). The fader's position-to-dB mapping is logarithmic, while saved gain values remain unchanged.
+### 5.1 Playback behavior and looping
 
-**Technical limit:** stereo meter calculations use buffers prepared before the audio callback, up to 8,192 frames per block. For longer blocks, a conservative value based on individual contributions is used for the overflow; actual audio rendering is unaffected.
+The clip playback behavior determines how a second trigger acts: **Retrigger**, **Pause/Restart**, **Pause/Resume** or **Continue** as configured. **Loop playback** is independent of that behavior. The Inspector separately exposes the cue's **Loop all clips**, the cell's **Loop playback** and **Include in row GO** settings.
 
-The **MASTER AUDIO** area is on the left of the column utilities. It uses the same integrated stereo GainMeterFader and also includes **Master Pan** and **Master Mute**. At 0 dB gain is neutral; negative values attenuate the output and positive values boost the mix. Master controls affect final PCM audio only, **not** MIDI or OSC messages, and do not change stored column levels. Master processing occurs before safety clipping at ±1; it does not replace a live-show limiter. The global OUTPUT meter shows the level after the Master.
+### 5.2 Auto Stop
 
-Master gain is stored in the show (added in v8). Legacy v1–v7 projects open at **0 dB Master gain**. Master Pan and Mute default to centered/unmuted if missing from older projects.
+Each row has a pinned **Auto Stop** toggle, normally enabled initially. The additional **+** below its toggle exposes cell-level Auto Stop settings.
 
-### Copy/Paste and BPM in the Grid
+A previously active cell is stopped by a later cue's GO only when both its row-level Auto Stop and its cell-level Auto Stop are enabled. Disabling row Auto Stop allows its clips to continue. A direct Stop, Row Stop or Panic still stops them. The next GO can also stop protected clips independently of whether the new cue itself has media.
 
-Select a cell and press **Ctrl+C** to copy its contents and settings. Select a cell in the **same column type** (Audio, MIDI, or OSC) and press **Ctrl+V** to paste. The cell's right-click menu offers the same actions. The destination cell ID remains unchanged and any already-loaded audio media can be shared in memory. Pasting between different column types is not allowed.
+## 6. Inspector: cue settings, cell settings and notes
 
-Unnamed new columns are automatically named **Audio 1**, **Audio 2**, **MIDI 1**, **OSC 1**, and so forth, with separate numbering by type. Double-click a column title to rename it; custom names are preserved. Older projects with empty names still display a numbered label without rewriting the saved file.
+The right-side Inspector distinguishes **Cue properties** from **Cell properties**.
 
-For **whole rows**, use the **…** menu next to the cue name or right-click the name area. Options are **Copy cue**, **Paste cue below**, **Duplicate cue**, and **Delete cue**. Pasting creates a new row below the selected one, including its tempo map, clips, and settings. Duplicating immediately creates a row with the suffix "(copy)". Both operations assign new row/cell IDs without changing the originals. Preloaded audio may be shared in memory. These structural actions stop playback, as does reordering/deleting rows. Copied rows can still be pasted after their source has been deleted, provided the column layout is compatible.
+**Cue:** name, initial BPM and tempo-map editor, cue-wide loop selection. **Cell:** name, compatible options for Audio/MIDI/OSC/Control, gain in dB for audio, inclusion in GO, playback loop, clip import or editor launch.
 
-Click the cue's **BPM label** in the row to change its initial tempo directly, retaining later tempo changes. The operation rebuilds MIDI/OSC timing and stops playback. The time signature is no longer shown in the cue-grid interface.
+The **Notes / Cue NN** multiline editor holds technical stage directions, reminders and other operational notes. They belong to the selected cue and are included in the project save; each Cuelist maintains its own notes. Moving to another cue or collapsing the Inspector commits valid pending changes. An invalid Inspector value can prevent the panel from closing until corrected.
 
-### Auto Stop 2.0
+Text input not yet applied to the model is not independently guaranteed to exist in a periodic recovery checkpoint. Save explicitly after editing cue notes and titles.
 
-The row's **Auto Stop** switch is the master gate, displayed at the right of each cue and enabled by default. Individual Audio, MIDI, and OSC cell **AS ON / AS OFF** controls are initially hidden to reduce clutter. Click the **+ below the row's Auto Stop toggle** to show or hide them, then toggle individual cells. The equivalent Inspector setting, on the **Cell** tab, is **Stop on next cue GO**.
+## 7. Audio, mixer and routing
 
-**A cell stops on another cue's GO only when both the row Auto Stop and that cell's Auto Stop are ON.** If the row switch is OFF, all its clips continue regardless of individual settings. If the row is ON, AS OFF cells continue while other cells stop. Protected clips retain their transport and cue timeline. The rule also applies to directly triggered cells and when the incoming cue is empty. Re-triggering the same cue does not apply Auto Stop to itself.
+### 7.1 Audio cells
 
-**Direct Stop, cue Stop, and Panic** always stop playback, including AS OFF cells. Auto Stop is independent of **Include in row GO**, which only controls whether the cell is started by a collective row GO.
+Audio cells support WAV and MP3, imported with the cell's import action. One mono or stereo file may be associated with a cell. The show decodes audio to PCM for playback and enforces memory limits; media import and saving large collections can still take time.
 
-New shows default all cells to AS ON. When opening older v1–v6 shows, their cells also default to ON, preserving the previous row-level behavior.
+Individual cell gain is expressed in **dB**. A peak meter reports **dBFS**: 0 dB gain is unity, while 0 dBFS is the digital ceiling. The two units are not interchangeable.
 
-### Playback Behaviors
+### 7.2 Column Utilities
 
-| Behavior | Effect |
-| --- | --- |
-| Retrigger | Restart from the beginning, even if already playing |
-| Pause / Restart | Pause; the next activation restarts from the beginning |
-| Pause / Resume | Toggle pause/resume from the saved position |
-| Continue | Keep playing if active; otherwise resume from the saved position |
+Audio column strips provide gain, stereo meters, pan, Mute, phase inversion and routing. MIDI and OSC strips expose the appropriate output controls rather than audio faders. Collapsed Audio columns retain compact meter/gain and Mute controls.
 
-**Loop** is independent of playback behavior. **Include in row GO** determines whether a cell participates in collective launch. On the **Entire cue** tab, you can set cue-wide gain, mute, loop, and a common GO behavior; direct cell launch still uses each cell's own behavior.
+An Audio column can send signal to the **Master** on its left/right paths and/or to a physical stereo **Direct Out** pair. Direct can be **PRE** or **POST** relative to the strip fader; post-strip Master Send is independent. Mute, pan and other per-cell/per-cue processing follow their implemented signal path.
 
-## OSC Clips / UDP and Automation
+### 7.3 Master Audio
 
-1. Add an **OSC** column and configure its UDP **host/IP and port** in the column utilities. Routing belongs to the column, not to individual messages.
-2. Select a cell and click **Create OSC clip**. Instantaneous events and automation lanes share the **same horizontal timeline**. You may detach and reattach the editor without creating a separate copy of its data. When docked, drag its height handle to resize it.
-3. **Click the EVENTS lane** to add a message at the chosen time. An event marker displays its **OSC address and arguments**, when present. **Double-click a marker** to edit its time, address, and ordered arguments. The **+** button creates a message and opens its editor. Drag a marker to move it; Duplicate, Delete, the context menu, and the Delete key are available.
-4. Click the **+** button to add a persistent **empty automation track** (it does not create a ramp). Each track has one OSC address and automated argument, and can hold multiple nonoverlapping segments. **Double-click empty space in a track** to create a **0 → 1 ramp lasting one true second** without a setup dialog. Drag the ramp body to move it, or its right handle to resize. **Existing intermediate points retain their original times during resizing**; shortening is rejected if it would silently discard a point. **Shift+click** adds a control point, drag points to change their values or times, and **right-click a point → Delete point** to remove an intermediate point (endpoints cannot be deleted). A **0 → 1 → 0** curve is supported: the final value is not forced to equal the parameter maximum. **Double-click the ramp** to edit independent start/end values, the parameter min/max range, the argument list/type and the automated argument index. **Double-click the track header** to edit the shared OSC address. The typed OSC message template, other constant arguments and saved parameter range are held with the track while each segment keeps its independent times and control points.
-5. Arguments are ordered and entered as `i:7; f:0.5; s:scene; b:true`. `i` is int32, `f` is float32, `s` is string, and `b:true/false` is an OSC boolean (type tag `T`/`F`, with no payload). A clip can use **Seconds** or **Beats**; switching units uses the cue's BPM map to convert times and curve points. Only numeric int32 and float32 arguments may be automated.
-6. The **EVENTS lane, all track headers, segments and control points use one shared vertical scroll position**. Use the mouse wheel to scroll vertically; use **− / + / Fit** for horizontal zoom, **Ctrl+wheel** to zoom around the cursor and **Shift+wheel** to pan horizontally. The ruler, events and all automation segments share the exact same time scale at every zoom level. **Grid** and **Snap** remain independent; the division selector sets snap resolution. Valid edits are immediately applied and use the shared Undo/Redo history. Overall clip length can also be resized in the main timeline.
+The **Master Audio** strip provides Main Out routing, stereo gain/meter, pan, mute and an optional safety peak limiter. Its meter is pre-limiter. The limiter indicates current gain reduction and does not affect independent Direct Out paths.
 
-**Playback:** instant events fire once at their specified time. Curves generate periodic messages at up to 30 updates/s (a compiled limit of about 8,192 ticks per clip can reduce the rate for long or numerous automations). Messages, including changes to specific arguments, are **prepared off the real-time thread**. The audio clock schedules packets through a dedicated UDP thread.
+**Routing warning:** sending a Direct Out to the same physical channels as Master Main Out can cause post-limiter summation and clipping. Preflight warns about the conflict, but an operator must verify the actual routing.
 
-**Stop:** stops automation and cancels queued messages without sending a reset. Receivers normally keep their most recently received value unless configured otherwise. **Retrigger:** restarts and sends each automation's precise initial value at its scheduled start, even if unchanged. **Loop:** repeats its messages. **Seek:** skips past positions and continues from subsequent updates without resetting the target.
+Master gain/mute/pan act on PCM audio, not MIDI notes or OSC commands. The output stage clamps device PCM samples, but that is not a substitute for physical gain staging and rehearsal.
 
-**Multiple automations:** if curves at one address control different arguments, their current numeric values are combined into outgoing packets. This avoids resetting other arguments to defaults. Overlapping curves targeting the same argument are rejected.
+## 8. MIDI clips and Piano Roll
 
-Sending uses **OSC 1.0 over UDP** and is not delivery-guaranteed. The transport clock requires an initialized audio device even for OSC-only shows. Test the target host, port, latency, and receiver behavior before a performance.
+Add a **MIDI** column and choose the correct external output in its Column Utilities. Import an existing MIDI file or create a note clip in the built-in **Piano Roll**. The clip participates in cue GO, stopping, looping and timeline operations as supported.
 
-## Editing and Timeline
+The importer supports standard MIDI type 0/1 files using PPQ, subject to size and note-count limits. File tempo and non-note events such as controllers, program changes, SysEx and sustain may not be imported; the cue's tempo map controls playback of imported notes. SMPTE and type-2 MIDI files are unsupported.
 
-- Double-click a cue or column title to rename it; the input receives keyboard focus immediately. **Enter** also confirms text fields in the Inspector.
-- Use arrows to reorder rows/columns and **X** to delete. Deleting the last item leaves a usable empty row/column. Original imported files are never deleted.
-- Drag a clip within the cue grid to move it; an occupied destination is swapped. Columns must have matching types.
-- Drag a clip on the timeline to move its start time in seconds. Drag the **right-edge handle** on MIDI/OSC clips to resize their duration, keeping existing content. Under **GRID**, show/hide BPM lines and select divisions of 1/4, 1/8, 1/16, or 1/32. **SNAP** has a separate magnet toggle and division selector. The grid can be hidden with snapping enabled, or visible while snapping is disabled. Grid lines follow tempo-map changes. Direct cell launch begins immediately instead of waiting for the timeline offset.
-- Drag the timeline ruler cursor to seek within the cue. Each cell displays elapsed/total time, progress, and whether it is playing, paused, or waiting.
-- **− / +** change zoom; **Fit** displays the full cue, and **Ctrl+mouse wheel** zooms around the pointer. Use the horizontal scrollbar to pan and the mouse wheel to scroll tracks. **Click a MIDI clip in the timeline** to open its docked Clip Editor; **Detach/Reattach** moves the same editor between a panel and a floating window.
+MIDI ports are tracked by their device identifiers. A missing configured output is **not** silently replaced by another interface. Reconnecting the original exact-ID port invalidates outdated queued messages. Physical output latency remains dependent on hardware, driver and OS scheduling.
 
-Audio parameters update without resetting playback. Enter, **Apply changes**, Save, or changing selection commits text fields. Importing, opening, or making structural changes can stop audio playback.
+Use **Undo/Redo** in the supported clip editor operations; the buttons are disabled when no relevant history exists.
 
-## Column Utilities and Outputs
+## 9. OSC messages and automation
 
-| Control | Function |
-| --- | --- |
-| Out | Pair of active outputs; a saved but missing output is reported without automatic replacement |
-| dB fader | From silence (−60 dB) to +12 dB; double-click for 0 dB |
-| Pan | Stereo balance: center unchanged; extremes mute the opposite channel; double-click to center |
-| Crossed-out speaker | Mute, without stopping clips |
-| Slashed circle | Invert polarity of both channels |
+Add an **OSC** column and enter the destination **host/IP address and UDP port** in Column Utilities. Create an OSC clip, then edit timed events and automation tracks using the OSC editor.
 
-Active icons are highlighted. Cell, cue, and column gains are multiplied. Output lists update when the device or active channels change. MIDI strips hide audio controls and allow a hardware or virtual MIDI output to be selected. OSC strips expose UDP destination configuration: enter the receiver's host/IP and port. UDP delivery is not acknowledged.
+- Event messages contain an OSC address, event time and ordered typed arguments.
+- Arguments use `i:` (int32), `f:` (float32), `s:` (string), and `b:` (boolean), for example `i:7; f:0.5; s:scene; b:true`.
+- Automation lanes hold a shared OSC address/argument and one or more non-overlapping ramp segments. Add and move control points, resize permitted segments and adjust start/end values.
+- Events and automation share the editor's horizontal timeline; vertical scrolling follows the same track alignment.
+- Clips may use Seconds or Beats; conversion uses the selected cue's tempo map.
+- MIDI/OSC events are timestamped against the audio callback's common monotonic origin, but actual delivery can be delayed by device workers and the operating system.
 
-## MIDI Clips and Piano Roll
+**UDP has no built-in delivery acknowledgement.** A transmitted packet count or illuminated OSC TX indicator does not prove that the receiver applied a command. Use receiver-side monitoring during rehearsal.
 
-1. Add a **MIDI** column with **+ Column**.
-2. Choose **Import MIDI** to load a `.mid`/`.midi`, or **Create MIDI clip** to start with an empty four-beat clip. MIDI files can also be dropped onto cells.
-3. Select a MIDI cell and choose **Create MIDI clip / Edit piano roll**, or click its timeline clip to open the docked editor. The cell Play button starts playback.
-4. Choose a **MIDI output** in column utilities. An external synthesizer, app, or device must listen on that port: The Cuelist does not contain a synthesizer.
+## 10. Control Mapping and Control Columns
 
-In the piano roll, left-click an empty grid position to add a note. Drag a note to change its timing and pitch, or drag its right edge to change duration. **Right-drag** selects multiple notes in a rectangle. **Shift+click** adds/removes notes from the selection. Selected notes can be moved, deleted, or edited together for **Velocity** (1–127) and **Channel** (1–16). **Delete** removes them. **Snap** selects subdivisions from 1/4 to 1/32, or **Off** for free movement. **+ / −** adjust zoom and scrollbars move the view. **Clip beats** changes the overall length without trimming existing notes. Beats are quarter notes; C4 is MIDI note 60.
+### 10.1 MIDI Learn and destinations
 
-MIDI changes are **immediately applied to the clip model**. **Undo/Redo** reverses or reapplies note edits. The panel can be collapsed, closed, detached, or reattached. Closing it does not discard changes. Click **Save** to keep the updates in the show file.
+Open **Control Mapping**, select the actual MIDI input port, start **MIDI Learn**, and move a physical fader, encoder or button. The mapping subsystem recognizes CC, note events and Pitch Bend as supported and exposes destinations such as Master/Audio gain and pan, GO, Panic, MIDI CC and OSC float.
 
-MIDI clips participate in GO, Auto Stop, loop, pause, and timeline seek. They can be moved between MIDI cells and on the timeline. Audio dB gains and pan do not affect MIDI; note velocity is used instead. MIDI transport follows the audio device's clock, which therefore needs to be open even for MIDI-only shows.
+Mapping settings can include a value range, inversion and response curves. **Jump** applies the physical value immediately; **Pickup** waits for the physical input to cross the current destination value to reduce sudden parameter changes.
 
-**Import limits:** standard MIDI type 0/1 with PPQ division, at most 8 MB, 10,000 notes, and 4,096 beats per clip. Tracks are merged without losing their MIDI channels. Only **notes** are imported: file tempo, CC, sustain, program changes, pitch bend, and SysEx are ignored, with a warning for discarded events. SMPTE timing and type 2 MIDI files are unsupported. Playback uses the cue tempo map.
+### 10.2 Scope and priority
 
-Outputs are saved by device ID. A missing output is not automatically replaced. GO with MIDI notes requires an available output. Accuracy depends on drivers, audio buffers, and OS scheduling; external hardware latency and disconnect tests are still required.
+Mappings can be Global, Column, Preset or cue-specific. Cue-specific mapping becomes active through a **successful GO**, not merely selecting a row. Panic clears active cue-specific mapping state as designed while preserving the configured global rules.
 
-## Portable Projects and Backups
+A **Control Column** can contain per-cue Control Sets. Locking a Control Column promotes its chosen set to a low-priority default across cues; unlocking restores cue-specific sets. Unlocked columns can have Medium, High or Maximum priority. More specific/higher-priority mappings override the same physical input while unrelated inputs inherit lower-level mappings. Equal-priority conflicts resolve by the rightmost Control Column.
 
-**Save** creates a `.cuelist` file and collects audio in a sibling `<name>_media` folder. Transfer **both** together, keeping them adjacent. Stored paths are relative.
+Reusable Control Sets can be saved and applied to cells or defaults. All mapping data is included in the project schema. **Control Mapping is experimental** and requires physical-device testing, especially hot unplug/reconnect, Pickup/Jump, key repeat and conflicting targets.
 
-Overwriting a show retains the previous version as `.cuelist.bak`. Earlier media generations may be retained so backups remain valid; repeated saves can therefore increase disk usage.
+## 11. Tempo maps and Timeline
 
-The current show format is **v10**. **Open** can also load v1–v9 and backup files. v9 introduced OSC automation curves and boolean arguments. Cell Auto Stop flags were introduced in v7 and default to ON for older shows. MIDI clips are stored inside the show, so imported MIDI source files are not needed afterwards.
-
-- Auto Stop is enabled by default for pre-v4 projects.
-- For v1/v2, former Restart and Stop options migrate to Retrigger, and column utilities start in neutral states.
-- For v3, Pause/Restart behavior and saved column settings are retained.
-
-Save a legacy project again to collect its media. Missing files are reported and can be relinked by importing them into the affected cells.
-
-## Musical Tempo
-
-Each cue has its own **Tempo map**, with one change per line in the format `beat BPM`. The first beat is `0`, with quarter-note units. New maps use a **4/4** time signature; the Inspector no longer edits it. Legacy time signatures are preserved until the tempo map is changed.
+Each cue contains a tempo map in quarter-note beats, with its first event at beat zero. A typical entry list is:
 
 ```text
 0 120
 8 90
 ```
 
-BPM and the tempo map control MIDI timing, not WAV/MP3 playback speed. The renderer adapts audio sample rates using linear interpolation. Global looping repeats each clip independently without rewinding the row clock.
+These entries set 120 BPM at beat 0 and 90 BPM from beat 8. MIDI/OSC beat timing follows the tempo map; changing BPM does **not** change the natural playback rate of imported WAV/MP3 audio. Older projects may retain legacy time-signature fields.
 
-## Current Limitations
+The Timeline represents the selected cue's clip timing, provides zoom, grid visibility, snap and a horizontal scrollbar. Dragging/range edits are available for supported MIDI/OSC clips. Displaying grid lines and enabling snap are separate choices. The pinned row BPM and Auto Stop controls remain visible even when scrolling columns.
 
-- One mono/stereo WAV/MP3 clip per cell, with preloaded PCM limited to **128 MB per file and 512 MB per show**. Streaming and internal multitrack processing are not implemented.
-- Decoding is performed on the UI thread, so large files can cause delays. The render callback performs no I/O, allocation, or mutex locking.
-- OSC UDP with int32/float/string/boolean messages and linear automation is implemented; LTC/MTC, autosave, and crash recovery are not. Basic physical MIDI input mapping is experimental. ASIO is disabled in this build; WASAPI is available through JUCE.
-- Linear resampling and safety clipping at ±1 are used. Extended listening, jitter, and external-hardware disconnect testing remains to be done.
+## 12. Files, backups and recovery
 
-## Development and Verification
+### 12.1 Saving and transferring a show
 
-To **compile**, install Visual Studio Build Tools with **Desktop development with C++**, the Windows SDK, and CMake tools. Git is needed only if `vendor/JUCE` has not already been downloaded. The project uses JUCE **8.0.12**, commit `29396c22c93392d6738e021b83196283d6e4d850`.
+The project document is `<name>.cuelist`, a versioned JSON file with **schema v10**. The application version `0.9.0-beta.5` is a separate identifier. Audio assets are collected into an adjacent `<name>_media` folder; **transfer the project file and this folder together**. MIDI/OSC clip data and Cuelist metadata are saved within the project document.
+
+Overwriting may retain a `.cuelist.bak` backup and older media generations. Check disk usage. Previously created schema v1–v9 and compatible v10 projects can be opened by the supported migration logic; the optional multi-Cuelist and cue-note fields do not require a schema-number change. Newer feature data may not be understood by older application binaries.
+
+### 12.2 Project load safety
+
+Opening a project parses and validates the model and prepares its media on a background worker. The active show is not replaced until the new project passes validation, media decoding and PCM budget checks. Newer load requests supersede stale ones. Switching Cuelists inside an already open project stops playback before changing the active cue list.
+
+### 12.3 Crash recovery
+
+A bounded background checkpoint writer periodically saves applied unsaved model changes (approximately every 20 seconds) using an atomic file replacement. After an abnormal exit, the application can offer **Restore**, **Discard checkpoint** or **Later**. Recovery does not automatically start playback and does not overwrite the saved show.
+
+A checkpoint is not a substitute for `Save` and off-device copies. It may not reflect keystrokes that were still in an uncommitted Inspector field, and it references media files rather than making additional copies.
+
+## 13. Preflight, Diagnostics and physical validation
+
+Use **Preferences → Pre-flight** to inspect model validity, missing or empty audio, configured device availability, potential routing collisions and OSC endpoint configuration. An OSC destination being configured is not proof that any remote server is online.
+
+Use **Preferences → Diagnostics** for local audio command queue, MIDI/OSC send/drop, late-dispatch and active-voice statistics. These measurements describe The Cuelist's workers; external cable, device and receiver latency is not measured.
+
+**Recommended acceptance rehearsal:** run simultaneous audio/MIDI/OSC cues; exercise GO, Row Stop, Panic, selective Auto Stop, Direct/MAIN outputs, Master limiter, Cuelist switching, note saving, MIDI controller connection changes, and OSC receiver failure/restart. Perform a prolonged load test and record real device behavior.
+
+See [Stability and timing](stability-and-timing.md) and the [0.9 release acceptance checklist](0.9-release-checklist.md) for further engineering context.
+
+## 14. Build, test and optional packaging
+
+Install Visual Studio 2022 or Build Tools with **Desktop development with C++**, a Windows SDK and CMake. The build script downloads the pinned JUCE **8.0.12** dependency when `vendor/JUCE` is missing (Git required only for that acquisition).
 
 ```powershell
-# Release build and tests; equivalent to Compila.cmd
+# Release application, test targets and CTest
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build.ps1
 
-# Portable package with license notices (without source code)
-powershell -NoProfile -ExecutionPolicy Bypass -File scripts/package.ps1
+# Optional: test-only target, or compile then launch
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build.ps1 -TestOnly
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build.ps1 -Run
 
-# Verify archive, documentation, checksums, and launcher
-powershell -NoProfile -ExecutionPolicy Bypass -File scripts/check-package.ps1
+# Explicit package creation and extraction verification (not a regular build)
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts/package.ps1 -SkipBuild
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts/check-package.ps1 -SmokeLaunch
+
+# Read-only hardware inventory, optionally followed by localhost OSC test
+powershell -ExecutionPolicy Bypass -File scripts/hardware-check.ps1
+powershell -ExecutionPolicy Bypass -File scripts/hardware-check.ps1 -OscLoopback
 ```
 
-`build.ps1 -TestOnly` builds only tests; `-Run` starts the application. `package.ps1 -SkipBuild` reuses a verified build. `check-package.ps1 -SmokeLaunch` checks offline startup and shutdown. The executable accepts `--offline` to avoid opening an audio device.
+The executable is written to `build/TheCuelist_artefacts/Release/The Cuelist.exe`. Standard pull-request CI builds and runs CTest; creating a portable ZIP is an explicitly requested separate operation. Packaged archives include a SHA-256 checksum and the required license notices.
 
-Executable path: `build/TheCuelist_artefacts/Release/The Cuelist.exe`. Version 0.4 was verified with **68 cases and 20,472 assertions**, including a show with 10,000 rows. Tests produce audio, project files, and previews under `build/Release/test-artifacts`. See the historical [development log](progress.md) for further details.
+### Source layout
 
-| Path | Contents |
+| Path | Responsibility |
 | --- | --- |
-| `src/ShowModel.*` | Model, validation, tempo, and persistence |
-| `src/AudioEngine.*` | Decoding, renderer, transport, and telemetry |
-| `src/MainComponent.*`, `src/CueViews.cpp` | Editor and cue grid |
-| `src/Timeline.cpp`, `src/ColumnUtilities.cpp` | Timeline and mixer |
-| `tests/`, `scripts/` | Tests, build, packaging, and verification |
+| `src/ShowModel.*` | Show/Cuelist data, validation, migrations, JSON and media paths |
+| `src/AudioEngine.*` | PCM playback, transport, DSP, output routing and telemetry |
+| `src/MainComponent.*`, `src/CueViews.cpp` | Main workspace, tabs, cue grid, sidebar, Inspector coordination |
+| `src/Timeline.cpp`, `src/ColumnUtilities.cpp` | Timing views and media/output utility strips |
+| `src/MidiClip.cpp`, `src/MidiUI.cpp`, `src/PianoRoll.cpp` | MIDI clips and note editor |
+| `src/OscClip.cpp`, `src/OscUI.cpp`, `src/OscEditor.cpp` | OSC clips, automation and editor |
+| `src/ControlMapping.h`, `src/ControlRuntime.cpp` | MIDI input mappings, layers, controller dispatch |
+| `tests/`, `scripts/` | Automated tests, Windows build, hardware probe and packaging |
 
-## License
+## 15. Known limitations and legal terms
 
-**The Cuelist is proprietary software; all rights reserved.** The original code is not open source. Third-party use, modification, or redistribution requires the copyright holder's permission, except where non-waivable legal rights apply. See [LICENSE](../LICENSE) and [NOTICE.md](../NOTICE.md).
+This prerelease does not provide native video playback, LTC/MTC, motorized MIDI controller feedback or guaranteed sample-accurate external MIDI/OSC delivery. The application still has UI-thread work in some import/save operations and needs hardware stress testing before a public production release. Prefer independent backups and a tested fallback.
 
-The portable package does not include source code. User-created audio and show files retain their respective rights.
-
-JUCE and the other dependencies retain their own licenses. **JUCE licensing for distribution of this proprietary application must be verified before sharing it with third parties**: no license has been declared or activated on behalf of the copyright holder. See [JUCE licensing](https://juce.com/get-juce/) and [JUCE 8.0.12 framework license](https://github.com/juce-framework/JUCE/blob/8.0.12/LICENSE.md).
-
-## Recovery, Preflight and Diagnostics (0.7.0-alpha.1)
-
-**Preflight** (upper-right session toolbar) reports model validation, missing or empty audio media, configured MIDI output IDs that are unavailable, MIDI input disconnection and configured OSC UDP endpoints. OSC endpoints are **not** declared online without an application-level acknowledgement. Preflight is advisory; no existing GO/PANIC keyboard shortcut is removed.
-
-**Diagnostics** shows current local transport state: audio callback command overflow, MIDI input queue drops, MIDI output sent/dropped messages, OSC UDP sent/dropped messages, active voices and device status. Output counters restart when The Cuelist restarts, and an OSC send count does not prove the destination received it.
-
-**Crash recovery**: the app writes an atomic checkpoint to the user's application-data recovery folder every ~20 seconds while unsaved changes exist. After an abnormal exit, choose **Restore**, **Discard checkpoint**, or **Later** at next startup. Restoring does not autoplay or overwrite the saved show; check the recovered show, reconnect unavailable media, and save to a chosen `.cuelist` file. Clean exits discard transient checkpoints (unless you explicitly defer recovery). Checkpoints reference source media by absolute paths; always retain the actual media files.
-
-**Loading safety**: the application parses the new show and loads its media, including memory-limit checks, before stopping the previous show. A failed parse or exceeded PCM memory budget leaves the current show in place. Successfully switching to a new show does stop playback as before.
-
-See [the stability and timing engineering notes](stability-and-timing.md) for operator tests, version policy and remaining 0.8 work.
+The Cuelist is **proprietary software, not open source**. The single [LICENSE](../LICENSE) contains the authoritative Italian license and a reference English translation. See [NOTICE.md](../NOTICE.md) for independent JUCE and third-party license obligations. A proprietary binary must not be distributed without verifying suitable rights for JUCE and any other included dependencies.
