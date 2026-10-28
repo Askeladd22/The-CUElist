@@ -438,6 +438,34 @@ void MainComponent::paint(juce::Graphics& g) {
           {x+3,notesTop+5,inspectorInner-6,20},11,palette::teal,true);
     label(g,status,{geometry.viewport.getX(),h-35,std::max(1,geometry.editorX-200),25},12,palette::muted);
 }
+void MainComponent::refreshCuelistTabs() {
+    // Three compact tabs fit alongside the clock at the minimum 1180px
+    // window width. The third tab acts as an overflow selector when needed.
+    juce::TextButton* tabs[]={&cuelistTab0,&cuelistTab1,&cuelistTab2};
+    const int count=(int)show.cuelists.size();
+    const int visible=std::min(3,count);
+    for (int i=0;i<3;++i) {
+        auto* tab=tabs[i];
+        tab->setVisible(i<visible);
+        if (i>=visible) continue;
+        int target=i;
+        if (i==2 && count>3 && show.activeCuelist>=2)
+            target=show.activeCuelist;
+        juce::String name=show.cuelists[(size_t)target].name;
+        if (i==2 && count>3) name+="  +";
+        tab->setButtonText(name);
+        tab->setBounds(190+i*96,43,92,27);
+        const bool current=show.activeCuelist==target;
+        tab->setColour(juce::TextButton::buttonColourId,
+                       current ? juce::Colour(0xff086d70) : palette::panel);
+        tab->setTooltip(i==2 && count>3
+            ? "Choose another Cuelist from the menu."
+            : "Switch Cuelist. Playback will stop before changing lists.");
+    }
+    addCuelistButton.setVisible(count<12);
+    addCuelistButton.setBounds(190+visible*96,43,28,27);
+}
+
 void MainComponent::resized() {
     const int w=getWidth(),h=getHeight();
     const auto geometry=workspaceLayout();
