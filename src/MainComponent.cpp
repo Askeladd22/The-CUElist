@@ -27,10 +27,12 @@ juce::String duration(double seconds) {
 MainComponent::MainComponent(bool startAudio) {
     setLookAndFeel(&theme); setWantsKeyboardFocus(true); setSize(1440,900);
     for (juce::Component* c : std::initializer_list<juce::Component*>{&openButton,&saveButton,&newButton,&addRowButton,&addColumnButton,
-         &goButton,&panicButton,&deviceButton,&controlButton,&collapseAllButton,&dockResize,&timelineResize,&importButton,&midiEditButton,&oscEditButton,&playCellButton,&stopCellButton,&clearButton,&tempoButton,&applyButton,
+         &goButton,&panicButton,&deviceButton,&controlButton,&collapseAllButton,
+         &cuelistTab0,&cuelistTab1,&cuelistTab2,&addCuelistButton,&dockResize,&timelineResize,&importButton,&midiEditButton,&oscEditButton,&playCellButton,&stopCellButton,&clearButton,&tempoButton,&applyButton,
          &cellTab,&rowTab,&rowGain,&rowBehaviour,&rowMute,&rowLoop,&rowName,&cellName,&bpm,&cueNotes,&behaviour,&follow,&loop,&cellAutoStop,&gainDb,&viewport,&timeline,&utilities,
          &clipCollapseButton,&clipCloseButton,&cueHeaders,&cueMetrics,&preflightButton,&diagnosticsButton,&preferencesButton,&projectNameLabel}) addAndMakeVisible(c);
     for (auto* b : {&openButton,&saveButton,&newButton,&addRowButton,&addColumnButton,&goButton,&panicButton,&deviceButton,&controlButton,&collapseAllButton,
+                    &cuelistTab0,&cuelistTab1,&cuelistTab2,&addCuelistButton,
                     &importButton,&midiEditButton,&oscEditButton,&playCellButton,&stopCellButton,&clearButton,&tempoButton,&applyButton,
                     &preflightButton,&diagnosticsButton,&preferencesButton}) b->setWantsKeyboardFocus(false);
     viewport.setViewedComponent(&grid,false); viewport.setScrollBarsShown(true,true);
@@ -162,12 +164,15 @@ MainComponent::MainComponent(bool startAudio) {
         faderMenu.addItem(3,"-∞ dB / +6 dB",true,faderCeilingDb==6);
         faderMenu.addItem(4,"-∞ dB / 0 dB",true,faderCeilingDb==0);
         menu.addSubMenu("Fader Range",faderMenu);
+        menu.addSeparator();
+        menu.addItem(5,"Rename active Cuelist");
         auto safe=juce::Component::SafePointer<MainComponent>(this);
         menu.showMenuAsync(juce::PopupMenu::Options().withTargetComponent(&preferencesButton),[safe](int choice) {
             if (!safe) return;
             if(choice==1) safe->showPreflight();
             else if(choice==2) safe->showDiagnostics();
             else if(choice==3 || choice==4) safe->setAudioFaderCeilingDb(choice==3 ? 6 : 0);
+            else if(choice==5) safe->renameActiveCuelist();
         });
     };
     newButton.onClick=[this] { withDiscardConfirmation([this] { if(projectLoader) projectLoader->cancel(); closeMidiClip(); closeOscClip(); editHistory.clearUndoHistory(); stopAll(); show=makeShow(); clips.clear(); projectFile={}; selectedRow=selectedColumn=nextCue=0;
@@ -190,6 +195,26 @@ MainComponent::MainComponent(bool startAudio) {
     addColumnButton.onClick=[this] { showColumnMenu(addColumnButton.getScreenBounds().getCentre()); };
     goButton.onClick=[this] { goNext(); }; panicButton.onClick=[this] { stopAll(); };
     deviceButton.onClick=[this] { showDevices(); };
+    cuelistTab0.setName("cuelistTab0");
+    cuelistTab1.setName("cuelistTab1");
+    cuelistTab2.setName("cuelistTab2");
+    addCuelistButton.setName("newCuelist");
+    addCuelistButton.setTooltip("Create another Cuelist in this show.");
+    cuelistTab0.onClick=[this] {activateCuelist(0);};
+    cuelistTab1.onClick=[this] {activateCuelist(1);};
+    cuelistTab2.onClick=[this] {
+        if (show.cuelists.size()<=3) {activateCuelist(2);return;}
+        juce::PopupMenu menu;
+        for (int i=2;i<(int)show.cuelists.size();++i)
+            menu.addItem(100+i,show.cuelists[(size_t)i].name,true,
+                         i==show.activeCuelist);
+        menu.showMenuAsync(
+            juce::PopupMenu::Options().withTargetComponent(&cuelistTab2),
+            [safe=juce::Component::SafePointer<MainComponent>(this)](int choice) {
+                if (safe && choice>=102) safe->activateCuelist(choice-100);
+            });
+    };
+    addCuelistButton.onClick=[this] {createCuelist();};
     controlButton.setName("controlMapping");
     controlButton.setTooltip("MIDI input, MIDI Learn, and global/per-cue mappings.");
     controlButton.onClick=[this] {
@@ -422,6 +447,7 @@ void MainComponent::resized() {
     deviceButton.setBounds(20,188,140,33);
     preferencesButton.setBounds(20,227,140,31);
     controlButton.setBounds(20,264,140,33);
+    refreshCuelistTabs();
     collapseAllButton.setBounds(geometry.cueHeaders.getX()+CueGrid::nameWidth-84,
                                 geometry.cueHeaders.getY()+9,77,24);
     const bool allCollapsed=std::all_of(show.columns.begin(),show.columns.end(),
