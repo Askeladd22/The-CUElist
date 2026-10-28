@@ -36,11 +36,11 @@ MainComponent::MainComponent(bool startAudio) {
                     &importButton,&midiEditButton,&oscEditButton,&playCellButton,&stopCellButton,&clearButton,&tempoButton,&applyButton,
                     &preflightButton,&diagnosticsButton,&preferencesButton}) b->setWantsKeyboardFocus(false);
     viewport.setViewedComponent(&grid,false); viewport.setScrollBarsShown(true,true);
-    goButton.setColour(juce::TextButton::buttonColourId,juce::Colour(0xff097b70));
+    goButton.setColour(juce::TextButton::buttonColourId,palette::go);
     goButton.setColour(juce::TextButton::textColourOffId,palette::text);
-    panicButton.setColour(juce::TextButton::buttonColourId,juce::Colour(0xff923b49));
+    panicButton.setColour(juce::TextButton::buttonColourId,palette::panic);
     panicButton.setColour(juce::TextButton::textColourOffId,palette::text);
-    importButton.setColour(juce::TextButton::buttonColourId,juce::Colour(0xff097b70));
+    importButton.setColour(juce::TextButton::buttonColourId,palette::go);
     behaviour.addItemList({"Retrigger","Pause / Restart","Pause / Resume","Continue"},1);
     rowGain.setSliderStyle(juce::Slider::LinearHorizontal);
     rowGain.setTextBoxStyle(juce::Slider::TextBoxRight,false,72,24);
@@ -315,7 +315,7 @@ void MainComponent::paint(juce::Graphics& g) {
     const int w=getWidth(),h=getHeight();
     const auto geometry=workspaceLayout();
     g.fillAll(palette::background);
-    g.setColour(palette::raised); g.fillRect(0,0,w,72);
+    g.setColour(palette::toolbar); g.fillRect(0,0,w,72);
     g.setColour(palette::panel); g.fillRect(0,73,180,h-73);
     // A collapsed MIDI/OSC editor retains a 36px docking region while
     // its editor component is hidden. Paint the reserved panel background
@@ -493,7 +493,7 @@ void MainComponent::refreshCuelistTabs() {
         tab->setBounds(190+i*96,43,92,27);
         const bool current=show.activeCuelist==target;
         tab->setColour(juce::TextButton::buttonColourId,
-                       current ? juce::Colour(0xff086d70) : palette::panel);
+                       current ? palette::selectedTab : palette::panel);
         tab->setTooltip(i==2 && count>3
             ? "Choose another Cuelist from the menu."
             : "Switch Cuelist. Playback will stop before changing lists.");
