@@ -12,6 +12,13 @@ $package = Join-Path $checkRoot $name
 foreach ($file in @('The Cuelist.exe', 'Avvia.cmd', 'README-WINDOWS.txt', 'README.md', 'LICENSE', 'NOTICE.md', 'JUCE-LICENSE.md', 'SHA256.txt')) {
     if (!(Test-Path -LiteralPath (Join-Path $package $file))) { throw "Missing file: $file" }
 }
+foreach ($license in @('Exo2-OFL.txt','Hind-OFL.txt')) {
+    $relative = 'fonts\' + $license
+    $source = Join-Path $repo ('assets\fonts\' + $license)
+    $packaged = Join-Path $package $relative
+    if (!(Test-Path -LiteralPath $packaged)) { throw "Missing OFL notice: $relative" }
+    if ((Get-FileHash -LiteralPath $source).Hash -ne (Get-FileHash -LiteralPath $packaged).Hash) { throw "Outdated OFL notice: $relative" }
+}
 if (Test-Path -LiteralPath (Join-Path $package 'Sorgenti.zip')) { throw 'Unexpected source archive in the proprietary package.' }
 $guide = 'docs\complete-user-guide.md'
 if (!(Test-Path -LiteralPath (Join-Path $package $guide))) { throw "Missing offline User Guide: $guide" }
