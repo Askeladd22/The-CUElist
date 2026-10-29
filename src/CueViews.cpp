@@ -184,13 +184,13 @@ void CueGrid::paint(juce::Graphics& g) {
         g.fillRoundedRectangle(56.f,(float)y+9,42.f,32.f,5.f);
         label(g,"GO",{56,y+9,42,32},13,palette::background,true,juce::Justification::centred);
         label(g,row.name.isEmpty()?"Untitled cue":row.name,
-            {107,y+4,nameWidth-213,24},14,palette::text,true);
+            {107,y+4,nameWidth-224,24},14,palette::text,true);
         const auto state=playing?"PLAYING":paused?"PAUSED":next?"NEXT CUE":row.muted?"MUTED":"STANDBY";
         label(g,juce::String(r+1).paddedLeft('0',2)+" / "+state,
-            {107,y+29,nameWidth-213,18},10,playing?palette::teal:next?palette::amber:palette::muted,true);
-        playPauseIcon(g,{nameWidth-95,y+13,25,20},playing);
-        transportButton(g,{nameWidth-65,y+13,25,20},true,true);
-        smallButton(g,"...",{nameWidth-34,y+13,25,20},true);
+            {107,y+29,nameWidth-224,18},10,playing?palette::teal:next?palette::amber:palette::muted,true);
+        playPauseIcon(g,rowPlayBounds(y),playing);
+        transportButton(g,rowStopBounds(y),true,true);
+        smallButton(g,"...",rowMenuBounds(y),true);
         for (int c=0;c<(int)show.columns.size();++c) {
             const auto& column=show.columns[(size_t)c];
             const auto& cell=row.cells[(size_t)c];
@@ -342,15 +342,16 @@ void CueGrid::showRowMenu(int row,juce::Point<int> screenPoint,int /*cellColumn*
 void CueGrid::clickRowHeader(int row,int x,int localY,int clicks,juce::Point<int> screen) {
     if (row<0 || row>=(int)owner.show.rows.size()) return;
         if (x<50 && clicks>1) return;
-        if (localY>=13 && localY<34 && x>=nameWidth-34 && x<nameWidth-9) {
+        // The exact rectangles used for painting also own the hit tests.
+        if (rowMenuBounds(0).contains(x,localY)) {
             if (clicks==1) showRowMenu(row,screen);
             return;
         }
-        if (localY>=13 && localY<33 && x>=nameWidth-65 && x<nameWidth-40) {
+        if (rowStopBounds(0).contains(x,localY)) {
             if (clicks==1) owner.stopRow(row);
             return;
         }
-        if (localY>=13 && localY<33 && x>=nameWidth-95 && x<nameWidth-70) {
+        if (rowPlayBounds(0).contains(x,localY)) {
             if (clicks==1) owner.toggleRowPlayPause(row);
             return;
         }
@@ -492,17 +493,25 @@ void CueGrid::filesDropped(const juce::StringArray& files,int x,int y) {
     if (owner.select(row,column)) owner.importFile(juce::File(files[0]));
 }
 void PinnedCueHeaders::paint(juce::Graphics& g) {
-    // Use exactly the same vertical scroll offset as the cells. The row
-    // identities, colour bands, GO/Pause/Stop and menus remain pixel-aligned.
+    // Scroll only the body. The first 72px are a genuinely fixed header,
+    // not a translated copy that allows rows to show through when scrolling.
     g.saveState();
-    g.reduceClipRegion(getLocalBounds());
+    g.reduceClipRegion(getLocalBounds().withTrimmedTop(CueGrid::headerHeight));
     g.addTransform(juce::AffineTransform::translation(
         0.0f,-(float)owner.viewport.getViewPositionY()));
     owner.grid.paint(g);
     g.restoreState();
-    g.setColour(palette::line);g.drawVerticalLine(getWidth()-1,0,(float)getHeight());
+    g.saveState();
+    g.reduceClipRegion(getLocalBounds().withHeight(CueGrid::headerHeight));
+    owner.grid.paint(g);
+    g.restoreState();
+    g.setColour(palette::line);
+    g.drawHorizontalLine(CueGrid::headerHeight-1,0.0f,(float)getWidth());
+    g.drawVerticalLine(getWidth()-1,0,(float)getHeight());
 }
 void PinnedCueHeaders::mouseDown(const juce::MouseEvent& e) {
+    // A row scrolled behind the fixed header must never receive input.
+    if (e.y<CueGrid::headerHeight) return;
     const int y=e.y+owner.viewport.getViewPositionY();
     const int row=y>=CueGrid::headerHeight ?
         (y-CueGrid::headerHeight)/CueGrid::rowHeight : -1;
@@ -525,12 +534,13 @@ void PinnedCueHeaders::mouseDown(const juce::MouseEvent& e) {
         e.getNumberOfClicks(),e.getScreenPosition());
 }
 void PinnedCueHeaders::mouseDoubleClick(const juce::MouseEvent& e) {
-    const int y=e.y+owner.viewport.getViewPositionY();
-    if (e.mods.isLeftButtonDown() && y>=0 && y<33 &&
-        e.x>=18 && e.x<CueGrid::nameWidth-114) {
-        owner.renameActiveCuelist();
+    if (e.y<CueGrid::headerHeight) {
+        if (e.mods.isLeftButtonDown() && e.y>=0 && e.y<33 &&
+            e.x>=18 && e.x<CueGrid::nameWidth-114)
+            owner.renameActiveCuelist();
         return;
     }
+    const int y=e.y+owner.viewport.getViewPositionY();
     const int row=y>=CueGrid::headerHeight ?
         (y-CueGrid::headerHeight)/CueGrid::rowHeight : -1;
     if (row>=0 && row<(int)owner.show.rows.size() &&
@@ -548,9 +558,9 @@ void PinnedCueHeaders::mouseWheelMove(const juce::MouseEvent& e,
 }
 void CueMetricsOverlay::paint(juce::Graphics& g) {
     g.fillAll(palette::raised);
-    g.setColour(palette::teal);g.fillRect(0,0,3,getHeight());
-    label(g,"BPM",{22,18,61,23},11,palette::text,true);
-    label(g,"AUTO STOP",{100,18,78,23},10,palette::text,true);
+    // Paint BPM and Auto Stop rows strictly below the pinned heading.
+    g.saveState();
+    g.reduceClipRegion(getLocalBounds().withTrimmedTop(CueGrid::headerHeight));
     const int scroll=owner.viewport.getViewPositionY();
     const int first=std::max(0,(scroll-CueGrid::headerHeight)/CueGrid::rowHeight);
     const int last=std::min((int)owner.show.rows.size(),
@@ -578,8 +588,19 @@ void CueMetricsOverlay::paint(juce::Graphics& g) {
         g.setColour(palette::line);
         g.drawHorizontalLine(y+CueGrid::rowHeight-1,0,(float)getWidth());
     }
+    g.restoreState();
+    // Paint the heading last and restore its divider, so no scrolling row
+    // (including partially visible toggles) can appear above the boundary.
+    g.setColour(palette::raised);
+    g.fillRect(0,0,getWidth(),CueGrid::headerHeight);
+    g.setColour(palette::teal);g.fillRect(0,0,3,getHeight());
+    label(g,"BPM",{22,18,61,23},11,palette::text,true);
+    label(g,"AUTO STOP",{100,18,78,23},10,palette::text,true);
+    g.setColour(palette::line);
+    g.drawHorizontalLine(CueGrid::headerHeight-1,0.0f,(float)getWidth());
 }
 void CueMetricsOverlay::mouseDown(const juce::MouseEvent& e) {
+    if (e.y<CueGrid::headerHeight) return;
     if (e.mods.isPopupMenu()) {
         const int scroll=owner.viewport.getViewPositionY();
         const int row=(e.y+scroll-CueGrid::headerHeight)/CueGrid::rowHeight;
@@ -588,7 +609,7 @@ void CueMetricsOverlay::mouseDown(const juce::MouseEvent& e) {
     }
     if (!e.mods.isLeftButtonDown()) return;
     const int scroll=owner.viewport.getViewPositionY();
-    if (e.y+scroll<CueGrid::headerHeight) return;
+
     const int row=(e.y+scroll-CueGrid::headerHeight)/CueGrid::rowHeight;
     if (row<0 || row>=(int)owner.show.rows.size()) return;
     const int localY=(e.y+scroll-CueGrid::headerHeight)%CueGrid::rowHeight;
