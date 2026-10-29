@@ -60,6 +60,28 @@ void uiRefinementTests() {
               "Native controls bypass the shared typography hierarchy");
     });
 
+    test("Bundled Unicode fallbacks cover infinity and are preferred by UI fonts",[] {
+        const auto& faces=appTypefaces();
+        check(faces.notoMath!=nullptr && faces.notoSymbols2!=nullptr,
+              "Noto fallback typefaces failed to register");
+        check(faces.notoMath->getNominalGlyphForCodepoint(0x221E).has_value(),
+              "Bundled Noto Sans Math lacks infinity U+221E");
+        for (const auto size: {12.0f,20.0f}) {
+            const auto uiFont=font(size);
+            const auto families=uiFont.getPreferredFallbackFamilies();
+            check(uiFont.getFallbackEnabled() &&
+                  families.contains("Noto Sans Math") &&
+                  families.contains("Noto Sans Symbols 2"),
+                  "Exo 2 / Hind did not retain the configured glyph fallback");
+            const auto infinity=uiFont.findSuitableFontForText(
+                juce::String::charToString((juce::juce_wchar) 0x221E));
+            const auto resolved=infinity.getTypefacePtr();
+            check(resolved!=nullptr &&
+                  resolved->getNominalGlyphForCodepoint(0x221E).has_value(),
+                  "Infinity is not renderable through the configured fallback");
+        }
+    });
+
     test("Midnight Slate palette preserves layered dark surfaces and safety accents",[] {
         const auto brightness=[](juce::Colour colour) {
             return 0.2126f*(float)colour.getRed()+
