@@ -17,7 +17,7 @@ public:
         sourceColumnId(main.show.columns[(size_t)main.selectedColumn].id) {
         setName("controlMappingPanel");
         for (juce::Component* c : std::initializer_list<juce::Component*>{
-            &device,&connect,&learn,&add,&remove,&newPreset,&assignPreset,
+            &device,&connect,&learn,&oscLearn,&oscInputPort,&add,&remove,&newPreset,&assignPreset,
             &presetName,&presets,&scope,&target,&takeover,&columns,&bindingList,&state,
             &outputCc,&oscAddress,&invert,&updateSelected,&curve,&minimum,&maximum,
              &functionChoice,&functionName,&newFunction,&saveRoute,
@@ -70,6 +70,27 @@ public:
         device.setTooltip("Select a device explicitly. No automatic fallback on disconnect.");
         connect.setButtonText("Refresh ports");
         learn.setButtonText("MIDI Learn");
+        oscLearn.setButtonText("OSC Learn");
+        oscLearn.setName("mappingOscLearn");
+        oscInputPort.setName("mappingOscInputPort");
+        oscInputPort.setInputRestrictions(5,"0123456789");
+        oscInputPort.setText(juce::String(main.show.controls.oscInputPort==0 ?
+                                    9011 : main.show.controls.oscInputPort),false);
+        oscInputPort.setTooltip("UDP input port; OSC listener receives single numeric/boolean OSC 1.0 messages.");
+        oscLearn.setTooltip("Listen for an OSC input address. Only the selected mapping scope is edited.");
+        oscLearn.onClick=[this] {
+            if (!owner) return;
+            const int port=oscInputPort.getText().getIntValue();
+            if (!owner->startOscControlInput(port)) {
+                state.setText(owner->status,juce::dontSendNotification);
+                return;
+            }
+            captured.reset();
+            owner->armOscControlLearn();
+            state.setText("OSC Learn armed on UDP "+juce::String(port)+
+                ". Send a float, int or boolean OSC message.",
+                juce::dontSendNotification);
+        };
         add.setButtonText("Add mapping");
         updateSelected.setButtonText("Update selected");
         updateSelected.setName("mappingUpdateSelected");
@@ -267,8 +288,10 @@ public:
         const int w=getWidth();
         device.setBounds(20,105,w-177,31);
         connect.setBounds(w-143,105,123,31);
-        learn.setBounds(20,163,128,32);
-        state.setBounds(160,162,w-180,33);
+        learn.setBounds(20,163,116,32);
+        oscLearn.setBounds(144,163,116,32);
+        oscInputPort.setBounds(269,163,68,32);
+        state.setBounds(347,162,w-367,33);
         functionChoice.setBounds(20,207,185,29);
         functionName.setBounds(213,207,228,29);
         newFunction.setBounds(449,207,140,29);
@@ -332,9 +355,9 @@ private:
         return cell.controlSet ? &cell.controlSet->bindings : nullptr;
     }
     juce::ComboBox device,presets,scope,target,takeover,columns,curve,templates,functionChoice;
-    juce::TextButton connect,learn,add,remove,updateSelected,newPreset,assignPreset,saveTemplate,loadTemplate,
+    juce::TextButton connect,learn,oscLearn,add,remove,updateSelected,newPreset,assignPreset,saveTemplate,loadTemplate,
                      newFunction,saveRoute;
-    juce::TextEditor presetName,outputCc,oscAddress,minimum,maximum,effectivePreview,templateName,functionName;
+    juce::TextEditor presetName,outputCc,oscAddress,minimum,maximum,effectivePreview,templateName,functionName,oscInputPort;
     juce::ToggleButton invert{"Invert"};
     juce::Label state;
     juce::ListBox bindingList;
@@ -538,6 +561,7 @@ private:
             const auto input=b;
             b=materializeFunctionBinding(input,*it);
         }
+        if (b.kind==ControlKind::osc) b.takeover=ControlTakeover::jump;
         if (b.kind==ControlKind::note || b.target==ControlTarget::go ||
             b.target==ControlTarget::panic) b.takeover=ControlTakeover::jump;
         b.invert=invert.getToggleState();
