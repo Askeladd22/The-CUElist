@@ -282,7 +282,15 @@ MainComponent::MainComponent(bool startAudio) {
     globalMidiLearn.setTooltip("Learn a MIDI input for the Default Map. Select its function in the mapping panel.");
     globalOscLearn.setTooltip("Learn an OSC address for the Default Map; configure UDP input port in the mapping panel.");
     globalMidiLearn.onClick=[this] {
-        openControlPanel(false);armControlLearn();
+        openControlPanel(false);
+        if (!midiInput.connected()) {
+            controlLearnArmed=false;
+            status="Select and connect a MIDI input before arming Default Map Learn.";
+            repaint();
+            return;
+        }
+        armControlLearn();
+        repaint();
     };
     globalOscLearn.onClick=[this] {
         openControlPanel(false);
@@ -663,8 +671,9 @@ void MainComponent::resized() {
     undoButton.setBounds(getWidth()-764,10,51,25);
     redoButton.setBounds(getWidth()-709,10,51,25);
     const int activityX=getWidth()-365;
-    globalMidiLearn.setBounds(activityX+91,10,59,20);
-    globalOscLearn.setBounds(activityX+153,10,59,20);
+    // Leave separation from the I/O ACTIVITY caption and the audio card.
+    globalMidiLearn.setBounds(activityX+95,10,58,20);
+    globalOscLearn.setBounds(activityX+154,10,58,20);
     // Collapse-all follows the pinned header after JUCE has computed the
     // actual left scrollbar inset (see placement below).
     const bool allCollapsed=std::all_of(show.columns.begin(),show.columns.end(),
