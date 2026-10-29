@@ -269,6 +269,8 @@ public:
     int createAbstractControlFunction(const juce::String& name,ControlBinding destination);
     bool updateAbstractControlFunction(int id,const juce::String& name,
                                        ControlBinding destination);
+    juce::String exportControlPresetText() const;
+    juce::Result importControlPresetText(const juce::String&);
     int createMappingPreset(const juce::String&);
     bool assignMappingPreset(int rowId,int presetId);
     void armControlLearn() { oscLearnArmed=false;controlLearnArmed=true; }
