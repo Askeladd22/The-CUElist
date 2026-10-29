@@ -57,13 +57,13 @@ The top row contains named **Cuelist tabs**, the **+** action, **Undo/Redo**, a 
 The **Help** button in the top toolbar opens a menu with **Guide** and **About The Cuelist**. The Guide entry opens the content of the local `docs/complete-user-guide.md` **inside The Cuelist**, in a separate non-modal, resizable, scrollable window with headings and a built-in search. No external browser or Markdown editor is launched. The reader uses the bundled Markdown file, which is copied beside the compiled EXE and into portable packages, and reloads it each time the Guide is opened. About displays the current version derived from `VERSION.txt`, the proprietary copyright notice and the two credited co-authors, **Davide Salvatore** and **Riccardo D'Ambrosio**.
 
 - **Undo/Redo** use the existing MIDI/OSC clip-edit history; they are not general-purpose undo for show deletion, tab management or every mixer action.
-- **CPU/RAM** report system-level usage, not per-plugin or per-clip estimates. Unsupported telemetry displays N/A.
+- **CPU/RAM** report system-level usage, not per-plugin or per-clip estimates. The two usage values and their horizontal meters have separate aligned positions; unsupported telemetry displays N/A.
 - **MIDI RX/TX** indicate local traffic; **OSC TX** indicates local transmission. OSC RX remains inactive because a native OSC input endpoint is not implemented.
 - **Audio Available** reports local device availability, not an assertion that speakers or downstream equipment are functioning.
 
 ### 3.3 Cue grid, Inspector, mixer and Timeline
 
-The central cue grid has row controls on the left and columns for Audio/MIDI/OSC/Control. The **BPM** and **Auto Stop** strip is pinned to the right of the cue grid, including during horizontal scrolling. Column Utilities and the Master Audio strip occupy the lower working area; a Timeline with zoom/grid/snap controls is underneath.
+The central cue grid has row controls on the left and columns for Audio/MIDI/OSC/Control. The **BPM** and **Auto Stop** strip is pinned to the right of the cue grid, including during horizontal scrolling. During vertical scrolling, row values, toggles and action targets remain **below** their fixed headers: controls hidden behind the header are neither visible nor clickable. Row Play/Pause, Stop and the action menu are physically separated, as are the larger Play/Stop targets inside each cell. Column Utilities and the Master Audio strip occupy the lower working area; a Timeline with zoom/grid/snap controls is underneath.
 
 The **Inspector** on the right edits the selected cue and cell separately. Use its narrow edge tab to collapse the Inspector toward the right, increasing the width of the workspace; click the tab again to reopen. The same area contains a cue-specific multiline **Notes** field.
 
@@ -112,7 +112,7 @@ Space does not launch a cue while typing into a text input. Escape is intended t
 
 Click a cue to make it the next armed cue. Use the row menu to **Copy**, **Paste below**, **Duplicate** or **Delete** a whole cue. The cell context menu covers cell-specific copy, paste, cut, delete, loop and inclusion in Row GO. Duplicated rows and cells receive appropriate new identities; imported audio can share decoded PCM in memory when safe.
 
-Use the arrow controls to reorder cue rows. Changes that affect the structure or timing may stop transport to preserve deterministic cue state.
+Use the **▲ / ▼** controls to reorder cue rows. These glyphs use the bundled Noto Sans Symbols 2 font directly (or vector shapes if a glyph is unavailable); the Delete cross is drawn as vector geometry. Changes that affect the structure or timing may stop transport to preserve deterministic cue state.
 
 ### 5.1 Playback behavior and looping
 
@@ -120,7 +120,7 @@ The clip playback behavior determines how a second trigger acts: **Retrigger**, 
 
 ### 5.2 Auto Stop
 
-Each row has a pinned **Auto Stop** toggle, normally enabled initially. The additional **+** below its toggle exposes cell-level Auto Stop settings.
+Each row has a pinned **Auto Stop** toggle, normally enabled initially. Select the separate **CELLS +** control beneath the switch to reveal the cell-level Auto Stop options. It changes to **CELLS −** while expanded. The switch and disclosure have distinct clickable regions and remain below the fixed header when you scroll.
 
 A previously active cell is stopped by a later cue's GO only when both its row-level Auto Stop and its cell-level Auto Stop are enabled. Disabling row Auto Stop allows its clips to continue. A direct Stop, Row Stop or Panic still stops them. The next GO can also stop protected clips independently of whether the new cue itself has media.
 
@@ -140,7 +140,7 @@ Text input not yet applied to the model is not independently guaranteed to exist
 
 Audio cells support WAV and MP3, imported with the cell's import action. One mono or stereo file may be associated with a cell. The show decodes audio to PCM for playback and enforces memory limits; media import and saving large collections can still take time.
 
-Individual cell gain is expressed in **dB**. A peak meter reports **dBFS**: 0 dB gain is unity, while 0 dBFS is the digital ceiling. The two units are not interchangeable.
+Individual cell gain is expressed in **dB**. A peak meter reports **dBFS**: 0 dB gain is unity, while 0 dBFS is the digital ceiling. The two units are not interchangeable. A muted fader reads **−∞ dB**; its mathematical minus/infinity symbols are rendered directly with embedded Noto Sans Math, while the unit remains in Exo 2. The meter's L/R labels and the gain readout occupy separate vertical lanes.
 
 ### 7.2 Column Utilities
 
