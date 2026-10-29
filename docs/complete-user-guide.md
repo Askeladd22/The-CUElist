@@ -67,7 +67,7 @@ The central cue grid has row controls on the left and columns for Audio/MIDI/OSC
 
 The **Inspector** on the right edits the selected cue and cell separately. Use its narrow edge tab (one framed surface with a directional chevron) to collapse the Inspector toward the right, increasing the width of the workspace; click the tab again to reopen. The same area contains a cue-specific multiline **Notes** field.
 
-Columns can be collapsed individually or together with **Collapse all** in the cue grid header. Collapsing is a layout choice; it does not stop running media or change audio routing. The pinned BPM / Auto Stop area has a continuous visual boundary with the scrollable grid and the mixer below, including at row separators. The vertical scrolling gutter is narrower and the boundary is drawn after the horizontal rules to avoid a broken accent line.
+Columns can be collapsed individually or together with **Collapse all** in the cue grid header. Collapsing is a layout choice; it does not stop running media or change audio routing. The pinned BPM / Auto Stop area has a continuous visual boundary with the scrollable grid and the mixer below, including at row separators. The Cue List's **vertical scrollbar sits at its left edge**, rather than between the last cell and BPM / Auto Stop. It appears only when there are more rows than can fit on screen. The pinned row header follows that scrollbar's visible inset, keeping Play, Stop and row names aligned with the scrolling content. When no vertical scrollbar is necessary, the grid expands all the way to the BPM boundary instead of retaining an empty gutter.
 
 ## 4. Managing multiple Cuelists
 
