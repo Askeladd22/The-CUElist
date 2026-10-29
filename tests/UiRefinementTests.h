@@ -2,6 +2,7 @@
 #include "GainMeterFader.h"
 #include "HelpGuide.h"
 #include "OperatorReportDialog.h"
+#include "OperatorTextPrompt.h"
 #include "OscEditor.h"
 void uiRefinementTests() {
     using namespace cueViewFixtures;
@@ -377,9 +378,11 @@ void uiRefinementTests() {
         auto* metrics=find<CueMetricsOverlay>(ui);
         check(metrics!=nullptr,"Fixed BPM / Auto Stop overlay missing");
         click(*metrics,22.0f,(float)CueGrid::headerHeight+17);
-        auto* modal=dynamic_cast<juce::AlertWindow*>(juce::ModalComponentManager::getInstance()->getModalComponent(0));
-        check(modal!=nullptr && modal->getTextEditor("value")!=nullptr,"BPM row label did not open editor");
-        check(modal->getTextEditor("value")->getText().contains("120"),"BPM dialog initial value incorrect");
+        auto* modal=dynamic_cast<juce::DialogWindow*>(
+            juce::ModalComponentManager::getInstance()->getModalComponent(0));
+        auto* editor=modal ? dynamic_cast<OperatorTextPrompt*>(modal->getContentComponent()) : nullptr;
+        check(editor!=nullptr,"BPM row label did not open shared editor");
+        check(editor->getEditor().getText().contains("120"),"BPM dialog initial value incorrect");
         delete modal;
     });
     test("MIDI and OSC timeline edges resize durations without moving clip start", [] {
