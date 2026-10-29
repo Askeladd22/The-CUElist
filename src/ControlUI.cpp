@@ -464,6 +464,9 @@ private:
         functionChoice.setSelectedId(old>0 && functionChoice.indexOfItemId(old)>=0 ?
             old : owner->show.controls.functions.empty() ? 1 :
                   owner->show.controls.functions.front().id+1,juce::dontSendNotification);
+        // Scope belongs to legacy bindings only. Named-function source
+        // assignments in Default Map always inherit globally.
+        scope.setEnabled(!editSet && functionChoice.getSelectedId()==1);
     }
     void showRoute(const ControlBinding& b) {
         const int targetIndex=b.target==ControlTarget::masterGain ? 1 :
