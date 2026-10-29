@@ -395,8 +395,58 @@ void MainComponent::dispatchControl(const ControlEvent& input) {
 }
 
 
+
+bool MainComponent::deleteAbstractControlFunction(int id) {
+    auto candidate=show;
+    auto& functions=candidate.controls.functions;
+    const auto found=std::find_if(functions.begin(),functions.end(),
+        [id](const ControlFunction& f){return f.id==id;});
+    if (found==functions.end()) return false;
+    functions.erase(found);
+    auto discard=[id](std::vector<ControlBinding>& bindings) {
+        bindings.erase(std::remove_if(bindings.begin(),bindings.end(),
+            [id](const ControlBinding& b){return b.functionId==id;}),
+            bindings.end());
+    };
+    discard(candidate.controls.bindings);
+    for (auto& item:candidate.controls.templates) discard(item.set.bindings);
+    for (auto& col:candidate.columns) discard(col.controlDefaultSet.bindings);
+    for (auto& row:candidate.rows)
+        for (auto& cell:row.cells) if (cell.controlSet)
+            discard(cell.controlSet->bindings);
+    for (auto& list:candidate.cuelists)
+        for (auto& row:list.rows)
+            for (auto& cell:row.cells) if (cell.controlSet)
+                discard(cell.controlSet->bindings);
+    if (auto valid=validateShow(candidate);valid.failed()) {
+        status=valid.getErrorMessage();return false;
+    }
+    show=std::move(candidate);refreshControlSettings();dirty=true;refresh();
+    status="Function and associated assignments removed.";return true;
+}
+bool MainComponent::moveAbstractControlFunction(int id,int direction) {
+    auto candidate=show;
+    auto& functions=candidate.controls.functions;
+    const auto it=std::find_if(functions.begin(),functions.end(),
+        [id](const ControlFunction& f){return f.id==id;});
+    if (it==functions.end() || (direction!=-1 && direction!=1)) return false;
+    const int index=(int)std::distance(functions.begin(),it);
+    const int next=index+direction;
+    if (next<0 || next>=(int)functions.size()) return false;
+    std::iter_swap(functions.begin()+index,functions.begin()+next);
+    if (auto valid=validateShow(candidate);valid.failed()) {
+        status=valid.getErrorMessage();return false;
+    }
+    show=std::move(candidate);refreshControlSettings();dirty=true;
+    status="Function order updated.";refresh();return true;
+}
+
 void MainComponent::ensureStarterControlFunctions() {
     if (!show.controls.functions.empty()) return;
+    // Legacy locked columns are converted only when their document is loaded.
+    // Do not silently change a still-open legacy control configuration.
+    for (const auto& column:show.columns)
+        if (column.controlLocked) return;
     auto candidate=show;
     // New projects start with a compact 8 + 8 palette. A missing output
     // column is represented by ID 0 and never produces output until configured.

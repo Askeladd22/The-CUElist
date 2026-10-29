@@ -269,6 +269,8 @@ public:
     int createAbstractControlFunction(const juce::String& name,ControlBinding destination);
     bool updateAbstractControlFunction(int id,const juce::String& name,
                                        ControlBinding destination);
+    bool deleteAbstractControlFunction(int id);
+    bool moveAbstractControlFunction(int id,int direction);
     juce::String exportControlPresetText() const;
     juce::Result importControlPresetText(const juce::String&);
     int createMappingPreset(const juce::String&);
