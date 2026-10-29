@@ -36,9 +36,9 @@ void oscAutomationV9Tests() {
         auto* collapseButton=dynamic_cast<juce::Button*>(collapse);
         check(collapseButton!=nullptr,"Collapse button unavailable.");
         collapseButton->triggerClick();
-        const auto bounds=ui.workspaceLayout();
-        check(collapse->getBottom()<=bounds.timeline.getY() &&
-              close->getBottom()<=bounds.timeline.getY(),
+        auto* timeline=cueViewFixtures::find<Timeline>(ui);
+        check(timeline && collapse->getBottom()<=timeline->getY() &&
+              close->getBottom()<=timeline->getY(),
               "Collapsed editor buttons cover the Timeline.");
     });
     test("OSC editor footer remains clipped and automation geometry unchanged",[] {

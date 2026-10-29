@@ -141,6 +141,7 @@ struct ColumnUtilities::Strip final : juce::Component {
                                       col.type==ColumnType::audio);
         panLearnHotspot.setLearnActive(owner.isQuickLearnActive() &&
                                      col.type==ColumnType::audio && !col.collapsed);
+        refreshLearnVisuals();
         phase.setVisible(col.type==ColumnType::audio && !col.collapsed);
         masterSend.setVisible(col.type==ColumnType::audio && !col.collapsed);
         dataMute.setVisible(col.type==ColumnType::midi || col.type==ColumnType::osc);
@@ -159,6 +160,14 @@ struct ColumnUtilities::Strip final : juce::Component {
             controlEdit.setButtonText("Edit Q set");
         }
         syncRouting();
+    }
+    void refreshLearnVisuals() {
+        const auto colour=owner.quickLearnAccent();
+        const bool bright=owner.quickLearnPulseIsBright();
+        gainLearnHotspot.setLearnPresentation(colour,
+            owner.isQuickLearnTargetSelected(ControlTarget::columnGain,id),bright);
+        panLearnHotspot.setLearnPresentation(colour,
+            owner.isQuickLearnTargetSelected(ControlTarget::columnPan,id),bright);
     }
     void syncRouting() {
         const auto& col=owner.show.columns[index]; int channels=2;
@@ -333,6 +342,9 @@ void ColumnUtilities::refresh() {
     }
 
     resized(); repaint();
+}
+void ColumnUtilities::refreshLearnVisuals() {
+    for (auto& strip:strips) strip->refreshLearnVisuals();
 }
 void ColumnUtilities::syncScroll(int x) { if (scrollX!=x) { scrollX=x; resized(); repaint(); } }
 void ColumnUtilities::refreshRouting() {
