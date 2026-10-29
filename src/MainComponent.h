@@ -192,6 +192,7 @@ public:
     void refresh();
     void syncScroll(int);
     void refreshRouting();
+    void refreshLearnVisuals();
     void refreshMeters();
     void resized() override;
     void paint(juce::Graphics&) override;
@@ -283,6 +284,12 @@ public:
     void chooseQuickLearnGuiTarget(ControlTarget target,int columnId=0);
     bool isQuickLearnActive() const noexcept {return quickLearnMode!=QuickLearnMode::off;}
     bool isQuickLearnAwaitingInput() const noexcept {return quickLearnFunctionId>0 && isQuickLearnActive();}
+    juce::Colour quickLearnAccent() const noexcept {
+        return quickLearnMode==QuickLearnMode::osc ? palette::purple : palette::amber;
+    }
+    bool quickLearnPulseIsBright() const noexcept {return quickLearnPulseBright;}
+    bool isQuickLearnTargetSelected(ControlTarget target,int columnId=0) const;
+    void updateQuickLearnVisuals();
     void refreshQuickLearnTargets();
     void completeQuickLearn(const ControlEvent& event);
     void finishQuickLearn();
@@ -395,9 +402,13 @@ private:
             setMouseCursor(juce::MouseCursor::UpDownResizeCursor);
         }
         void paint(juce::Graphics& g) override {
-            g.setColour(palette::muted);
-            g.fillRoundedRectangle(getLocalBounds().toFloat()
-                .withSizeKeepingCentre(86,3),1.5f);
+            // Recessed splitter, not a detached bright scrollbar-like line.
+            const auto area=getLocalBounds().toFloat();
+            g.setColour(palette::background.withAlpha(.92f));
+            g.fillRoundedRectangle(area.reduced(0.0f,1.0f),3.0f);
+            g.setColour(palette::line.withAlpha(.80f));
+            g.fillRoundedRectangle(area.withSizeKeepingCentre(57.0f,3.0f),
+                                   1.5f);
         }
         void mouseDown(const juce::MouseEvent&) override {
             original=owner.workspaceLayout().effectiveTimelineAdjustment;
@@ -435,6 +446,9 @@ private:
     enum class QuickLearnMode {off,midi,osc};
     QuickLearnMode quickLearnMode=QuickLearnMode::off;
     int quickLearnFunctionId=0;
+    int quickLearnArmedEntryId=0;
+    int quickLearnPulseTicks=0;
+    bool quickLearnPulseBright=true;
     juce::String quickLearnFeedback;
     bool controlLearnArmed=false,oscLearnArmed=false;
     std::optional<ControlEvent> learnedInput;

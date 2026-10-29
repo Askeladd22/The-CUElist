@@ -77,7 +77,10 @@ Columns can be collapsed individually or together with **Collapse all** in the c
 the upper-right corner next to the independent MIDI/OSC activity monitors.
 The Inspector temporarily shows a scrollable list of functions and mappable
 parameters. The supported controls in the normal GUI (GO, PANIC, Master Gain,
-Master Pan, and each audio-strip Gain/Pan) also receive amber click targets:
+Master Pan, and each audio-strip Gain/Pan) also receive protocol-coloured
+click targets: **amber/yellow for MIDI Learn, violet for OSC Learn**. The
+selected GUI parameter and its Inspector entry blink while awaiting input,
+so you can immediately tell which function will be assigned next:
 click the highlighted GUI control *or* an Inspector function, then move/press
 a hardware control or send one OSC message. The original button, fader or
 pan value is not operated by the selection click.
