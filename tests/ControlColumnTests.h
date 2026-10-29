@@ -1,8 +1,252 @@
 #pragma once
 #include "MainComponent.h"
 #include "ControlMapping.h"
+#include "ControlPresetArchive.h"
 
 void controlColumnTests() {
+    test("Legacy Control Column lock migrates without implicitly activating dormant Q sets",[] {
+        Show original=makeShow();
+        addColumn(original,ColumnType::control,"Legacy control");
+        addColumn(original,ColumnType::midi,"External MIDI");
+        addRow(original,"Next Q");
+        const int controlIndex=1;
+        auto& col=original.columns[(size_t)controlIndex];
+        col.controlLocked=true;
+        col.controlPriority=1;
+        col.controlDefaultSourceRowId=original.rows.front().id;
+        ControlBinding old;
+        old.id=original.controls.nextId++;
+        old.deviceId="fader-A";old.kind=ControlKind::cc;
+        old.channel=1;old.number=20;
+        old.target=ControlTarget::midiCc;
+        old.targetColumnId=original.columns[2].id;
+        old.outputNumber=74;old.outputChannel=9;
+        old.minimum=0;old.maximum=127;
+        old.takeover=ControlTakeover::jump;
+        col.controlDefaultSet.bindings.push_back(old);
+        // Old locked columns legitimately shadowed global mappings on the
+        // same hardware control. Migration must preserve the old winner and
+        // retain, but disable, the shadowed direct input.
+        ControlBinding shadowed=old;
+        shadowed.id=original.controls.nextId++;
+        shadowed.target=ControlTarget::masterGain;
+        shadowed.targetColumnId=0;
+        shadowed.minimum=0;shadowed.maximum=1;
+        original.controls.bindings.push_back(shadowed);
+        ControlBinding dormant=old;
+        dormant.id=original.controls.nextId++;
+        dormant.deviceId="fader-B";dormant.number=25;
+        original.rows.front().cells[controlIndex].controlSet=
+            ControlSet{{dormant}};
+        check(validateShow(original).wasOk(),
+              "Legacy locked show fixture is invalid");
+        Show migrated=original;
+        bool changed=false;
+        check(migrateLegacyControlColumns(migrated,changed).wasOk() && changed,
+              "Legacy migration failed");
+        check(!migrated.columns[controlIndex].controlLocked &&
+              migrated.columns[controlIndex].controlPriority==2 &&
+              migrated.columns[controlIndex].controlDefaultSet.bindings.empty(),
+              "Per-column lock was not retired");
+        check(migrated.controls.functions.size()==1 &&
+              migrated.controls.bindings.size()==2 &&
+              !migrated.controls.bindings.front().enabled &&
+              migrated.controls.bindings.back().enabled &&
+              migrated.controls.templates.size()==1 &&
+              !migrated.rows.front().cells[controlIndex].controlSet,
+              "Legacy global input or dormant Q set was lost/activated");
+        const auto& function=migrated.controls.functions.front();
+        check(function.destination.target==ControlTarget::midiCc &&
+              function.destination.outputNumber==74 &&
+              function.destination.outputChannel==9,
+              "Migration altered the destination's MIDI CC 74");
+        ControlMappingEngine mapping;
+        mapping.setSettings(migrated.controls);
+        mapping.setLayers(buildControlLayers(migrated));
+        mapping.setActiveCue(migrated.rows.front().id,0);
+        const auto* effective=mapping.matched(
+            {"fader-A",ControlKind::cc,1,20,85,false});
+        check(effective && effective->functionId==function.id &&
+              effective->outputNumber==74,
+              "Default Map did not inherit the migrated input");
+        check(mapping.matched({"fader-B",ControlKind::cc,1,25,85,false})==nullptr,
+              "Dormant Q set unexpectedly fired after migration");
+        check(validateShow(migrated).wasOk(),
+              "Migrated Control Map failed complete Show validation");
+        const auto snapshot=encodeShow(migrated);
+        Show loaded;
+        check(decodeShow(snapshot,loaded).wasOk() &&
+              loaded.controls.functions.size()==1 &&
+              loaded.controls.templates.size()==1,
+              "Migrated map or archived template did not persist");
+        const auto before=encodeShow(migrated);
+        changed=true;
+        check(migrateLegacyControlColumns(migrated,changed).wasOk() &&
+              !changed && encodeShow(migrated)==before,
+              "Legacy migration was not idempotent");
+        check(original.columns[controlIndex].controlLocked &&
+              original.rows.front().cells[controlIndex].controlSet.has_value(),
+              "Migration mutated the input model");
+    });
+
+    test("Portable controller preset excludes names and preserves cue overrides",[] {
+        auto source=makeShow();
+        addColumn(source,ColumnType::midi,"MIDI Out");
+        ControlFunction f;f.id=source.controls.nextId++;
+        f.name="Resolume Brightness";
+        f.destination.target=ControlTarget::midiCc;
+        f.destination.targetColumnId=source.columns[1].id;
+        f.destination.outputChannel=9;
+        f.destination.outputNumber=74;
+        f.destination.maximum=127;
+        source.controls.functions.push_back(f);
+        ControlBinding input;input.id=source.controls.nextId++;
+        input.functionId=f.id;input.deviceId="physical-A";
+        input.number=20;input.target=f.destination.target;
+        input.targetColumnId=f.destination.targetColumnId;
+        source.controls.bindings.push_back(input);
+        const auto archive=exportControllerPreset(source);
+        check(!archive.contains("Resolume Brightness") &&
+              archive.contains("TheCuelistControllerPreset"),
+              "Portable preset leaked project-specific function names");
+        auto project=makeShow();
+        addColumn(project,ColumnType::midi,"Output");
+        addColumn(project,ColumnType::control,"Control");
+        ControlFunction existing=f;
+        existing.name="Project-specific name";
+        existing.destination.targetColumnId=project.columns[1].id;
+        project.controls.functions.push_back(existing);
+        project.controls.nextId=3;
+        ControlBinding local=input;local.id=project.controls.nextId++;
+        local.deviceId="physical-B";local.number=30;
+        local.targetColumnId=project.columns[1].id;
+        project.rows[0].cells[2].controlSet=ControlSet{{local}};
+        check(validateShow(project).wasOk(),"Controller preset fixture invalid");
+        check(importControllerPreset(archive,project).wasOk(),
+              "Unable to import a preset with a compatible MIDI column");
+        check(project.controls.functions[0].name=="Project-specific name" &&
+              project.controls.functions[0].destination.outputNumber==74 &&
+              project.controls.functions[0].destination.outputChannel==9 &&
+              project.controls.bindings.size()==1 &&
+              project.controls.bindings[0].deviceId=="physical-A" &&
+              project.rows[0].cells[2].controlSet->bindings.front().deviceId=="physical-B",
+              "Import changed project labels, unrelated cue override or MIDI routing");
+        auto invalid=makeShow(); // no compatible MIDI destination
+        const auto oldName=invalid.name;
+        check(importControllerPreset(archive,invalid).failed() &&
+              invalid.controls.functions.empty() && invalid.name==oldName,
+              "Failed preset import mutated an incompatible project");
+    });
+    test("OSC input decodes numeric and boolean messages into learned addresses",[] {
+        OscEvent event;event.address="/show/brightness";
+        OscValue value;value.type=OscValueType::decimal;value.decimal=.75f;
+        event.arguments.push_back(value);
+        const auto bytes=encodeOscMessage(event);
+        OscControlInput::Packet packet;
+        check(OscControlInput::decode(bytes.data(),(int)bytes.size(),packet) &&
+              juce::String(packet.address.data())=="/show/brightness" &&
+              packet.value>=94 && packet.value<=97,
+              "OSC numeric control input decoded an incorrect address/value");
+        OscControlInput input;
+        input.ingestForTest(bytes.data(),(int)bytes.size());
+        ControlEvent incoming;
+        check(input.poll(incoming) && incoming.kind==ControlKind::osc &&
+              incoming.channel==1 && incoming.number==0 &&
+              incoming.deviceId=="/show/brightness" &&
+              incoming.value==packet.value,
+              "OSC Learn did not receive the parsed control event");
+        event.arguments[0].type=OscValueType::boolean;
+        event.arguments[0].boolean=true;
+        const auto on=encodeOscMessage(event);
+        check(OscControlInput::decode(on.data(),(int)on.size(),packet) &&
+              packet.value==127,"OSC true must trigger a full-scale action");
+        event.arguments[0].boolean=false;
+        const auto off=encodeOscMessage(event);
+        check(OscControlInput::decode(off.data(),(int)off.size(),packet) &&
+              packet.value==0,"OSC false must release a momentary input");
+        const uint8_t malformed[]={'/',0,0,0,',','f',0,0,0,0,0,0};
+        check(!OscControlInput::decode(malformed,sizeof(malformed),packet) ||
+              packet.address[0]=='/',
+              "Malformed OSC packet caused invalid memory access");
+    });
+    test("Abstract function preserves MIDI destination when local fader changes",[] {
+        ControlSettings settings;
+        ControlFunction function;
+        function.id=1;function.name="Resolume Brightness";
+        function.destination.target=ControlTarget::midiCc;
+        function.destination.outputNumber=74;
+        function.destination.outputChannel=9;
+        function.destination.minimum=0;
+        function.destination.maximum=127;
+        settings.functions.push_back(function);
+        settings.nextId=5;
+        ControlBinding global;global.id=2;global.deviceId="hardware-A";
+        global.number=11;global.takeover=ControlTakeover::jump;
+        global.functionId=1;settings.bindings.push_back(global);
+        ControlBinding override=global;
+        override.id=3;override.deviceId="hardware-B";override.number=25;
+        override.target=ControlTarget::oscFloat;override.outputNumber=12;
+        override.outputChannel=4;override.oscAddress="/wrong-route";
+        override.minimum=0.25f;override.maximum=0.75f;
+        ControlLayer local;local.columnId=100;local.cueId=202;
+        local.priority=2;local.set.bindings.push_back(override);
+        ControlMappingEngine mapping;
+        mapping.setSettings(settings);mapping.setLayers({local});
+        const ControlEvent a{"hardware-A",ControlKind::cc,1,11,64,false};
+        const ControlEvent b{"hardware-B",ControlKind::cc,1,25,64,false};
+        mapping.setActiveCue(201,0);
+        check(mapping.matched(a)!=nullptr && mapping.matched(b)==nullptr,
+              "Default Map not active on first cue");
+        mapping.setActiveCue(202,0);
+        check(mapping.matched(a)==nullptr && mapping.matched(b)!=nullptr,
+              "Cue override did not replace the function input");
+        const auto action=mapping.resolve(b);
+        check(action && action->binding.functionId==1 &&
+              action->binding.outputNumber==74 &&
+              action->binding.outputChannel==9 &&
+              action->binding.target==ControlTarget::midiCc &&
+              action->binding.minimum==0.0f &&
+              action->binding.maximum==127.0f &&
+              action->binding.oscAddress==function.destination.oscAddress,
+              "Local fader changed the function destination, CC, OSC route or range");
+        mapping.setActiveCue(203,0);
+        check(mapping.matched(a)!=nullptr && mapping.matched(b)==nullptr,
+              "Cue transition retained a stale Control Set override");
+        const auto preview=mapping.effectiveForCue(202);
+        const auto found=std::find_if(preview.begin(),preview.end(),
+            [](const EffectiveControl& c){return c.binding.functionId==1;});
+        check(found!=preview.end() && found->overrides && found->columnId==100,
+              "Control Set preview lost provenance of the function override");
+    });
+    test("Abstract function and cue override persist in optional v10 fields",[] {
+        auto show=makeShow();
+        addColumn(show,ColumnType::control,"Lighting");
+        ControlFunction f;f.id=show.controls.nextId++;
+        f.name="Resolume Brightness";
+        f.destination.target=ControlTarget::midiCc;
+        addColumn(show,ColumnType::midi,"Resolume");
+        f.destination.targetColumnId=show.columns.back().id;
+        f.destination.outputNumber=74;
+        f.destination.outputChannel=7;
+        f.destination.maximum=127;
+        show.controls.functions.push_back(f);
+        ControlBinding input;input.id=show.controls.nextId++;
+        input.deviceId="fader-A";input.number=10;input.functionId=f.id;
+        input.target=f.destination.target;input.targetColumnId=f.destination.targetColumnId;
+        show.controls.bindings.push_back(input);
+        ControlBinding replacement=input;replacement.id=show.controls.nextId++;
+        replacement.deviceId="fader-B";replacement.number=30;
+        show.rows[0].cells[1].controlSet=ControlSet{{replacement}};
+        check(validateShow(show).wasOk(),"Abstract mapping invalidates v10 show");
+        Show loaded;
+        check(decodeShow(encodeShow(show),loaded).wasOk(),
+              "Abstract mapping cannot survive a project roundtrip");
+        check(loaded.controls.functions.size()==1 &&
+              loaded.controls.functions[0].destination.outputNumber==74 &&
+              loaded.rows[0].cells[1].controlSet &&
+              loaded.rows[0].cells[1].controlSet->bindings.front().functionId==f.id,
+              "Function identity or cue override was lost on reload");
+    });
     test("Control Column Q mappings inherit and override only matching hardware inputs",[] {
         ControlBinding first; first.id=11; first.deviceId="controller";first.number=1;
         first.target=ControlTarget::columnGain;first.takeover=ControlTakeover::jump;

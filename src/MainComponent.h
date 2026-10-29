@@ -7,6 +7,7 @@
 #include "MixerControls.h"
 #include "WorkspaceLayout.h"
 #include "MidiInputManager.h"
+#include "OscControlInput.h"
 #include "ControlOutputRouter.h"
 #include "ControlDispatchPolicy.h"
 #include <set>
@@ -266,9 +267,16 @@ public:
     bool addMappingBinding(ControlBinding, const juce::String& functionName={});
     bool renameControlFunction(int functionId,const juce::String& name);
     bool deleteMappingBinding(int);
+    int createAbstractControlFunction(const juce::String& name,ControlBinding destination);
+    bool updateAbstractControlFunction(int id,const juce::String& name,
+                                       ControlBinding destination);
+    juce::String exportControlPresetText() const;
+    juce::Result importControlPresetText(const juce::String&);
     int createMappingPreset(const juce::String&);
     bool assignMappingPreset(int rowId,int presetId);
-    void armControlLearn() { controlLearnArmed=true; }
+    void armControlLearn() { oscLearnArmed=false;controlLearnArmed=true; }
+    bool startOscControlInput(int port);
+    void armOscControlLearn() { controlLearnArmed=false;oscLearnArmed=true; }
     std::optional<ControlEvent> consumeLearnedInput() { auto result=learnedInput; learnedInput.reset(); return result; }
     void dispatchControlForTest(const ControlEvent& event) { dispatchControl(event); }
     int activeCueMappingId() const noexcept { return activeCueId; }
@@ -342,6 +350,7 @@ private:
     std::array<std::unique_ptr<juce::TextButton>,12> cuelistCloseButtons;
     juce::TextButton cuelistOverflowButton{"..."},addCuelistButton{"+"};
     juce::TextButton undoButton{"Undo"},redoButton{"Redo"};
+    juce::TextButton globalMidiLearn{"M Learn"},globalOscLearn{"O Learn"};
     void refreshCuelistTabs();
     void showCuelistOverflowMenu();
     std::unique_ptr<GuideWindow> userGuideWindow;
@@ -403,10 +412,11 @@ private:
     bool rowSettings=false;
     int nextCue=0;
     MidiInputManager midiInput;
+    OscControlInput oscInput;
     ControlMappingEngine controlMapping;
     ControlOutputRouter controlOutput;
     int activeCueId=0;
-    bool controlLearnArmed=false;
+    bool controlLearnArmed=false,oscLearnArmed=false;
     std::optional<ControlEvent> learnedInput;
     juce::Component::SafePointer<juce::DialogWindow> controlDialog;
     PhysicalControlEdges physicalEdges;
@@ -445,9 +455,9 @@ private:
     int editorX=0;
     float displayPeak=0;
     int midiRefreshTicks=0;
-    uint64_t lastMidiRx=0,lastMidiTx=0,lastOscTx=0;
+    uint64_t lastMidiRx=0,lastMidiTx=0,lastOscTx=0,lastOscRx=0;
     bool activityInitialized=false;
-    double midiRxUntil=0,midiTxUntil=0,oscTxUntil=0;
+    double midiRxUntil=0,midiTxUntil=0,oscTxUntil=0,oscRxUntil=0;
     unsigned midiInputReconnectAttempts=0;
     int recoveryTicks=0;
     bool recoveryEnabled=false;

@@ -29,6 +29,31 @@ The native interface uses **Exo 2** for compact operational labels (no smaller t
 
 Compact icon controls now share a subdued **Midnight Slate** surface: neutral low-contrast outlines at rest, slightly brighter on hover, light semantic tint when toggled, muted disabled ink and a distinct keyboard-focus indicator. The symbol remains the visual priority; Play, Stop, Mute, Snap, row/column controls, Inspector grip and control lock retain their operational meanings, tooltip text and hitboxes. Dedicated **GO / PANIC** and ordinary labelled buttons deliberately keep their own treatment. Noto Sans Symbols 2 and Noto Sans Math remain *explicitly selected* for their corresponding glyphs, not font fallbacks. See [Unicode symbol audit](docs/unicode-symbol-audit.md).
 
+### Abstract Control Mapping and Default Map
+
+The controller system supports named project functions with stable IDs and
+independent routing: **physical MIDI/OSC input → function → output target**.
+A global **Default Map** assigns hardware inputs; a cue's Control Column cell
+may override a function's *input* without modifying its destination (for
+example Resolume brightness remains MIDI CC 74 on its configured channel).
+Overrides do not carry forward between cues unless copied into their Control
+Sets. The effective preview identifies inherited vs local assignments.
+
+Global **M Learn / O Learn** controls sit beside the top-right activity
+monitors; the Control Set editor provides its own scoped MIDI/OSC Learn.
+The OSC receiver starts only on a configured UDP port, accepts bounded
+numeric/boolean OSC 1.0 input and updates genuine OSC RX activity. It is
+**unauthenticated**: use on a trusted LAN with appropriate firewall rules.
+Name-free controller routing presets can be exported and imported without
+overwriting project-specific function labels or unrelated local Control Sets.
+The old per-column Control Lock is removed from the operator interface.
+On project activation, its global bindings migrate transactionally into
+named Default Map functions; dormant cue-specific sets are archived as
+reusable Control Sets rather than activated unexpectedly. Review and save
+the migrated project explicitly: the original file is not overwritten
+automatically. Legacy fields remain decoder-compatible, and a separate
+global edit lock is reserved for a later explicitly defined policy.
+
 ### The workspace
 
 A shared dark editor component is used for cue/column/Cuelist renames, BPM and multiline tempo maps. Control Mapping uses labelled sections, contextual MIDI/OSC target fields and an explicit empty-list state. The left sidebar contains New, Open, Save, Audio devices, Preferences, Control Mapping, the next-cue indicator and GO/Panic. The upper bar displays the current Cuelist tabs, Undo/Redo, a 24-hour clock, CPU/RAM telemetry and MIDI/OSC activity indicators.

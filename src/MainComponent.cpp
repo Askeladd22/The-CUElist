@@ -29,12 +29,12 @@ juce::String duration(double seconds) {
 MainComponent::MainComponent(bool startAudio) {
     setLookAndFeel(&theme); setWantsKeyboardFocus(true); setSize(1440,900);
     for (juce::Component* c : std::initializer_list<juce::Component*>{&openButton,&saveButton,&newButton,&addRowButton,&addColumnButton,
-         &goButton,&panicButton,&deviceButton,&controlButton,&midiLearnTop,&oscLearnTop,&collapseAllButton,&inspectorSideTab,
-         &cuelistOverflowButton,&addCuelistButton,&undoButton,&redoButton,&helpButton,&dockResize,&timelineResize,&importButton,&midiEditButton,&oscEditButton,&playCellButton,&stopCellButton,&clearButton,&tempoButton,&applyButton,
+         &goButton,&panicButton,&deviceButton,&controlButton,&collapseAllButton,&inspectorSideTab,
+         &cuelistOverflowButton,&addCuelistButton,&undoButton,&redoButton,&globalMidiLearn,&globalOscLearn,&helpButton,&dockResize,&timelineResize,&importButton,&midiEditButton,&oscEditButton,&playCellButton,&stopCellButton,&clearButton,&tempoButton,&applyButton,
          &cellTab,&rowTab,&rowGain,&rowBehaviour,&rowMute,&rowLoop,&rowName,&cellName,&bpm,&cueNotes,&behaviour,&follow,&loop,&cellAutoStop,&gainDb,&viewport,&timeline,&utilities,
          &clipCollapseButton,&clipCloseButton,&cueHeaders,&columnHeaders,&cueMetrics,&preflightButton,&diagnosticsButton,&preferencesButton,&projectNameLabel}) addAndMakeVisible(c);
-    for (juce::TextButton* b : std::initializer_list<juce::TextButton*>{&openButton,&saveButton,&newButton,&addRowButton,&addColumnButton,&goButton,&panicButton,&deviceButton,&controlButton,&midiLearnTop,&oscLearnTop,&collapseAllButton,&inspectorSideTab,
-                    &cuelistOverflowButton,&addCuelistButton,&undoButton,&redoButton,&helpButton,
+    for (juce::TextButton* b : std::initializer_list<juce::TextButton*>{&openButton,&saveButton,&newButton,&addRowButton,&addColumnButton,&goButton,&panicButton,&deviceButton,&controlButton,&collapseAllButton,&inspectorSideTab,
+                    &cuelistOverflowButton,&addCuelistButton,&undoButton,&redoButton,&globalMidiLearn,&globalOscLearn,&helpButton,
                     &importButton,&midiEditButton,&oscEditButton,&playCellButton,&stopCellButton,&clearButton,&tempoButton,&applyButton,
                     &preflightButton,&diagnosticsButton,&preferencesButton}) b->setWantsKeyboardFocus(false);
     viewport.setViewedComponent(&grid,false); viewport.setScrollBarsShown(true,true);
@@ -277,21 +277,26 @@ MainComponent::MainComponent(bool startAudio) {
     redoButton.onClick=[this] {redoEdit();};
     undoButton.setEnabled(false);
     redoButton.setEnabled(false);
-    midiLearnTop.setName("globalMidiLearn");
-    oscLearnTop.setName("globalOscLearn");
-    midiLearnTop.setTooltip("Learn a physical input for the project's Default Map.");
-    oscLearnTop.setTooltip("OSC input and OSC Learn are not implemented yet.");
-    oscLearnTop.setEnabled(false);
-    midiLearnTop.setColour(juce::TextButton::buttonOnColourId,palette::amber);
-    midiLearnTop.onClick=[this] {
-        if (!midiInput.connected()) {
-            status="Select and connect a MIDI input before MIDI Learn.";
-            repaint(); return;
-        }
+    globalMidiLearn.setName("globalMidiLearn");
+    globalOscLearn.setName("globalOscLearn");
+    globalMidiLearn.setTooltip("Learn a MIDI input for the Default Map. Select its function in the mapping panel.");
+    globalOscLearn.setTooltip("Learn an OSC address for the Default Map; configure UDP input port in the mapping panel.");
+    globalMidiLearn.onClick=[this] {
         openControlPanel(false);
-        learnedInput.reset();armControlLearn();
-        status="GLOBAL MIDI LEARN ARMED: move a controller control.";
-        midiLearnTop.setToggleState(true,juce::dontSendNotification);
+        if (!midiInput.connected()) {
+            controlLearnArmed=false;
+            status="Select and connect a MIDI input before arming Default Map Learn.";
+            repaint();
+            return;
+        }
+        armControlLearn();
+        repaint();
+    };
+    globalOscLearn.onClick=[this] {
+        openControlPanel(false);
+        if (show.controls.oscInputPort>0 && oscInput.port()>0)
+            armOscControlLearn();
+        else status="Configure and activate an OSC input port in Control Mapping first.";
         repaint();
     };
     controlButton.setName("controlMapping");
@@ -454,7 +459,7 @@ void MainComponent::paint(juce::Graphics& g) {
     g.setColour(palette::line.withAlpha(.85f));
     g.drawRoundedRectangle(monitor,5.0f,1.0f);
     g.drawVerticalLine(w-153,13.0f,59.0f);
-    label(g,"MIDI / OSC ACTIVITY",{statusX+10,11,197,14},
+    label(g,"I/O ACTIVITY",{statusX+10,11,82,14},
           10,palette::muted,true);
     const double now=juce::Time::getMillisecondCounterHiRes();
     const auto activity=[&](int x,int y,const juce::String& title,bool active) {
@@ -463,10 +468,10 @@ void MainComponent::paint(juce::Graphics& g) {
         label(g,title,{x+14,y,83,17},11,
               active ? palette::text : palette::muted,true);
     };
-    activity(statusX+12,26,"MIDI RX",now<midiRxUntil);
-    activity(statusX+112,26,"MIDI TX",now<midiTxUntil);
-    activity(statusX+12,44,"OSC RX",false); // No OSC input endpoint yet.
-    activity(statusX+112,44,"OSC TX",now<oscTxUntil);
+    activity(statusX+12,30,"MIDI RX",now<midiRxUntil);
+    activity(statusX+112,30,"MIDI TX",now<midiTxUntil);
+    activity(statusX+12,47,"OSC RX",now<oscRxUntil);
+    activity(statusX+112,47,"OSC TX",now<oscTxUntil);
     const bool audioConnected=engine.connected.load();
     label(g,"AUDIO",{w-137,13,119,16},10,palette::muted,true);
     g.setColour(audioConnected ? palette::teal : palette::red);
@@ -665,9 +670,13 @@ void MainComponent::resized() {
     refreshCuelistTabs();
     // Undo/Redo live in the unused upper-right band before the clock,
     // separate from the 43px-high Cuelist tab row.
-    helpButton.setBounds(getWidth()-966,10,61,25);
-    undoButton.setBounds(getWidth()-899,10,51,25);
-    redoButton.setBounds(getWidth()-844,10,51,25);
+    helpButton.setBounds(getWidth()-831,10,61,25);
+    undoButton.setBounds(getWidth()-764,10,51,25);
+    redoButton.setBounds(getWidth()-709,10,51,25);
+    const int activityX=getWidth()-365;
+    // Leave separation from the I/O ACTIVITY caption and the audio card.
+    globalMidiLearn.setBounds(activityX+95,10,58,20);
+    globalOscLearn.setBounds(activityX+154,10,58,20);
     // Collapse-all follows the pinned header after JUCE has computed the
     // actual left scrollbar inset (see placement below).
     const bool allCollapsed=std::all_of(show.columns.begin(),show.columns.end(),
@@ -1184,7 +1193,14 @@ void MainComponent::timerCallback() {
         if (!consumeMidiLearnEvent(controlLearnArmed,learnedInput,control))
             dispatchControl(control);
     }
-    midiLearnTop.setToggleState(controlLearnArmed,juce::dontSendNotification);
+    // OSC datagrams are decoded off-thread and safely dispatched here.
+    // Learn consumes the first input without triggering a live cue.
+    int oscProcessed=0;
+    while (oscProcessed++<256 && oscInput.poll(control)) {
+        if (oscLearnArmed) {
+            learnedInput=control;oscLearnArmed=false;
+        } else dispatchControl(control);
+    }
     if (++midiRefreshTicks>=25) {
         midiRefreshTicks=0; engine.refreshMidiOutputs();
         // Take one inventory snapshot per refresh. The policy checks exact
@@ -1214,14 +1230,20 @@ void MainComponent::timerCallback() {
     const uint64_t rx=midiInput.receivedCount();
     const uint64_t tx=diag.midiOutputSent;
     const uint64_t oscTx=static_cast<uint64_t>(diag.oscSent)+controlOutput.sentCount();
+    const uint64_t oscRx=oscInput.receivedCount();
     const double now=juce::Time::getMillisecondCounterHiRes();
     if(activityInitialized) {
         if(rx>lastMidiRx) midiRxUntil=now+170.0;
         if(tx>lastMidiTx) midiTxUntil=now+170.0;
         if(oscTx>lastOscTx) oscTxUntil=now+170.0;
+        if(oscRx>lastOscRx) oscRxUntil=now+170.0;
     }
-    lastMidiRx=rx; lastMidiTx=tx; lastOscTx=oscTx;
+    lastMidiRx=rx; lastMidiTx=tx; lastOscTx=oscTx; lastOscRx=oscRx;
     activityInitialized=true;
+    globalMidiLearn.setColour(juce::TextButton::buttonColourId,
+        controlLearnArmed ? palette::amber.withAlpha(.55f) : palette::raised);
+    globalOscLearn.setColour(juce::TextButton::buttonColourId,
+        oscLearnArmed ? palette::amber.withAlpha(.55f) : palette::raised);
     utilities.syncScroll(viewport.getViewPositionX()); utilities.refreshRouting();
     grid.repaint(); cueHeaders.repaint(); columnHeaders.repaint();
     displayPeak=std::max(engine.peak.load(),displayPeak*.88f);

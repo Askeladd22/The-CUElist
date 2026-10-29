@@ -1,5 +1,6 @@
 #include "MainComponent.h"
 #include "ControlLayerBuilder.h"
+#include "ControlPresetArchive.h"
 #include <algorithm>
 #include <cmath>
 
@@ -12,7 +13,24 @@ void MainComponent::resetActiveMapping() {
     controlMapping.setActiveCue(0,0);
 }
 
+bool MainComponent::startOscControlInput(int port) {
+    if (port<1 || port>65535) return false;
+    if (!oscInput.startListening(port)) {
+        status="OSC input port unavailable. Choose another UDP port.";
+        return false;
+    }
+    show.controls.oscInputPort=port;
+    dirty=true;
+    status="OSC control listener enabled on UDP "+juce::String(port)+".";
+    repaint();
+    return true;
+}
+
 void MainComponent::refreshControlSettings() {
+    if (show.controls.oscInputPort==0) oscInput.stopListening();
+    else if (oscInput.port()!=show.controls.oscInputPort &&
+             !oscInput.startListening(show.controls.oscInputPort))
+        status="Saved OSC input port is unavailable.";
     controlMapping.setSettings(show.controls);
     // Resolution order and preset selection are pure, tested show-model
     // operations; device ownership/reconnection stays on the UI thread.
@@ -37,7 +55,63 @@ juce::Result MainComponent::selectControlInput(const juce::String& id) {
     repaint(); return result;
 }
 
-bool MainComponent::addMappingBinding(ControlBinding b,const juce::String& name) {
+juce::String MainComponent::exportControlPresetText() const {
+    return exportControllerPreset(show);
+}
+juce::Result MainComponent::importControlPresetText(const juce::String& text) {
+    auto candidate=show;
+    const auto result=importControllerPreset(text,candidate);
+    if(result.failed()) {status=result.getErrorMessage();return result;}
+    show=std::move(candidate);
+    refreshControlSettings();dirty=true;
+    status="Default Map preset imported; project function names and cue overrides preserved.";
+    refresh();return juce::Result::ok();
+}
+
+int MainComponent::createAbstractControlFunction(
+        const juce::String& name,ControlBinding destination) {
+    const auto title=name.trim();
+    if (title.isEmpty() || title.length()>120) return 0;
+    for (const auto& column:show.columns)
+        if (column.controlLocked) {
+            status="Unlock legacy Control Columns before adding named functions.";
+            return 0;
+        }
+    auto candidate=show;
+    // The source fields are *never* part of the output function identity.
+    destination.id=0;destination.functionId=0;
+    destination.deviceId={};destination.scope=ControlScope::global;
+    destination.scopeId=0;
+    const int id=candidate.controls.nextId++;
+    candidate.controls.functions.push_back({id,title,std::move(destination)});
+    if (const auto valid=validateShow(candidate);valid.failed()) {
+        status=valid.getErrorMessage();return 0;
+    }
+    show=std::move(candidate);refreshControlSettings();dirty=true;
+    status="Abstract function created: "+title;refresh();return id;
+}
+bool MainComponent::updateAbstractControlFunction(
+        int id,const juce::String& name,ControlBinding destination) {
+    const auto title=name.trim();
+    if (title.isEmpty() || title.length()>120) return false;
+    auto candidate=show;
+    const auto it=std::find_if(candidate.controls.functions.begin(),
+        candidate.controls.functions.end(),
+        [id](const ControlFunction& f){return f.id==id;});
+    if (it==candidate.controls.functions.end()) return false;
+    destination.id=0;destination.functionId=0;
+    destination.deviceId={};destination.scope=ControlScope::global;
+    destination.scopeId=0;
+    it->name=title;it->destination=std::move(destination);
+    if (const auto valid=validateShow(candidate);valid.failed()) {
+        status=valid.getErrorMessage();return false;
+    }
+    show=std::move(candidate);refreshControlSettings();dirty=true;
+    status="Function route updated without changing its hardware inputs.";
+    refresh();return true;
+}
+
+bool MainComponent::addMappingBinding(ControlBinding b) {
     auto candidate=show;
     b.id=candidate.controls.nextId++;
     if (b.functionId==0) {
@@ -237,7 +311,8 @@ bool MainComponent::applyControlSetTemplate(int row,int column,int templateId) {
 bool MainComponent::setControlColumnLocked(int column,bool locked,int sourceRow) {
     if (column<0 || column>=(int)show.columns.size() ||
         show.columns[(size_t)column].type!=ColumnType::control ||
-        sourceRow<0 || sourceRow>=(int)show.rows.size()) return false;
+        sourceRow<0 || sourceRow>=(int)show.rows.size() ||
+        (locked && !show.controls.functions.empty())) return false;
     auto candidate=show;
     auto& col=candidate.columns[(size_t)column];
     if (locked && !col.controlLocked) {
