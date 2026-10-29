@@ -245,13 +245,25 @@ inline juce::Result validateControls(const ControlSettings& s,
             d.outputNumber<0 || d.outputNumber>127 ||
             d.oscPort<1 || d.oscPort>65535 || d.oscHost.isEmpty() ||
             !d.oscAddress.startsWithChar('/') ||
-            !std::isfinite(d.minimum) || !std::isfinite(d.maximum) || d.minimum>d.maximum)
+            !std::isfinite(d.minimum) || !std::isfinite(d.maximum) || d.minimum>d.maximum ||
+            ((d.target==ControlTarget::masterGain || d.target==ControlTarget::columnGain) &&
+             (d.minimum<0 || d.maximum>4)) ||
+            ((d.target==ControlTarget::masterPan || d.target==ControlTarget::columnPan) &&
+             (d.minimum< -1 || d.maximum>1)))
             return juce::Result::fail("Invalid named control function.");
     }
     for (const auto& t:s.templates)
         if (t.id<1 || t.id>=s.nextId || !ids.insert(t.id).second ||
             t.name.trim().isEmpty() || t.name.length()>120)
             return juce::Result::fail("Invalid Control Set template.");
+    for (size_t i=0;i<s.bindings.size();++i)
+        for (size_t j=i+1;j<s.bindings.size();++j) {
+            const auto& a=s.bindings[i],&b=s.bindings[j];
+            if (a.enabled && b.enabled && a.functionId>0 &&
+                a.functionId==b.functionId && a.scope==b.scope &&
+                (a.scope==ControlScope::column || a.scopeId==b.scopeId))
+                return juce::Result::fail("Function is assigned twice in the same mapping scope.");
+        }
     for (size_t i=0;i<s.bindings.size();++i)
         for (size_t j=i+1;j<s.bindings.size();++j) {
             const auto& a=s.bindings[i],&b=s.bindings[j];
