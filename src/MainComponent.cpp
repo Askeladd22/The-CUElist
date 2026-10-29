@@ -1,4 +1,5 @@
 #include "MainComponent.h"
+#include "OperatorReportDialog.h"
 #include "HelpGuide.h"
 #include "MidiSessionPolicy.h"
 #include "ProjectSafety.h"
@@ -784,16 +785,24 @@ void MainComponent::openUserGuide() {
 }
 
 void MainComponent::showAbout() {
-    const juce::String info=
-        "Version: "+juce::String(THE_CUELIST_VERSION)+"\n"
-        "Copyright (c) 2026 Davide Salvatore and Riccardo D'Ambrosio.\n"
-        "All rights reserved.\n\n"
-        "License: Proprietary software - no public software license.\n"
-        "Copyright holders: Davide Salvatore and Riccardo D'Ambrosio.\n\n"
-        "See LICENSE for the copyright notice and NOTICE.md "
-        "for third-party licenses, including JUCE.";
-    juce::AlertWindow::showMessageBoxAsync(
-        juce::MessageBoxIconType::InfoIcon,"About The Cuelist",info,"Close",this);
+    using Status=OperatorReportRow::Status;
+    showOperatorReport(*this,theme,"About The Cuelist",
+        "Version "+juce::String(THE_CUELIST_VERSION),{
+            {"AUTHORS",{
+                {"Davide Salvatore","Co-author",Status::neutral},
+                {"Riccardo D'Ambrosio","Co-author",Status::neutral}
+            }},
+            {"APPLICATION",{
+                {"Copyright","2026",Status::neutral},
+                {"Rights","All rights reserved",Status::neutral}
+            }},
+            {"LICENCE",{
+                {"Software","Proprietary",Status::neutral},
+                {"Public source licence","Not granted",Status::caution}
+            }}
+        },
+        "The Cuelist's copyright notice is in LICENSE. Third-party "
+        "notices (including JUCE and embedded fonts) are in NOTICE.md.");
 }
 
 void MainComponent::message(const juce::String& text) { status=text; repaint(); juce::AlertWindow::showMessageBoxAsync(juce::MessageBoxIconType::WarningIcon,"The Cuelist",text,"OK",this); }
