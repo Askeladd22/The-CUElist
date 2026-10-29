@@ -24,6 +24,15 @@ void controlColumnTests() {
         old.minimum=0;old.maximum=127;
         old.takeover=ControlTakeover::jump;
         col.controlDefaultSet.bindings.push_back(old);
+        // Old locked columns legitimately shadowed global mappings on the
+        // same hardware control. Migration must preserve the old winner and
+        // retain, but disable, the shadowed direct input.
+        ControlBinding shadowed=old;
+        shadowed.id=original.controls.nextId++;
+        shadowed.target=ControlTarget::masterGain;
+        shadowed.targetColumnId=0;
+        shadowed.minimum=0;shadowed.maximum=1;
+        original.controls.bindings.push_back(shadowed);
         ControlBinding dormant=old;
         dormant.id=original.controls.nextId++;
         dormant.deviceId="fader-B";dormant.number=25;
@@ -40,7 +49,9 @@ void controlColumnTests() {
               migrated.columns[controlIndex].controlDefaultSet.bindings.empty(),
               "Per-column lock was not retired");
         check(migrated.controls.functions.size()==1 &&
-              migrated.controls.bindings.size()==1 &&
+              migrated.controls.bindings.size()==2 &&
+              !migrated.controls.bindings.front().enabled &&
+              migrated.controls.bindings.back().enabled &&
               migrated.controls.templates.size()==1 &&
               !migrated.rows.front().cells[controlIndex].controlSet,
               "Legacy global input or dormant Q set was lost/activated");
