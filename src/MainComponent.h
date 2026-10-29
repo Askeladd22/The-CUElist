@@ -93,6 +93,13 @@ public:
     static juce::Rectangle<int> rowPlayBounds(int y) { return {nameWidth-114,y+11,29,26}; }
     static juce::Rectangle<int> rowStopBounds(int y) { return {nameWidth-75,y+11,29,26}; }
     static juce::Rectangle<int> rowMenuBounds(int y) { return {nameWidth-36,y+11,29,26}; }
+    // Shared by the painter and input handling to prevent discrepancies.
+    static juce::Rectangle<int> cellPlayBounds(int x,int width,int y) {
+        return {x+width-64,y+23,24,23};
+    }
+    static juce::Rectangle<int> cellStopBounds(int x,int width,int y) {
+        return {x+width-32,y+23,24,23};
+    }
     static constexpr int rowContentInset=4; // visual padding, used by both paint and hit-testing
 private:
     MainComponent& owner;
