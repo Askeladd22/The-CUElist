@@ -112,7 +112,7 @@ Space does not launch a cue while typing into a text input. Escape is intended t
 
 Click a cue to make it the next armed cue. Use the row menu to **Copy**, **Paste below**, **Duplicate** or **Delete** a whole cue. The cell context menu covers cell-specific copy, paste, cut, delete, loop and inclusion in Row GO. Duplicated rows and cells receive appropriate new identities; imported audio can share decoded PCM in memory when safe.
 
-Use the **▲ / ▼** controls to reorder cue rows. These glyphs use the bundled Noto Sans Symbols 2 font directly (or vector shapes if a glyph is unavailable); the Delete cross is drawn as vector geometry. Changes that affect the structure or timing may stop transport to preserve deterministic cue state.
+Use the **▲ / ▼** controls to reorder cue rows. These glyphs, and the **◀ / ▶** column-reorder controls, use the bundled Noto Sans Symbols 2 font directly (or vector shapes if a glyph is unavailable); the Delete cross is drawn as vector geometry. Changes that affect the structure or timing may stop transport to preserve deterministic cue state.
 
 ### 5.1 Playback behavior and looping
 
