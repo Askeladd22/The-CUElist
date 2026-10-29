@@ -2,36 +2,6 @@
 #include "GainMeterFader.h"
 
 namespace cuelist {
-// Scalable lock drawn with JUCE primitives instead of OS-dependent glyphs.
-class ControlLockButton final : public juce::Button {
-public:
-    ControlLockButton() : juce::Button("controlColumnLock") {}
-    void paintButton(juce::Graphics& g,bool hovered,bool pressed) override {
-        const auto area=getLocalBounds().toFloat().reduced(1.0f);
-        const auto accent=getToggleState()?palette::amber:palette::teal;
-        const IconButtonState state{isEnabled(),hovered,pressed,getToggleState(),
-                                    hasKeyboardFocus(false)};
-        drawIconButtonSurface(g,area,accent,state,5.0f);
-        const auto ink=iconButtonInk(accent,state);
-        const float cx=area.getCentreX(),cy=area.getCentreY();
-        juce::Path shackle;
-        if(getToggleState()) {
-            shackle.startNewSubPath(cx-6.0f,cy);
-            shackle.lineTo(cx-6.0f,cy-5.0f);
-            shackle.cubicTo(cx-6.0f,cy-14.0f,cx+6.0f,cy-14.0f,cx+6.0f,cy-5.0f);
-            shackle.lineTo(cx+6.0f,cy);
-        } else {
-            shackle.startNewSubPath(cx-6.0f,cy);
-            shackle.lineTo(cx-6.0f,cy-5.0f);
-            shackle.cubicTo(cx-6.0f,cy-14.0f,cx+6.0f,cy-14.0f,cx+6.0f,cy-5.0f);
-        }
-        g.setColour(ink);
-        g.strokePath(shackle,juce::PathStrokeType(1.8f));
-        g.fillRoundedRectangle(cx-9.0f,cy-1.0f,18.0f,12.0f,2.5f);
-        g.setColour(palette::background);
-        g.fillEllipse(cx-1.5f,cy+3.0f,3.0f,3.0f);
-    }
-};
 struct ColumnUtilities::Strip final : juce::Component {
     MainComponent& owner;
     int id, index;
@@ -49,7 +19,6 @@ struct ColumnUtilities::Strip final : juce::Component {
     juce::TextButton directMode{"POST"};
     MasterSendButton masterSend;
     juce::TextButton oscDestination{"OSC / destination"};
-    ControlLockButton controlLock;
     juce::TextButton controlPriority{"Medium"},controlEdit{"Edit set"};
     int routingChannels=-1, routingOutput=-1;
     bool routingDirect=false;
@@ -80,18 +49,11 @@ struct ColumnUtilities::Strip final : juce::Component {
         masterSend.setWantsKeyboardFocus(false);
         masterSend.onClick=[this] {owner.setColumnMasterSend(index,masterSend.getToggleState());};
         addAndMakeVisible(oscDestination); oscDestination.setName("columnOscDestination");
-        addAndMakeVisible(controlLock); addAndMakeVisible(controlPriority);
+        addAndMakeVisible(controlPriority);
         addAndMakeVisible(controlEdit);
-        controlLock.setName("controlColumnLock");
         controlPriority.setName("controlColumnPriority");
         controlEdit.setName("controlColumnEditSet");
-        controlLock.setTooltip("Legacy Control Column lock. Unlock before migrating to abstract functions.");
-        // Deliberately no lock callback: Default Map plus Q overrides
-        // replaces column-wide lock semantics. Kept as an inert hidden
-        // compatibility widget until old project migration tests retire it.
-        controlLock.setEnabled(false);
         controlPriority.onClick=[this] {
-            if (owner.show.columns[(size_t)index].controlLocked) return;
             juce::PopupMenu menu;
             menu.setLookAndFeel(&getLookAndFeel());
             menu.addItem(2,"Medium"); menu.addItem(3,"High"); menu.addItem(4,"Maximum");
@@ -173,22 +135,13 @@ struct ColumnUtilities::Strip final : juce::Component {
         oscDestination.setVisible(col.type==ColumnType::osc && !col.collapsed);
         output.setVisible(!col.collapsed && (col.type==ColumnType::audio || col.type==ColumnType::midi));
         const bool control=col.type==ColumnType::control;
-        // The old column lock cannot be enabled on a new Default Map.
-        // Show only already-locked legacy projects so the operator may
-        // explicitly unlock and migrate without losing their old settings.
-        // Retired: a locked legacy column is migrated when the project is
-        // activated. Never expose the old per-column lock in the new UI.
-        controlLock.setVisible(false);
         controlPriority.setVisible(control && !col.collapsed);
         controlEdit.setVisible(control && !col.collapsed);
         if (control) {
-            controlLock.setToggleState(col.controlLocked,juce::dontSendNotification);
-            controlLock.setTooltip("Retired legacy control; migrated on project open.");
-            controlPriority.setButtonText(col.controlLocked ? "Low" :
-                col.controlPriority==4 ? "Maximum" :
+            controlPriority.setButtonText(col.controlPriority==4 ? "Maximum" :
                 col.controlPriority==3 ? "High" : "Medium");
-            controlPriority.setEnabled(!col.controlLocked);
-            controlEdit.setButtonText(col.controlLocked ? "Edit default" : "Edit Q set");
+            controlPriority.setEnabled(true);
+            controlEdit.setButtonText("Edit Q set");
         }
         syncRouting();
     }
@@ -290,8 +243,7 @@ struct ColumnUtilities::Strip final : juce::Component {
                                 collapsed ? 23 : 46,17);
         oscActivity.setBounds(collapsed ? (w-22)/2 : 12,collapsed ? 40 : 42,
                                collapsed ? 23 : 46,17);
-        controlLock.setBounds(6,collapsed ? 30 : 5,34,29);
-        controlPriority.setBounds(44,5,std::max(1,w-50),29);
+        controlPriority.setBounds(6,5,std::max(1,w-12),29);
         controlEdit.setBounds(8,44,w-16,32);
     }
     void paint(juce::Graphics& g) override {
@@ -312,10 +264,9 @@ struct ColumnUtilities::Strip final : juce::Component {
             return;
         }
         if (colType==ColumnType::control) {
-            label(g,col.controlLocked ? "DEFAULT / ALL CUES" : "CUE-SPECIFIC",
+            label(g,"CUE-SPECIFIC / DEFAULT MAP OVERRIDES",
                   {7,91,getWidth()-14,22},11,palette::teal,true);
-            label(g,col.controlLocked ? "Priority: LOW" :
-                  col.controlPriority==4 ? "Priority: MAXIMUM" :
+            label(g,col.controlPriority==4 ? "Priority: MAXIMUM" :
                   col.controlPriority==3 ? "Priority: HIGH" : "Priority: MEDIUM",
                   {7,120,getWidth()-14,20},10,palette::muted);
             return;
