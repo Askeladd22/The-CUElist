@@ -265,6 +265,9 @@ public:
     juce::Result selectControlInput(const juce::String&);
     bool addMappingBinding(ControlBinding);
     bool deleteMappingBinding(int);
+    int createAbstractControlFunction(const juce::String& name,ControlBinding destination);
+    bool updateAbstractControlFunction(int id,const juce::String& name,
+                                       ControlBinding destination);
     int createMappingPreset(const juce::String&);
     bool assignMappingPreset(int rowId,int presetId);
     void armControlLearn() { controlLearnArmed=true; }
