@@ -38,6 +38,8 @@ MainComponent::MainComponent(bool startAudio) {
                     &importButton,&midiEditButton,&oscEditButton,&playCellButton,&stopCellButton,&clearButton,&tempoButton,&applyButton,
                     &preflightButton,&diagnosticsButton,&preferencesButton}) b->setWantsKeyboardFocus(false);
     viewport.setViewedComponent(&grid,false); viewport.setScrollBarsShown(true,true);
+    // Avoid a broad, dark 14px gutter next to the fixed BPM boundary.
+    viewport.setScrollBarThickness(9);
     goButton.setColour(juce::TextButton::buttonColourId,palette::go);
     goButton.setColour(juce::TextButton::textColourOffId,palette::text);
     panicButton.setColour(juce::TextButton::buttonColourId,palette::panic);
