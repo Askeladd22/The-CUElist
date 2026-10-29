@@ -2,6 +2,7 @@
 #include "OperatorReportDialog.h"
 #include "ProjectSafety.h"
 #include "ProjectMediaLoader.h"
+#include "ControlLayerBuilder.h"
 
 namespace cuelist {
 // Project I/O, safe activation, recovery and operator preflight remain
@@ -114,6 +115,16 @@ bool MainComponent::activateProject(Show candidate,const juce::File& source,bool
 
 bool MainComponent::commitPreparedProject(Show candidate,const juce::File& source,
                                            bool recovering,PreparedShowMedia prepared) {
+    // Migration is transactional and happens before stopping any playing
+    // show. A locked legacy Control Column becomes Default Map functions;
+    // dormant Q sets are archived, never unexpectedly activated.
+    bool migratedLegacy=false;
+    const auto migration=migrateLegacyControlColumns(candidate,migratedLegacy);
+    if(migration.failed()) {
+        message(migration.getErrorMessage()+
+                " The original project remains loaded and unchanged.");
+        return false;
+    }
     // Only the UI thread may interrupt playback or touch the AudioEngine.
     // Decode and memory-budget checks have already completed transactionally.
     auto loaded=std::move(prepared.clips);
@@ -127,12 +138,15 @@ bool MainComponent::commitPreparedProject(Show candidate,const juce::File& sourc
         }
     closeMidiClip();closeOscClip();editHistory.clearUndoHistory();
     show=std::move(candidate);clips=std::move(loaded);
-    projectFile=recovering ? juce::File{} : source;dirty=recovering;
+    projectFile=recovering ? juce::File{} : source;
+    dirty=recovering || migratedLegacy;
     selectedRow=selectedColumn=nextCue=0;
     resetActiveMapping();refreshControlSettings();
     engine.publish(makeRenderState(show,clips));refresh();
     status=recovering ? "Recovered unsaved show. Use Save to choose a project filename." :
-                        "Project opened: "+source.getFileName();
+                        migratedLegacy ?
+                            "Legacy Control Columns migrated to Default Map; review imported functions and Save to persist." :
+                            "Project opened: "+source.getFileName();
     if(!recovering && recoveryEnabled) {
         if (recoveryWriter) recoveryWriter->flush();
         ProjectRecovery::discard(ProjectRecovery::defaultDirectory());

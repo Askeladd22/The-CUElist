@@ -17,24 +17,154 @@ public:
         sourceColumnId(main.show.columns[(size_t)main.selectedColumn].id) {
         setName("controlMappingPanel");
         for (juce::Component* c : std::initializer_list<juce::Component*>{
-            &device,&connect,&learn,&add,&remove,&newPreset,&assignPreset,
+            &device,&connect,&learn,&oscLearn,&oscInputPort,&add,&remove,&newPreset,&assignPreset,
             &presetName,&presets,&scope,&target,&takeover,&columns,&bindingList,&state,
-            &outputCc,&oscAddress,&invert,&updateSelected,&curve,&minimum,&maximum,
-             &effectivePreview,&templateName,&templates,&saveTemplate,&loadTemplate,
+            &outputCc,&outputChannel,&oscAddress,&invert,&updateSelected,&curve,&minimum,&maximum,
+             &functionChoice,&functionName,&newFunction,&saveRoute,
+             &saveControllerPreset,&loadControllerPreset,&effectivePreview,&templateName,&templates,&saveTemplate,&loadTemplate,
              &emptyBindings})
             addAndMakeVisible(c);
+        functionChoice.setName("mappingAbstractFunction");
+        functionName.setName("mappingAbstractFunctionName");
+        functionName.setTextToShowWhenEmpty("Function name (e.g. Resolume Brightness)",palette::muted);
+        newFunction.setButtonText("New function");
+        saveRoute.setButtonText("Save route");
+        newFunction.setName("createControlFunction");
+        saveRoute.setName("saveControlFunctionRoute");
+        saveControllerPreset.setName("exportControllerPreset");
+        loadControllerPreset.setName("importControllerPreset");
+        saveControllerPreset.setButtonText("Export Default Map");
+        loadControllerPreset.setButtonText("Import Default Map");
+        saveControllerPreset.setVisible(!editSet);
+        loadControllerPreset.setVisible(!editSet);
+        saveControllerPreset.setTooltip("Export hardware inputs and destinations without project-specific function names.");
+        loadControllerPreset.setTooltip("Import routing by function order; preserve project names, other functions and cue-local overrides.");
+        saveControllerPreset.onClick=[this] {
+            if (!owner) return;
+            const auto preset=owner->exportControlPresetText();
+            presetFileChooser=std::make_unique<juce::FileChooser>(
+                "Export Default Map",juce::File::getSpecialLocation(
+                    juce::File::userDocumentsDirectory)
+                    .getChildFile("TheCuelist-DefaultMap.json"),"*.json");
+            auto safe=juce::Component::SafePointer<ControlPanel>(this);
+            presetFileChooser->launchAsync(
+                juce::FileBrowserComponent::saveMode |
+                juce::FileBrowserComponent::canSelectFiles,
+                [safe,preset](const juce::FileChooser& chooser) {
+                    if (!safe) return;
+                    const auto path=chooser.getResult();
+                    if (path==juce::File()) return;
+                    safe->state.setText(path.replaceWithText(preset) ?
+                        "Default Map preset exported without function labels." :
+                        "Could not save mapping preset.",juce::dontSendNotification);
+                });
+        };
+        loadControllerPreset.onClick=[this] {
+            if (!owner) return;
+            presetFileChooser=std::make_unique<juce::FileChooser>(
+                "Import Default Map",juce::File::getSpecialLocation(
+                    juce::File::userDocumentsDirectory),"*.json");
+            auto safe=juce::Component::SafePointer<ControlPanel>(this);
+            presetFileChooser->launchAsync(
+                juce::FileBrowserComponent::openMode |
+                juce::FileBrowserComponent::canSelectFiles,
+                [safe](const juce::FileChooser& chooser) {
+                    if (!safe || !safe->owner) return;
+                    const auto file=chooser.getResult();
+                    if (file==juce::File()) return;
+                    if (file.getSize()>256*1024) {
+                        safe->state.setText("Mapping preset exceeds 256KB.",
+                                            juce::dontSendNotification);
+                        return;
+                    }
+                    const auto result=safe->owner->importControlPresetText(
+                        file.loadFileAsString());
+                    if (result.wasOk()) {
+                        safe->refreshFunctions();
+                        safe->bindingList.updateContent();
+                        safe->bindingList.repaint();
+                        safe->selected=-1;
+                        safe->remove.setEnabled(false);
+                        safe->updateSelected.setEnabled(false);
+                        safe->refreshEmptyState();
+                    }
+                    safe->state.setText(result.wasOk() ?
+                        "Imported routes and inputs; project labels retained." :
+                        result.getErrorMessage(),juce::dontSendNotification);
+                });
+        };
+        newFunction.setVisible(!editSet);
+        saveRoute.setVisible(!editSet);
+        newFunction.setTooltip("Create a stable project function; its output will not change on MIDI Learn.");
+        saveRoute.setTooltip("Save the selected function destination globally; physical input assignments stay unchanged.");
+        functionChoice.onChange=[this] {
+            if (!owner) return;
+            const int id=functionChoice.getSelectedId()-1;
+            scope.setSelectedId(1,juce::dontSendNotification);
+            scope.setEnabled(id==0 && !editSet);
+            for (const auto& item:owner->show.controls.functions)
+                if (item.id==id) {
+                    functionName.setText(item.name,false);
+                    showRoute(item.destination);
+                    return;
+                }
+        };
+        newFunction.onClick=[this] {
+            if (!owner) return;
+            const auto route=readRoute();
+            if (!route) return;
+            const int id=owner->createAbstractControlFunction(functionName.getText(),*route);
+            if (id>0) {
+                refreshFunctions();functionChoice.setSelectedId(id+1);
+                state.setText("Function created. Learn its physical input, then Add mapping.",
+                              juce::dontSendNotification);
+            } else state.setText(owner->status,juce::dontSendNotification);
+        };
+        saveRoute.onClick=[this] {
+            if (!owner || functionChoice.getSelectedId()<2) return;
+            const auto route=readRoute();
+            if (!route) return;
+            const bool ok=owner->updateAbstractControlFunction(
+                functionChoice.getSelectedId()-1,functionName.getText(),*route);
+            state.setText(ok ? "Function output updated; input assignment unchanged." :
+                           owner->status,juce::dontSendNotification);
+            if (ok) refreshFunctions();
+        };
         device.setName("controlInputDevice");
         device.setTooltip("Select a device explicitly. No automatic fallback on disconnect.");
         connect.setButtonText("Refresh ports");
         learn.setButtonText("MIDI Learn");
+        oscLearn.setButtonText("OSC Learn");
+        oscLearn.setName("mappingOscLearn");
+        oscInputPort.setName("mappingOscInputPort");
+        oscInputPort.setInputRestrictions(5,"0123456789");
+        oscInputPort.setText(juce::String(main.show.controls.oscInputPort==0 ?
+                                    9011 : main.show.controls.oscInputPort),false);
+        oscInputPort.setTooltip("UDP input port; OSC listener receives single numeric/boolean OSC 1.0 messages.");
+        oscLearn.setTooltip("Listen for an OSC input address. Only the selected mapping scope is edited.");
+        oscLearn.onClick=[this] {
+            if (!owner) return;
+            const int port=oscInputPort.getText().getIntValue();
+            if (!owner->startOscControlInput(port)) {
+                state.setText(owner->status,juce::dontSendNotification);
+                return;
+            }
+            captured.reset();
+            owner->armOscControlLearn();
+            state.setText("OSC Learn armed on UDP "+juce::String(port)+
+                ". Send a float, int or boolean OSC message.",
+                juce::dontSendNotification);
+        };
         add.setButtonText("Add mapping");
         updateSelected.setButtonText("Update selected");
         updateSelected.setName("mappingUpdateSelected");
         updateSelected.setEnabled(false);
         remove.setEnabled(false);
         emptyBindings.setName("mappingEmptyState");
-        emptyBindings.setText("No mappings yet. Use MIDI Learn, then Add mapping.",
-                              juce::dontSendNotification);
+        emptyBindings.setText(editSet ?
+             "No local overrides. Functions inherit the Default Map." :
+             "No Default Map inputs. Create a function, then use Learn.",
+             juce::dontSendNotification);
         emptyBindings.setColour(juce::Label::textColourId,palette::muted);
         emptyBindings.setFont(font(13.5f));
         emptyBindings.setJustificationType(juce::Justification::centred);
@@ -111,6 +241,9 @@ public:
             minimum.setText(t==7 || t==8 ? "-1" : "0",false);
             maximum.setText(t==5 ? "127" : "1",false);
         };
+        outputChannel.setName("mappingOutputMidiChannel");
+        outputChannel.setText("1");outputChannel.setInputRestrictions(2,"0123456789");
+        outputChannel.setTooltip("Outgoing MIDI channel, independent of the source controller.");
         outputCc.setName("mappingOutputCc");
         outputCc.setText("20"); outputCc.setInputRestrictions(3,"0123456789");
         oscAddress.setName("mappingOscAddress");
@@ -174,6 +307,18 @@ public:
                 state.setText("Preset assigned to selected cue.",juce::dontSendNotification);
         };
         refreshDevices(); refreshPresets(); refreshColumns();refreshTemplates();
+        refreshFunctions();
+        if (!owner->show.controls.functions.empty()) {
+            const auto& f=owner->show.controls.functions.front();
+            functionName.setText(f.name,false);
+            showRoute(f.destination);
+        }
+        if (editSet) {
+            for (juce::Component* widget : std::initializer_list<juce::Component*>{
+                    &target,&outputChannel,&outputCc,&oscAddress,&columns,
+                    &minimum,&maximum,&functionName})
+                widget->setEnabled(false);
+        }
         refreshDestinationFields();
         refreshEmptyState();
         updateEffectivePreview();
@@ -183,22 +328,26 @@ public:
     void paint(juce::Graphics& g) override {
         g.fillAll(palette::panel);
         label(g,editSet ? "CONTROL SET / Q"+juce::String(sourceRow+1) :
-              "CONTROL & MAPPING",{20,15,520,31},21,palette::teal,true);
+              "DEFAULT MAP / CONTROL MAPPING",{20,15,620,31},21,palette::teal,true);
         g.setColour(palette::line);
         g.drawHorizontalLine(52,19,(float)getWidth()-19);
-        label(g,"MIDI INPUT",{20,60,350,19},12,palette::teal,true);
+        label(g,"MIDI / OSC INPUT",{20,60,350,19},12,palette::teal,true);
         label(g,"Input device",{20,83,200,18},11,palette::muted,true);
-        label(g,"MIDI Learn",{20,143,200,18},11,palette::muted,true);
+        label(g,"MIDI Learn",{20,143,116,18},11,palette::muted,true);
+        label(g,"OSC Learn",{144,143,116,18},11,palette::muted,true);
+        label(g,"UDP port",{269,143,68,18},11,palette::muted,true);
 
         g.setColour(palette::line);
         g.drawHorizontalLine(191,20,(float)getWidth()-20);
-        label(g,"MAPPING CONFIGURATION",{20,198,350,19},12,palette::teal,true);
+        // Function selection occupies the 198-224px band; do not draw
+        // a section heading over the active combo box.
         label(g,editSet?"Control Set scope":"Scope",{20,228,179,18},11,palette::muted,true);
         label(g,"Target",{214,228,178,18},11,palette::muted,true);
         label(g,"Takeover",{411,228,132,18},11,palette::muted,true);
         label(g,"Destination column",{556,228,207,18},11,palette::muted,true);
-        label(g,"Output CC",{20,285,85,18},11,palette::muted,true);
-        label(g,"OSC address",{113,285,210,18},11,palette::muted,true);
+        label(g,"OUT CH",{20,285,48,18},10,palette::muted,true);
+        label(g,"CC",{78,285,52,18},10,palette::muted,true);
+        label(g,"OSC address",{142,285,184,18},11,palette::muted,true);
         label(g,"Curve",{441,285,114,18},11,palette::muted,true);
         label(g,"Min",{573,285,84,18},11,palette::muted,true);
         label(g,"Max",{672,285,84,18},11,palette::muted,true);
@@ -211,11 +360,11 @@ public:
             label(g,"New preset name",{388,347,220,18},11,palette::muted,true);
         }
         label(g,editSet?"MAPPINGS IN THIS CONTROL SET":"SAVED MAPPINGS",
-              {20,editSet?534:425,380,18},12,palette::teal,true);
+              {20,editSet?534:434,380,15},11,palette::teal,true);
         g.setColour(palette::line);
         g.drawHorizontalLine(getHeight()-48,20,(float)getWidth()-20);
         label(g,editSet ?
-            "Control Sets become active after GO. Locked sets apply to every cue." :
+            "Control Set overrides apply after GO; remove one to inherit Default Map." :
             "Cue mappings become active after GO, not when selecting a cue.",
             {20,getHeight()-40,getWidth()-40,23},11,palette::muted);
     }
@@ -223,15 +372,22 @@ public:
         const int w=getWidth();
         device.setBounds(20,105,w-177,31);
         connect.setBounds(w-143,105,123,31);
-        learn.setBounds(20,163,128,32);
-        state.setBounds(160,162,w-180,33);
+        learn.setBounds(20,163,116,32);
+        oscLearn.setBounds(144,163,116,32);
+        oscInputPort.setBounds(269,163,68,32);
+        state.setBounds(347,162,w-367,33);
+        functionChoice.setBounds(20,198,185,26);
+        functionName.setBounds(213,198,228,26);
+        newFunction.setBounds(449,198,140,26);
+        saveRoute.setBounds(597,198,w-617,26);
 
         scope.setBounds(20,250,176,31);
         target.setBounds(214,250,178,31);
         takeover.setBounds(411,250,133,31);
         columns.setBounds(556,250,w-576,31);
-        outputCc.setBounds(20,307,84,31);
-        oscAddress.setBounds(113,307,210,31);
+        outputChannel.setBounds(20,307,48,31);
+        outputCc.setBounds(78,307,54,31);
+        oscAddress.setBounds(142,307,181,31);
         invert.setBounds(336,307,96,31);
         curve.setBounds(441,307,115,31);
         minimum.setBounds(573,307,85,31);
@@ -247,6 +403,8 @@ public:
         presetName.setBounds(388,370,w-548,31);
         newPreset.setBounds(w-149,370,129,31);
 
+        saveControllerPreset.setBounds(20,403,173,29);
+        loadControllerPreset.setBounds(201,403,173,29);
         const int listY=editSet?558:449;
         const int listHeight=editSet?136:157;
         bindingList.setBounds(20,listY,w-239,listHeight);
@@ -283,9 +441,10 @@ private:
         const auto& cell=owner->show.rows[(size_t)row].cells[(size_t)columnIndex];
         return cell.controlSet ? &cell.controlSet->bindings : nullptr;
     }
-    juce::ComboBox device,presets,scope,target,takeover,columns,curve,templates;
-    juce::TextButton connect,learn,add,remove,updateSelected,newPreset,assignPreset,saveTemplate,loadTemplate;
-    juce::TextEditor presetName,outputCc,oscAddress,minimum,maximum,effectivePreview,templateName;
+    juce::ComboBox device,presets,scope,target,takeover,columns,curve,templates,functionChoice;
+    juce::TextButton connect,learn,oscLearn,add,remove,updateSelected,newPreset,assignPreset,saveTemplate,loadTemplate,
+                     newFunction,saveRoute,saveControllerPreset,loadControllerPreset;
+    juce::TextEditor presetName,outputCc,outputChannel,oscAddress,minimum,maximum,effectivePreview,templateName,functionName,oscInputPort;
     juce::ToggleButton invert{"Invert"};
     juce::Label state;
     juce::ListBox bindingList;
@@ -293,13 +452,90 @@ private:
     std::vector<juce::String> deviceIds;
     std::vector<int> columnIds;
     std::optional<ControlEvent> captured;
+    std::unique_ptr<juce::FileChooser> presetFileChooser;
     int selected=-1;
+    void refreshFunctions() {
+        if (!owner) return;
+        const int old=functionChoice.getSelectedId();
+        functionChoice.clear(juce::dontSendNotification);
+        functionChoice.addItem("Legacy direct mapping",1);
+        for (const auto& f:owner->show.controls.functions)
+            functionChoice.addItem(f.name,f.id+1);
+        functionChoice.setSelectedId(old>0 && functionChoice.indexOfItemId(old)>=0 ?
+            old : owner->show.controls.functions.empty() ? 1 :
+                  owner->show.controls.functions.front().id+1,juce::dontSendNotification);
+        // Scope belongs to legacy bindings only. Named-function source
+        // assignments in Default Map always inherit globally.
+        scope.setEnabled(!editSet && functionChoice.getSelectedId()==1);
+    }
+    void showRoute(const ControlBinding& b) {
+        const int targetIndex=b.target==ControlTarget::masterGain ? 1 :
+            b.target==ControlTarget::columnGain ? 2 :
+            b.target==ControlTarget::go ? 3 :
+            b.target==ControlTarget::panic ? 4 :
+            b.target==ControlTarget::midiCc ? 5 :
+            b.target==ControlTarget::oscFloat ? 6 :
+            b.target==ControlTarget::columnPan ? 7 : 8;
+        target.setSelectedId(targetIndex,juce::dontSendNotification);
+        refreshColumns();
+        for (size_t i=0;i<columnIds.size();++i)
+            if (columnIds[i]==b.targetColumnId)
+                columns.setSelectedId((int)i+1,juce::dontSendNotification);
+        outputChannel.setText(juce::String(b.outputChannel),false);
+        outputCc.setText(juce::String(b.outputNumber),false);
+        oscAddress.setText(b.oscAddress,false);
+        minimum.setText(juce::String(b.minimum,3),false);
+        maximum.setText(juce::String(b.maximum,3),false);
+        refreshDestinationFields();
+    }
+    std::optional<ControlBinding> readRoute() {
+        ControlBinding b;
+        switch (target.getSelectedId()) {
+            case 1: b.target=ControlTarget::masterGain;break;
+            case 2: b.target=ControlTarget::columnGain;break;
+            case 3: b.target=ControlTarget::go;break;
+            case 4: b.target=ControlTarget::panic;break;
+            case 5: b.target=ControlTarget::midiCc;break;
+            case 6: b.target=ControlTarget::oscFloat;break;
+            case 7: b.target=ControlTarget::columnPan;break;
+            case 8: b.target=ControlTarget::masterPan;break;
+            default:return {};
+        }
+        if (b.target==ControlTarget::columnGain ||
+            b.target==ControlTarget::columnPan ||
+            b.target==ControlTarget::midiCc || b.target==ControlTarget::oscFloat) {
+            const int index=columns.getSelectedId()-1;
+            if (index<0 || index>=(int)columnIds.size()) {
+                state.setText("Choose a valid output column.",juce::dontSendNotification);
+                return {};
+            }
+            b.targetColumnId=columnIds[(size_t)index];
+        }
+        if (b.target==ControlTarget::midiCc) {
+            b.outputNumber=outputCc.getText().getIntValue();
+            b.outputChannel=outputChannel.getText().getIntValue(); // Not the incoming channel.
+        }
+        if (b.target==ControlTarget::oscFloat && b.functionId==0)
+            b.oscAddress=oscAddress.getText().trim();
+        const auto low=minimum.getText().trim(), high=maximum.getText().trim();
+        const auto valid=[](const juce::String& v) {
+            return v.isNotEmpty() && v.containsAnyOf("0123456789") &&
+                v.retainCharacters("0123456789.-+")==v;
+        };
+        if (!valid(low) || !valid(high)) {
+            state.setText("Enter valid minimum and maximum.",juce::dontSendNotification);
+            return {};
+        }
+        b.minimum=low.getFloatValue();b.maximum=high.getFloatValue();
+        return b;
+    }
     void refreshDestinationFields() {
         const int t=target.getSelectedId();
-        outputCc.setEnabled(t==5);
-        oscAddress.setEnabled(t==6);
-        columns.setEnabled(editSet || scope.getSelectedId()==2 ||
-                           t==2 || t==5 || t==6 || t==7);
+        outputChannel.setEnabled(t==5 && !editSet);
+        outputCc.setEnabled(t==5 && !editSet);
+        oscAddress.setEnabled(!editSet && t==6);
+        columns.setEnabled(!editSet &&
+            (scope.getSelectedId()==2 || t==2 || t==5 || t==6 || t==7));
     }
     void refreshEmptyState() {
         emptyBindings.setVisible(getNumRows()==0);
@@ -307,6 +543,11 @@ private:
     }
     void timerCallback() override {
         if (!owner) return;
+        // Armed Learn is an operator-critical state, not a transient tooltip.
+        learn.setColour(juce::TextButton::buttonColourId,
+            owner->controlLearnArmed ? palette::amber.withAlpha(.58f) : palette::raised);
+        oscLearn.setColour(juce::TextButton::buttonColourId,
+            owner->oscLearnArmed ? palette::amber.withAlpha(.58f) : palette::raised);
         if (auto event=owner->consumeLearnedInput()) {
             captured=event;
             state.setText("Learned "+event->deviceId+" ch"+juce::String(event->channel)+
@@ -371,11 +612,22 @@ private:
                 juce::dontSendNotification); return;
         }
         ControlBinding b=update ? (*existing)[(size_t)selected] : ControlBinding{};
+        // A Control Set overrides only which physical input invokes the
+        // function. Target/destination remain owned by the project function.
+        b.functionId=std::max(0,functionChoice.getSelectedId()-1);
+        if (!update && b.functionId==0) {
+            state.setText("Create or select a named function in Default Map first.",
+                          juce::dontSendNotification);
+            return;
+        }
         if (captured) {
             b.deviceId=captured->deviceId;
             b.kind=captured->kind; b.channel=captured->channel; b.number=captured->number;
         }
-        b.scope=(ControlScope)(scope.getSelectedId()-1);
+        // Named functions in the Default Map are global. Only the
+        // selected cue's Control Set can override their physical inputs.
+        b.scope=b.functionId>0 ? ControlScope::global :
+            (ControlScope)(scope.getSelectedId()-1);
         switch (target.getSelectedId()) {
             case 1: b.target=ControlTarget::masterGain; break;
             case 2: b.target=ControlTarget::columnGain; break;
@@ -404,10 +656,23 @@ private:
             b.targetColumnId=columnIds[(size_t)i];
             if (b.scope==ControlScope::column) b.scopeId=b.targetColumnId;
         }
+        if (b.functionId>0) {
+            const auto it=std::find_if(owner->show.controls.functions.begin(),
+                owner->show.controls.functions.end(),
+                [&](const ControlFunction& f){return f.id==b.functionId;});
+            if (it==owner->show.controls.functions.end()) {
+                state.setText("Select an existing function.",juce::dontSendNotification);
+                return;
+            }
+            const auto input=b;
+            b=materializeFunctionBinding(input,*it);
+        }
+        if (b.kind==ControlKind::osc) b.takeover=ControlTakeover::jump;
         if (b.kind==ControlKind::note || b.target==ControlTarget::go ||
             b.target==ControlTarget::panic) b.takeover=ControlTakeover::jump;
         b.invert=invert.getToggleState();
-        if (b.target==ControlTarget::midiCc) {
+        if (b.target==ControlTarget::midiCc && b.functionId==0) {
+            // Legacy direct mappings preserve historical behavior.
             b.outputChannel=b.channel;
             b.outputNumber=outputCc.getText().getIntValue();
         }
@@ -421,7 +686,12 @@ private:
         if (!numeric(low) || !numeric(high)) {
             state.setText("Enter valid minimum and maximum values.",juce::dontSendNotification); return;
         }
-        b.minimum=low.getFloatValue(); b.maximum=high.getFloatValue();
+        // Named functions exclusively own output value ranges. Learn and
+        // source updates cannot rewrite the destination's scaling or route.
+        if (b.functionId==0) {
+            b.minimum=low.getFloatValue();
+            b.maximum=high.getFloatValue();
+        }
         int row=-1,column=-1;
         const bool resolved=!editSet || resolveSource(row,column);
         const bool saved=resolved && (update ?
@@ -451,24 +721,33 @@ private:
             "PREVIEW Q"+juce::String(row+1)+" — changes take effect after GO";
         if (resolved.empty()) summary+="\nNo active Control Column mappings.";
         for (const auto& item:resolved) {
-            juce::String source="Global / legacy";
+            juce::String source=item.binding.functionId>0 ?
+                "Default Map" : "Global / legacy";
             for (const auto& col:owner->show.columns)
                 if (col.id==item.columnId) {source=col.name;break;}
             const auto& b=item.binding;
             const bool local=item.columnId==sourceColumnId;
-            summary+="\n"+juce::String(local ? (item.overrides ? "OVERRIDE / " : "LOCAL / ") :
+            juce::String abstractName;
+            for (const auto& function:owner->show.controls.functions)
+                if (function.id==b.functionId) {
+                    abstractName="FUNCTION "+function.name+" / ";break;
+                }
+            summary+="\n"+abstractName+juce::String(local ? (item.overrides ? "OVERRIDE / " : "LOCAL / ") :
                 (item.overrides ? "INHERITED OVERRIDE / " : "INHERITED / "))+
                 source+" ("+(item.priority==0 ? juce::String("legacy") :
                       "P"+juce::String(item.priority))+")  "+
                 (b.kind==ControlKind::cc ? "CC " :
-                 b.kind==ControlKind::note ? "NOTE " : "BEND ")+
+                 b.kind==ControlKind::note ? "NOTE " : b.kind==ControlKind::osc ? "OSC " : "BEND ")+
                 juce::String(b.channel)+":"+juce::String(b.number)+
                 " -> "+(b.target==ControlTarget::masterGain ? "MASTER GAIN" :
                   b.target==ControlTarget::masterPan ? "MASTER PAN" :
                   b.target==ControlTarget::columnGain ? "CHANNEL GAIN" :
                   b.target==ControlTarget::columnPan ? "CHANNEL PAN" :
-                  b.target==ControlTarget::midiCc ? "MIDI CC" :
-                  b.target==ControlTarget::oscFloat ? "OSC" :
+                  b.target==ControlTarget::midiCc ?
+                    "MIDI CC "+juce::String(b.outputChannel)+":"+
+                      juce::String(b.outputNumber) :
+                  b.target==ControlTarget::oscFloat ?
+                    "OSC "+b.oscAddress :
                   b.target==ControlTarget::go ? "GO" : "PANIC");
         }
         if (effectivePreview.getText()!=summary)
@@ -487,12 +766,14 @@ private:
         const auto& b=(*entries)[(size_t)row];
         captured.reset();
         scope.setSelectedId((int)b.scope+1,juce::dontSendNotification);
-        target.setSelectedId((int)b.target+1,juce::dontSendNotification);
-        refreshColumns();
-        refreshDestinationFields();
-        for (size_t i=0;i<columnIds.size();++i)
-            if (columnIds[i]==b.targetColumnId)
-                columns.setSelectedId((int)i+1,juce::dontSendNotification);
+        scope.setEnabled(!editSet && b.functionId==0);
+        functionChoice.setSelectedId(b.functionId>0 ? b.functionId+1 : 1,
+                                     juce::dontSendNotification);
+        // Combo target item order differs from ControlTarget enumeration.
+        const ControlBinding* route=&b;
+        for (const auto& f:owner->show.controls.functions)
+            if (f.id==b.functionId) {route=&f.destination;break;}
+        showRoute(*route);
         takeover.setSelectedId((int)b.takeover+1,juce::dontSendNotification);
         curve.setSelectedId((int)b.curve+1,juce::dontSendNotification);
         minimum.setText(juce::String(b.minimum,3),false);
@@ -515,9 +796,14 @@ private:
             b.target==ControlTarget::columnPan ? "PAN" :
             b.target==ControlTarget::oscFloat ? "OSC" :
             b.target==ControlTarget::midiCc ? "MIDI CC" : "GAIN";
+        juce::String functionName=targetName;
+        for (const auto& function:owner->show.controls.functions)
+            if (function.id==b.functionId) {
+                functionName=function.name+" / "+targetName;break;
+            }
         label(g,"#"+juce::String(b.id)+"   ch"+juce::String(b.channel)+
             " "+(b.kind==ControlKind::cc?"CC ":b.kind==ControlKind::note?"NOTE ":"BEND ")+
-            juce::String(b.number)+" → "+targetName+
+            juce::String(b.number)+" → "+functionName+
             "  ["+juce::String((int)b.scope)+"]",
             {7,0,width-14,height},12,active?palette::text:palette::muted);
     }

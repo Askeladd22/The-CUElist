@@ -71,6 +71,65 @@ The **Inspector** on the right edits the selected cue and cell separately. Use i
 
 Columns can be collapsed individually or together with **Collapse all** in the cue grid header. Collapsing is a layout choice; it does not stop running media or change audio routing. The pinned BPM / Auto Stop area has a continuous visual boundary with the scrollable grid and the mixer below, including at row separators. The Cue List's **vertical scrollbar sits at its left edge**, rather than between the last cell and BPM / Auto Stop. It appears only when there are more rows than can fit on screen. The pinned row header follows that scrollbar's visible inset, keeping Play, Stop and row names aligned with the scrolling content. When no vertical scrollbar is necessary, the grid expands all the way to the BPM boundary instead of retaining an empty gutter.
 
+### Control Mapping: project functions and cue overrides (incremental implementation)
+
+The mapping editor can create a **named project function** with an independent
+output target, and bind an incoming hardware control to it. The destination
+is stored in the function rather than in the controller input: rebinding
+**Resolume Brightness** from Fader A to Fader B can still send MIDI CC 74
+on the configured MIDI output. These function names are project-specific.
+
+The `Default Map` consists of the project's global function inputs.
+A Control Column cell can supply a local input for the **same function ID**.
+When that cue becomes active after GO, the local input replaces the default
+input; when moving to another cue, the default input is automatically restored
+unless the next cue also overrides it. The old input is not kept alive alongside
+its replacement. Copy/paste Control Set cells to repeat an override deliberately.
+The Control Set editor's effective preview distinguishes inherited and locally
+overridden functions. Existing direct bindings remain readable for legacy
+projects.
+
+**MIDI Learn / OSC Learn.** Two distinct **M Learn** and **O Learn** controls
+are positioned next to the upper-right MIDI/OSC activity monitor; they open
+the global mapping panel and arm acquisition for the **Default Map only**.
+The Control Set editor has its own MIDI Learn and OSC Learn controls for the
+selected cue. An armed Learn state is marked amber; the first learned
+message is consumed rather than dispatched to GO/PANIC. The monitor's
+OSC RX indication counts genuine incoming datagrams, independent of Learn.
+
+**OSC input configuration.** OSC input is **disabled by default**, including
+when loading older projects. The operator must explicitly configure a UDP
+input port (suggested 9011) in the mapping editor and activate OSC Learn.
+Only single OSC 1.0 float, integer or boolean messages with short printable
+ASCII addresses are supported; bundles and other argument types are ignored.
+The listener has a bounded queue and transfers mapping decisions to the
+GUI thread. It binds a UDP port on the host: use only a trusted LAN, restrict
+inbound access using the Windows firewall and never expose show-control
+inputs directly to the public Internet. OSC/UDP has no authentication or
+guaranteed delivery.
+
+**Portable Default Map presets.** Use **Export Default Map** / **Import Default
+Map** in the global mapping editor. The exported JSON contains the physical
+assignments and function destinations, but **not** project-specific function
+names. Import matches functions by their order in the project, retains existing
+project names/IDs and local cue overrides, and rejects incompatible target
+columns without partially overwriting the show. Review the output hardware
+and all routed targets after import; device IDs may differ on another PC.
+
+**Legacy Control Column Lock migration.** The old per-column Lock button
+is no longer part of the operator interface. When opening a legacy locked
+project, The Cuelist first converts its global locked mappings into named
+Default Map functions with the **same physical inputs and output routes**.
+Any dormant per-cue mappings previously ignored by that lock are preserved
+as reusable Control Set templates, *not* activated automatically. The change
+is transactional and occurs **before playback is interrupted**; an invalid
+migration leaves the previous show in place. The migrated show is marked
+unsaved: review its inputs, routes and archived templates, then explicitly
+Save if the conversion is correct. The original file remains unchanged
+until the operator saves. The legacy file format remains readable; the
+global operator edit lock is a separate, future feature with no predefined
+list of blocked actions.
+
 ## 4. Managing multiple Cuelists
 
 ### 4.1 Creating, selecting and removing
