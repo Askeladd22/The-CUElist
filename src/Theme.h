@@ -132,7 +132,10 @@ public:
         setColour(juce::ScrollBar::backgroundColourId,palette::raised);
         setColour(juce::AlertWindow::backgroundColourId,palette::panel);
         setColour(juce::AlertWindow::textColourId,palette::text);
-        setColour(juce::ScrollBar::thumbColourId,palette::line.brighter(0.3f));
+        // Quiet left-edge scrollbar: readable on hover, but not a glowing
+        // white line competing with cues and the cyan BPM boundary.
+        setColour(juce::ScrollBar::thumbColourId,
+                  palette::muted.withMultipliedBrightness(0.72f));
     }
     juce::Font getTextButtonFont(juce::TextButton&,int height) override {
         return font(height<26 ? 12.5f : 15.0f,true);
