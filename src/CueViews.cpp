@@ -397,6 +397,39 @@ void CueGrid::clickRowHeader(int row,int x,int localY,int clicks,juce::Point<int
         else owner.select(row,owner.selectedColumn);
         return;
 }
+void CueGrid::clickColumnHeader(int gridX,int y,int clicks,
+                                juce::Point<int> screen) {
+    if (gridX<nameWidth || y<0 || y>=headerHeight) return;
+    const int addColumnX=columnX((int)owner.show.columns.size())+6;
+    if (y>=16 && y<47 && gridX>=addColumnX && gridX<addColumnX+31) {
+        if (clicks==1) owner.showColumnMenu(screen);
+        return;
+    }
+    const int column=columnAt(gridX);
+    if (column<0) return;
+    const auto& col=owner.show.columns[(size_t)column];
+    const int width=columnWidthAt(column), local=gridX-columnX(column);
+    if (col.collapsed) {
+        if (clicks==1) owner.toggleColumnCollapsed(column);
+        return;
+    }
+    if (clicks>1) return;
+    if (y>=10 && y<29) {
+        if (local>=width-61 && local<width-43) owner.reorderColumn(column,-1);
+        else if (local>=width-41 && local<width-23) owner.reorderColumn(column,1);
+        else if (local>=width-21 && local<width-3) owner.deleteColumn(column);
+        else owner.select(owner.selectedRow,column);
+    } else if (y>=38 && y<59 && local>=width-26)
+        owner.toggleColumnCollapsed(column);
+    else owner.select(owner.selectedRow,column);
+}
+void CueGrid::doubleClickColumnHeader(int gridX,int y) {
+    if (y<34 || y>=headerHeight || gridX<nameWidth) return;
+    const int column=columnAt(gridX);
+    if (column>=0 && !owner.show.columns[(size_t)column].collapsed &&
+        gridX-columnX(column)<columnWidthAt(column)-28)
+        owner.renameTitle(true,column);
+}
 void CueGrid::mouseDown(const juce::MouseEvent& e) {
     dragRow=dragColumn=dropRow=dropColumn=-1;dragging=false;
     const int row=e.y>=headerHeight ? (e.y-headerHeight)/rowHeight : -1;
@@ -411,11 +444,6 @@ void CueGrid::mouseDown(const juce::MouseEvent& e) {
     if (!e.mods.isLeftButtonDown()) return;
     owner.grabKeyboardFocus();
     if (e.x<0 || e.y<0) return;
-    const int addColumnX=columnX((int)owner.show.columns.size())+6;
-    if (e.y>=16 && e.y<47 && e.x>=addColumnX && e.x<addColumnX+31) {
-        owner.showColumnMenu(e.getScreenPosition());
-        return;
-    }
     const int addCueY=headerHeight+(int)owner.show.rows.size()*rowHeight+7;
     if (e.y>=addCueY && e.y<addCueY+29 &&
         e.x>=nameWidth/2-18 && e.x<nameWidth/2+18) {
@@ -423,19 +451,7 @@ void CueGrid::mouseDown(const juce::MouseEvent& e) {
         return;
     }
     if (e.y<headerHeight) {
-        if (column<0) return;
-        const auto& col=owner.show.columns[(size_t)column];
-        const int w=columnWidthAt(column),local=e.x-columnX(column);
-        if (col.collapsed) { if (e.getNumberOfClicks()==1) owner.toggleColumnCollapsed(column); return; }
-        if (e.getNumberOfClicks()>1) return;
-        if (e.y>=10 && e.y<29) {
-            if (local>=w-61 && local<w-43) owner.reorderColumn(column,-1);
-            else if (local>=w-41 && local<w-23) owner.reorderColumn(column,1);
-            else if (local>=w-21 && local<w-3) owner.deleteColumn(column);
-            else owner.select(owner.selectedRow,column);
-        } else if (e.y>=38 && e.y<59 && local>=w-26)
-            owner.toggleColumnCollapsed(column);
-        else owner.select(owner.selectedRow,column);
+        clickColumnHeader(e.x,e.y,e.getNumberOfClicks(),e.getScreenPosition());
         return;
     }
     if (row<0 || row>=(int)owner.show.rows.size()) return;
@@ -495,9 +511,7 @@ void CueGrid::mouseDoubleClick(const juce::MouseEvent& e) {
     if (e.y<headerHeight) {
         if (column<0 && e.x>=18 && e.x<nameWidth-114 && e.y<33)
             owner.renameActiveCuelist();
-        else if (column>=0 && !owner.show.columns[(size_t)column].collapsed &&
-            e.y>=34 && e.x-columnX(column)<columnWidthAt(column)-28)
-            owner.renameTitle(true,column);
+        else doubleClickColumnHeader(e.x,e.y);
         return;
     }
     const int row=(e.y-headerHeight)/rowHeight;
@@ -592,6 +606,42 @@ void PinnedCueHeaders::mouseWheelMove(const juce::MouseEvent& e,
         owner.viewport.setViewPosition(x-(int)(wheel.deltaY*100),y);
     else owner.viewport.setViewPosition(x,y-(int)(wheel.deltaY*100));
     repaint();
+}
+int PinnedColumnHeaders::gridXAt(int localX) const {
+    return CueGrid::nameWidth+owner.viewport.getViewPositionX()+localX;
+}
+void PinnedColumnHeaders::paint(juce::Graphics& g) {
+    // The grid owns all header drawing. Clip to the fixed 72px strip and
+    // translate by precisely the horizontal scroll offset so the headers
+    // track their cells without inheriting vertical scrolling.
+    g.saveState();
+    g.reduceClipRegion(getLocalBounds());
+    g.addTransform(juce::AffineTransform::translation(
+        -(float)gridXAt(0),0.0f));
+    owner.grid.paint(g);
+    g.restoreState();
+    g.setColour(palette::line);
+    g.drawHorizontalLine(getHeight()-1,0.0f,(float)getWidth());
+}
+void PinnedColumnHeaders::mouseDown(const juce::MouseEvent& e) {
+    if (!e.mods.isLeftButtonDown() || e.mods.isPopupMenu()) return;
+    if (e.y<0 || e.y>=CueGrid::headerHeight) return;
+    owner.grabKeyboardFocus();
+    owner.grid.clickColumnHeader(gridXAt(e.x),e.y,
+                                 e.getNumberOfClicks(),e.getScreenPosition());
+}
+void PinnedColumnHeaders::mouseDoubleClick(const juce::MouseEvent& e) {
+    if (e.mods.isLeftButtonDown() && !e.mods.isPopupMenu())
+        owner.grid.doubleClickColumnHeader(gridXAt(e.x),e.y);
+}
+void PinnedColumnHeaders::mouseWheelMove(
+        const juce::MouseEvent& e,const juce::MouseWheelDetails& wheel) {
+    const int x=owner.viewport.getViewPositionX();
+    const int y=owner.viewport.getViewPositionY();
+    if (e.mods.isShiftDown())
+        owner.viewport.setViewPosition(x-(int)(wheel.deltaY*100),y);
+    else
+        owner.viewport.setViewPosition(x,y-(int)(wheel.deltaY*100));
 }
 void CueMetricsOverlay::paint(juce::Graphics& g) {
     g.fillAll(palette::raised);
