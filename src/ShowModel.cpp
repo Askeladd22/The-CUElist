@@ -229,6 +229,8 @@ juce::Result validateShow(const Show& show) {
         allControlBindingIds.insert(function.id);
     for (const auto& item:show.controls.templates)
         allControlBindingIds.insert(item.id);
+    for (const auto& fn:show.controls.functions)
+        allControlBindingIds.insert(fn.id);
     // Source-column priority conflicts are resolved deterministically at runtime.
     const auto validateSet=[&](const ControlSet& set)->juce::Result {
         if (set.bindings.size()>256) return fail("Control Set exceeds 256 mappings.");
@@ -263,6 +265,22 @@ juce::Result validateShow(const Show& show) {
         }
         return juce::Result::ok();
     };
+    for (const auto& fn:show.controls.functions) {
+        const auto& binding=fn.destination;
+        if (binding.target==ControlTarget::midiCc ||
+            binding.target==ControlTarget::oscFloat ||
+            binding.target==ControlTarget::columnGain ||
+            binding.target==ControlTarget::columnPan) {
+            auto col=std::find_if(show.columns.begin(),show.columns.end(),
+                [&](const Column& c){return c.id==binding.targetColumnId;});
+            if (col==show.columns.end() ||
+                (binding.target==ControlTarget::midiCc && col->type!=ColumnType::midi) ||
+                (binding.target==ControlTarget::oscFloat && col->type!=ColumnType::osc) ||
+                ((binding.target==ControlTarget::columnGain ||
+                  binding.target==ControlTarget::columnPan) && col->type!=ColumnType::audio))
+                return fail("Named function refers to an invalid destination column.");
+        }
+    }
     for (const auto& item:show.controls.templates)
         if (auto result=validateSet(item.set);result.failed()) return result;
     for (size_t i=0;i<show.columns.size();++i) {
@@ -312,6 +330,7 @@ juce::var controlSetObject(const ControlSet& set) {
     for (const auto& b:set.bindings)
         bindings.add(object({{"id",b.id},{"deviceId",b.deviceId},
             {"kind",(int)b.kind},{"channel",b.channel},{"number",b.number},
+            {"functionId",b.functionId},
             {"scope",(int)b.scope},{"scopeId",b.scopeId},{"target",(int)b.target},
             {"targetColumnId",b.targetColumnId},{"outputChannel",b.outputChannel},
             {"outputNumber",b.outputNumber},{"outputDeviceId",b.outputDeviceId},
@@ -326,6 +345,7 @@ ControlSet parseControlSet(const juce::var& data) {
     for (const auto& item:array(data,"bindings")) {
         ControlBinding b;
         b.id=integer(item,"id"); b.deviceId=string(item,"deviceId");
+        if (item.hasProperty("functionId")) b.functionId=integer(item,"functionId");
         b.kind=(ControlKind)integer(item,"kind");
         b.channel=integer(item,"channel"); b.number=integer(item,"number");
         b.scope=(ControlScope)integer(item,"scope");
@@ -411,6 +431,7 @@ juce::String encodeShow(const Show& show) {
     for (const auto& binding:show.controls.bindings)
         bindings.add(object({{"id",binding.id},{"deviceId",binding.deviceId},
             {"kind",(int)binding.kind},{"channel",binding.channel},{"number",binding.number},
+            {"functionId",binding.functionId},
             {"scope",(int)binding.scope},{"scopeId",binding.scopeId},{"target",(int)binding.target},
             {"targetColumnId",binding.targetColumnId},{"outputChannel",binding.outputChannel},
             {"outputNumber",binding.outputNumber},{"outputDeviceId",binding.outputDeviceId},
@@ -493,6 +514,7 @@ juce::Result decodeShow(const juce::String& text, Show& destination) {
             for (const auto& item:array(data,"bindings")) {
                 ControlBinding b;
                 b.id=integer(item,"id"); b.deviceId=string(item,"deviceId");
+                if (item.hasProperty("functionId")) b.functionId=integer(item,"functionId");
                 b.kind=(ControlKind)integer(item,"kind");
                 b.channel=integer(item,"channel"); b.number=integer(item,"number");
                 b.scope=(ControlScope)integer(item,"scope"); b.scopeId=integer(item,"scopeId");

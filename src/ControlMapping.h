@@ -36,6 +36,8 @@ struct ControlEvent {
 };
 struct ControlBinding {
     int id=0;
+    // Stable function identity. Zero preserves projects created before function routing.
+    int functionId=0;
     juce::String deviceId;
     ControlKind kind=ControlKind::cc;
     int channel=1, number=0;
@@ -81,11 +83,19 @@ struct ControlPreset { int id=0; juce::String name; };
 // Reusable content is distinct from the Control Column that determines when
 // and with which priority the content becomes active.
 struct ControlSetTemplate { int id=0; juce::String name; ControlSet set; };
+// The destination belongs to a named function, never to its physical input.
+// destination contains the output parameters; its device/channel/number are ignored.
+struct ControlFunction {
+    int id=0;
+    juce::String name;
+    ControlBinding destination;
+};
 struct ControlSettings {
     juce::String midiInputId;
     int nextId=1;
     std::vector<ControlPreset> presets;
     std::vector<ControlBinding> bindings;
+    std::vector<ControlFunction> functions;
     std::vector<ControlSetTemplate> templates;
     // Functions belong to the project, not reusable controller presets.
     std::vector<ControlFunction> functions;
@@ -118,6 +128,9 @@ inline bool scopeApplies(const ControlBinding& b,int activeCueId,int activePrese
 inline int priority(ControlScope s) { return (int)s; }
 
 // Pure model. No MIDI port, audio callback, GUI or network operations.
+// Compose physical inputs into functions, and resolve the destination only
+// after a winning assignment is known. The effective cache is rebuilt only on
+// settings/layer/GO changes, not in the MIDI input callback.
 class ControlMappingEngine {
 public:
     void setSettings(ControlSettings next) {
@@ -132,8 +145,7 @@ public:
         refreshAbstractCache();
     }
     int activeCue() const noexcept { return activeCueId; }
-    // Compose the visible effective mapping for a selected cue. No live state
-    // is altered: selecting a row must never activate hardware mappings.
+    // Selecting a row previews that cue; it does NOT change the active routing.
     std::vector<EffectiveControl> effectiveForCue(int cueId,int presetId=0) const {
         std::vector<EffectiveControl> result;
         // Preserve legacy global/column/preset/cue mappings as the lowest
@@ -148,10 +160,13 @@ public:
                 });
             if (it==result.end()) result.push_back({b,0,0,true});
             else if (priority(b.scope)>priority(it->binding.scope) ||
-                (priority(b.scope)==priority(it->binding.scope) &&
-                 b.id<it->binding.id))
-                *it={b,0,0,true};
+                     (priority(b.scope)==priority(it->binding.scope) &&
+                      b.id<it->binding.id))
+                *it={b,0,0,true,false};
         }
+        // A local override replaces the *function* assignment even if its
+        // physical input changed. It also wins source collisions. Other
+        // inherited functions remain untouched.
         for (const auto& layer:layers) {
             if (!layer.locked && (cueId==0 || layer.cueId!=cueId)) continue;
             for (const auto& b:layer.set.bindings) {
@@ -238,7 +253,8 @@ public:
             best->kind!=ControlKind::note && currentTarget.has_value()) {
             const float desired=juce::jlimit(0.0f,1.0f,*currentTarget);
             const float from=state.hasPrevious ? state.previous : raw;
-            const bool crossed=from<=desired && raw>=desired || from>=desired && raw<=desired;
+            const bool crossed=(from<=desired && raw>=desired) ||
+                               (from>=desired && raw<=desired);
             if (!state.captured && !crossed && std::abs(raw-desired)>0.015f) {
                 state.previous=raw; state.hasPrevious=true; return {};
             }
@@ -251,6 +267,21 @@ public:
         return MappedControl{*best,raw,value,raw>=0.5f && !e.isNoteOff};
     }
 private:
+    ControlBinding withFunctionDestination(ControlBinding b) const {
+        if (b.functionId<=0) return b;
+        const auto it=std::find_if(settings.functions.begin(),settings.functions.end(),
+            [&](const ControlFunction& f){return f.id==b.functionId;});
+        if (it==settings.functions.end()) return b; // invalid references are rejected on load
+        const auto& d=it->destination;
+        b.target=d.target;
+        b.targetColumnId=d.targetColumnId;
+        b.outputChannel=d.outputChannel; b.outputNumber=d.outputNumber;
+        b.outputDeviceId=d.outputDeviceId;
+        b.oscHost=d.oscHost; b.oscPort=d.oscPort; b.oscAddress=d.oscAddress;
+        b.minimum=d.minimum; b.maximum=d.maximum;
+        return b;
+    }
+    void rebuild() { activeEffective=effectiveForCue(activeCueId,activePresetId); }
     struct Pickup { float previous=0; bool hasPrevious=false,captured=false; };
     ControlSettings settings;
     std::vector<ControlLayer> layers;
@@ -276,6 +307,22 @@ inline juce::Result validateControls(const ControlSettings& s,
         if (p.id<1 || p.id>=s.nextId || !ids.insert(p.id).second ||
             p.name.trim().isEmpty() || p.name.length()>120)
             return juce::Result::fail("Invalid mapping preset.");
+    for (const auto& fn:s.functions) {
+        const auto& d=fn.destination;
+        if (fn.id<1 || fn.id>=s.nextId || !ids.insert(fn.id).second ||
+            fn.name.trim().isEmpty() || fn.name.length()>120 ||
+            (int)d.target<0 || (int)d.target>7 ||
+            d.outputChannel<1 || d.outputChannel>16 ||
+            d.outputNumber<0 || d.outputNumber>127 ||
+            d.oscPort<1 || d.oscPort>65535 || d.oscHost.isEmpty() ||
+            !d.oscAddress.startsWithChar('/') ||
+            !std::isfinite(d.minimum) || !std::isfinite(d.maximum) || d.minimum>d.maximum ||
+            ((d.target==ControlTarget::masterGain || d.target==ControlTarget::columnGain) &&
+             (d.minimum<0 || d.maximum>4)) ||
+            ((d.target==ControlTarget::masterPan || d.target==ControlTarget::columnPan) &&
+             (d.minimum< -1 || d.maximum>1)))
+            return juce::Result::fail("Invalid named control function.");
+    }
     for (const auto& t:s.templates)
         if (t.id<1 || t.id>=s.nextId || !ids.insert(t.id).second ||
             t.name.trim().isEmpty() || t.name.length()>120)
@@ -297,6 +344,14 @@ inline juce::Result validateControls(const ControlSettings& s,
     for (size_t i=0;i<s.bindings.size();++i)
         for (size_t j=i+1;j<s.bindings.size();++j) {
             const auto& a=s.bindings[i],&b=s.bindings[j];
+            if (a.enabled && b.enabled && a.functionId>0 &&
+                a.functionId==b.functionId && a.scope==b.scope &&
+                (a.scope==ControlScope::column || a.scopeId==b.scopeId))
+                return juce::Result::fail("Function is assigned twice in the same mapping scope.");
+        }
+    for (size_t i=0;i<s.bindings.size();++i)
+        for (size_t j=i+1;j<s.bindings.size();++j) {
+            const auto& a=s.bindings[i],&b=s.bindings[j];
             if (!a.enabled || !b.enabled || a.deviceId!=b.deviceId ||
                 a.kind!=b.kind || a.channel!=b.channel || a.number!=b.number ||
                 a.scope!=b.scope) continue;
@@ -304,6 +359,9 @@ inline juce::Result validateControls(const ControlSettings& s,
                 return juce::Result::fail("Two mappings share the same control and priority.");
         }
     for (const auto& b:s.bindings) {
+        if (b.functionId>0 && std::none_of(s.functions.begin(),s.functions.end(),
+            [&](const ControlFunction& f){return f.id==b.functionId;}))
+            return juce::Result::fail("Mapping references a missing function.");
         if (b.id<1 || b.id>=s.nextId || !ids.insert(b.id).second || b.deviceId.length()>255
             || (b.functionId>0 && std::none_of(s.functions.begin(),s.functions.end(),
                 [&](const ControlFunction& f){return f.id==b.functionId;}))

@@ -264,7 +264,8 @@ public:
     bool setControlColumnLocked(int column,bool locked,int sourceRow);
     bool setControlColumnPriority(int column,int priority);
     juce::Result selectControlInput(const juce::String&);
-    bool addMappingBinding(ControlBinding);
+    bool addMappingBinding(ControlBinding, const juce::String& functionName={});
+    bool renameControlFunction(int functionId,const juce::String& name);
     bool deleteMappingBinding(int);
     int createAbstractControlFunction(const juce::String& name,ControlBinding destination);
     bool updateAbstractControlFunction(int id,const juce::String& name,
@@ -340,7 +341,7 @@ private:
     juce::TextButton preferencesButton{"Preferences"},helpButton{"Help"};
     juce::Label projectNameLabel;
     juce::TextButton preflightButton{"Preflight"},diagnosticsButton{"Diagnostics"};
-    juce::TextButton goButton{"GO  /  SPACE"},panicButton{"PANIC  /  ESC"},deviceButton{"Audio devices"},controlButton{"Control Mapping"};
+    juce::TextButton goButton{"GO  /  SPACE"},panicButton{"PANIC  /  ESC"},deviceButton{"Audio devices"},controlButton{"Control Mapping"},midiLearnTop{"MIDI Learn"},oscLearnTop{"OSC Learn"};
     juce::TextButton collapseAllButton{"Collapse all"};
     InspectorGripButton inspectorSideTab;
     // Up to twelve independent Cuelists; only the physically fitting tabs

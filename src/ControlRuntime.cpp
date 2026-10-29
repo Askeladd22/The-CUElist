@@ -114,11 +114,36 @@ bool MainComponent::updateAbstractControlFunction(
 bool MainComponent::addMappingBinding(ControlBinding b) {
     auto candidate=show;
     b.id=candidate.controls.nextId++;
+    if (b.functionId==0) {
+        // A named function owns the output routing. Reassigning a fader can
+        // then change the source without changing the destination's identity.
+        const int id=candidate.controls.nextId++;
+        ControlBinding destination=b;
+        destination.id=0; destination.functionId=0;
+        const auto title=name.trim().isNotEmpty() ? name.trim() :
+            "Function "+juce::String(id);
+        candidate.controls.functions.push_back({id,title,destination});
+        b.functionId=id;
+    }
     candidate.controls.bindings.push_back(std::move(b));
     const auto valid=validateShow(candidate);
     if (valid.failed()) { status=valid.getErrorMessage(); return false; }
     show=std::move(candidate); refreshControlSettings();
     dirty=true; status="Mapping added."; repaint(); return true;
+}
+
+bool MainComponent::renameControlFunction(int id,const juce::String& name) {
+    auto candidate=show;
+    const auto label=name.trim();
+    if (label.isEmpty() || label.length()>120) return false;
+    auto fn=std::find_if(candidate.controls.functions.begin(),
+        candidate.controls.functions.end(),
+        [id](const ControlFunction& f){return f.id==id;});
+    if (fn==candidate.controls.functions.end()) return false;
+    fn->name=label;
+    if (validateShow(candidate).failed()) return false;
+    show=std::move(candidate); dirty=true; status="Function renamed.";
+    repaint(); return true;
 }
 
 bool MainComponent::deleteMappingBinding(int id) {
@@ -127,6 +152,7 @@ bool MainComponent::deleteMappingBinding(int id) {
     bindings.erase(std::remove_if(bindings.begin(),bindings.end(),
         [id](const auto& b){return b.id==id;}),bindings.end());
     if (bindings.size()==n) return false;
+    // Do not delete a function: local Control Sets may still reference it.
     refreshControlSettings(); dirty=true; status="Mapping removed."; repaint();
     return true;
 }
@@ -205,7 +231,27 @@ bool MainComponent::updateControlBinding(int row,int column,int id,ControlBindin
     const auto it=std::find_if(bindings->begin(),bindings->end(),
         [id](const ControlBinding& old){return old.id==id;});
     if (it==bindings->end()) return false;
-    b.id=id; *it=std::move(b);
+    b.id=id;
+    if (!inControlSet && b.functionId==0) {
+        // Upgrade an older project's source/target entry when first edited.
+        // Existing projects remain readable without a forced migration.
+        const int newId=candidate.controls.nextId++;
+        ControlBinding destination=b;
+        destination.id=0;destination.functionId=0;
+        candidate.controls.functions.push_back({newId,
+            "Function "+juce::String(newId),destination});
+        b.functionId=newId;
+    }
+    if (!inControlSet && b.functionId>0) {
+        const auto fn=std::find_if(candidate.controls.functions.begin(),
+            candidate.controls.functions.end(),
+            [&](const ControlFunction& f){return f.id==b.functionId;});
+        if (fn==candidate.controls.functions.end()) return false;
+        // Destination edits in Default Map must propagate to all cue overrides.
+        fn->destination=b;
+        fn->destination.id=0; fn->destination.functionId=0;
+    }
+    *it=std::move(b);
     if (auto valid=validateShow(candidate);valid.failed()) {
         status=valid.getErrorMessage();repaint();return false;
     }
