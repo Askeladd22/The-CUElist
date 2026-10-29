@@ -32,11 +32,9 @@ juce::Rectangle<int> zoomButton(int width,int index) {
 void Timeline::MagnetToggle::paintButton(juce::Graphics& g,bool hovered,bool pressed) {
     const bool enabled=getToggleState();
     const auto bounds=getLocalBounds().toFloat().reduced(2.0f);
-    g.setColour(enabled ? palette::teal.withAlpha(.19f) : palette::raised);
-    g.fillRoundedRectangle(bounds,5.0f);
-    g.setColour(enabled ? palette::teal :
-                hovered || pressed ? palette::text : palette::line);
-    g.drawRoundedRectangle(bounds,5.0f,enabled ? 1.5f : 1.0f);
+    const IconButtonState state{isEnabled(),hovered,pressed,enabled,
+                                hasKeyboardFocus(false)};
+    drawIconButtonSurface(g,bounds,palette::teal,state,5.0f);
 
     // The Unicode magnet U+1F9F2 is absent from our embedded Symbols 2
     // revision. Render a precise magnet *icon* instead of a missing glyph
