@@ -122,9 +122,10 @@ void uiRefinementTests() {
             juce::Graphics graphics(image);
             const bool drawn=drawNotoSymbol(graphics,
                 (juce::juce_wchar)codepoint,{0,0,36,36},22.0f,palette::teal);
-            check(drawn==drawable,
-                  "Noto symbol renderer wrongly accepted a missing/empty glyph (U+"+
-                      juce::String::toHexString(codepoint)+")");
+            const auto coverageMessage=
+                "Noto symbol renderer wrongly accepted a missing/empty glyph (U+"+
+                juce::String::toHexString(codepoint)+")";
+            check(drawn==drawable,coverageMessage.toRawUTF8());
         }
         // Keep primary UI labels in Exo 2 / Hind, even after adding symbols.
         check(!font(12.0f).getPreferredFallbackFamilies().contains("Noto Sans Symbols 2"),
@@ -148,9 +149,10 @@ void uiRefinementTests() {
                         left=std::min(left,x);top=std::min(top,y);
                         right=std::max(right,x);bottom=std::max(bottom,y);
                     }
-            check(right>=left && bottom>=top,
-                  "Drawable Noto glyph rendered blank (U+"+
-                     juce::String::toHexString(cp)+")");
+            const auto outlineMessage=
+                "Drawable Noto glyph rendered blank (U+"+
+                juce::String::toHexString(cp)+")";
+            check(right>=left && bottom>=top,outlineMessage.toRawUTF8());
             if (right<left || bottom<top) continue;
             check(std::abs((left+right)*.5f-(w-1)*.5f)<=1.5f &&
                   std::abs((top+bottom)*.5f-(h-1)*.5f)<=1.5f,
