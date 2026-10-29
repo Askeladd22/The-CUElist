@@ -2,6 +2,7 @@
 #include "GainMeterFader.h"
 #include "HelpGuide.h"
 #include "OperatorReportDialog.h"
+#include "OperatorTextPrompt.h"
 #include "OscEditor.h"
 void uiRefinementTests() {
     using namespace cueViewFixtures;
@@ -156,6 +157,63 @@ void uiRefinementTests() {
             auto image=panel->createComponentSnapshot(panel->getLocalBounds());
             check(image.isValid(),"Information dialog content cannot be rendered");
         }
+    });
+
+    test("Shared editor prompts use Hind/Exo styling and explicit form fields",[] {
+        OperatorTextPrompt single("Rename cue","Enter a cue name.",
+                                  "Cue name","Scena",false,"Apply",[](juce::String){});
+        OperatorTextPrompt tempo("Cue tempo map","Each line is beat BPM.",
+                                 "Tempo changes","0 120\\n16 140",true,"Apply",
+                                 [](juce::String){});
+        check(single.getWidth()==510 && single.getHeight()==256 &&
+              tempo.getHeight()==400,
+              "Native editing surfaces have unexpected dimensions");
+        check(single.getEditor().getName()=="value" &&
+              single.getEditor().getText()=="Scena" &&
+              tempo.getEditor().isMultiLine() &&
+              tempo.getEditor().getText().contains("16 140"),
+              "Shared prompt lost editable text or tempo multiline support");
+        for (auto* editor :std::initializer_list<OperatorTextPrompt*>{&single,&tempo}) {
+            auto* apply=controlsV3::named(*editor,"operatorPromptAccept");
+            auto* cancel=controlsV3::named(*editor,"operatorPromptCancel");
+            check(apply && cancel && apply->getRight()+7<=cancel->getX() &&
+                  cancel->getBottom()<editor->getHeight(),
+                  "Prompt action buttons overlap or leave the dialog");
+            check(editor->getEditor().getBounds().getWidth()>=450,
+                  "Cue editor field is not visibly sized");
+            const auto image=editor->createComponentSnapshot(editor->getLocalBounds());
+            check(image.isValid(),"Shared editor failed native render");
+        }
+    });
+
+    test("Control Mapping exposes labeled targets and safe empty mapping actions",[] {
+        MainComponent ui(false);
+        ui.openControlPanel(false);
+        auto* dialog=dynamic_cast<juce::DialogWindow*>(
+            juce::ModalComponentManager::getInstance()->getModalComponent(0));
+        check(dialog!=nullptr,"Control Mapping window did not open");
+        auto* pane=controlsV3::named(*dialog,"controlMappingPanel");
+        auto* target=dynamic_cast<juce::ComboBox*>(controlsV3::named(*dialog,"mappingTarget"));
+        auto* destination=dynamic_cast<juce::ComboBox*>(
+            controlsV3::named(*dialog,"mappingDestinationColumn"));
+        auto* output=controlsV3::named(*dialog,"mappingOutputCc");
+        auto* osc=controlsV3::named(*dialog,"mappingOscAddress");
+        auto* remove=controlsV3::named(*dialog,"mappingRemoveSelected");
+        auto* update=controlsV3::named(*dialog,"mappingUpdateSelected");
+        auto* empty=controlsV3::named(*dialog,"mappingEmptyState");
+        check(pane && target && destination && output && osc && remove &&
+              update && empty,"Control Mapping controls or empty-state label missing");
+        check(pane->getHeight()>=650 && empty->isVisible() &&
+              !update->isEnabled() && !remove->isEnabled() &&
+              !destination->isEnabled(),"Default mapping state is misleading");
+        target->setSelectedId(5); // MIDI CC
+        check(output->isEnabled() && !osc->isEnabled() &&
+              destination->isEnabled(),
+              "MIDI CC target does not enable only relevant controls");
+        target->setSelectedId(6); // OSC float
+        check(!output->isEnabled() && osc->isEnabled(),
+              "OSC target does not enable its address editor");
+        delete dialog;
     });
 
     test("Midnight Slate palette preserves layered dark surfaces and safety accents",[] {
@@ -377,9 +435,11 @@ void uiRefinementTests() {
         auto* metrics=find<CueMetricsOverlay>(ui);
         check(metrics!=nullptr,"Fixed BPM / Auto Stop overlay missing");
         click(*metrics,22.0f,(float)CueGrid::headerHeight+17);
-        auto* modal=dynamic_cast<juce::AlertWindow*>(juce::ModalComponentManager::getInstance()->getModalComponent(0));
-        check(modal!=nullptr && modal->getTextEditor("value")!=nullptr,"BPM row label did not open editor");
-        check(modal->getTextEditor("value")->getText().contains("120"),"BPM dialog initial value incorrect");
+        auto* modal=dynamic_cast<juce::DialogWindow*>(
+            juce::ModalComponentManager::getInstance()->getModalComponent(0));
+        auto* editor=modal ? dynamic_cast<OperatorTextPrompt*>(modal->getContentComponent()) : nullptr;
+        check(editor!=nullptr,"BPM row label did not open shared editor");
+        check(editor->getEditor().getText().contains("120"),"BPM dialog initial value incorrect");
         delete modal;
     });
     test("MIDI and OSC timeline edges resize durations without moving clip start", [] {

@@ -20,7 +20,8 @@ public:
             &device,&connect,&learn,&add,&remove,&newPreset,&assignPreset,
             &presetName,&presets,&scope,&target,&takeover,&columns,&bindingList,&state,
             &outputCc,&oscAddress,&invert,&updateSelected,&curve,&minimum,&maximum,
-             &effectivePreview,&templateName,&templates,&saveTemplate,&loadTemplate})
+             &effectivePreview,&templateName,&templates,&saveTemplate,&loadTemplate,
+             &emptyBindings})
             addAndMakeVisible(c);
         device.setName("controlInputDevice");
         device.setTooltip("Select a device explicitly. No automatic fallback on disconnect.");
@@ -30,6 +31,14 @@ public:
         updateSelected.setButtonText("Update selected");
         updateSelected.setName("mappingUpdateSelected");
         updateSelected.setEnabled(false);
+        remove.setEnabled(false);
+        emptyBindings.setName("mappingEmptyState");
+        emptyBindings.setText("No mappings yet. Use MIDI Learn, then Add mapping.",
+                              juce::dontSendNotification);
+        emptyBindings.setColour(juce::Label::textColourId,palette::muted);
+        emptyBindings.setFont(font(13.5f));
+        emptyBindings.setJustificationType(juce::Justification::centred);
+        emptyBindings.setInterceptsMouseClicks(false,false);
         updateSelected.onClick=[this] { createBinding(true); };
         curve.setName("mappingResponseCurve");
         curve.addItemList({"Linear","Ease in","Ease out"},1);
@@ -69,19 +78,26 @@ public:
                 selected=-1;bindingList.deselectAllRows();
                 bindingList.updateContent();bindingList.repaint();
                 updateSelected.setEnabled(false);
+                remove.setEnabled(false);
+                refreshEmptyState();
                 updateEffectivePreview();
                 state.setText("Reusable Set applied.",juce::dontSendNotification);
             } else state.setText(owner->status,juce::dontSendNotification);
         };
         effectivePreview.setColour(juce::TextEditor::outlineColourId,palette::line);
         remove.setButtonText("Remove selected");
+        remove.setName("mappingRemoveSelected");
         newPreset.setButtonText("New preset");
         assignPreset.setButtonText("Assign to cue");
         presetName.setTextToShowWhenEmpty("New preset name",palette::muted);
         state.setName("mappingStatus");
         state.setJustificationType(juce::Justification::centredLeft);
+        scope.setName("mappingScope");
+        columns.setName("mappingDestinationColumn");
+        target.setName("mappingTarget");
         scope.addItemList({"Global","Column","Preset","Single cue"},1);
         scope.setSelectedId(1);
+        scope.onChange=[this] { refreshDestinationFields(); };
         scope.setVisible(!editSet);
         presets.setVisible(!editSet); newPreset.setVisible(!editSet);
         assignPreset.setVisible(!editSet); presetName.setVisible(!editSet);
@@ -90,6 +106,7 @@ public:
         target.setSelectedId(1);
         target.onChange=[this] {
             refreshColumns();
+            refreshDestinationFields();
             const int t=target.getSelectedId();
             minimum.setText(t==7 || t==8 ? "-1" : "0",false);
             maximum.setText(t==5 ? "127" : "1",false);
@@ -138,6 +155,9 @@ public:
                 owner->deleteMappingBinding(id);
             if (removed) {
                 selected=-1; bindingList.updateContent(); bindingList.repaint();
+                updateSelected.setEnabled(false);
+                remove.setEnabled(false);
+                refreshEmptyState();
             }
         };
         newPreset.onClick=[this]{
@@ -154,65 +174,88 @@ public:
                 state.setText("Preset assigned to selected cue.",juce::dontSendNotification);
         };
         refreshDevices(); refreshPresets(); refreshColumns();refreshTemplates();
+        refreshDestinationFields();
+        refreshEmptyState();
         updateEffectivePreview();
-        setSize(780,editSet ? 718 : 610); startTimerHz(10);
+        setSize(780,editSet ? 764 : 658); startTimerHz(10);
     }
     ~ControlPanel() override {stopTimer();bindingList.setModel(nullptr);}
     void paint(juce::Graphics& g) override {
         g.fillAll(palette::panel);
         label(g,editSet ? "CONTROL SET / Q"+juce::String(sourceRow+1) :
-              "CONTROL & MAPPING",{17,12,350,26},20,palette::teal,true);
-        label(g,"MIDI input",{17,55,250,19},11,palette::muted,true);
-        label(g,"MIDI Learn",{17,120,150,19},11,palette::muted,true);
-        label(g,editSet ? "Column-level priority (set in utilities)" : "Scope",
-              {17,205,195,17},11,palette::muted,true);
-        label(g,"Destination",{213,205,120,17},11,palette::muted,true);
-        label(g,"Takeover",{410,205,120,17},11,palette::muted,true);
-        label(g,"Output CC",{17,263,95,16},10,palette::muted,true);
-        label(g,"OSC address",{112,263,140,16},10,palette::muted,true);
-        const auto currentTitle=editSet ? juce::String("Control Column / ") +
-              juce::String(sourceColumnId) : juce::String("Cue preset");
-        label(g,currentTitle,{17,324,300,17},11,palette::muted,true);
-        if (editSet) label(g,"REUSABLE CONTROL SETS",{17,421,290,18},10,palette::teal,true);
-        label(g,editSet ? "Mappings in this Control Set" : "Saved mappings",
-              {17,editSet ? 475 : 402,350,20},12,palette::teal,true);
-        label(g,"Curve",{440,263,100,16},10,palette::muted,true);
-        label(g,"Min",{572,263,75,16},10,palette::muted,true);
-        label(g,"Max",{671,263,75,16},10,palette::muted,true);
-        label(g,editSet ? "Control Set takes effect on GO; locked sets apply to every cue." :
-              "Mapping chooses its active destination after GO, not when selecting a row.",
-              {17,editSet ? 686 : 579,getWidth()-32,19},10,palette::muted);
+              "CONTROL & MAPPING",{20,15,520,31},21,palette::teal,true);
+        g.setColour(palette::line);
+        g.drawHorizontalLine(52,19,(float)getWidth()-19);
+        label(g,"MIDI INPUT",{20,60,350,19},12,palette::teal,true);
+        label(g,"Input device",{20,83,200,18},11,palette::muted,true);
+        label(g,"MIDI Learn",{20,143,200,18},11,palette::muted,true);
+
+        g.setColour(palette::line);
+        g.drawHorizontalLine(191,20,(float)getWidth()-20);
+        label(g,"MAPPING CONFIGURATION",{20,198,350,19},12,palette::teal,true);
+        label(g,editSet?"Control Set scope":"Scope",{20,228,179,18},11,palette::muted,true);
+        label(g,"Target",{214,228,178,18},11,palette::muted,true);
+        label(g,"Takeover",{411,228,132,18},11,palette::muted,true);
+        label(g,"Destination column",{556,228,207,18},11,palette::muted,true);
+        label(g,"Output CC",{20,285,85,18},11,palette::muted,true);
+        label(g,"OSC address",{113,285,210,18},11,palette::muted,true);
+        label(g,"Curve",{441,285,114,18},11,palette::muted,true);
+        label(g,"Min",{573,285,84,18},11,palette::muted,true);
+        label(g,"Max",{672,285,84,18},11,palette::muted,true);
+
+        if (editSet) {
+            label(g,"EFFECTIVE MAPPING",{20,347,330,18},12,palette::teal,true);
+            label(g,"REUSABLE CONTROL SETS",{20,456,330,18},12,palette::teal,true);
+        } else {
+            label(g,"CUE PRESETS",{20,347,250,18},12,palette::teal,true);
+            label(g,"New preset name",{388,347,220,18},11,palette::muted,true);
+        }
+        label(g,editSet?"MAPPINGS IN THIS CONTROL SET":"SAVED MAPPINGS",
+              {20,editSet?534:425,380,18},12,palette::teal,true);
+        g.setColour(palette::line);
+        g.drawHorizontalLine(getHeight()-48,20,(float)getWidth()-20);
+        label(g,editSet ?
+            "Control Sets become active after GO. Locked sets apply to every cue." :
+            "Cue mappings become active after GO, not when selecting a cue.",
+            {20,getHeight()-40,getWidth()-40,23},11,palette::muted);
     }
     void resized() override {
         const int w=getWidth();
-        device.setBounds(17,78,w-157,30);
-        connect.setBounds(w-132,78,115,30);
-        learn.setBounds(17,143,120,33);
-        state.setBounds(147,142,w-164,34);
-        scope.setBounds(17,227,178,29);
-        target.setBounds(213,227,180,29);
-        takeover.setBounds(410,227,133,29);
-        columns.setBounds(555,227,w-571,29);
-        outputCc.setBounds(17,281,83,29);
-        oscAddress.setBounds(112,281,210,29);
-        invert.setBounds(345,281,88,29);
-        curve.setBounds(440,281,116,29);
-        minimum.setBounds(572,281,86,29);
-        maximum.setBounds(671,281,86,29);
-        effectivePreview.setBounds(17,344,w-34,66);
-        templateName.setBounds(17,440,170,27);
-        templates.setBounds(193,440,232,27);
-        saveTemplate.setBounds(432,440,140,27);
-        loadTemplate.setBounds(580,440,w-597,27);
-        presets.setBounds(17,344,200,30);
-        assignPreset.setBounds(226,344,150,30);
-        presetName.setBounds(388,344,w-536,30);
-        newPreset.setBounds(w-140,344,123,30);
-        bindingList.setBounds(17,editSet ? 501 : 425,w-230,editSet ? 164 : 139);
-        add.setBounds(w-202,editSet ? 501 : 426,184,37);
-        updateSelected.setBounds(w-202,editSet ? 547 : 472,184,37);
-        remove.setBounds(w-202,editSet ? 593 : 518,184,37);
+        device.setBounds(20,105,w-177,31);
+        connect.setBounds(w-143,105,123,31);
+        learn.setBounds(20,163,128,32);
+        state.setBounds(160,162,w-180,33);
+
+        scope.setBounds(20,250,176,31);
+        target.setBounds(214,250,178,31);
+        takeover.setBounds(411,250,133,31);
+        columns.setBounds(556,250,w-576,31);
+        outputCc.setBounds(20,307,84,31);
+        oscAddress.setBounds(113,307,210,31);
+        invert.setBounds(336,307,96,31);
+        curve.setBounds(441,307,115,31);
+        minimum.setBounds(573,307,85,31);
+        maximum.setBounds(672,307,85,31);
+
+        effectivePreview.setBounds(20,372,w-40,72);
+        templateName.setBounds(20,479,169,31);
+        templates.setBounds(198,479,229,31);
+        saveTemplate.setBounds(437,479,137,31);
+        loadTemplate.setBounds(584,479,w-604,31);
+        presets.setBounds(20,370,195,31);
+        assignPreset.setBounds(223,370,153,31);
+        presetName.setBounds(388,370,w-548,31);
+        newPreset.setBounds(w-149,370,129,31);
+
+        const int listY=editSet?558:449;
+        const int listHeight=editSet?136:157;
+        bindingList.setBounds(20,listY,w-239,listHeight);
+        emptyBindings.setBounds(30,listY+19,w-259,42);
+        add.setBounds(w-209,listY,189,38);
+        updateSelected.setBounds(w-209,listY+47,189,38);
+        remove.setBounds(w-209,listY+94,189,38);
     }
+
 private:
     juce::Component::SafePointer<MainComponent> owner;
     bool editSet=false;
@@ -246,10 +289,22 @@ private:
     juce::ToggleButton invert{"Invert"};
     juce::Label state;
     juce::ListBox bindingList;
+    juce::Label emptyBindings;
     std::vector<juce::String> deviceIds;
     std::vector<int> columnIds;
     std::optional<ControlEvent> captured;
     int selected=-1;
+    void refreshDestinationFields() {
+        const int t=target.getSelectedId();
+        outputCc.setEnabled(t==5);
+        oscAddress.setEnabled(t==6);
+        columns.setEnabled(editSet || scope.getSelectedId()==2 ||
+                           t==2 || t==5 || t==6 || t==7);
+    }
+    void refreshEmptyState() {
+        emptyBindings.setVisible(getNumRows()==0);
+        remove.setEnabled(selected>=0 && selected<getNumRows());
+    }
     void timerCallback() override {
         if (!owner) return;
         if (auto event=owner->consumeLearnedInput()) {
@@ -376,6 +431,8 @@ private:
         if (saved) {
             bindingList.updateContent(); bindingList.repaint();
             selected=-1;updateSelected.setEnabled(false);bindingList.deselectAllRows();
+            remove.setEnabled(false);
+            refreshEmptyState();
             captured.reset();updateEffectivePreview();
             state.setText(update ? "Mapping updated." : "Mapping saved to the show.",
                 juce::dontSendNotification);
@@ -425,12 +482,14 @@ private:
         selected=row;
         const auto* entries=currentBindings();
         updateSelected.setEnabled(entries && row>=0 && row<(int)entries->size());
+        remove.setEnabled(entries && row>=0 && row<(int)entries->size());
         if (!entries || row<0 || row>=(int)entries->size()) return;
         const auto& b=(*entries)[(size_t)row];
         captured.reset();
         scope.setSelectedId((int)b.scope+1,juce::dontSendNotification);
         target.setSelectedId((int)b.target+1,juce::dontSendNotification);
         refreshColumns();
+        refreshDestinationFields();
         for (size_t i=0;i<columnIds.size();++i)
             if (columnIds[i]==b.targetColumnId)
                 columns.setSelectedId((int)i+1,juce::dontSendNotification);
@@ -475,8 +534,10 @@ void MainComponent::openControlPanel(bool editSet) {
         "The Cuelist — Control & Mapping";
     options.dialogBackgroundColour=palette::panel;
     options.escapeKeyTriggersCloseButton=true;
-    options.useNativeTitleBar=true;
+    options.useNativeTitleBar=false;
     options.resizable=true;
     controlDialog=options.launchAsync();
+    if (controlDialog)
+        controlDialog->setLookAndFeel(&theme); // Match Exo/Hind and Midnight Slate
 }
 }

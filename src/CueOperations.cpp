@@ -1,4 +1,5 @@
 #include "MainComponent.h"
+#include "OperatorTextPrompt.h"
 #include "ShowEditOperations.h"
 #include <algorithm>
 #include <sstream>
@@ -6,21 +7,14 @@
 
 namespace cuelist {
 namespace {
-// Keep transient operator rename/tempo dialogs next to cue editing.
-void prompt(juce::Component* parent,const juce::String& title,const juce::String& hint,const juce::String& initial,
-            bool multiline,std::function<void(juce::String)> result) {
-    auto* alert=new juce::AlertWindow(title,hint,juce::MessageBoxIconType::NoIcon,parent);
-    alert->addTextEditor("value",initial,{},false); auto* editor=alert->getTextEditor("value");
-    if (multiline) { editor->setMultiLine(true); editor->setReturnKeyStartsNewLine(true); editor->setSize(440,180); }
-    if (!multiline) editor->onReturnKey=[alert] { alert->exitModalState(1); };
-    alert->addButton("Apply",1); alert->addButton("Cancel",0,juce::KeyPress(juce::KeyPress::escapeKey));
-    alert->enterModalState(true,juce::ModalCallbackFunction::create([alert,result](int answer) {
-        if (answer==1) result(alert->getTextEditorContents("value"));
-    }),true);
-    editor->grabKeyboardFocus(); editor->selectAll();
-    juce::MessageManager::callAsync([safe=juce::Component::SafePointer<juce::TextEditor>(editor)] {
-        if (safe && safe->isShowing()) { safe->grabKeyboardFocus(); safe->selectAll(); }
-    });
+// Shared prompt UI; editing, validation and destructive model changes
+// remain in the existing owner callbacks.
+void prompt(juce::Component* parent,juce::LookAndFeel& theme,
+            const juce::String& title,const juce::String& hint,
+            const juce::String& field,const juce::String& initial,bool multiline,
+            std::function<void(juce::String)> result) {
+    showOperatorTextPrompt(*parent,theme,title,hint,field,initial,multiline,
+                           "Apply",std::move(result));
 }
 }
 
@@ -193,19 +187,14 @@ void MainComponent::renameActiveCuelist() {
 
 void MainComponent::renameCuelist(int index) {
     if (index<0 || index>=(int)show.cuelists.size()) return;
-    auto* dialog=new juce::AlertWindow("Rename Cuelist",
-        "Rename the tab and its Cue List header together.",
-        juce::MessageBoxIconType::NoIcon,this);
-    dialog->addTextEditor("name",show.cuelists[(size_t)index].name,"Name");
-    dialog->addButton("Rename",1);
-    dialog->addButton("Cancel",0,juce::KeyPress(juce::KeyPress::escapeKey));
-    dialog->enterModalState(true,juce::ModalCallbackFunction::create(
-        [safe=juce::Component::SafePointer<MainComponent>(this),dialog,index](int choice) {
-            if (!safe || choice!=1) return;
-            if (!safe->setCuelistName(index,dialog->getTextEditorContents("name")))
-                safe->message("Use a unique Cuelist name of 1–64 characters.");
-        }),true);
-    dialog->getTextEditor("name")->selectAll();
+    showOperatorTextPrompt(*this,theme,"Rename Cuelist",
+        "Update the tab and its Cue List header together.",
+        "Cuelist name",show.cuelists[(size_t)index].name,false,"Rename",
+        [safe=juce::Component::SafePointer<MainComponent>(this),index](juce::String name) {
+            if (!safe) return;
+            if (!safe->setCuelistName(index,name))
+                safe->message("Use a unique Cuelist name of 1-64 characters.");
+        });
 }
 
 void MainComponent::setAllColumnsCollapsed(bool collapsed) {
@@ -272,7 +261,9 @@ void MainComponent::editTempo() {
     stopAll();
     const int rowId=show.rows[selectedRow].id; juce::String text;
     for (const auto& p : show.rows[selectedRow].tempo) text+=juce::String(p.beat)+" "+juce::String(p.bpm)+"\n";
-    prompt(this,"Cue tempo map","One line per change: beat BPM. Beats count quarter notes from zero. Does not change WAV playback speed.",text,true,
+    prompt(this,theme,"Cue tempo map",
+        "Each line contains beat and BPM. Beats count quarter notes from zero. Audio file playback speed is unchanged.",
+        "Tempo changes",text,true,
         [safe=juce::Component::SafePointer<MainComponent>(this),rowId](juce::String input) {
             if (!safe) return;
             std::vector<TempoPoint> points;
@@ -291,7 +282,9 @@ void MainComponent::editTempo() {
 void MainComponent::renameTitle(bool column,int index) {
     if (!applyInspector()) return;
     const int id=column ? show.columns[index].id : show.rows[index].id;
-    prompt(this,column ? "Rename column" : "Rename cue","Press Enter to confirm; the name may be empty.",
+    prompt(this,theme,column ? "Rename column" : "Rename cue",
+        "Give this "+juce::String(column ? "column" : "cue")+" a name (or leave it empty).",
+        column ? "Column name" : "Cue name",
         column ? show.columns[index].name : show.rows[index].name,false,
         [safe=juce::Component::SafePointer<MainComponent>(this),column,id](juce::String name) {
             if (!safe) return;
@@ -410,8 +403,8 @@ void MainComponent::deleteColumn(int index) {
 void MainComponent::editRowBpm(int index) {
     if (index<0 || index>=(int)show.rows.size() || !applyInspector()) return;
     const int id=show.rows[(size_t)index].id;
-    prompt(this,"Cue BPM","New initial BPM (20–400). Any later tempo changes remain unchanged.",
-        juce::String(show.rows[(size_t)index].tempo.front().bpm,1),false,
+    prompt(this,theme,"Cue BPM","Set the initial BPM (20–400). Later tempo changes stay unchanged.",
+        "Initial BPM",juce::String(show.rows[(size_t)index].tempo.front().bpm,1),false,
         [safe=juce::Component::SafePointer<MainComponent>(this),id](juce::String text) {
             if (!safe) return;
             const auto value=text.trim();

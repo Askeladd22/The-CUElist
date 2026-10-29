@@ -100,7 +100,7 @@ WorkspaceLayout calculateWorkspaceLayout(const WorkspaceLayoutInput& input) {
     const int cueContent=input.columnEndX+cueGridTail;
     const int scrollWidth=cueContent; // The fixed right band never needs scroll clearance.
     result.gridSize={
-        std::max(result.viewport.getWidth()-14,scrollWidth),
+        std::max(result.viewport.getWidth()-9,scrollWidth),
         std::max(result.viewport.getHeight()-14,
                  input.rowHeaderHeight+input.rowCount*input.rowHeight+cueGridTail)};
     return result;
