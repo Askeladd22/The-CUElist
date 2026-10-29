@@ -193,6 +193,79 @@ void controlMappingV10Tests() {
         check(validateShow(ui.show).wasOk(),"Assigned mapping preset invalidated show");
     });
 
+    test("named function keeps its MIDI output when a cue changes the input",[] {
+        auto show=makeShow();
+        addColumn(show,ColumnType::midi,"Show MIDI");
+        addColumn(show,ColumnType::control,"Per-cue input");
+        addRow(show,"Q2");
+        ControlBinding route;
+        route.target=ControlTarget::midiCc;
+        route.targetColumnId=show.columns[1].id;
+        route.outputChannel=3; route.outputNumber=74;
+        route.minimum=0; route.maximum=127;
+        show.controls.functions.push_back({1,"Resolume Brightness",route});
+        ControlBinding global;
+        global.id=2; global.functionId=1;
+        global.deviceId="controller-A";global.number=10;
+        global.takeover=ControlTakeover::jump;
+        show.controls.bindings.push_back(global);
+        ControlBinding local=global;
+        local.id=3; local.deviceId="controller-B"; local.number=77;
+        local.target=ControlTarget::go; // must NOT replace function routing
+        show.rows[0].cells[2].controlSet=ControlSet{{local}};
+        show.controls.nextId=4;
+        check(validateShow(show).wasOk(),"Named routing project rejected");
+        ControlMappingEngine mapping;
+        mapping.setSettings(show.controls);
+        mapping.setLayers(buildControlLayers(show));
+        auto event=[](const juce::String& device,int cc) {
+            return ControlEvent{device,ControlKind::cc,1,cc,100,false};
+        };
+        mapping.setActiveCue(show.rows[0].id,0);
+        check(mapping.matched(event("controller-A",10))==nullptr,
+              "Default source remained active after local function override");
+        const auto* first=mapping.matched(event("controller-B",77));
+        check(first && first->functionId==1 && first->target==ControlTarget::midiCc &&
+              first->outputChannel==3 && first->outputNumber==74 &&
+              first->targetColumnId==show.columns[1].id,
+              "Local physical reassignment replaced the function destination");
+        const auto preview=mapping.effectiveForCue(show.rows[1].id,0);
+        check(preview.size()==1 && preview.front().binding.deviceId=="controller-A",
+              "Cue preview kept previous cue's override");
+        mapping.setActiveCue(show.rows[1].id,0);
+        check(mapping.matched(event("controller-B",77))==nullptr &&
+              mapping.matched(event("controller-A",10))!=nullptr,
+              "Local override persisted into the next cue");
+        // Editing a function destination must also change each inherited route.
+        show.controls.functions[0].destination.outputNumber=99;
+        mapping.setSettings(show.controls);
+        mapping.setActiveCue(show.rows[0].id,0);
+        check(mapping.matched(event("controller-B",77))->outputNumber==99,
+              "Overridden source did not inherit the edited Default Map destination");
+        Show restored;
+        check(decodeShow(encodeShow(show),restored).wasOk() &&
+              restored.controls.functions.size()==1 &&
+              restored.controls.functions[0].name=="Resolume Brightness" &&
+              restored.rows[0].cells[2].controlSet->bindings[0].functionId==1,
+              "Named function or local reassignment lost on project roundtrip");
+    });
+    test("renaming a named function does not remap an output",[] {
+        MainComponent ui(false);
+        ControlBinding b;b.deviceId="desk";b.number=20;
+        b.target=ControlTarget::masterGain;
+        b.takeover=ControlTakeover::jump;
+        check(ui.addMappingBinding(b,"House Lighting"),"Default Map function not created");
+        check(ui.show.controls.functions.size()==1,
+              "Function definition missing from default map");
+        const int id=ui.show.controls.functions.front().id;
+        check(ui.renameControlFunction(id,"Resolume Brightness"),"Function rename failed");
+        check(ui.show.controls.functions.front().name=="Resolume Brightness",
+              "Function rename not persisted");
+        check(ui.show.controls.bindings[0].functionId==id,
+              "Physical assignment lost stable function identity");
+        ui.dispatchControlForTest({"desk",ControlKind::cc,1,20,64,false});
+        near(ui.show.masterGain,64.0/127);
+    });
     test("Control Column priority produces partial physical-input overrides",[] {
         auto show=makeShow();
         addColumn(show,ColumnType::audio,"Audio 2");
