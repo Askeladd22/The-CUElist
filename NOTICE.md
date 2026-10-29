@@ -16,8 +16,10 @@ The Cuelist embeds the following Google Fonts under their **own** SIL Open Font 
 
 - **Exo 2** — copyright 2013 The Exo 2 Project Authors; small text and instrumentation (minimum 10 pt). Upstream: https://github.com/google/fonts/tree/main/ofl/exo2
 - **Hind** — copyright 2014 Indian Type Foundry; larger labels, headings and titles. Upstream: https://github.com/google/fonts/tree/main/ofl/hind
+- **Noto Sans Math** — copyright 2022 The Noto Project Authors; Unicode mathematical operators including infinity (U+221E). Upstream: https://github.com/google/fonts/tree/main/ofl/notosansmath
+- **Noto Sans Symbols 2** — copyright 2022 The Noto Project Authors; supplemental Unicode symbols and pictograms. Upstream: https://github.com/google/fonts/tree/main/ofl/notosanssymbols2
 - The exact typeface files are fetched from Google Fonts commit `9862abc066c9b83bf84c3e8ed1fc2d8d48f9bbf0` when configuring CMake, then embedded in the executable. No fonts need to be installed on Windows and no runtime download is required.
-- Full upstream notices and OFL terms are preserved at [assets/fonts/Exo2-OFL.txt](assets/fonts/Exo2-OFL.txt) and [assets/fonts/Hind-OFL.txt](assets/fonts/Hind-OFL.txt). Copies are included in portable packages under `fonts/`.
+- Full upstream notices and OFL terms are preserved at [assets/fonts/Exo2-OFL.txt](assets/fonts/Exo2-OFL.txt), [assets/fonts/Hind-OFL.txt](assets/fonts/Hind-OFL.txt), [assets/fonts/NotoSansMath-OFL.txt](assets/fonts/NotoSansMath-OFL.txt) and [assets/fonts/NotoSansSymbols2-OFL.txt](assets/fonts/NotoSansSymbols2-OFL.txt). Copies are included in portable packages under `fonts/`.
 
 The OFL permits embedding the fonts in proprietary applications, provided the font copyright and license notices are kept with distribution.
 
