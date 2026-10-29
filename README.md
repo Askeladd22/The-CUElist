@@ -46,8 +46,13 @@ numeric/boolean OSC 1.0 input and updates genuine OSC RX activity. It is
 **unauthenticated**: use on a trusted LAN with appropriate firewall rules.
 Name-free controller routing presets can be exported and imported without
 overwriting project-specific function labels or unrelated local Control Sets.
-Legacy per-column Control Lock is retained only for old project migration;
-a future independent global edit lock has no assigned blocking behavior yet.
+The old per-column Control Lock is removed from the operator interface.
+On project activation, its global bindings migrate transactionally into
+named Default Map functions; dormant cue-specific sets are archived as
+reusable Control Sets rather than activated unexpectedly. Review and save
+the migrated project explicitly: the original file is not overwritten
+automatically. Legacy fields remain decoder-compatible, and a separate
+global edit lock is reserved for a later explicitly defined policy.
 
 ### The workspace
 
