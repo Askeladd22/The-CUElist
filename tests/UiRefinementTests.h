@@ -103,15 +103,28 @@ void uiRefinementTests() {
             0x1F507  // Muted
         };
         for (const int codepoint:icons) {
-            const bool included=symbols!=nullptr &&
-                symbols->getNominalGlyphForCodepoint(
-                    (juce::juce_wchar)codepoint).has_value();
+            // Nominal presence can still mean .notdef or a non-renderable
+            // glyph. An icon is supported only when JUCE supplies real ink.
+            bool drawable=false;
+            if (symbols!=nullptr) {
+                const auto glyph=symbols->getNominalGlyphForCodepoint(
+                    (juce::juce_wchar)codepoint);
+                if (glyph && static_cast<int>(*glyph)!=0) {
+                    juce::Path path;
+                    symbols->getOutlineForGlyph(juce::TypefaceMetricsKind::portable,
+                                                static_cast<int>(*glyph),path);
+                    const auto bounds=path.getBounds();
+                    drawable=!path.isEmpty() && bounds.getWidth()>0.0f &&
+                             bounds.getHeight()>0.0f;
+                }
+            }
             juce::Image image(juce::Image::ARGB,36,36,true);
             juce::Graphics graphics(image);
             const bool drawn=drawNotoSymbol(graphics,
                 (juce::juce_wchar)codepoint,{0,0,36,36},22.0f,palette::teal);
-            check(drawn==included,
-                  "The symbol drawing helper used a fallback font or ignored glyph coverage");
+            check(drawn==drawable,
+                  "Noto symbol renderer wrongly accepted a missing/empty glyph (U+"+
+                      juce::String::toHexString(codepoint)+")");
         }
         // Keep primary UI labels in Exo 2 / Hind, even after adding symbols.
         check(!font(12.0f).getPreferredFallbackFamilies().contains("Noto Sans Symbols 2"),
@@ -136,7 +149,9 @@ void uiRefinementTests() {
                         right=std::max(right,x);bottom=std::max(bottom,y);
                     }
             check(right>=left && bottom>=top,
-                  "Bundled Noto glyph has an empty visible outline");
+                  "Drawable Noto glyph rendered blank (U+"+
+                     juce::String::toHexString(cp)+")");
+            if (right<left || bottom<top) continue;
             check(std::abs((left+right)*.5f-(w-1)*.5f)<=1.5f &&
                   std::abs((top+bottom)*.5f-(h-1)*.5f)<=1.5f,
                   "Noto glyph ink is offset from the actual button centre");
@@ -144,6 +159,11 @@ void uiRefinementTests() {
                   "Noto glyph is too close to a small button edge");
         }
         check(rendered>=2,"Transport test found too few supported Noto symbols");
+        juce::Image missing(juce::Image::ARGB,24,23,true);
+        juce::Graphics missingGraphics(missing);
+        check(!drawNotoSymbol(missingGraphics,(juce::juce_wchar)0x10FFFF,
+                              {0,0,24,23},17.5f,palette::teal),
+              "Unsupported symbol incorrectly reports successful rendering");
     });
 
     test("Fader Range menu explicitly draws Noto Math instead of a fallback",[] {
