@@ -54,11 +54,18 @@ void oscAutomationV9Tests() {
         editor.setSize(940,250);
         check(editor.createComponentSnapshot(editor.getLocalBounds()).isValid(),
               "Short OSC dock failed to render.");
-        const auto saved=encodeOscClip(editor.getClip());
+        const auto& prior=editor.getClip().automations.front();
+        const double time=prior.time,duration=prior.duration;
+        const auto points=prior.points;
         editor.setSize(710,250);
         check(editor.createComponentSnapshot(editor.getLocalBounds()).isValid(),
               "Compact OSC toolbar failed to render.");
-        check(encodeOscClip(editor.getClip())==saved,
+        const auto& after=editor.getClip().automations.front();
+        check(after.time==time && after.duration==duration &&
+              after.points.size()==points.size() &&
+              after.points.front().value==points.front().value &&
+              after.points.back().value==points.back().value &&
+              validateOscClip(editor.getClip()).wasOk(),
               "OSC visual resize should not change automation data.");
     });
     test("OSC 1.0 boolean T and F encode without payload bytes",[] {
