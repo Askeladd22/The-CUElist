@@ -31,17 +31,10 @@ public:
             return;
         }
 
-        const auto symbol=speakerCodepoint(muted);
-        const auto& symbols=appTypefaces().notoSymbols2;
-        if (symbols && symbols->getNominalGlyphForCodepoint(symbol).has_value()) {
-            // This is not font fallback: choose the bundled Symbols 2
-            // typeface explicitly for both active and muted speakers.
-            g.setFont(symbolsFont(20.0f));
-            g.drawText(juce::String::charToString(symbol),
-                       getLocalBounds().reduced(2),
-                       juce::Justification::centred,false);
+        // Use the same audited, explicit glyph path as the other UI icons.
+        if (drawNotoSymbol(g,speakerCodepoint(muted),
+                           getLocalBounds().reduced(2),20.0f,ink))
             return;
-        }
         // Defensive vector alternative for a damaged/replaced embedded font.
         const float x=icon.getX(),y=icon.getY();
         juce::Path speaker;
