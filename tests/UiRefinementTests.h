@@ -68,8 +68,10 @@ void uiRefinementTests() {
               faces.notoMath->getNominalGlyphForCodepoint(0x2212).has_value(),
               "Noto Sans Math does not include minus/infinity");
         check(faces.notoSymbols2->getNominalGlyphForCodepoint(0x25B2).has_value() &&
-              faces.notoSymbols2->getNominalGlyphForCodepoint(0x25BC).has_value(),
-              "Noto Sans Symbols 2 does not include up/down arrows");
+              faces.notoSymbols2->getNominalGlyphForCodepoint(0x25BC).has_value() &&
+              faces.notoSymbols2->getNominalGlyphForCodepoint(0x25C0).has_value() &&
+              faces.notoSymbols2->getNominalGlyphForCodepoint(0x25B6).has_value(),
+              "Noto Sans Symbols 2 does not include directional arrows");
         const auto body=font(12.0f),heading=font(20.0f);
         check(body.getTypefaceName().containsIgnoreCase("Exo") &&
               heading.getTypefaceName().containsIgnoreCase("Hind"),
