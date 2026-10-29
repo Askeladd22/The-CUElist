@@ -89,11 +89,40 @@ The Control Set editor's effective preview distinguishes inherited and locally
 overridden functions. Existing direct bindings remain readable for legacy
 projects.
 
-**Implementation boundary:** this pass adds the function routing model and
-editor; the separate OSC input listener/Learn workflow, global learn toolbar
-controls, preset import/export and complete legacy Column Lock removal still
-require their own integration and validation before being described as available.
-A global emergency edit lock is not yet assigned any blocking behavior.
+**MIDI Learn / OSC Learn.** Two distinct **M Learn** and **O Learn** controls
+are positioned next to the upper-right MIDI/OSC activity monitor; they open
+the global mapping panel and arm acquisition for the **Default Map only**.
+The Control Set editor has its own MIDI Learn and OSC Learn controls for the
+selected cue. An armed Learn state is marked amber; the first learned
+message is consumed rather than dispatched to GO/PANIC. The monitor's
+OSC RX indication counts genuine incoming datagrams, independent of Learn.
+
+**OSC input configuration.** OSC input is **disabled by default**, including
+when loading older projects. The operator must explicitly configure a UDP
+input port (suggested 9011) in the mapping editor and activate OSC Learn.
+Only single OSC 1.0 float, integer or boolean messages with short printable
+ASCII addresses are supported; bundles and other argument types are ignored.
+The listener has a bounded queue and transfers mapping decisions to the
+GUI thread. It binds a UDP port on the host: use only a trusted LAN, restrict
+inbound access using the Windows firewall and never expose show-control
+inputs directly to the public Internet. OSC/UDP has no authentication or
+guaranteed delivery.
+
+**Portable Default Map presets.** Use **Export Default Map** / **Import Default
+Map** in the global mapping editor. The exported JSON contains the physical
+assignments and function destinations, but **not** project-specific function
+names. Import matches functions by their order in the project, retains existing
+project names/IDs and local cue overrides, and rejects incompatible target
+columns without partially overwriting the show. Review the output hardware
+and all routed targets after import; device IDs may differ on another PC.
+
+**Legacy Control Column Lock.** The old per-column lock is hidden for newly
+created control columns. Existing locked projects retain an explicit
+**Unlock** path for safe migration before named functions can be added.
+The old lock schema/compatibility code is still retained for loading such
+projects; it is *not* a recommended part of the new mapping workflow.
+A separate global operator edit lock is not active yet because the
+actions it will forbid have not been specified.
 
 ## 4. Managing multiple Cuelists
 
