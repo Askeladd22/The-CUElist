@@ -12,7 +12,7 @@ $package = Join-Path $checkRoot $name
 foreach ($file in @('The Cuelist.exe', 'Avvia.cmd', 'README-WINDOWS.txt', 'README.md', 'LICENSE', 'NOTICE.md', 'JUCE-LICENSE.md', 'SHA256.txt')) {
     if (!(Test-Path -LiteralPath (Join-Path $package $file))) { throw "Missing file: $file" }
 }
-foreach ($license in @('Exo2-OFL.txt','Hind-OFL.txt')) {
+foreach ($license in @('Exo2-OFL.txt','Hind-OFL.txt','NotoSansMath-OFL.txt','NotoSansSymbols2-OFL.txt')) {
     $relative = 'fonts\' + $license
     $source = Join-Path $repo ('assets\fonts\' + $license)
     $packaged = Join-Path $package $relative
