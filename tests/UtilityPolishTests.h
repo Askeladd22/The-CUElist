@@ -3,6 +3,45 @@
 #include "GainMeterFader.h"
 
 void utilityPolishTests() {
+    test("Shared icon surfaces distinguish idle hover pressed active disabled and focus",[] {
+        const auto render=[](IconButtonState state,int width,int height) {
+            juce::Image image(juce::Image::ARGB,width,height,true);
+            juce::Graphics g(image);
+            g.fillAll(palette::panel);
+            drawIconButtonSurface(g,{0,0,(float)width,(float)height},
+                                  palette::red,state);
+            return image;
+        };
+        const auto different=[](const juce::Image& a,const juce::Image& b) {
+            if (!a.isValid() || !b.isValid()) return false;
+            for (int y=0;y<a.getHeight();++y)
+                for (int x=0;x<a.getWidth();++x)
+                    if (a.getPixelAt(x,y)!=b.getPixelAt(x,y)) return true;
+            return false;
+        };
+        const auto idle=render({true,false,false,false,false},24,23);
+        const auto hover=render({true,true,false,false,false},24,23);
+        const auto press=render({true,true,true,false,false},24,23);
+        const auto active=render({true,false,false,true,false},24,23);
+        const auto disabled=render({false,false,false,false,false},24,23);
+        const auto focus=render({true,false,false,false,true},24,23);
+        check(different(idle,hover) && different(hover,press) &&
+              different(idle,active) && different(idle,disabled) &&
+              different(idle,focus),
+              "Shared icon states are not visually distinguishable");
+        check(iconButtonInk(palette::red,{false,false,false,true,false})
+                  .getFloatAlpha()<.5f &&
+              iconButtonInk(palette::red,{true,false,false,true,false})
+                  .getFloatAlpha()>.9f,
+              "Disabled icon ink or active semantic ink has incorrect contrast");
+        for (const auto sz:std::initializer_list<juce::Point<int>>{
+                 {20,23},{24,23},{32,29},{41,25}}) {
+            const auto image=render({true,false,false,true,false},sz.x,sz.y);
+            check(image.isValid() && image.getWidth()==sz.x &&
+                  image.getHeight()==sz.y,
+                  "Compact icon surface is clipped or changed its hitbox");
+        }
+    });
     test("Noto mute icons switch between sound and silence",[] {
         const auto& symbols=appTypefaces().notoSymbols2;
         check(symbols!=nullptr &&

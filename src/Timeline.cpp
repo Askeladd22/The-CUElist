@@ -32,11 +32,9 @@ juce::Rectangle<int> zoomButton(int width,int index) {
 void Timeline::MagnetToggle::paintButton(juce::Graphics& g,bool hovered,bool pressed) {
     const bool enabled=getToggleState();
     const auto bounds=getLocalBounds().toFloat().reduced(2.0f);
-    g.setColour(enabled ? palette::teal.withAlpha(.19f) : palette::raised);
-    g.fillRoundedRectangle(bounds,5.0f);
-    g.setColour(enabled ? palette::teal :
-                hovered || pressed ? palette::text : palette::line);
-    g.drawRoundedRectangle(bounds,5.0f,enabled ? 1.5f : 1.0f);
+    const IconButtonState state{isEnabled(),hovered,pressed,enabled,
+                                hasKeyboardFocus(false)};
+    drawIconButtonSurface(g,bounds,palette::teal,state,5.0f);
 
     // The Unicode magnet U+1F9F2 is absent from our embedded Symbols 2
     // revision. Render a precise magnet *icon* instead of a missing glyph
@@ -181,8 +179,12 @@ void Timeline::paint(juce::Graphics& g) {
     }
     if (getHeight()>=detailedToolbarHeight) for (int i=0;i<3;++i) {
         const auto box=zoomButton(getWidth(),i);
-        g.setColour(palette::raised); g.fillRoundedRectangle(box.toFloat(),3);
-        label(g,i==0 ? "-" : i==1 ? "+" : "Fit",box,12,palette::text,true,juce::Justification::centred);
+        // Timeline zoom controls use the same restrained icon-only surface;
+        // their click geometry and zoom/fit behavior are unchanged.
+        drawIconButtonSurface(g,box.toFloat(),palette::teal,
+                              IconButtonState{true,false,false,false,false},3.5f);
+        label(g,i==0 ? "-" : i==1 ? "+" : "Fit",box,12,palette::text,true,
+              juce::Justification::centred);
     }
     g.setColour(palette::line); g.drawHorizontalLine(45,0,(float)getWidth());
     // At minimum height even the ruler is outside the supported content

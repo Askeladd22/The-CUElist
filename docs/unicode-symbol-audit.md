@@ -13,7 +13,7 @@ It is **not** a claim that every Unicode character is supported by one font.
 The app embeds pinned OFL font binaries through CMake; see `CMakeLists.txt`
 and `NOTICE.md`. `drawNotoSymbol()` checks
 `getNominalGlyphForCodepoint()` before explicitly drawing from the
-embedded Symbols 2 typeface. Each UI caller preserves a vector fallback,
+embedded Symbols 2 typeface. When the glyph provides a vector outline, the shared renderer centres its visible ink bounds within the requested button rectangle and preserves its aspect ratio instead of centring the font advance. Each UI caller preserves a vector fallback,
 rather than showing a missing-glyph box or relying on operating-system
 emoji fonts. Availability is tested against the font **actually bundled**
 with each build.
@@ -47,6 +47,24 @@ glyphs with their underlying toggle state. The words "Mute", "Snap",
 - **Add/remove arithmetic signs and text-only toolbar actions:** preserve
   the current accessible text and spacing; don't replace them with
   unrelated decorative Unicode.
+
+## Compact icon-button surfaces
+
+A shared `IconButtonState` / `drawIconButtonSurface()` in `src/Theme.h`
+provides consistent low-contrast outlines, sparse semantic fill, disabled
+rendering and an explicit keyboard-focus ring for the small operational buttons.
+`iconButtonInk()` defines glyph emphasis separately from the frame.
+
+The same treatment is applied to Cue List row and cell transport, reorder and
+action buttons, the Auto Stop CELLS disclosure, Master/column Mute and phase
+inversion, the Snap magnet, Control lock, Inspector grip and the JUCE single-
+character add/close/more buttons. The Master Send circle is also toned down,
+while retaining its distinctive round shape.
+
+The `Noto Sans Symbols 2` glyph lookup and visible-outline centering logic are
+unchanged; this is a surface-styling pass, not a change to font coverage.
+Full-text buttons, GO and PANIC, the limiter's actual gain-reduction indicator,
+and the custom loop icon keep their own operator-specific graphics.
 
 ## QA
 

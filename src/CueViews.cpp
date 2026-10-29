@@ -10,11 +10,9 @@ juce::String timeText(double seconds) {
 }
 void smallButton(juce::Graphics& g, const juce::String& text, juce::Rectangle<int> box, bool enabled, bool danger=false) {
     const auto colour=danger ? palette::red : palette::muted;
-    g.setColour(palette::raised.withAlpha(enabled ? 1.0f : .45f));
-    g.fillRoundedRectangle(box.toFloat(),5);
-    g.setColour(palette::line.withAlpha(enabled ? 1.0f : .4f));
-    g.drawRoundedRectangle(box.toFloat().reduced(.5f),5,1);
-    const auto ink=colour.withAlpha(enabled ? 1.0f : .45f);
+    const IconButtonState state{enabled,false,false,false,false};
+    drawIconButtonSurface(g,box.toFloat(),colour,state);
+    const auto ink=iconButtonInk(colour,state);
     if (text=="^" || text=="v" || text=="<" || text==">") {
         // Unicode directional symbols are rendered in embedded Noto Sans
         // Symbols 2, rather than text-shaped ^, v, < or > placeholders.
@@ -86,11 +84,12 @@ void drawLoopIcon(juce::Graphics& g,juce::Rectangle<int> bounds,juce::Colour col
     g.fillPath(arrow);
 }
 void playPauseIcon(juce::Graphics& g,juce::Rectangle<int> box,bool pause) {
-    g.setColour(palette::raised); g.fillRoundedRectangle(box.toFloat(),5);
-    g.setColour(palette::line); g.drawRoundedRectangle(box.toFloat().reduced(.5f),5,1);
-    g.setColour(palette::teal);
+    const IconButtonState state{true,false,false,pause,false};
+    drawIconButtonSurface(g,box.toFloat(),palette::teal,state);
+    const auto ink=iconButtonInk(palette::teal,state);
+    g.setColour(ink);
     if (drawNotoSymbol(g,(juce::juce_wchar)(pause ? 0x23F8 : 0x25B6),
-                       box,17.5f,palette::teal))
+                       box,17.5f,ink))
         return;
     // Keep the previous vector drawing as a reliable fallback.
     const float cx=(float)box.getCentreX(),cy=(float)box.getCentreY();
@@ -103,12 +102,10 @@ void playPauseIcon(juce::Graphics& g,juce::Rectangle<int> box,bool pause) {
     }
 }
 void transportButton(juce::Graphics& g,juce::Rectangle<int> box,bool stop,bool enabled) {
-    g.setColour((stop ? palette::red : palette::teal).withAlpha(enabled ? .16f : .06f));
-    g.fillRoundedRectangle(box.toFloat(),5);
-    g.setColour((stop ? palette::red : palette::teal).withAlpha(enabled ? .75f : .30f));
-    g.drawRoundedRectangle(box.toFloat().reduced(.5f),5,1);
-    const auto ink=(stop ? palette::red : palette::teal)
-                  .withAlpha(enabled ? 1.0f : .25f);
+    const auto accent=stop ? palette::red : palette::teal;
+    const IconButtonState state{enabled,false,false,false,false};
+    drawIconButtonSurface(g,box.toFloat(),accent,state);
+    const auto ink=iconButtonInk(accent,state);
     g.setColour(ink);
     if (drawNotoSymbol(g,(juce::juce_wchar)(stop ? 0x23F9 : 0x25B6),
                        box,17.5f,ink))
@@ -686,10 +683,8 @@ void CueMetricsOverlay::paint(juce::Graphics& g) {
               row.stopOnNext?palette::teal:palette::muted,true);
         const bool details=owner.grid.autoStopDetailsVisible(row.id);
         const auto disclose=cellDetailsBounds(y).toFloat();
-        g.setColour(palette::raised);
-        g.fillRoundedRectangle(disclose,4.0f);
-        g.setColour((details?palette::amber:palette::line).withAlpha(.85f));
-        g.drawRoundedRectangle(disclose.reduced(.5f),4.0f,1.0f);
+        drawIconButtonSurface(g,disclose,palette::amber,
+            IconButtonState{true,false,false,details,false},4.0f);
         g.setColour(details?palette::amber:palette::text);
         const float cx=121.f,cy=(float)y+46;
         g.drawLine(cx-4.f,cy,cx+4.f,cy,1.8f);

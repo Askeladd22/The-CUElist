@@ -27,13 +27,10 @@ class InspectorGripButton final : public juce::TextButton {
 public:
     void setInspectorOpen(bool open) { inspectorOpen=open; repaint(); }
     void paintButton(juce::Graphics& g,bool hovered,bool pressed) override {
-        const auto background=palette::raised.withMultipliedBrightness(
-            pressed ? .9f : hovered ? 1.17f : 1.0f);
         const auto r=getLocalBounds().toFloat().reduced(.5f);
-        g.setColour(background);
-        g.fillRoundedRectangle(r,4.0f);
-        g.setColour(palette::line);
-        g.drawRoundedRectangle(r,4.0f,1.0f);
+        const IconButtonState state{isEnabled(),hovered,pressed,false,
+                                    hasKeyboardFocus(false)};
+        drawIconButtonSurface(g,r,palette::teal,state,4.0f);
 
         const auto cx=r.getCentreX(), cy=r.getCentreY();
         // One outer hit surface, one slim panel rail and one chevron:

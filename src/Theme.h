@@ -26,6 +26,38 @@ inline juce::Colour type(int i) {
            juce::Colour(0xff82baf4);
 }
 }
+// Small icon buttons share one restrained surface, but retain their own
+// glyphs, colours, geometry and event handling. Ordinary text buttons are
+// intentionally not forced into this visual treatment.
+struct IconButtonState {
+    bool enabled=true;
+    bool hovered=false;
+    bool pressed=false;
+    bool active=false;
+    bool keyboardFocus=false;
+};
+inline juce::Colour iconButtonInk(juce::Colour accent,const IconButtonState& state) {
+    if (!state.enabled) return palette::muted.withAlpha(.44f);
+    return accent.withAlpha(state.active || state.hovered || state.pressed ? 1.0f : .90f);
+}
+inline void drawIconButtonSurface(juce::Graphics& g,juce::Rectangle<float> bounds,
+                                  juce::Colour accent,const IconButtonState& state,
+                                  float radius=4.5f) {
+    if (bounds.isEmpty()) return;
+    const auto rect=bounds.reduced(.65f);
+    const auto fill=state.active ? accent.withAlpha(state.pressed ? .18f : .12f) :
+                    state.pressed ? palette::raised.withAlpha(.82f) :
+                    palette::raised.withAlpha(state.hovered ? .68f : .47f);
+    g.setColour(state.enabled ? fill : fill.withMultipliedAlpha(.40f));
+    g.fillRoundedRectangle(rect,radius);
+    const auto stroke=state.keyboardFocus ? palette::teal :
+        state.active ? accent.withAlpha(.58f) :
+        state.hovered ? palette::line.withAlpha(.48f) :
+                        palette::line.withAlpha(.27f);
+    g.setColour(state.enabled ? stroke : stroke.withMultipliedAlpha(.45f));
+    g.drawRoundedRectangle(rect,radius,state.keyboardFocus ? 1.65f :
+                                         state.active ? .95f : .8f);
+}
 // Embedded OFL typefaces are registered once and kept alive for the app's
 // lifetime. No user-installed fonts, startup network or Windows font state.
 struct AppTypefaces {
@@ -93,14 +125,31 @@ inline juce::Font symbolsFont(float size) {
 inline bool drawNotoSymbol(juce::Graphics& g,juce::juce_wchar codepoint,
                            juce::Rectangle<int> area,float size,juce::Colour ink) {
     const auto& symbols=appTypefaces().notoSymbols2;
-    if (symbols==nullptr ||
-        !symbols->getNominalGlyphForCodepoint(codepoint).has_value())
-        return false;
+    if (symbols==nullptr) return false;
+    const auto glyph=symbols->getNominalGlyphForCodepoint(codepoint);
+    if (!glyph) return false;
     g.saveState();
     g.setColour(ink);
-    g.setFont(symbolsFont(size));
-    g.drawText(juce::String::charToString(codepoint),area,
-               juce::Justification::centred,false);
+    juce::Path outline;
+    symbols->getOutlineForGlyph(juce::TypefaceMetricsKind::portable,
+                                static_cast<int>(*glyph),outline);
+    if (!outline.isEmpty()) {
+        // Do not centre by font advance/baseline: optical (ink) bounds can
+        // differ substantially, especially for ▶, ⏹ and directional arrows.
+        // Preserve proportions and leave 2px of breathing room on each side.
+        const float extent=juce::jmax(1.0f,juce::jmin(
+            juce::jmin((float)area.getWidth()-4.0f,
+                       (float)area.getHeight()-4.0f),size*.82f));
+        const auto target=juce::Rectangle<float>(extent,extent)
+            .withCentre(area.toFloat().getCentre());
+        g.fillPath(outline,outline.getTransformToScaleToFit(
+            target,true,juce::Justification::centred));
+    } else {
+        // Embedded Noto text rendering only; never OS emoji substitution.
+        g.setFont(symbolsFont(size));
+        g.drawText(juce::String::charToString(codepoint),area,
+                   juce::Justification::centred,false);
+    }
     g.restoreState();
     return true;
 }
@@ -166,6 +215,16 @@ public:
     juce::Font getAlertWindowFont() override { return font(14.0f); }
     juce::Font getSliderPopupFont(juce::Slider&) override { return font(14.0f); }
     void drawButtonBackground(juce::Graphics& g,juce::Button& b,const juce::Colour& colour,bool over,bool down) override {
+        const auto caption=b.getButtonText();
+        // Only icon-only JUCE TextButtons. Keep full-text controls, the
+        // emergency PANIC action and the GO button visually unchanged.
+        if (caption=="+" || caption=="x" || caption=="..." || caption=="⋯") {
+            const IconButtonState state{b.isEnabled(),over,down,
+                b.getToggleState(),b.hasKeyboardFocus(false)};
+            drawIconButtonSurface(g,b.getLocalBounds().toFloat(),
+                                  caption=="x" ? palette::red : palette::teal,state);
+            return;
+        }
         const auto r=b.getLocalBounds().toFloat().reduced(0.8f);
         const auto fill=colour.withMultipliedBrightness(down ? 0.87f : over ? 1.14f : 1.0f);
         g.setColour(b.isEnabled() ? fill : fill.withAlpha(0.46f));

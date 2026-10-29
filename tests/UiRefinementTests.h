@@ -118,6 +118,34 @@ void uiRefinementTests() {
               "Noto must be explicitly selected, not a global font fallback");
     });
 
+    test("Noto transport outlines are optically centred within icon buttons",[] {
+        int rendered=0;
+        for (const int cp:{0x25B6,0x23F9,0x25B2,0x25BC}) {
+            constexpr int w=24,h=23;
+            juce::Image image(juce::Image::ARGB,w,h,true);
+            juce::Graphics g(image);
+            if (!drawNotoSymbol(g,(juce::juce_wchar)cp,{0,0,w,h},
+                                17.5f,palette::teal))
+                continue; // Exact embedded-font coverage determines use.
+            ++rendered;
+            int left=w,top=h,right=-1,bottom=-1;
+            for (int y=0;y<h;++y)
+                for (int x=0;x<w;++x)
+                    if (image.getPixelAt(x,y).getAlpha()>24) {
+                        left=std::min(left,x);top=std::min(top,y);
+                        right=std::max(right,x);bottom=std::max(bottom,y);
+                    }
+            check(right>=left && bottom>=top,
+                  "Bundled Noto glyph has an empty visible outline");
+            check(std::abs((left+right)*.5f-(w-1)*.5f)<=1.5f &&
+                  std::abs((top+bottom)*.5f-(h-1)*.5f)<=1.5f,
+                  "Noto glyph ink is offset from the actual button centre");
+            check(left>=1 && top>=1 && right<w-1 && bottom<h-1,
+                  "Noto glyph is too close to a small button edge");
+        }
+        check(rendered>=2,"Transport test found too few supported Noto symbols");
+    });
+
     test("Fader Range menu explicitly draws Noto Math instead of a fallback",[] {
         const auto leading=faderMinusInfinity();
         check(leading.length()==2 && leading[0]==(juce::juce_wchar)0x2212 &&
