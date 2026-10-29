@@ -3,6 +3,79 @@
 #include "ControlMapping.h"
 
 void controlColumnTests() {
+    test("Abstract function preserves MIDI destination when local fader changes",[] {
+        ControlSettings settings;
+        ControlFunction function;
+        function.id=1;function.name="Resolume Brightness";
+        function.destination.target=ControlTarget::midiCc;
+        function.destination.outputNumber=74;
+        function.destination.outputChannel=9;
+        function.destination.minimum=0;
+        function.destination.maximum=127;
+        settings.functions.push_back(function);
+        settings.nextId=5;
+        ControlBinding global;global.id=2;global.deviceId="hardware-A";
+        global.number=11;global.takeover=ControlTakeover::jump;
+        global.functionId=1;settings.bindings.push_back(global);
+        ControlBinding override=global;
+        override.id=3;override.deviceId="hardware-B";override.number=25;
+        override.target=ControlTarget::oscFloat;override.outputNumber=12;
+        ControlLayer local;local.columnId=100;local.cueId=202;
+        local.priority=2;local.set.bindings.push_back(override);
+        ControlMappingEngine mapping;
+        mapping.setSettings(settings);mapping.setLayers({local});
+        const ControlEvent a{"hardware-A",ControlKind::cc,1,11,64,false};
+        const ControlEvent b{"hardware-B",ControlKind::cc,1,25,64,false};
+        mapping.setActiveCue(201,0);
+        check(mapping.matched(a)!=nullptr && mapping.matched(b)==nullptr,
+              "Default Map not active on first cue");
+        mapping.setActiveCue(202,0);
+        check(mapping.matched(a)==nullptr && mapping.matched(b)!=nullptr,
+              "Cue override did not replace the function input");
+        const auto action=mapping.resolve(b);
+        check(action && action->binding.functionId==1 &&
+              action->binding.outputNumber==74 &&
+              action->binding.outputChannel==9 &&
+              action->binding.target==ControlTarget::midiCc,
+              "Local fader changed the abstract function destination");
+        mapping.setActiveCue(203,0);
+        check(mapping.matched(a)!=nullptr && mapping.matched(b)==nullptr,
+              "Cue transition retained a stale Control Set override");
+        const auto preview=mapping.effectiveForCue(202);
+        const auto found=std::find_if(preview.begin(),preview.end(),
+            [](const EffectiveControl& c){return c.binding.functionId==1;});
+        check(found!=preview.end() && found->overrides && found->columnId==100,
+              "Control Set preview lost provenance of the function override");
+    });
+    test("Abstract function and cue override persist in optional v10 fields",[] {
+        auto show=makeShow();
+        addColumn(show,ColumnType::control,"Lighting");
+        ControlFunction f;f.id=show.controls.nextId++;
+        f.name="Resolume Brightness";
+        f.destination.target=ControlTarget::midiCc;
+        addColumn(show,ColumnType::midi,"Resolume");
+        f.destination.targetColumnId=show.columns.back().id;
+        f.destination.outputNumber=74;
+        f.destination.outputChannel=7;
+        f.destination.maximum=127;
+        show.controls.functions.push_back(f);
+        ControlBinding input;input.id=show.controls.nextId++;
+        input.deviceId="fader-A";input.number=10;input.functionId=f.id;
+        input.target=f.destination.target;input.targetColumnId=f.destination.targetColumnId;
+        show.controls.bindings.push_back(input);
+        ControlBinding replacement=input;replacement.id=show.controls.nextId++;
+        replacement.deviceId="fader-B";replacement.number=30;
+        show.rows[0].cells[1].controlSet=ControlSet{{replacement}};
+        check(validateShow(show).wasOk(),"Abstract mapping invalidates v10 show");
+        Show loaded;
+        check(decodeShow(encodeShow(show),loaded).wasOk(),
+              "Abstract mapping cannot survive a project roundtrip");
+        check(loaded.controls.functions.size()==1 &&
+              loaded.controls.functions[0].destination.outputNumber==74 &&
+              loaded.rows[0].cells[1].controlSet &&
+              loaded.rows[0].cells[1].controlSet->bindings.front().functionId==f.id,
+              "Function identity or cue override was lost on reload");
+    });
     test("Control Column Q mappings inherit and override only matching hardware inputs",[] {
         ControlBinding first; first.id=11; first.deviceId="controller";first.number=1;
         first.target=ControlTarget::columnGain;first.takeover=ControlTakeover::jump;
