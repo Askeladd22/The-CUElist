@@ -619,12 +619,17 @@ private:
                 if (col.id==item.columnId) {source=col.name;break;}
             const auto& b=item.binding;
             const bool local=item.columnId==sourceColumnId;
-            summary+="\n"+juce::String(local ? (item.overrides ? "OVERRIDE / " : "LOCAL / ") :
+            juce::String abstractName;
+            for (const auto& function:owner->show.controls.functions)
+                if (function.id==b.functionId) {
+                    abstractName="FUNCTION "+function.name+" / ";break;
+                }
+            summary+="\n"+abstractName+juce::String(local ? (item.overrides ? "OVERRIDE / " : "LOCAL / ") :
                 (item.overrides ? "INHERITED OVERRIDE / " : "INHERITED / "))+
                 source+" ("+(item.priority==0 ? juce::String("legacy") :
                       "P"+juce::String(item.priority))+")  "+
                 (b.kind==ControlKind::cc ? "CC " :
-                 b.kind==ControlKind::note ? "NOTE " : "BEND ")+
+                 b.kind==ControlKind::note ? "NOTE " : b.kind==ControlKind::osc ? "OSC " : "BEND ")+
                 juce::String(b.channel)+":"+juce::String(b.number)+
                 " -> "+(b.target==ControlTarget::masterGain ? "MASTER GAIN" :
                   b.target==ControlTarget::masterPan ? "MASTER PAN" :
@@ -679,9 +684,14 @@ private:
             b.target==ControlTarget::columnPan ? "PAN" :
             b.target==ControlTarget::oscFloat ? "OSC" :
             b.target==ControlTarget::midiCc ? "MIDI CC" : "GAIN";
+        juce::String functionName=targetName;
+        for (const auto& function:owner->show.controls.functions)
+            if (function.id==b.functionId) {
+                functionName=function.name+" / "+targetName;break;
+            }
         label(g,"#"+juce::String(b.id)+"   ch"+juce::String(b.channel)+
             " "+(b.kind==ControlKind::cc?"CC ":b.kind==ControlKind::note?"NOTE ":"BEND ")+
-            juce::String(b.number)+" → "+targetName+
+            juce::String(b.number)+" → "+functionName+
             "  ["+juce::String((int)b.scope)+"]",
             {7,0,width-14,height},12,active?palette::text:palette::muted);
     }
