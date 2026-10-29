@@ -71,6 +71,30 @@ The **Inspector** on the right edits the selected cue and cell separately. Use i
 
 Columns can be collapsed individually or together with **Collapse all** in the cue grid header. Collapsing is a layout choice; it does not stop running media or change audio routing. The pinned BPM / Auto Stop area has a continuous visual boundary with the scrollable grid and the mixer below, including at row separators. The Cue List's **vertical scrollbar sits at its left edge**, rather than between the last cell and BPM / Auto Stop. It appears only when there are more rows than can fit on screen. The pinned row header follows that scrollbar's visible inset, keeping Play, Stop and row names aligned with the scrolling content. When no vertical scrollbar is necessary, the grid expands all the way to the BPM boundary instead of retaining an empty gutter.
 
+### Control Mapping: project functions and cue overrides (incremental implementation)
+
+The mapping editor can create a **named project function** with an independent
+output target, and bind an incoming hardware control to it. The destination
+is stored in the function rather than in the controller input: rebinding
+**Resolume Brightness** from Fader A to Fader B can still send MIDI CC 74
+on the configured MIDI output. These function names are project-specific.
+
+The `Default Map` consists of the project's global function inputs.
+A Control Column cell can supply a local input for the **same function ID**.
+When that cue becomes active after GO, the local input replaces the default
+input; when moving to another cue, the default input is automatically restored
+unless the next cue also overrides it. The old input is not kept alive alongside
+its replacement. Copy/paste Control Set cells to repeat an override deliberately.
+The Control Set editor's effective preview distinguishes inherited and locally
+overridden functions. Existing direct bindings remain readable for legacy
+projects.
+
+**Implementation boundary:** this pass adds the function routing model and
+editor; the separate OSC input listener/Learn workflow, global learn toolbar
+controls, preset import/export and complete legacy Column Lock removal still
+require their own integration and validation before being described as available.
+A global emergency edit lock is not yet assigned any blocking behavior.
+
 ## 4. Managing multiple Cuelists
 
 ### 4.1 Creating, selecting and removing
