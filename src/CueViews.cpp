@@ -89,7 +89,7 @@ void playPauseIcon(juce::Graphics& g,juce::Rectangle<int> box,bool pause) {
     const auto ink=iconButtonInk(palette::teal,state);
     g.setColour(ink);
     if (drawNotoSymbol(g,(juce::juce_wchar)(pause ? 0x23F8 : 0x25B6),
-                       box,iconSize,ink))
+                       box,17.5f,ink))
         return;
     // Keep the previous vector drawing as a reliable fallback.
     const float cx=(float)box.getCentreX(),cy=(float)box.getCentreY();
@@ -109,7 +109,7 @@ void transportButton(juce::Graphics& g,juce::Rectangle<int> box,bool stop,
     const auto ink=iconButtonInk(accent,state);
     g.setColour(ink);
     if (drawNotoSymbol(g,(juce::juce_wchar)(stop ? 0x23F9 : 0x25B6),
-                       box,17.5f,ink))
+                       box,iconSize,ink))
         return;
     const float x=(float)box.getCentreX(),y=(float)box.getCentreY();
     if (stop) g.fillRect(x-4,y-4,8.0f,8.0f);
