@@ -620,6 +620,47 @@ void uiRefinementTests() {
               "Expanded column positions are inconsistent");
     });
 
+    test("Cue rows meet BPM without a right scrollbar gutter",[] {
+        MainComponent ui(false);
+        ui.setSize(1440,900);
+        auto* headers=cueViewFixtures::find<PinnedCueHeaders>(ui);
+        auto* metrics=cueViewFixtures::find<CueMetricsOverlay>(ui);
+        auto* grid=cueViewFixtures::find<CueGrid>(ui);
+        juce::Viewport* view=nullptr;
+        for (auto* child:ui.getChildren())
+            if (auto* candidate=dynamic_cast<juce::Viewport*>(child))
+                view=candidate;
+        check(view && headers && metrics && grid,
+              "Cue grid, header or metrics unavailable");
+        check(!view->isVerticalScrollbarOnTheRight(),
+              "Cue vertical scrollbar is still between cells and BPM");
+        check(!view->getVerticalScrollBar().isVisible() &&
+              grid->getWidth()==view->getWidth() &&
+              headers->getX()==view->getX(),
+              "Short Cue List still reserves an empty right-side gutter");
+        for (int i=0;i<16;++i) addRow(ui.show,"Scroll cue");
+        ui.resized();
+        check(view->getVerticalScrollBar().isVisible(),
+              "Tall Cue List did not expose its vertical scrollbar");
+        const int inset=view->getScrollBarThickness();
+        check(view->getVerticalScrollBar().getX()==0 &&
+              headers->getX()==view->getX()+inset &&
+              headers->getWidth()==CueGrid::nameWidth,
+              "Pinned header did not follow the left-side scrollbar inset");
+        check(grid->getWidth()==view->getWidth()-inset &&
+              metrics->getX()==view->getRight(),
+              "Right edge did not meet the pinned BPM strip");
+        view->setViewPosition(0,112);
+        check(view->getViewPositionY()==112,
+              "Left-side scrollbar broke cue-list vertical scrolling");
+        const auto corner=view->createComponentSnapshot({
+            view->getWidth()-7,CueGrid::headerHeight+25,7,28});
+        check(corner.isValid(),"Cue list right edge failed to render");
+        const auto body=corner.getPixelAt(3,6);
+        check(body!=juce::Colour(0xff071725),
+              "A dark scrollbar gutter is still painted against BPM");
+    });
+
     test("BPM/Auto Stop edge remains a continuous accent while rows scroll",[] {
         MainComponent ui(false);
         for (int i=0;i<8;++i) addRow(ui.show,"Cue");
