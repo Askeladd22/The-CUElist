@@ -1210,7 +1210,8 @@ void MainComponent::timerCallback() {
     while (processed++<256 && midiInput.poll(control)) {
         // A quick-Learn input is consumed, never dispatched to live GO/PANIC.
         if (consumeMidiTick) {
-            if (quickLearnFunctionId>0 && controlLearnArmed) {
+            if (quickLearnFunctionId>0 && controlLearnArmed &&
+                !(control.kind==ControlKind::note && control.isNoteOff)) {
                 controlLearnArmed=false;
                 completeQuickLearn(control);
             }
