@@ -621,7 +621,7 @@ void CueMetricsOverlay::paint(juce::Graphics& g) {
         label(g,row.stopOnNext?"ON":"OFF",{141,y+9,36,21},10,
               row.stopOnNext?palette::teal:palette::muted,true);
         const bool details=owner.grid.autoStopDetailsVisible(row.id);
-        const juce::Rectangle<float> disclose(108.f,(float)y+36,68.f,20.f);
+        const auto disclose=cellDetailsBounds(y).toFloat();
         g.setColour(palette::raised);
         g.fillRoundedRectangle(disclose,4.0f);
         g.setColour((details?palette::amber:palette::line).withAlpha(.85f));
@@ -661,7 +661,7 @@ void CueMetricsOverlay::mouseDown(const juce::MouseEvent& e) {
     if (row<0 || row>=(int)owner.show.rows.size()) return;
     const int localY=(e.y+scroll-CueGrid::headerHeight)%CueGrid::rowHeight;
     if (e.x<91) owner.editRowBpm(row);
-    else if (e.x>=104 && e.x<180 && localY>=34 && localY<59)
+    else if (cellDetailsBounds(0).contains(e.x,localY))
         owner.grid.toggleAutoStopDetails(row);
     else if (e.x>=102 && e.x<180 && localY>=8 && localY<34)
         owner.setAutoStop(row,!owner.show.rows[(size_t)row].stopOnNext);

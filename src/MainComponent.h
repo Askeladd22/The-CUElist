@@ -126,6 +126,11 @@ public:
     void mouseDown(const juce::MouseEvent&) override;
     void mouseWheelMove(const juce::MouseEvent&,const juce::MouseWheelDetails&) override;
     static constexpr int width=184;
+    // Single geometry source for both drawing and hit-testing the cell
+    // Auto Stop disclosure within the fixed BPM/AUTO STOP strip.
+    static juce::Rectangle<int> cellDetailsBounds(int rowTop) {
+        return {108,rowTop+36,68,20};
+    }
 private:
     MainComponent& owner;
 };

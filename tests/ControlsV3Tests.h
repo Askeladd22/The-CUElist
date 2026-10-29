@@ -33,12 +33,30 @@ void controlsV3Tests() {
         ui.select(1,0); ui.engine.connected.store(true); ui.engine.publish(makeRenderState(ui.show,ui.clips));
         auto* grid=find<CueGrid>(ui);
         auto sample=[&] { float value=0; float* out[]{&value}; ui.engine.collectRetired(); ui.engine.processBlock(out,1,1,48000); return value; };
-        click(*grid,CueGrid::nameWidth+CueGrid::columnWidth-40,CueGrid::headerHeight+CueGrid::rowContentInset+33); near(sample(),.1);
+        // Click the actual painted centres, not historical offsets.
+        // In particular, columnWidth-40 is now the exclusive right edge
+        // of the expanded cell Play button, not an interior point.
+        const auto cellPoint=[&](int row,int col,bool stop) {
+            const int x=CueGrid::nameWidth+col*CueGrid::columnWidth;
+            const int y=CueGrid::headerHeight+row*CueGrid::rowHeight;
+            const auto rect=stop
+                ? CueGrid::cellStopBounds(x,CueGrid::columnWidth,y)
+                : CueGrid::cellPlayBounds(x,CueGrid::columnWidth,y);
+            return juce::Point<float>((float)rect.getCentreX(),
+                                      (float)(rect.getCentreY()+CueGrid::rowContentInset));
+        };
+        const auto clickCell=[&](int row,int col,bool stop) {
+            const auto point=cellPoint(row,col,stop);
+            click(*grid,point.x,point.y);
+        };
+        clickCell(0,0,false); near(sample(),.1);
         check(ui.nextCueIndex()==1,"Cell play changed sequential GO target");
-        click(*grid,CueGrid::nameWidth+2*CueGrid::columnWidth-40,CueGrid::headerHeight+CueGrid::rowContentInset+33); near(sample(),.3);
-        click(*grid,CueGrid::nameWidth+CueGrid::columnWidth-40,CueGrid::headerHeight+CueGrid::rowHeight+CueGrid::rowContentInset+33); near(sample(),.7);
-        click(*grid,CueGrid::nameWidth+CueGrid::columnWidth-16,CueGrid::headerHeight+CueGrid::rowContentInset+33); near(sample(),.6);
-        click(*grid,CueGrid::nameWidth-52,CueGrid::headerHeight+CueGrid::rowContentInset+23); near(sample(),.4);
+        clickCell(0,1,false); near(sample(),.3);
+        clickCell(1,0,false); near(sample(),.7);
+        clickCell(0,0,true); near(sample(),.6);
+        const auto rowStop=CueGrid::rowStopBounds(CueGrid::headerHeight);
+        click(*grid,(float)rowStop.getCentreX(),
+              (float)(rowStop.getCentreY()+CueGrid::rowContentInset)); near(sample(),.4);
         check(ui.nextCueIndex()==1,"Stop changed sequential GO target");
     });
     test("column mixer widgets affect live PCM and stay aligned when scrolled", [] {
