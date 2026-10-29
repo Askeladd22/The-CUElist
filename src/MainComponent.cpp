@@ -414,7 +414,7 @@ void MainComponent::paint(juce::Graphics& g) {
     // Keep the left half free for cue-list tabs. Telemetry panels are
     // fixed to the right and never cover the source/utility workspace.
     g.setColour(palette::teal); g.fillRect(190,70,122,2);
-    const int clockX=w-785, cpuX=w-645;
+    const int clockX=w-650, cpuX=w-516;
     g.setColour(palette::panel);
     g.fillRoundedRectangle((float)clockX,8.0f,124.0f,56.0f,5.0f);
     g.fillRoundedRectangle((float)cpuX,8.0f,132.0f,56.0f,5.0f);
@@ -452,8 +452,8 @@ void MainComponent::paint(juce::Graphics& g) {
     // A compact but prominent shared signal monitor: 2x2 traffic
     // indicators and independent audio availability, all inside one card.
     // The values are real counters (OSC RX stays inactive: no listener).
-    const int statusX=w-495;
-    const auto monitor=juce::Rectangle<float>((float)statusX,8.0f,484.0f,56.0f);
+    const int statusX=w-365;
+    const auto monitor=juce::Rectangle<float>((float)statusX,8.0f,354.0f,56.0f);
     g.setColour(palette::panel);
     g.fillRoundedRectangle(monitor,5.0f);
     g.setColour(palette::line.withAlpha(.85f));
@@ -664,9 +664,6 @@ void MainComponent::resized() {
     deviceButton.setBounds(20,218,140,34);
     preferencesButton.setBounds(20,267,140,34);
     controlButton.setBounds(20,316,140,34);
-    midiLearnTop.setBounds(getWidth()-277,24,69,32);
-    oscLearnTop.setBounds(getWidth()-202,24,43,32);
-    oscLearnTop.setButtonText("OSC");
     refreshCuelistTabs();
     // Undo/Redo live in the unused upper-right band before the clock,
     // separate from the 43px-high Cuelist tab row.

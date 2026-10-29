@@ -322,7 +322,7 @@ public:
         refreshDestinationFields();
         refreshEmptyState();
         updateEffectivePreview();
-        setSize(780,editSet ? 816 : 710); startTimerHz(10);
+        setSize(780,editSet ? 764 : 658); startTimerHz(10);
     }
     ~ControlPanel() override {stopTimer();bindingList.setModel(nullptr);}
     void paint(juce::Graphics& g) override {
@@ -353,11 +353,11 @@ public:
         label(g,"Max",{672,285,84,18},11,palette::muted,true);
 
         if (editSet) {
-            label(g,"EFFECTIVE MAPPING",{20,395,330,18},12,palette::teal,true);
-            label(g,"REUSABLE CONTROL SETS",{20,504,330,18},12,palette::teal,true);
+            label(g,"EFFECTIVE MAPPING",{20,347,330,18},12,palette::teal,true);
+            label(g,"REUSABLE CONTROL SETS",{20,456,330,18},12,palette::teal,true);
         } else {
-            label(g,"CUE PRESETS",{20,395,250,18},12,palette::teal,true);
-            label(g,"New preset name",{388,395,220,18},11,palette::muted,true);
+            label(g,"CUE PRESETS",{20,347,250,18},12,palette::teal,true);
+            label(g,"New preset name",{388,347,220,18},11,palette::muted,true);
         }
         label(g,editSet?"MAPPINGS IN THIS CONTROL SET":"SAVED MAPPINGS",
               {20,editSet?534:434,380,15},11,palette::teal,true);
@@ -393,15 +393,15 @@ public:
         minimum.setBounds(573,307,85,31);
         maximum.setBounds(672,307,85,31);
 
-        effectivePreview.setBounds(20,420,w-40,72);
-        templateName.setBounds(20,527,169,31);
-        templates.setBounds(198,527,229,31);
-        saveTemplate.setBounds(437,527,137,31);
-        loadTemplate.setBounds(584,527,w-604,31);
-        presets.setBounds(20,418,195,31);
-        assignPreset.setBounds(223,418,153,31);
-        presetName.setBounds(388,418,w-548,31);
-        newPreset.setBounds(w-149,418,129,31);
+        effectivePreview.setBounds(20,372,w-40,72);
+        templateName.setBounds(20,479,169,31);
+        templates.setBounds(198,479,229,31);
+        saveTemplate.setBounds(437,479,137,31);
+        loadTemplate.setBounds(584,479,w-604,31);
+        presets.setBounds(20,370,195,31);
+        assignPreset.setBounds(223,370,153,31);
+        presetName.setBounds(388,370,w-548,31);
+        newPreset.setBounds(w-149,370,129,31);
 
         saveControllerPreset.setBounds(20,403,173,29);
         loadControllerPreset.setBounds(201,403,173,29);
@@ -556,37 +556,6 @@ private:
         }
         if (editSet) updateEffectivePreview();
     }
-    void refreshFunctions() {
-        if (!owner) return;
-        const int old=functionChoice.getSelectedId();
-        functionChoice.clear(juce::dontSendNotification);
-        functionChoice.addItem(editSet ? "Choose a Default Map function" : "New function",1);
-        for (const auto& f:owner->show.controls.functions)
-            functionChoice.addItem(f.name,f.id+1);
-        functionChoice.setSelectedId(old>0 && functionChoice.indexOfItemId(old)>=0 ? old : 1,juce::dontSendNotification);
-        loadFunctionDestination();
-    }
-    void loadFunctionDestination() {
-        if (!owner) return;
-        const int id=functionChoice.getSelectedId()-1;
-        const auto& functions=owner->show.controls.functions;
-        auto it=std::find_if(functions.begin(),functions.end(),
-            [id](const ControlFunction& f){return f.id==id;});
-        if (it==functions.end()) {if (editSet) functionName.clear();return;}
-        functionName.setText(it->name,false);
-        const auto& b=it->destination;
-        target.setSelectedId((int)b.target+1,juce::dontSendNotification);
-        refreshColumns();
-        for (size_t i=0;i<columnIds.size();++i)
-            if (columnIds[i]==b.targetColumnId)
-                columns.setSelectedId((int)i+1,juce::dontSendNotification);
-        outputChannel.setText(juce::String(b.outputChannel),false);
-        outputCc.setText(juce::String(b.outputNumber),false);
-        oscAddress.setText(b.oscAddress,false);
-        minimum.setText(juce::String(b.minimum,3),false);
-        maximum.setText(juce::String(b.maximum,3),false);
-        refreshDestinationFields();
-    }
     void refreshDevices() {
         if (!owner) return;
         device.clear(juce::dontSendNotification);
@@ -728,13 +697,13 @@ private:
         const bool saved=resolved && (update ?
             owner->updateControlBinding(row,column,b.id,b,editSet) :
             editSet ? owner->addControlSetBinding(row,column,b) :
-                      owner->addMappingBinding(b,functionName.getText()));
+                      owner->addMappingBinding(b));
         if (saved) {
             bindingList.updateContent(); bindingList.repaint();
             selected=-1;updateSelected.setEnabled(false);bindingList.deselectAllRows();
             remove.setEnabled(false);
             refreshEmptyState();
-            captured.reset();refreshFunctions();updateEffectivePreview();
+            captured.reset();updateEffectivePreview();
             state.setText(update ? "Mapping updated." : "Mapping saved to the show.",
                 juce::dontSendNotification);
         } else state.setText(owner->status,juce::dontSendNotification);
@@ -765,7 +734,7 @@ private:
                 }
             summary+="\n"+abstractName+juce::String(local ? (item.overrides ? "OVERRIDE / " : "LOCAL / ") :
                 (item.overrides ? "INHERITED OVERRIDE / " : "INHERITED / "))+
-                source+" ("+(item.priority==0 ? juce::String("default") :
+                source+" ("+(item.priority==0 ? juce::String("legacy") :
                       "P"+juce::String(item.priority))+")  "+
                 (b.kind==ControlKind::cc ? "CC " :
                  b.kind==ControlKind::note ? "NOTE " : b.kind==ControlKind::osc ? "OSC " : "BEND ")+
@@ -795,21 +764,6 @@ private:
         remove.setEnabled(entries && row>=0 && row<(int)entries->size());
         if (!entries || row<0 || row>=(int)entries->size()) return;
         const auto& b=(*entries)[(size_t)row];
-        ControlBinding display=b;
-        if (b.functionId>0)
-            for (const auto& fn:owner->show.controls.functions)
-                if (fn.id==b.functionId) {
-                    display.target=fn.destination.target;
-                    display.targetColumnId=fn.destination.targetColumnId;
-                    display.outputChannel=fn.destination.outputChannel;
-                    display.outputNumber=fn.destination.outputNumber;
-                    display.oscAddress=fn.destination.oscAddress;
-                    display.minimum=fn.destination.minimum;
-                    display.maximum=fn.destination.maximum;
-                    break;
-                }
-        functionChoice.setSelectedId(b.functionId>0 ? b.functionId+1 : 1,juce::dontSendNotification);
-        if (b.functionId>0) loadFunctionDestination();
         captured.reset();
         scope.setSelectedId((int)b.scope+1,juce::dontSendNotification);
         scope.setEnabled(!editSet && b.functionId==0);
@@ -822,10 +776,10 @@ private:
         showRoute(*route);
         takeover.setSelectedId((int)b.takeover+1,juce::dontSendNotification);
         curve.setSelectedId((int)b.curve+1,juce::dontSendNotification);
-        minimum.setText(juce::String(display.minimum,3),false);
-        maximum.setText(juce::String(display.maximum,3),false);
-        outputCc.setText(juce::String(display.outputNumber),false);
-        oscAddress.setText(display.oscAddress,false);
+        minimum.setText(juce::String(b.minimum,3),false);
+        maximum.setText(juce::String(b.maximum,3),false);
+        outputCc.setText(juce::String(b.outputNumber),false);
+        oscAddress.setText(b.oscAddress,false);
         invert.setToggleState(b.invert,juce::dontSendNotification);
         state.setText("Editing #"+juce::String(b.id)+" — input "+b.deviceId+
             " ch"+juce::String(b.channel)+" / "+juce::String(b.number),
@@ -834,9 +788,6 @@ private:
     void paintListBoxItem(int row,juce::Graphics& g,int width,int height,bool active) override {
         if (!owner || row<0 || row>=getNumRows()) return;
         const auto& b=(*currentBindings())[(size_t)row];
-        juce::String functionLabel;
-        for (const auto& fn:owner->show.controls.functions)
-            if (fn.id==b.functionId) {functionLabel=fn.name+" / ";break;}
         if (active) g.fillAll(palette::teal.withAlpha(.20f));
         juce::String targetName=b.target==ControlTarget::go ? "GO" :
             b.target==ControlTarget::panic ? "PANIC" :
