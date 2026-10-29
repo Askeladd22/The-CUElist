@@ -156,6 +156,7 @@ int OscClipEditor::trackForAutomation(int index) const {
     return -1;
 }
 int OscClipEditor::trackAt(float y) const {
+    if (y>=getHeight()-26) return -1; // reserved footer is never a lane
     for (int i=0;i<=(int)clip.tracks.size();++i)
         if (y>=laneTop(i) && y<laneTop(i)+laneHeight-4) return i;
     return -1;
@@ -232,7 +233,7 @@ void OscClipEditor::paint(juce::Graphics& g) {
     const int eventsY=eventLaneTop();
     g.setColour(palette::raised);
     g.fillRoundedRectangle((float)left,(float)eventsY,(float)axisWidth(),(float)eventHeight,3);
-    label(g,"EVENTS",{8,eventsY+6,68,19},10,palette::teal,true);
+    label(g,"EVENTS",{8,eventsY+6,68,19},12,palette::teal,true);
     for (int i=0;i<(int)clip.events.size();++i) {
         const auto& event=clip.events[(size_t)i];
         const float x=xForTime(event.time);
@@ -250,7 +251,8 @@ void OscClipEditor::paint(juce::Graphics& g) {
         const bool placeholder=track==(int)clip.tracks.size();
         if (placeholder && clip.tracks.size()>=16) break;
         const int y=laneTop(track);
-        if (y>=laneBottom || y+laneHeight<rulerBottom) continue;
+        if (y>=laneBottom || y+laneHeight<rulerBottom ||
+            (placeholder && y+25>laneBottom)) continue;
         g.setColour(track%2 ? palette::raised : palette::background);
         g.fillRect(left,y,axisWidth(),laneHeight-4);
         const bool selected=track==selectedTrack;

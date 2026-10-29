@@ -3,6 +3,64 @@
 #include <cstring>
 
 void oscAutomationV9Tests() {
+    test("OSC dock toolbar never overlaps at desktop and minimum window widths",[] {
+        MainComponent ui(false);
+        addColumn(ui.show,ColumnType::osc,"OSC");
+        check(ui.select(0,1),"Cannot select OSC column.");
+        ui.editOscClip();
+        auto* editor=controlsV3::named(ui,"sharedOscEditor");
+        auto* collapse=controlsV3::named(ui,"clipEditorCollapse");
+        auto* close=controlsV3::named(ui,"clipEditorClose");
+        check(editor && collapse && close,"Docked OSC editor actions missing.");
+        for (int width : {1180,1440,1640}) {
+            ui.setSize(width,900);
+            auto* zoom=controlsV3::named(*editor,"oscZoomFit");
+            auto* unit=controlsV3::named(*editor,"oscTimeUnit");
+            auto* detach=controlsV3::named(*editor,"oscDetach");
+            auto* snap=controlsV3::named(*editor,"oscSnapEnabled");
+            auto* grid=controlsV3::named(*editor,"oscGridVisible");
+            check(zoom && unit && detach && snap && grid,
+                  "OSC toolbar items missing.");
+            const auto localCollapse=collapse->getBounds().translated(
+                -editor->getX(),-editor->getY());
+            const auto localClose=close->getBounds().translated(
+                -editor->getX(),-editor->getY());
+            for (auto* control : {zoom,unit,detach,snap,grid})
+                check(!localCollapse.intersects(control->getBounds()) &&
+                      !localClose.intersects(control->getBounds()),
+                      "Dock buttons overlap the OSC toolbar.");
+            check(!localCollapse.intersects(localClose),
+                  "Collapse and Close overlap each other.");
+        }
+        ui.setSize(1180,900);
+        auto* collapseButton=dynamic_cast<juce::Button*>(collapse);
+        check(collapseButton!=nullptr,"Collapse button unavailable.");
+        collapseButton->triggerClick();
+        const auto bounds=ui.workspaceLayout();
+        check(collapse->getBottom()<=bounds.timeline.getY() &&
+              close->getBottom()<=bounds.timeline.getY(),
+              "Collapsed editor buttons cover the Timeline.");
+    });
+    test("OSC editor footer remains clipped and automation geometry unchanged",[] {
+        OscClip clip;clip.length=4;
+        OscAutomation ramp;
+        ramp.message.address="/brightness";
+        ramp.message.arguments={{OscValueType::decimal,0,0,{}}};
+        ramp.time=1;ramp.duration=1;
+        ramp.points={{0,0},{1,1}};
+        clip.automations.push_back(ramp);
+        OscClipEditor editor(clip,{{0,120,4,4}},
+            [](const OscClip&,const OscClip&,bool){});
+        editor.setSize(940,250);
+        check(editor.createComponentSnapshot(editor.getLocalBounds()).isValid(),
+              "Short OSC dock failed to render.");
+        const auto saved=encodeOscClip(editor.getClip());
+        editor.setSize(710,250);
+        check(editor.createComponentSnapshot(editor.getLocalBounds()).isValid(),
+              "Compact OSC toolbar failed to render.");
+        check(encodeOscClip(editor.getClip())==saved,
+              "OSC visual resize should not change automation data.");
+    });
     test("OSC 1.0 boolean T and F encode without payload bytes",[] {
         OscEvent e; e.address="/go";
         e.arguments={{OscValueType::boolean,0,0,{},true},

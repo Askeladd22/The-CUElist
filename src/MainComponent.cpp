@@ -731,9 +731,14 @@ void MainComponent::resized() {
             // The compact arrangement uses the second toolbar row.
             const bool compact=geometry.dockEditor.getWidth()<950;
             const int x=geometry.dockEditor.getX();
-            const int y=geometry.dockY+(compact ? 36 : 4);
-            clipCollapseButton.setBounds(x+(compact ? 290 : 541),y,86,26);
-            clipCloseButton.setBounds(x+(compact ? 383 : 634),y,82,26);
+            // Collapsed docks are only 36px high: their two actions
+            // must return to the first row instead of covering Timeline.
+            const int y=geometry.dockY+
+                (clipCollapsed ? 4 : compact ? 36 : 4);
+            clipCollapseButton.setBounds(
+                x+(clipCollapsed ? 14 : compact ? 290 : 541),y,86,26);
+            clipCloseButton.setBounds(
+                x+(clipCollapsed ? 109 : compact ? 383 : 634),y,82,26);
         } else {
             clipCollapseButton.setBounds(geometry.dockCollapse);
             clipCloseButton.setBounds(geometry.dockClose);
