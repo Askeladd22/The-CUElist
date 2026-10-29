@@ -116,13 +116,19 @@ project names/IDs and local cue overrides, and rejects incompatible target
 columns without partially overwriting the show. Review the output hardware
 and all routed targets after import; device IDs may differ on another PC.
 
-**Legacy Control Column Lock.** The old per-column lock is hidden for newly
-created control columns. Existing locked projects retain an explicit
-**Unlock** path for safe migration before named functions can be added.
-The old lock schema/compatibility code is still retained for loading such
-projects; it is *not* a recommended part of the new mapping workflow.
-A separate global operator edit lock is not active yet because the
-actions it will forbid have not been specified.
+**Legacy Control Column Lock migration.** The old per-column Lock button
+is no longer part of the operator interface. When opening a legacy locked
+project, The Cuelist first converts its global locked mappings into named
+Default Map functions with the **same physical inputs and output routes**.
+Any dormant per-cue mappings previously ignored by that lock are preserved
+as reusable Control Set templates, *not* activated automatically. The change
+is transactional and occurs **before playback is interrupted**; an invalid
+migration leaves the previous show in place. The migrated show is marked
+unsaved: review its inputs, routes and archived templates, then explicitly
+Save if the conversion is correct. The original file remains unchanged
+until the operator saves. The legacy file format remains readable; the
+global operator edit lock is a separate, future feature with no predefined
+list of blocked actions.
 
 ## 4. Managing multiple Cuelists
 
