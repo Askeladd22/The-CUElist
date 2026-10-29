@@ -10,6 +10,7 @@ namespace cuelist {
 
 void MainComponent::resetActiveMapping() {
     quickLearnMode=QuickLearnMode::off;quickLearnFunctionId=0;
+    quickLearnFeedback.clear();
     controlLearnArmed=false;oscLearnArmed=false;
     quickControlTargets.setVisible(false);cancelQuickLearn.setVisible(false);
     activeCueId=0;
@@ -477,6 +478,7 @@ void MainComponent::ensureStarterControlFunctions() {
 }
 void MainComponent::finishQuickLearn() {
     quickLearnMode=QuickLearnMode::off;quickLearnFunctionId=0;
+    quickLearnFeedback.clear();
     controlLearnArmed=false;oscLearnArmed=false;
     quickControlTargets.setVisible(false);cancelQuickLearn.setVisible(false);
     refresh();
@@ -502,6 +504,16 @@ void MainComponent::beginQuickLearn(bool osc) {
     }
     ensureStarterControlFunctions();
     quickLearnMode=mode;quickLearnFunctionId=0;
+    quickLearnFeedback.clear();
+    refreshQuickLearnTargets();
+    inspectorVisible=true;
+    status=osc ? "OSC Learn: choose a GUI control or function, then send OSC." :
+                 "MIDI Learn: choose a GUI control or function, then move a controller.";
+    utilities.refresh();
+    resized();repaint();
+}
+void MainComponent::refreshQuickLearnTargets() {
+    if (quickLearnMode==QuickLearnMode::off) return;
     std::vector<QuickControlTargets::Entry> entries;
     for (const auto& function:show.controls.functions) {
         juce::String detail;
@@ -531,10 +543,28 @@ void MainComponent::beginQuickLearn(bool osc) {
         entries.push_back({-101-index*2,col.name+" Pan","Audio column balance"});
     }
     quickControlTargets.setEntries(std::move(entries));
-    inspectorVisible=true;
-    status=osc ? "OSC Learn: select a function, then send OSC." :
-                 "MIDI Learn: select a function, then move a fader or press a button.";
-    resized();repaint();
+}
+void MainComponent::chooseQuickLearnGuiTarget(ControlTarget target,int columnId) {
+    if (quickLearnMode==QuickLearnMode::off) return;
+    switch (target) {
+        case ControlTarget::masterGain: chooseQuickLearnTarget(-1);return;
+        case ControlTarget::masterPan: chooseQuickLearnTarget(-2);return;
+        case ControlTarget::go: chooseQuickLearnTarget(-3);return;
+        case ControlTarget::panic: chooseQuickLearnTarget(-4);return;
+        case ControlTarget::columnGain:
+        case ControlTarget::columnPan: {
+            for (int index=0;index<(int)show.columns.size();++index) {
+                const auto& col=show.columns[(size_t)index];
+                if (col.id==columnId && col.type==ColumnType::audio) {
+                    chooseQuickLearnTarget(-100-index*2-
+                        (target==ControlTarget::columnPan ? 1 : 0));
+                    return;
+                }
+            }
+            return;
+        }
+        default: return; // Unsupported widgets are never intercepted.
+    }
 }
 void MainComponent::chooseQuickLearnTarget(int functionId) {
     if (quickLearnMode==QuickLearnMode::off) return;
@@ -590,6 +620,7 @@ void MainComponent::chooseQuickLearnTarget(int functionId) {
         repaint();return;
     }
     quickLearnFunctionId=functionId;
+    quickLearnFeedback.clear();
     if (quickLearnMode==QuickLearnMode::midi) armControlLearn();
     else armOscControlLearn();
     status="Listening for "+juce::String(quickLearnMode==QuickLearnMode::midi ?
@@ -624,14 +655,24 @@ void MainComponent::completeQuickLearn(const ControlEvent& event) {
         addMappingBinding(input);
     if (!ok) {
         status="Learn failed: "+status+". Check for conflicting hardware bindings.";
+        quickLearnFeedback="Binding failed. Select another target.";
         quickLearnFunctionId=0;controlLearnArmed=false;oscLearnArmed=false;
+        quickControlTargets.deselectAllRows();
         repaint();return;
     }
     // Preserve held-button state so repeating a learned note cannot fire
     // GO/PANIC until the physical control is released.
     physicalEdges.recordAndWasDown(event);
-    finishQuickLearn();
-    status="Learn saved to Default Map: "+name+" ← "+event.deviceId;
+    // Remain in the same Learn protocol until Cancel or its top-right
+    // toggle is pressed. This is a one-shot target selection, NOT a
+    // one-shot Learn session: the operator can immediately map the next
+    // GUI control or function without reopening MIDI/OSC Learn.
+    quickLearnFunctionId=0;
+    controlLearnArmed=false;oscLearnArmed=false;
+    quickLearnFeedback="Mapped: "+name;
+    refreshQuickLearnTargets(); // clear selection, refresh assignment labels
+    status="Learn saved to Default Map: "+name+
+        " ← "+event.deviceId+". Select the next target or Cancel Learn.";
     repaint();
 }
 
