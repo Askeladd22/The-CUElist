@@ -12,7 +12,24 @@ void MainComponent::resetActiveMapping() {
     controlMapping.setActiveCue(0,0);
 }
 
+bool MainComponent::startOscControlInput(int port) {
+    if (port<1 || port>65535) return false;
+    if (!oscInput.startListening(port)) {
+        status="OSC input port unavailable. Choose another UDP port.";
+        return false;
+    }
+    show.controls.oscInputPort=port;
+    dirty=true;
+    status="OSC control listener enabled on UDP "+juce::String(port)+".";
+    repaint();
+    return true;
+}
+
 void MainComponent::refreshControlSettings() {
+    if (show.controls.oscInputPort==0) oscInput.stopListening();
+    else if (oscInput.port()!=show.controls.oscInputPort &&
+             !oscInput.startListening(show.controls.oscInputPort))
+        status="Saved OSC input port is unavailable.";
     controlMapping.setSettings(show.controls);
     // Resolution order and preset selection are pure, tested show-model
     // operations; device ownership/reconnection stays on the UI thread.
