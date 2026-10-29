@@ -15,6 +15,12 @@ void controlMappingV10Tests() {
                                  {2,"OSC Function 1",osc}};
         show.controls.nextId=3;
         check(validateShow(show).wasOk(),"Unconfigured output placeholders rejected");
+        const auto preset=exportControllerPreset(show);
+        Show controllerImport=makeShow();
+        check(importControllerPreset(preset,controllerImport).wasOk() &&
+              controllerImport.controls.functions.size()==2 &&
+              controllerImport.controls.functions[0].destination.targetColumnId==0,
+              "Unconfigured controller preset import must remain inert");
         Show loaded;
         check(decodeShow(encodeShow(show),loaded).wasOk() &&
               loaded.controls.functions.size()==2,"Function placeholders lost on reload");

@@ -94,22 +94,28 @@ inline juce::Result importControllerPreset(const juce::String& text,Show& destin
             if(needsColumn) {
                 const int wanted=(int)(route.target==ControlTarget::midiCc ? ColumnType::midi :
                     route.target==ControlTarget::oscFloat ? ColumnType::osc : ColumnType::audio);
-                if(type!=wanted || ordinal<0)
-                    throw std::runtime_error("Preset has an invalid destination column.");
-                int count=0;
-                Column* selected=nullptr;
-                for(auto& col:proposed.columns)
-                    if((int)col.type==wanted && count++==ordinal) {
-                        selected=&col;break;
+                if(type==-1 && ordinal==-1) {
+                    // Unconfigured output placeholder: preserve the function
+                    // without silently routing it to an unrelated column.
+                    route.targetColumnId=0;
+                } else {
+                    if(type!=wanted || ordinal<0)
+                        throw std::runtime_error("Preset has an invalid destination column.");
+                    int count=0;
+                    Column* selected=nullptr;
+                    for(auto& col:proposed.columns)
+                        if((int)col.type==wanted && count++==ordinal) {
+                            selected=&col;break;
+                        }
+                    if(!selected) throw std::runtime_error(
+                        "Project lacks a compatible output column for this preset.");
+                    route.targetColumnId=selected->id;
+                    if(route.target==ControlTarget::midiCc)
+                        selected->midiOutputId=record.getProperty("midiOutputId",{}).toString();
+                    else if(route.target==ControlTarget::oscFloat) {
+                        selected->oscHost=record.getProperty("oscHost",{}).toString();
+                        selected->oscPort=(int)record.getProperty("oscPort",{});
                     }
-                if(!selected) throw std::runtime_error(
-                    "Project lacks a compatible output column for this preset.");
-                route.targetColumnId=selected->id;
-                if(route.target==ControlTarget::midiCc)
-                    selected->midiOutputId=record.getProperty("midiOutputId",{}).toString();
-                else if(route.target==ControlTarget::oscFloat) {
-                    selected->oscHost=record.getProperty("oscHost",{}).toString();
-                    selected->oscPort=(int)record.getProperty("oscPort",{});
                 }
             }
             int functionId=0;
