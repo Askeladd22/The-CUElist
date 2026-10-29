@@ -137,9 +137,16 @@ void uiRefinementTests() {
         for (const int cp:{0x25B6,0x23F9,0x25B2,0x25BC}) {
             constexpr int w=24,h=23;
             juce::Image image(juce::Image::ARGB,w,h,true);
-            juce::Graphics g(image);
-            if (!drawNotoSymbol(g,(juce::juce_wchar)cp,{0,0,w,h},
-                                17.5f,palette::teal))
+            bool drawn=false;
+            {
+                // On Windows the graphics backend may defer raster writes
+                // until the Graphics context is destroyed. Reading pixels
+                // with that context still alive falsely reports a blank glyph.
+                juce::Graphics g(image);
+                drawn=drawNotoSymbol(g,(juce::juce_wchar)cp,{0,0,w,h},
+                                     17.5f,palette::teal);
+            }
+            if (!drawn)
                 continue; // Exact embedded-font coverage determines use.
             ++rendered;
             int left=w,top=h,right=-1,bottom=-1;
