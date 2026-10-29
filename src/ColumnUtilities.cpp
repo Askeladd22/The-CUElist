@@ -86,10 +86,10 @@ struct ColumnUtilities::Strip final : juce::Component {
         controlPriority.setName("controlColumnPriority");
         controlEdit.setName("controlColumnEditSet");
         controlLock.setTooltip("Legacy Control Column lock. Unlock before migrating to abstract functions.");
-        controlLock.onClick=[this] {
-            const auto& col=owner.show.columns[(size_t)index];
-            owner.setControlColumnLocked(index,!col.controlLocked,owner.selectedRow);
-        };
+        // Deliberately no lock callback: Default Map plus Q overrides
+        // replaces column-wide lock semantics. Kept as an inert hidden
+        // compatibility widget until old project migration tests retire it.
+        controlLock.setEnabled(false);
         controlPriority.onClick=[this] {
             if (owner.show.columns[(size_t)index].controlLocked) return;
             juce::PopupMenu menu;
@@ -176,13 +176,14 @@ struct ColumnUtilities::Strip final : juce::Component {
         // The old column lock cannot be enabled on a new Default Map.
         // Show only already-locked legacy projects so the operator may
         // explicitly unlock and migrate without losing their old settings.
-        controlLock.setVisible(control && col.controlLocked &&
-                               owner.show.controls.functions.empty());
+        // Retired: a locked legacy column is migrated when the project is
+        // activated. Never expose the old per-column lock in the new UI.
+        controlLock.setVisible(false);
         controlPriority.setVisible(control && !col.collapsed);
         controlEdit.setVisible(control && !col.collapsed);
         if (control) {
             controlLock.setToggleState(col.controlLocked,juce::dontSendNotification);
-            controlLock.setTooltip("Legacy lock active: unlock before using named functions.");
+            controlLock.setTooltip("Retired legacy control; migrated on project open.");
             controlPriority.setButtonText(col.controlLocked ? "Low" :
                 col.controlPriority==4 ? "Maximum" :
                 col.controlPriority==3 ? "High" : "Medium");
