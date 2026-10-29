@@ -485,6 +485,7 @@ private:
         scope.setSelectedId((int)b.scope+1,juce::dontSendNotification);
         target.setSelectedId((int)b.target+1,juce::dontSendNotification);
         refreshColumns();
+        refreshDestinationFields();
         for (size_t i=0;i<columnIds.size();++i)
             if (columnIds[i]==b.targetColumnId)
                 columns.setSelectedId((int)i+1,juce::dontSendNotification);
