@@ -287,8 +287,8 @@ void CueGrid::paint(juce::Graphics& g) {
             }
             if (column.type!=ColumnType::control) {
                 // 24x23 px individual transports, with an 8px safety gap.
-                transportButton(g,{x+w-64,y+23,24,23},false,loaded);
-                transportButton(g,{x+w-32,y+23,24,23},true,loaded);
+                transportButton(g,cellPlayBounds(x,w,y),false,loaded);
+                transportButton(g,cellStopBounds(x,w,y),true,loaded);
             }
         }
         g.restoreState();
@@ -452,12 +452,12 @@ void CueGrid::mouseDown(const juce::MouseEvent& e) {
             owner.setCellAutoStop(row,column,!owner.show.rows[(size_t)row].cells[(size_t)column].stopOnNext);
         return;
     }
-    if (col.type!=ColumnType::control && localY>=23 && localY<46) {
-        if (localX>=w-64 && localX<w-40) {
+    if (col.type!=ColumnType::control) {
+        if (cellPlayBounds(0,w,0).contains(localX,localY)) {
             if (e.getNumberOfClicks()==1 && owner.hasClip(row,column)) owner.triggerCellAt(row,column);
             return;
         }
-        if (localX>=w-32 && localX<w-8) {
+        if (cellStopBounds(0,w,0).contains(localX,localY)) {
             if (e.getNumberOfClicks()==1 && owner.hasClip(row,column)) owner.stopCellAt(row,column);
             return;
         }
@@ -504,7 +504,9 @@ void CueGrid::mouseDoubleClick(const juce::MouseEvent& e) {
     if (e.x>=107 && e.x<rowPlayBounds(0).getX()-4) owner.renameTitle(false,row);
     else if (column>=0 && !owner.show.columns[(size_t)column].collapsed) {
         const int localX=e.x-columnX(column),localY=(e.y-headerHeight)%rowHeight-rowContentInset;
-        if (localY>=23 && localY<46 && localX>=columnWidthAt(column)-64) return;
+        if (cellPlayBounds(0,columnWidthAt(column),0).contains(localX,localY) ||
+            cellStopBounds(0,columnWidthAt(column),0).contains(localX,localY))
+            return;
         if (owner.select(row,column)) {
             const auto type=owner.show.columns[(size_t)column].type;
             if (type==ColumnType::midi) owner.editMidiClip();
