@@ -13,7 +13,7 @@ It is **not** a claim that every Unicode character is supported by one font.
 The app embeds pinned OFL font binaries through CMake; see `CMakeLists.txt`
 and `NOTICE.md`. `drawNotoSymbol()` checks
 `getNominalGlyphForCodepoint()` before explicitly drawing from the
-embedded Symbols 2 typeface. Each UI caller preserves a vector fallback,
+embedded Symbols 2 typeface. When the glyph provides a vector outline, the shared renderer centres its visible ink bounds within the requested button rectangle and preserves its aspect ratio instead of centring the font advance. Each UI caller preserves a vector fallback,
 rather than showing a missing-glyph box or relying on operating-system
 emoji fonts. Availability is tested against the font **actually bundled**
 with each build.
