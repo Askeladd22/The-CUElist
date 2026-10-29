@@ -40,7 +40,7 @@ public:
             const int id=functionChoice.getSelectedId()-1;
             for (const auto& item:owner->show.controls.functions)
                 if (item.id==id) {
-                    functionName.setText(item.name,juce::dontSendNotification);
+                    functionName.setText(item.name,false);
                     showRoute(item.destination);
                     return;
                 }
@@ -621,18 +621,13 @@ private:
         const auto& b=(*entries)[(size_t)row];
         captured.reset();
         scope.setSelectedId((int)b.scope+1,juce::dontSendNotification);
-        if (b.functionId>0)
-            functionChoice.setSelectedId(b.functionId+1,juce::dontSendNotification);
+        functionChoice.setSelectedId(b.functionId>0 ? b.functionId+1 : 1,
+                                     juce::dontSendNotification);
         // Combo target item order differs from ControlTarget enumeration.
         const ControlBinding* route=&b;
         for (const auto& f:owner->show.controls.functions)
             if (f.id==b.functionId) {route=&f.destination;break;}
         showRoute(*route);
-        refreshColumns();
-        refreshDestinationFields();
-        for (size_t i=0;i<columnIds.size();++i)
-            if (columnIds[i]==b.targetColumnId)
-                columns.setSelectedId((int)i+1,juce::dontSendNotification);
         takeover.setSelectedId((int)b.takeover+1,juce::dontSendNotification);
         curve.setSelectedId((int)b.curve+1,juce::dontSendNotification);
         minimum.setText(juce::String(b.minimum,3),false);
