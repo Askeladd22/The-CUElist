@@ -467,7 +467,7 @@ void CueGrid::mouseDoubleClick(const juce::MouseEvent& e) {
     }
     const int row=(e.y-headerHeight)/rowHeight;
     if (row<0 || row>=(int)owner.show.rows.size()) return;
-    if (e.x>=107 && e.x<nameWidth-100) owner.renameTitle(false,row);
+    if (e.x>=107 && e.x<rowPlayBounds(0).getX()-4) owner.renameTitle(false,row);
     else if (column>=0 && !owner.show.columns[(size_t)column].collapsed) {
         const int localX=e.x-columnX(column),localY=(e.y-headerHeight)%rowHeight-rowContentInset;
         if (localY>=25 && localY<43 && localX>=columnWidthAt(column)-49) return;
@@ -544,7 +544,7 @@ void PinnedCueHeaders::mouseDoubleClick(const juce::MouseEvent& e) {
     const int row=y>=CueGrid::headerHeight ?
         (y-CueGrid::headerHeight)/CueGrid::rowHeight : -1;
     if (row>=0 && row<(int)owner.show.rows.size() &&
-        e.x>=107 && e.x<CueGrid::nameWidth-100)
+        e.x>=107 && e.x<CueGrid::rowPlayBounds(0).getX()-4)
         owner.renameTitle(false,row);
 }
 void PinnedCueHeaders::mouseWheelMove(const juce::MouseEvent& e,
