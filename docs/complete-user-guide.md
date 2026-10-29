@@ -67,7 +67,7 @@ The central cue grid has row controls on the left and columns for Audio/MIDI/OSC
 
 The **Inspector** on the right edits the selected cue and cell separately. Use its narrow edge tab (one framed surface with a directional chevron) to collapse the Inspector toward the right, increasing the width of the workspace; click the tab again to reopen. The same area contains a cue-specific multiline **Notes** field.
 
-Columns can be collapsed individually or together with **Collapse all** in the cue grid header. Collapsing is a layout choice; it does not stop running media or change audio routing. The pinned BPM / Auto Stop area has a continuous visual boundary with the scrollable grid and the mixer below, including at row separators.
+Columns can be collapsed individually or together with **Collapse all** in the cue grid header. Collapsing is a layout choice; it does not stop running media or change audio routing. The pinned BPM / Auto Stop area has a continuous visual boundary with the scrollable grid and the mixer below, including at row separators. The vertical scrolling gutter is narrower and the boundary is drawn after the horizontal rules to avoid a broken accent line.
 
 ## 4. Managing multiple Cuelists
 
@@ -84,7 +84,7 @@ Deleting a Cuelist is a structural operation and is not an Undo/Redo action. Sav
 
 ### 4.2 Renaming — synchronized in both directions
 
-**Double-click either the Cuelist tab or the Cuelist name in the pinned cue-grid header** to rename it. The alternative **Preferences → Rename active Cuelist** remains available.
+**Double-click either the Cuelist tab or the Cuelist name in the pinned cue-grid header** to rename it. The alternative **Preferences → Rename active Cuelist** remains available. The Rename Cuelist, Rename cue, Rename column, Cue BPM and Cue tempo map windows now share a consistent dark editor: a title, short left-aligned instruction, labelled text field and Apply/Rename plus Cancel controls. Single-line editors accept Enter; Escape or Cancel closes without changing the model. Names still use the existing uniqueness/length constraints.
 
 The tab and the grid header are two views of the **same saved Cuelist name**. Renaming either updates both immediately, and the name persists when you save the `.cuelist` file. Names must be unique, nonempty and no longer than 64 characters.
 
@@ -185,7 +185,7 @@ Add an **OSC** column and enter the destination **host/IP address and UDP port**
 
 Open **Control Mapping**, select the actual MIDI input port, start **MIDI Learn**, and move a physical fader, encoder or button. The mapping subsystem recognizes CC, note events and Pitch Bend as supported and exposes destinations such as Master/Audio gain and pan, GO, Panic, MIDI CC and OSC float.
 
-Mapping settings can include a value range, inversion and response curves. **Jump** applies the physical value immediately; **Pickup** waits for the physical input to cross the current destination value to reduce sudden parameter changes.
+Mapping settings can include a value range, inversion and response curves. **Jump** applies the physical value immediately; **Pickup** waits for the physical input to cross the current destination value to reduce sudden parameter changes. The configuration window groups **MIDI Input**, **Mapping Configuration**, **Cue Presets / Reusable Control Sets**, and **Saved Mappings**. The Destination column selector has a visible label; MIDI Output CC and OSC address fields are enabled only for their respective target types. When no mappings exist, the saved list explains how to create one, and Update/Remove remain disabled until a mapping is selected.
 
 ### 10.2 Scope and priority
 
@@ -197,7 +197,7 @@ Reusable Control Sets can be saved and applied to cells or defaults. All mapping
 
 ## 11. Tempo maps and Timeline
 
-Each cue contains a tempo map in quarter-note beats, with its first event at beat zero. A typical entry list is:
+Each cue contains a tempo map in quarter-note beats, with its first event at beat zero. The shared tempo editor has a multiline field labelled **Tempo changes** and a syntax reminder (**beat BPM**). A typical entry list is:
 
 ```text
 0 120
