@@ -29,11 +29,11 @@ juce::String duration(double seconds) {
 MainComponent::MainComponent(bool startAudio) {
     setLookAndFeel(&theme); setWantsKeyboardFocus(true); setSize(1440,900);
     for (juce::Component* c : std::initializer_list<juce::Component*>{&openButton,&saveButton,&newButton,&addRowButton,&addColumnButton,
-         &goButton,&panicButton,&deviceButton,&controlButton,&collapseAllButton,&inspectorSideTab,
+         &goButton,&panicButton,&deviceButton,&controlButton,&midiLearnTop,&oscLearnTop,&collapseAllButton,&inspectorSideTab,
          &cuelistOverflowButton,&addCuelistButton,&undoButton,&redoButton,&helpButton,&dockResize,&timelineResize,&importButton,&midiEditButton,&oscEditButton,&playCellButton,&stopCellButton,&clearButton,&tempoButton,&applyButton,
          &cellTab,&rowTab,&rowGain,&rowBehaviour,&rowMute,&rowLoop,&rowName,&cellName,&bpm,&cueNotes,&behaviour,&follow,&loop,&cellAutoStop,&gainDb,&viewport,&timeline,&utilities,
          &clipCollapseButton,&clipCloseButton,&cueHeaders,&columnHeaders,&cueMetrics,&preflightButton,&diagnosticsButton,&preferencesButton,&projectNameLabel}) addAndMakeVisible(c);
-    for (juce::TextButton* b : std::initializer_list<juce::TextButton*>{&openButton,&saveButton,&newButton,&addRowButton,&addColumnButton,&goButton,&panicButton,&deviceButton,&controlButton,&collapseAllButton,&inspectorSideTab,
+    for (juce::TextButton* b : std::initializer_list<juce::TextButton*>{&openButton,&saveButton,&newButton,&addRowButton,&addColumnButton,&goButton,&panicButton,&deviceButton,&controlButton,&midiLearnTop,&oscLearnTop,&collapseAllButton,&inspectorSideTab,
                     &cuelistOverflowButton,&addCuelistButton,&undoButton,&redoButton,&helpButton,
                     &importButton,&midiEditButton,&oscEditButton,&playCellButton,&stopCellButton,&clearButton,&tempoButton,&applyButton,
                     &preflightButton,&diagnosticsButton,&preferencesButton}) b->setWantsKeyboardFocus(false);
@@ -277,6 +277,23 @@ MainComponent::MainComponent(bool startAudio) {
     redoButton.onClick=[this] {redoEdit();};
     undoButton.setEnabled(false);
     redoButton.setEnabled(false);
+    midiLearnTop.setName("globalMidiLearn");
+    oscLearnTop.setName("globalOscLearn");
+    midiLearnTop.setTooltip("Learn a physical input for the project's Default Map.");
+    oscLearnTop.setTooltip("OSC input and OSC Learn are not implemented yet.");
+    oscLearnTop.setEnabled(false);
+    midiLearnTop.setColour(juce::TextButton::buttonOnColourId,palette::amber);
+    midiLearnTop.onClick=[this] {
+        if (!midiInput.connected()) {
+            status="Select and connect a MIDI input before MIDI Learn.";
+            repaint(); return;
+        }
+        openControlPanel(false);
+        learnedInput.reset();armControlLearn();
+        status="GLOBAL MIDI LEARN ARMED: move a controller control.";
+        midiLearnTop.setToggleState(true,juce::dontSendNotification);
+        repaint();
+    };
     controlButton.setName("controlMapping");
     controlButton.setTooltip("MIDI input, MIDI Learn, and global/per-cue mappings.");
     controlButton.onClick=[this] {
@@ -392,7 +409,7 @@ void MainComponent::paint(juce::Graphics& g) {
     // Keep the left half free for cue-list tabs. Telemetry panels are
     // fixed to the right and never cover the source/utility workspace.
     g.setColour(palette::teal); g.fillRect(190,70,122,2);
-    const int clockX=w-650, cpuX=w-516;
+    const int clockX=w-785, cpuX=w-645;
     g.setColour(palette::panel);
     g.fillRoundedRectangle((float)clockX,8.0f,124.0f,56.0f,5.0f);
     g.fillRoundedRectangle((float)cpuX,8.0f,132.0f,56.0f,5.0f);
@@ -430,8 +447,8 @@ void MainComponent::paint(juce::Graphics& g) {
     // A compact but prominent shared signal monitor: 2x2 traffic
     // indicators and independent audio availability, all inside one card.
     // The values are real counters (OSC RX stays inactive: no listener).
-    const int statusX=w-365;
-    const auto monitor=juce::Rectangle<float>((float)statusX,8.0f,354.0f,56.0f);
+    const int statusX=w-495;
+    const auto monitor=juce::Rectangle<float>((float)statusX,8.0f,484.0f,56.0f);
     g.setColour(palette::panel);
     g.fillRoundedRectangle(monitor,5.0f);
     g.setColour(palette::line.withAlpha(.85f));
@@ -642,6 +659,9 @@ void MainComponent::resized() {
     deviceButton.setBounds(20,218,140,34);
     preferencesButton.setBounds(20,267,140,34);
     controlButton.setBounds(20,316,140,34);
+    midiLearnTop.setBounds(getWidth()-277,24,69,32);
+    oscLearnTop.setBounds(getWidth()-202,24,43,32);
+    oscLearnTop.setButtonText("OSC");
     refreshCuelistTabs();
     // Undo/Redo live in the unused upper-right band before the clock,
     // separate from the 43px-high Cuelist tab row.
@@ -1164,6 +1184,7 @@ void MainComponent::timerCallback() {
         if (!consumeMidiLearnEvent(controlLearnArmed,learnedInput,control))
             dispatchControl(control);
     }
+    midiLearnTop.setToggleState(controlLearnArmed,juce::dontSendNotification);
     if (++midiRefreshTicks>=25) {
         midiRefreshTicks=0; engine.refreshMidiOutputs();
         // Take one inventory snapshot per refresh. The policy checks exact
