@@ -202,10 +202,10 @@ juce::Result validateShow(const Show& show) {
             return fail("Abstract function value range is invalid.");
     }
     for (const auto& binding:show.controls.bindings) {
-        if (binding.target==ControlTarget::midiCc ||
+        if (binding.functionId==0 && (binding.target==ControlTarget::midiCc ||
             binding.target==ControlTarget::oscFloat ||
             binding.target==ControlTarget::columnGain ||
-            binding.target==ControlTarget::columnPan) {
+            binding.target==ControlTarget::columnPan)) {
             const auto it=std::find_if(show.columns.begin(),show.columns.end(),
                 [&](const Column& col){return col.id==binding.targetColumnId;});
             if (it==show.columns.end()) return fail("Control Mapping destination does not exist.");
@@ -246,10 +246,11 @@ juce::Result validateShow(const Show& show) {
                 return fail("Duplicate Control Set binding ID.");
             if (binding.scope!=ControlScope::global)
                 return fail("Control Set bindings must be independent of legacy scopes.");
-            if (binding.target==ControlTarget::columnGain ||
+            if (binding.functionId==0 &&
+                (binding.target==ControlTarget::columnGain ||
                 binding.target==ControlTarget::midiCc ||
                 binding.target==ControlTarget::oscFloat ||
-                binding.target==ControlTarget::columnPan) {
+                binding.target==ControlTarget::columnPan)) {
                 const auto destination=std::find_if(show.columns.begin(),show.columns.end(),
                     [&](const Column& col){return col.id==binding.targetColumnId;});
                 if (destination==show.columns.end() ||
