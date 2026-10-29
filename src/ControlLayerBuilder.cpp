@@ -53,6 +53,18 @@ juce::Result migrateLegacyControlColumns(Show& show,bool& migrated) {
             output.scope=ControlScope::global;output.scopeId=0;
             const auto name=("Imported "+col.name+" / "+juce::String(++ordinal))
                 .substring(0,120);
+            // The old locked layer was higher priority than global direct
+            // mappings. If another input already claims the same physical
+            // control, keep its settings but disable it: never let migration
+            // fail just because the formerly shadowed binding exists.
+            // Migrating locked columns left-to-right preserves the old
+            // rightmost-column-wins conflict policy.
+            for(auto& prior:candidate.controls.bindings) {
+                if(prior.enabled && prior.scope==ControlScope::global &&
+                   prior.deviceId==old.deviceId && prior.kind==old.kind &&
+                   prior.channel==old.channel && prior.number==old.number)
+                    prior.enabled=false;
+            }
             candidate.controls.functions.push_back({functionId,name,output});
             ControlBinding input=old;
             input.id=bindingId;input.functionId=functionId;
