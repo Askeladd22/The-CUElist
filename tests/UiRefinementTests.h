@@ -186,6 +186,36 @@ void uiRefinementTests() {
         }
     });
 
+    test("Control Mapping exposes labeled targets and safe empty mapping actions",[] {
+        MainComponent ui(false);
+        ui.openControlPanel(false);
+        auto* dialog=dynamic_cast<juce::DialogWindow*>(
+            juce::ModalComponentManager::getInstance()->getModalComponent(0));
+        check(dialog!=nullptr,"Control Mapping window did not open");
+        auto* pane=controlsV3::named(*dialog,"controlMappingPanel");
+        auto* target=dynamic_cast<juce::ComboBox*>(controlsV3::named(*dialog,"mappingTarget"));
+        auto* destination=dynamic_cast<juce::ComboBox*>(
+            controlsV3::named(*dialog,"mappingDestinationColumn"));
+        auto* output=controlsV3::named(*dialog,"mappingOutputCc");
+        auto* osc=controlsV3::named(*dialog,"mappingOscAddress");
+        auto* remove=controlsV3::named(*dialog,"mappingRemoveSelected");
+        auto* update=controlsV3::named(*dialog,"mappingUpdateSelected");
+        auto* empty=controlsV3::named(*dialog,"mappingEmptyState");
+        check(pane && target && destination && output && osc && remove &&
+              update && empty,"Control Mapping controls or empty-state label missing");
+        check(pane->getHeight()>=650 && empty->isVisible() &&
+              !update->isEnabled() && !remove->isEnabled() &&
+              !destination->isEnabled(),"Default mapping state is misleading");
+        target->setSelectedId(5); // MIDI CC
+        check(output->isEnabled() && !osc->isEnabled() &&
+              destination->isEnabled(),
+              "MIDI CC target does not enable only relevant controls");
+        target->setSelectedId(6); // OSC float
+        check(!output->isEnabled() && osc->isEnabled(),
+              "OSC target does not enable its address editor");
+        delete dialog;
+    });
+
     test("Midnight Slate palette preserves layered dark surfaces and safety accents",[] {
         const auto brightness=[](juce::Colour colour) {
             return 0.2126f*(float)colour.getRed()+
