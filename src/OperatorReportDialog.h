@@ -92,6 +92,84 @@ private:
     juce::TextButton close;
 };
 
+
+class UnsavedChangesPanel final : public juce::Component {
+public:
+    explicit UnsavedChangesPanel(std::function<void()> confirm)
+        : onConfirm(std::move(confirm)) {
+        addAndMakeVisible(discard);
+        addAndMakeVisible(cancel);
+        discard.setName("discardUnsavedChanges");
+        discard.setButtonText("Discard and continue");
+        discard.setColour(juce::TextButton::buttonColourId,palette::panel);
+        discard.setColour(juce::TextButton::textColourOffId,palette::red);
+        discard.onClick=[this] {
+            // Take ownership of the callback before closing the modal:
+            // closing may destroy this panel before the show is replaced.
+            auto approved=onConfirm;
+            if (auto* window=findParentComponentOfClass<juce::DialogWindow>())
+                window->exitModalState(1);
+            if (approved) approved();
+        };
+        cancel.setName("cancelUnsavedChanges");
+        cancel.setButtonText("Cancel");
+        cancel.setColour(juce::TextButton::buttonColourId,palette::raised);
+        cancel.setColour(juce::TextButton::textColourOffId,palette::text);
+        cancel.onClick=[this] {
+            if (auto* window=findParentComponentOfClass<juce::DialogWindow>())
+                window->exitModalState(0);
+        };
+        // Reuse the primary application fonts; warning mark is vector-drawn.
+        setSize(510,228);
+    }
+    void resized() override {
+        cancel.setBounds(getWidth()-121,getHeight()-54,96,34);
+        discard.setBounds(cancel.getX()-204,getHeight()-54,190,34);
+    }
+    void paint(juce::Graphics& g) override {
+        g.fillAll(palette::panel);
+        g.setColour(palette::amber.withAlpha(.12f));
+        g.fillEllipse(23.0f,22.0f,30.0f,30.0f);
+        g.setColour(palette::amber);
+        g.drawEllipse(23.5f,22.5f,29.0f,29.0f,1.2f);
+        // A 12px vector exclamation replaces the oversized QuestionIcon.
+        g.fillRoundedRectangle(37.0f,29.0f,2.6f,11.0f,1.2f);
+        g.fillEllipse(36.7f,42.5f,3.2f,3.2f);
+        label(g,"Unsaved changes",{67,20,getWidth()-92,32},
+              22,palette::text,true);
+        label(g,"Your current show contains changes that have not been saved.",
+              {27,76,getWidth()-54,25},15,palette::text);
+        label(g,"Continuing will discard those changes.",
+              {27,105,getWidth()-54,23},14,palette::amber,true);
+        label(g,"Choose Cancel to return to the show and save it.",
+              {27,132,getWidth()-54,21},12,palette::muted);
+        g.setColour(palette::line);
+        g.drawHorizontalLine(getHeight()-69,23.0f,(float)getWidth()-23);
+    }
+    void focusSafeAction() { cancel.grabKeyboardFocus(); }
+private:
+    std::function<void()> onConfirm;
+    juce::TextButton discard,cancel;
+};
+
+inline void showUnsavedChangesConfirmation(juce::Component& parent,
+                                           juce::LookAndFeel& theme,
+                                           std::function<void()> onDiscard) {
+    juce::DialogWindow::LaunchOptions options;
+    options.dialogTitle="Unsaved changes";
+    options.dialogBackgroundColour=palette::panel;
+    auto* panel=new UnsavedChangesPanel(std::move(onDiscard));
+    options.content.setOwned(panel);
+    options.componentToCentreAround=&parent;
+    options.useNativeTitleBar=true;
+    options.resizable=false;
+    options.escapeKeyTriggersCloseButton=true;
+    if (auto* dialog=options.launchAsync()) {
+        dialog->setLookAndFeel(&theme);
+        panel->focusSafeAction();  // Enter/Space must not silently discard.
+    }
+}
+
 inline void showOperatorReport(juce::Component& parent,juce::LookAndFeel& theme,
                                const juce::String& title,const juce::String& subtitle,
                                std::vector<OperatorReportSection> sections,
