@@ -144,7 +144,7 @@ Individual cell gain is expressed in **dB**. A peak meter reports **dBFS**: 0 dB
 
 ### 7.2 Column Utilities
 
-Audio column strips provide gain, stereo meters, pan, Mute, phase inversion and routing. MIDI and OSC strips expose the appropriate output controls rather than audio faders. Collapsed Audio columns retain compact meter/gain and Mute controls.
+Audio column strips provide gain, stereo meters, pan, Mute, phase inversion and routing. MIDI and OSC strips expose the appropriate output controls rather than audio faders. Collapsed Audio columns retain compact meter/gain and Mute controls. **Mute** uses the embedded **Noto Sans Symbols 2** directly: **🔊** means audio/output enabled; **🔇** means muted. The same two-state icon is used for Master, Audio columns and MIDI/OSC data-output mute, while phase inversion retains its own symbol.
 
 An Audio column can send signal to the **Master** on its left/right paths and/or to a physical stereo **Direct Out** pair. Direct can be **PRE** or **POST** relative to the strip fader; post-strip Master Send is independent. Mute, pan and other per-cell/per-cue processing follow their implemented signal path.
 
@@ -206,7 +206,7 @@ Each cue contains a tempo map in quarter-note beats, with its first event at bea
 
 These entries set 120 BPM at beat 0 and 90 BPM from beat 8. MIDI/OSC beat timing follows the tempo map; changing BPM does **not** change the natural playback rate of imported WAV/MP3 audio. Older projects may retain legacy time-signature fields.
 
-The Timeline represents the selected cue's clip timing, provides zoom, grid visibility, snap and a horizontal scrollbar. Dragging/range edits are available for supported MIDI/OSC clips. Displaying grid lines and enabling snap are separate choices. The pinned row BPM and Auto Stop controls remain visible even when scrolling columns.
+The Timeline represents the selected cue's clip timing, provides zoom, grid visibility, snap and a horizontal scrollbar. Dragging/range edits are available for supported MIDI/OSC clips. Displaying grid lines and enabling snap are separate choices. The **Snap** button uses a compact, centred vector magnet: teal magnet for ON, grey magnet crossed by a red slash for OFF. The Unicode magnet emoji is not included in the bundled Noto Sans Symbols 2, so it is intentionally not rendered through an operating-system emoji font. The pinned row BPM and Auto Stop controls remain visible even when scrolling columns.
 
 ## 12. Files, backups and recovery
 
