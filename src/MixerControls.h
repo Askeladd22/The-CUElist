@@ -17,13 +17,13 @@ public:
     void paintButton(juce::Graphics& g,bool hover,bool down) override {
         const auto box=getLocalBounds().toFloat().reduced(2);
         const bool muted=!phase && getToggleState();
-        const auto ink=phase ? (getToggleState() ? palette::teal : palette::muted)
-                             : muted ? palette::red
-                             : (hover || down ? palette::text : palette::teal);
-        g.setColour(getToggleState() ? ink.withAlpha(.16f) : palette::raised);
-        g.fillRoundedRectangle(box,4);
+        const auto accent=phase ? (getToggleState() ? palette::teal : palette::muted)
+                                : muted ? palette::red : palette::teal;
+        const IconButtonState state{isEnabled(),hover,down,getToggleState(),
+                                    hasKeyboardFocus(false)};
+        drawIconButtonSurface(g,box,accent,state,4.0f);
+        const auto ink=iconButtonInk(accent,state);
         g.setColour(ink);
-        g.drawRoundedRectangle(box,4,getToggleState() ? 1.4f : .9f);
         const auto icon=juce::Rectangle<float>(20,20).withCentre(box.getCentre());
         if (phase) {
             g.drawEllipse(icon.reduced(2),2.3f);
@@ -108,10 +108,14 @@ public:
     void paintButton(juce::Graphics& g,bool hover,bool) override {
         const auto circle=getLocalBounds().toFloat().reduced(2);
         const bool on=getToggleState();
-        g.setColour(on ? palette::teal.withAlpha(.25f) : palette::raised);
+        g.setColour(on ? palette::teal.withAlpha(.13f)
+                       : palette::raised.withAlpha(.52f));
         g.fillEllipse(circle);
-        g.setColour(on ? palette::teal : hover ? palette::text : palette::line);
-        g.drawEllipse(circle,on ? 2.0f : 1.2f);
+        g.setColour(hasKeyboardFocus(false) ? palette::teal :
+                    on ? palette::teal.withAlpha(.58f) :
+                    hover ? palette::line.withAlpha(.48f) :
+                            palette::line.withAlpha(.27f));
+        g.drawEllipse(circle,hasKeyboardFocus(false) ? 1.6f : .9f);
         g.setColour(on ? palette::text : palette::muted);
         g.setFont(font(10.5f,true));
         g.drawFittedText("L/R",getLocalBounds(),juce::Justification::centred,1);
