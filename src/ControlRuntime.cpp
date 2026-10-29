@@ -568,6 +568,7 @@ void MainComponent::chooseQuickLearnGuiTarget(ControlTarget target,int columnId)
 }
 void MainComponent::chooseQuickLearnTarget(int functionId) {
     if (quickLearnMode==QuickLearnMode::off) return;
+    quickLearnFeedback.clear();
     if (functionId<=-100) {
         const int encoded=-100-functionId;
         const int index=encoded/2;
@@ -598,8 +599,10 @@ void MainComponent::chooseQuickLearnTarget(int functionId) {
         const juce::String title=functionId==-1 ? "Master Gain" :
             functionId==-2 ? "Master Pan" : functionId==-3 ? "GO" : "PANIC";
         functionId=0;
+        // A renamed logical function must keep its stable destination
+        // identity: GUI selection never creates a second GO/Master function.
         for (const auto& fn:show.controls.functions)
-            if (fn.name==title && fn.destination.target==target) {
+            if (fn.destination.target==target) {
                 functionId=fn.id;break;
             }
         if (functionId==0) {

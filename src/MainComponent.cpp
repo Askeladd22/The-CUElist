@@ -280,7 +280,7 @@ MainComponent::MainComponent(bool startAudio) {
     quickControlTargets.setVisible(false);
     cancelQuickLearn.setVisible(false);
     quickControlTargets.onPick=[this](int functionId) {chooseQuickLearnTarget(functionId);};
-    cancelQuickLearn.onClick=[this] {finishQuickLearn();};
+    cancelQuickLearn.onClick=[this] {finishQuickLearn();status="Quick Learn ended.";repaint();};
     cancelQuickLearn.setName("cancelQuickLearn");
     goLearnHotspot.onPick=[this] {chooseQuickLearnGuiTarget(ControlTarget::go);};
     panicLearnHotspot.onPick=[this] {chooseQuickLearnGuiTarget(ControlTarget::panic);};
@@ -1292,10 +1292,14 @@ void MainComponent::timerCallback() {
     }
     lastMidiRx=rx; lastMidiTx=tx; lastOscTx=oscTx; lastOscRx=oscRx;
     activityInitialized=true;
+    // The protocol stays visibly ON between assignments, even when
+    // there is no currently selected target waiting for its next event.
     globalMidiLearn.setColour(juce::TextButton::buttonColourId,
-        controlLearnArmed ? palette::amber.withAlpha(.55f) : palette::raised);
+        (quickLearnMode==QuickLearnMode::midi || controlLearnArmed) ?
+        palette::amber.withAlpha(.55f) : palette::raised);
     globalOscLearn.setColour(juce::TextButton::buttonColourId,
-        oscLearnArmed ? palette::amber.withAlpha(.55f) : palette::raised);
+        (quickLearnMode==QuickLearnMode::osc || oscLearnArmed) ?
+        palette::amber.withAlpha(.55f) : palette::raised);
     utilities.syncScroll(viewport.getViewPositionX()); utilities.refreshRouting();
     grid.repaint(); cueHeaders.repaint(); columnHeaders.repaint();
     displayPeak=std::max(engine.peak.load(),displayPeak*.88f);

@@ -52,6 +52,26 @@ void quickLearnPersistenceTests() {
         check(ui.show.controls.bindings[0].functionId!=
               ui.show.controls.bindings[1].functionId,
               "GUI targets must use distinct stable function identities.");
+        // Renaming a function must not create another logical function
+        // when the operator clicks the same physical GUI parameter.
+        const int panId=ui.show.controls.bindings.back().functionId;
+        const auto found=std::find_if(ui.show.controls.functions.begin(),
+            ui.show.controls.functions.end(),
+            [panId](const ControlFunction& fn){return fn.id==panId;});
+        check(found!=ui.show.controls.functions.end(),
+              "Learned Pan function was not found.");
+        const auto route=found->destination;
+        const auto functionCount=ui.show.controls.functions.size();
+        check(ui.updateAbstractControlFunction(panId,"Renamed Master Balance",route),
+              "Unable to rename abstract Pan function.");
+        cueViewFixtures::click(*masterPanTarget,5.0f,5.0f);
+        check(ui.isQuickLearnAwaitingInput() &&
+              ui.show.controls.functions.size()==functionCount,
+              "Renamed GUI target must reuse the existing function ID.");
+        ui.completeQuickLearn({"/test/quick-pan-new",ControlKind::osc,1,0,90,false});
+        check(ui.show.controls.bindings.size()==2 &&
+              ui.show.controls.bindings.back().deviceId=="/test/quick-pan-new",
+              "Rebinding a renamed function should replace its physical input.");
         ui.finishQuickLearn();
         check(!ui.isQuickLearnActive(),"Explicit Cancel must stop OSC Learn.");
     });
