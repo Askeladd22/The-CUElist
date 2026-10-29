@@ -198,8 +198,8 @@ MainComponent::MainComponent(bool startAudio) {
         menu.addItem(1,"Pre-flight"); menu.addItem(2,"Diagnostics");
         juce::PopupMenu faderMenu;
         faderMenu.setLookAndFeel(&theme);
-        faderMenu.addItem(3,"-∞ dB / +6 dB",true,faderCeilingDb==6);
-        faderMenu.addItem(4,"-∞ dB / 0 dB",true,faderCeilingDb==0);
+        faderMenu.addItem(3,faderRangeMenuTitle(6),true,faderCeilingDb==6);
+        faderMenu.addItem(4,faderRangeMenuTitle(0),true,faderCeilingDb==0);
         menu.addSubMenu("Fader Range",faderMenu);
         menu.addSeparator();
         menu.addItem(5,"Rename active Cuelist");
