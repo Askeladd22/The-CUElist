@@ -28,6 +28,38 @@ void utilityPolishTests() {
         check(changed,"Mute icon looks identical in audible and muted states");
         check(mute.getToggleState(),"Mute icon lost toggle state");
     });
+    test("Noto speaker icon centres its actual outline in compact Mute buttons",[] {
+        const auto& face=appTypefaces().notoSymbols2;
+        check(face!=nullptr,"Embedded Symbols 2 is unavailable");
+        if (!face) return;
+        for (const bool muted:{false,true}) {
+            const auto glyph=face->getNominalGlyphForCodepoint(
+                UtilityIcon::speakerCodepoint(muted));
+            check(glyph.has_value(),"Speaker glyph missing from bundled font");
+            if (!glyph) continue;
+            juce::Path path;
+            face->getOutlineForGlyph(juce::TypefaceMetricsKind::portable,
+                                     static_cast<int>(*glyph),path);
+            check(!path.isEmpty(),"Speaker has no usable Noto outline");
+            if (path.isEmpty()) continue;
+            // Same target as UtilityIcon::paintButton at 32x29.
+            const auto target=juce::Rectangle<float>(18.0f,18.0f)
+                .withCentre({16.0f,14.5f});
+            const auto bounds=path.getBoundsTransformed(
+                path.getTransformToScaleToFit(
+                    target,true,juce::Justification::centred));
+            check(std::abs(bounds.getCentreX()-target.getCentreX())<0.25f &&
+                  std::abs(bounds.getCentreY()-target.getCentreY())<0.25f &&
+                  bounds.getWidth()<=target.getWidth()+.1f &&
+                  bounds.getHeight()<=target.getHeight()+.1f,
+                  "Speaker ink is visually offset or clipped in Mute button");
+            UtilityIcon mute(false);
+            mute.setSize(32,29);
+            mute.setToggleState(muted,juce::dontSendNotification);
+            const auto image=mute.createComponentSnapshot(mute.getLocalBounds());
+            check(image.isValid(),"Compact Mute icon failed to render");
+        }
+    });
     test("Timeline Snap magnet has visibly different ON and OFF states",[] {
         MainComponent ui(false);
         ui.setSize(1440,900);
