@@ -1,6 +1,7 @@
 #pragma once
 #include "GainMeterFader.h"
 #include "HelpGuide.h"
+#include "OperatorReportDialog.h"
 #include "OscEditor.h"
 void uiRefinementTests() {
     using namespace cueViewFixtures;
@@ -82,6 +83,53 @@ void uiRefinementTests() {
         check(!body.getPreferredFallbackFamilies().contains("Noto Sans Math") &&
               !body.getPreferredFallbackFamilies().contains("Noto Sans Symbols 2"),
               "Noto fonts must be explicit rather than generic text fallback");
+    });
+
+    test("Fader Range menu explicitly draws Noto Math instead of a fallback",[] {
+        const auto leading=faderMinusInfinity();
+        check(leading.length()==2 && leading[0]==(juce::juce_wchar)0x2212 &&
+              leading[1]==(juce::juce_wchar)0x221e,
+              "Fader menu lost its U+2212/U+221E mathematical pair");
+        for (const int ceiling:{0,6}) {
+            const auto title=faderRangeMenuTitle(ceiling);
+            check(title.startsWith(leading) &&
+                  title.endsWith(ceiling==0?"0 dB":"+6 dB"),
+                  "Fader menu caption is not an explicit mixed-font label");
+            Theme theme;
+            int width=0,height=0;
+            theme.getIdealPopupMenuItemSize(title,false,24,width,height);
+            check(width>=142 && height>=34,
+                  "Fader menu clips the mathematical portion of its caption");
+            juce::Image img(juce::Image::ARGB,width,height,true);
+            juce::Graphics graphics(img);
+            theme.drawPopupMenuItem(graphics,{0,0,width,height},
+                                    false,true,false,true,false,
+                                    title,{},nullptr,nullptr);
+            check(img.isValid(),"Fader menu mixed-font rendering failed");
+        }
+    });
+
+    test("About and Diagnostics use compact aligned panels without InfoIcon",[] {
+        OperatorReportPanel about("About The Cuelist","Version 0.9",{
+            {"AUTHORS",{{"Davide Salvatore","Co-author"},
+                        {"Riccardo D'Ambrosio","Co-author"}}},
+            {"LICENCE",{{"Software","Proprietary"}}}
+        },"Licence and third-party notices");
+        OperatorReportPanel diag("Diagnostics","Engine diagnostics",{
+            {"AUDIO",{{"Device","ONLINE",OperatorReportRow::Status::positive}}},
+            {"MIDI",{{"Input","DISCONNECTED",OperatorReportRow::Status::caution}}},
+            {"OSC",{{"UDP packets sent","0"}}},
+            {"RECOVERY",{{"I/O failures","0"}}}
+        },"Local counters only");
+        for (auto* panel:std::initializer_list<OperatorReportPanel*>{&about,&diag}) {
+            check(panel->getWidth()==542 && panel->getHeight()<720,
+                  "Operator report escaped compact desktop bounds");
+            auto* button=controlsV3::named(*panel,"operatorReportClose");
+            check(button && button->getBounds().getBottom()<=panel->getHeight(),
+                  "Close button is not visible inside the information panel");
+            auto image=panel->createComponentSnapshot(panel->getLocalBounds());
+            check(image.isValid(),"Information dialog content cannot be rendered");
+        }
     });
 
     test("Midnight Slate palette preserves layered dark surfaces and safety accents",[] {
@@ -482,6 +530,25 @@ void uiRefinementTests() {
         check(ui.show.rows[0].stopOnNext!=stop,"Fixed Auto Stop control was not clickable");
         check(grid->totalColumnsWidth()==(int)ui.show.columns.size()*CueGrid::columnWidth,
               "Expanded column positions are inconsistent");
+    });
+
+    test("BPM/Auto Stop edge remains a continuous accent while rows scroll",[] {
+        MainComponent ui(false);
+        for (int i=0;i<8;++i) addRow(ui.show,"Cue");
+        ui.setSize(1440,900);
+        auto* metrics=cueViewFixtures::find<CueMetricsOverlay>(ui);
+        juce::Viewport* view=nullptr;
+        for (auto* child:ui.getChildren())
+            if (auto* candidate=dynamic_cast<juce::Viewport*>(child))
+                view=candidate;
+        check(metrics && view,"Cannot locate pinned metrics for border test");
+        view->setViewPosition(0,83);
+        const auto rail=metrics->createComponentSnapshot({0,0,3,metrics->getHeight()});
+        check(rail.isValid() && rail.getWidth()==3,
+              "Pinned metrics accent rail not rendered");
+        for (int y=0;y<rail.getHeight();y+=7)
+            check(rail.getPixelAt(1,y)==palette::teal,
+                  "Row separators interrupt the pinned metrics accent rail");
     });
 
     test("Scrolled cues remain below pinned headings and header targets are protected",[] {
