@@ -21,8 +21,23 @@ public:
             &presetName,&presets,&scope,&target,&takeover,&columns,&bindingList,&state,
             &outputCc,&oscAddress,&invert,&updateSelected,&curve,&minimum,&maximum,
              &effectivePreview,&templateName,&templates,&saveTemplate,&loadTemplate,
-             &emptyBindings})
+             &emptyBindings,&functionChoice,&functionName,&renameFunction})
             addAndMakeVisible(c);
+        functionChoice.setName("controlFunctionChoice");
+        functionName.setName("controlFunctionName");
+        functionName.setTextToShowWhenEmpty("Function name",palette::muted);
+        functionName.setReadOnly(editSet);
+        renameFunction.setButtonText("Rename"); renameFunction.setVisible(!editSet);
+        functionChoice.onChange=[this] { loadFunctionDestination(); };
+        renameFunction.onClick=[this] {
+            if (!owner) return;
+            const int id=functionChoice.getSelectedId()-1;
+            if (id>0 && owner->renameControlFunction(id,functionName.getText())) {
+                refreshFunctions(); functionChoice.setSelectedId(id+1,juce::dontSendNotification);
+                state.setText("Function renamed.",juce::dontSendNotification);
+                bindingList.repaint();
+            } else state.setText("Select a function and enter a valid name.",juce::dontSendNotification);
+        };
         device.setName("controlInputDevice");
         device.setTooltip("Select a device explicitly. No automatic fallback on disconnect.");
         connect.setButtonText("Refresh ports");
@@ -173,11 +188,11 @@ public:
                                            std::max(0,presets.getSelectedId()-1)))
                 state.setText("Preset assigned to selected cue.",juce::dontSendNotification);
         };
-        refreshDevices(); refreshPresets(); refreshColumns();refreshTemplates();
+        refreshDevices(); refreshPresets(); refreshColumns();refreshTemplates(); refreshFunctions();
         refreshDestinationFields();
         refreshEmptyState();
         updateEffectivePreview();
-        setSize(780,editSet ? 764 : 658); startTimerHz(10);
+        setSize(780,editSet ? 816 : 710); startTimerHz(10);
     }
     ~ControlPanel() override {stopTimer();bindingList.setModel(nullptr);}
     void paint(juce::Graphics& g) override {
@@ -192,30 +207,32 @@ public:
 
         g.setColour(palette::line);
         g.drawHorizontalLine(191,20,(float)getWidth()-20);
-        label(g,"MAPPING CONFIGURATION",{20,198,350,19},12,palette::teal,true);
-        label(g,editSet?"Control Set scope":"Scope",{20,228,179,18},11,palette::muted,true);
-        label(g,"Target",{214,228,178,18},11,palette::muted,true);
-        label(g,"Takeover",{411,228,132,18},11,palette::muted,true);
-        label(g,"Destination column",{556,228,207,18},11,palette::muted,true);
-        label(g,"Output CC",{20,285,85,18},11,palette::muted,true);
-        label(g,"OSC address",{113,285,210,18},11,palette::muted,true);
-        label(g,"Curve",{441,285,114,18},11,palette::muted,true);
-        label(g,"Min",{573,285,84,18},11,palette::muted,true);
-        label(g,"Max",{672,285,84,18},11,palette::muted,true);
+        label(g,"FUNCTION / DESTINATION ROUTING",{20,199,430,19},12,palette::teal,true);
+        g.drawHorizontalLine(242,20,(float)getWidth()-20);
+        label(g,"MAPPING CONFIGURATION",{20,246,350,19},12,palette::teal,true);
+        label(g,editSet?"Control Set scope":"Scope",{20,276,179,18},11,palette::muted,true);
+        label(g,"Target",{214,276,178,18},11,palette::muted,true);
+        label(g,"Takeover",{411,276,132,18},11,palette::muted,true);
+        label(g,"Destination column",{556,276,207,18},11,palette::muted,true);
+        label(g,"Output CC",{20,333,85,18},11,palette::muted,true);
+        label(g,"OSC address",{113,333,210,18},11,palette::muted,true);
+        label(g,"Curve",{441,333,114,18},11,palette::muted,true);
+        label(g,"Min",{573,333,84,18},11,palette::muted,true);
+        label(g,"Max",{672,333,84,18},11,palette::muted,true);
 
         if (editSet) {
-            label(g,"EFFECTIVE MAPPING",{20,347,330,18},12,palette::teal,true);
-            label(g,"REUSABLE CONTROL SETS",{20,456,330,18},12,palette::teal,true);
+            label(g,"EFFECTIVE MAPPING",{20,395,330,18},12,palette::teal,true);
+            label(g,"REUSABLE CONTROL SETS",{20,504,330,18},12,palette::teal,true);
         } else {
-            label(g,"CUE PRESETS",{20,347,250,18},12,palette::teal,true);
-            label(g,"New preset name",{388,347,220,18},11,palette::muted,true);
+            label(g,"CUE PRESETS",{20,395,250,18},12,palette::teal,true);
+            label(g,"New preset name",{388,395,220,18},11,palette::muted,true);
         }
         label(g,editSet?"MAPPINGS IN THIS CONTROL SET":"SAVED MAPPINGS",
-              {20,editSet?534:425,380,18},12,palette::teal,true);
+              {20,editSet?582:473,380,18},12,palette::teal,true);
         g.setColour(palette::line);
         g.drawHorizontalLine(getHeight()-48,20,(float)getWidth()-20);
         label(g,editSet ?
-            "Control Sets become active after GO. Locked sets apply to every cue." :
+            "Control Sets override the Default Map for this cue only." :
             "Cue mappings become active after GO, not when selecting a cue.",
             {20,getHeight()-40,getWidth()-40,23},11,palette::muted);
     }
@@ -226,28 +243,31 @@ public:
         learn.setBounds(20,163,128,32);
         state.setBounds(160,162,w-180,33);
 
-        scope.setBounds(20,250,176,31);
-        target.setBounds(214,250,178,31);
-        takeover.setBounds(411,250,133,31);
-        columns.setBounds(556,250,w-576,31);
-        outputCc.setBounds(20,307,84,31);
-        oscAddress.setBounds(113,307,210,31);
-        invert.setBounds(336,307,96,31);
-        curve.setBounds(441,307,115,31);
-        minimum.setBounds(573,307,85,31);
-        maximum.setBounds(672,307,85,31);
+        functionChoice.setBounds(20,213,280,29);
+        functionName.setBounds(308,213,275,29);
+        renameFunction.setBounds(592,213,168,29);
+        scope.setBounds(20,298,176,31);
+        target.setBounds(214,298,178,31);
+        takeover.setBounds(411,298,133,31);
+        columns.setBounds(556,298,w-576,31);
+        outputCc.setBounds(20,355,84,31);
+        oscAddress.setBounds(113,355,210,31);
+        invert.setBounds(336,355,96,31);
+        curve.setBounds(441,355,115,31);
+        minimum.setBounds(573,355,85,31);
+        maximum.setBounds(672,355,85,31);
 
-        effectivePreview.setBounds(20,372,w-40,72);
-        templateName.setBounds(20,479,169,31);
-        templates.setBounds(198,479,229,31);
-        saveTemplate.setBounds(437,479,137,31);
-        loadTemplate.setBounds(584,479,w-604,31);
-        presets.setBounds(20,370,195,31);
-        assignPreset.setBounds(223,370,153,31);
-        presetName.setBounds(388,370,w-548,31);
-        newPreset.setBounds(w-149,370,129,31);
+        effectivePreview.setBounds(20,420,w-40,72);
+        templateName.setBounds(20,527,169,31);
+        templates.setBounds(198,527,229,31);
+        saveTemplate.setBounds(437,527,137,31);
+        loadTemplate.setBounds(584,527,w-604,31);
+        presets.setBounds(20,418,195,31);
+        assignPreset.setBounds(223,418,153,31);
+        presetName.setBounds(388,418,w-548,31);
+        newPreset.setBounds(w-149,418,129,31);
 
-        const int listY=editSet?558:449;
+        const int listY=editSet?606:497;
         const int listHeight=editSet?136:157;
         bindingList.setBounds(20,listY,w-239,listHeight);
         emptyBindings.setBounds(30,listY+19,w-259,42);
@@ -283,9 +303,9 @@ private:
         const auto& cell=owner->show.rows[(size_t)row].cells[(size_t)columnIndex];
         return cell.controlSet ? &cell.controlSet->bindings : nullptr;
     }
-    juce::ComboBox device,presets,scope,target,takeover,columns,curve,templates;
-    juce::TextButton connect,learn,add,remove,updateSelected,newPreset,assignPreset,saveTemplate,loadTemplate;
-    juce::TextEditor presetName,outputCc,oscAddress,minimum,maximum,effectivePreview,templateName;
+    juce::ComboBox device,presets,scope,target,takeover,columns,curve,templates,functionChoice;
+    juce::TextButton connect,learn,add,remove,updateSelected,newPreset,assignPreset,saveTemplate,loadTemplate,renameFunction;
+    juce::TextEditor presetName,outputCc,oscAddress,minimum,maximum,effectivePreview,templateName,functionName;
     juce::ToggleButton invert{"Invert"};
     juce::Label state;
     juce::ListBox bindingList;
@@ -314,6 +334,36 @@ private:
                 juce::dontSendNotification);
         }
         if (editSet) updateEffectivePreview();
+    }
+    void refreshFunctions() {
+        if (!owner) return;
+        const int old=functionChoice.getSelectedId();
+        functionChoice.clear(juce::dontSendNotification);
+        functionChoice.addItem(editSet ? "Choose a Default Map function" : "New function",1);
+        for (const auto& f:owner->show.controls.functions)
+            functionChoice.addItem(f.name,f.id+1);
+        functionChoice.setSelectedId(old>0 && functionChoice.indexOfItemId(old)>=0 ? old : 1,juce::dontSendNotification);
+        loadFunctionDestination();
+    }
+    void loadFunctionDestination() {
+        if (!owner) return;
+        const int id=functionChoice.getSelectedId()-1;
+        const auto& functions=owner->show.controls.functions;
+        auto it=std::find_if(functions.begin(),functions.end(),
+            [id](const ControlFunction& f){return f.id==id;});
+        if (it==functions.end()) {if (editSet) functionName.clear();return;}
+        functionName.setText(it->name,false);
+        const auto& b=it->destination;
+        target.setSelectedId((int)b.target+1,juce::dontSendNotification);
+        refreshColumns();
+        for (size_t i=0;i<columnIds.size();++i)
+            if (columnIds[i]==b.targetColumnId)
+                columns.setSelectedId((int)i+1,juce::dontSendNotification);
+        outputCc.setText(juce::String(b.outputNumber),false);
+        oscAddress.setText(b.oscAddress,false);
+        minimum.setText(juce::String(b.minimum,3),false);
+        maximum.setText(juce::String(b.maximum,3),false);
+        refreshDestinationFields();
     }
     void refreshDevices() {
         if (!owner) return;
@@ -375,6 +425,14 @@ private:
             b.deviceId=captured->deviceId;
             b.kind=captured->kind; b.channel=captured->channel; b.number=captured->number;
         }
+        const int functionId=functionChoice.getSelectedId()-1;
+        if (editSet && functionId<=0) {
+            state.setText("Choose a Default Map function.",juce::dontSendNotification);return;
+        }
+        if (update && !editSet && functionId<=0) {
+            state.setText("Choose a function to update.",juce::dontSendNotification);return;
+        }
+        b.functionId=std::max(0,functionId);
         b.scope=(ControlScope)(scope.getSelectedId()-1);
         switch (target.getSelectedId()) {
             case 1: b.target=ControlTarget::masterGain; break;
@@ -427,13 +485,13 @@ private:
         const bool saved=resolved && (update ?
             owner->updateControlBinding(row,column,b.id,b,editSet) :
             editSet ? owner->addControlSetBinding(row,column,b) :
-                      owner->addMappingBinding(b));
+                      owner->addMappingBinding(b,functionName.getText()));
         if (saved) {
             bindingList.updateContent(); bindingList.repaint();
             selected=-1;updateSelected.setEnabled(false);bindingList.deselectAllRows();
             remove.setEnabled(false);
             refreshEmptyState();
-            captured.reset();updateEffectivePreview();
+            captured.reset();refreshFunctions();updateEffectivePreview();
             state.setText(update ? "Mapping updated." : "Mapping saved to the show.",
                 juce::dontSendNotification);
         } else state.setText(owner->status,juce::dontSendNotification);
@@ -456,9 +514,12 @@ private:
                 if (col.id==item.columnId) {source=col.name;break;}
             const auto& b=item.binding;
             const bool local=item.columnId==sourceColumnId;
+            juce::String functionLabel;
+            for (const auto& fn:owner->show.controls.functions)
+                if (fn.id==b.functionId) {functionLabel=fn.name+" / ";break;}
             summary+="\n"+juce::String(local ? (item.overrides ? "OVERRIDE / " : "LOCAL / ") :
                 (item.overrides ? "INHERITED OVERRIDE / " : "INHERITED / "))+
-                source+" ("+(item.priority==0 ? juce::String("legacy") :
+                source+" ("+(item.priority==0 ? juce::String("default") :
                       "P"+juce::String(item.priority))+")  "+
                 (b.kind==ControlKind::cc ? "CC " :
                  b.kind==ControlKind::note ? "NOTE " : "BEND ")+
@@ -485,6 +546,8 @@ private:
         remove.setEnabled(entries && row>=0 && row<(int)entries->size());
         if (!entries || row<0 || row>=(int)entries->size()) return;
         const auto& b=(*entries)[(size_t)row];
+        functionChoice.setSelectedId(b.functionId>0 ? b.functionId+1 : 1,juce::dontSendNotification);
+        if (b.functionId>0) loadFunctionDestination();
         captured.reset();
         scope.setSelectedId((int)b.scope+1,juce::dontSendNotification);
         target.setSelectedId((int)b.target+1,juce::dontSendNotification);
@@ -507,6 +570,9 @@ private:
     void paintListBoxItem(int row,juce::Graphics& g,int width,int height,bool active) override {
         if (!owner || row<0 || row>=getNumRows()) return;
         const auto& b=(*currentBindings())[(size_t)row];
+        juce::String functionLabel;
+        for (const auto& fn:owner->show.controls.functions)
+            if (fn.id==b.functionId) {functionLabel=fn.name+" / ";break;}
         if (active) g.fillAll(palette::teal.withAlpha(.20f));
         juce::String targetName=b.target==ControlTarget::go ? "GO" :
             b.target==ControlTarget::panic ? "PANIC" :
@@ -518,7 +584,7 @@ private:
         label(g,"#"+juce::String(b.id)+"   ch"+juce::String(b.channel)+
             " "+(b.kind==ControlKind::cc?"CC ":b.kind==ControlKind::note?"NOTE ":"BEND ")+
             juce::String(b.number)+" → "+targetName+
-            "  ["+juce::String((int)b.scope)+"]",
+            "  ["+juce::String((int)b.scope)+"]  "+functionLabel,
             {7,0,width-14,height},12,active?palette::text:palette::muted);
     }
 };
