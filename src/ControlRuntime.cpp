@@ -158,6 +158,16 @@ bool MainComponent::updateControlBinding(int row,int column,int id,ControlBindin
         [id](const ControlBinding& old){return old.id==id;});
     if (it==bindings->end()) return false;
     b.id=id;
+    if (!inControlSet && b.functionId==0) {
+        // Upgrade an older project's source/target entry when first edited.
+        // Existing projects remain readable without a forced migration.
+        const int newId=candidate.controls.nextId++;
+        ControlBinding destination=b;
+        destination.id=0;destination.functionId=0;
+        candidate.controls.functions.push_back({newId,
+            "Function "+juce::String(newId),destination});
+        b.functionId=newId;
+    }
     if (!inControlSet && b.functionId>0) {
         const auto fn=std::find_if(candidate.controls.functions.begin(),
             candidate.controls.functions.end(),
