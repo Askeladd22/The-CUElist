@@ -360,7 +360,7 @@ public:
         g.setColour(palette::line);
         g.drawHorizontalLine(getHeight()-48,20,(float)getWidth()-20);
         label(g,editSet ?
-            "Control Sets become active after GO. Locked sets apply to every cue." :
+            "Control Set overrides apply after GO; remove one to inherit Default Map." :
             "Cue mappings become active after GO, not when selecting a cue.",
             {20,getHeight()-40,getWidth()-40,23},11,palette::muted);
     }
@@ -508,7 +508,7 @@ private:
             b.outputNumber=outputCc.getText().getIntValue();
             b.outputChannel=outputChannel.getText().getIntValue(); // Not the incoming channel.
         }
-        if (b.target==ControlTarget::oscFloat)
+        if (b.target==ControlTarget::oscFloat && b.functionId==0)
             b.oscAddress=oscAddress.getText().trim();
         const auto low=minimum.getText().trim(), high=maximum.getText().trim();
         const auto valid=[](const juce::String& v) {
@@ -617,7 +617,10 @@ private:
             b.deviceId=captured->deviceId;
             b.kind=captured->kind; b.channel=captured->channel; b.number=captured->number;
         }
-        b.scope=(ControlScope)(scope.getSelectedId()-1);
+        // Named functions in the Default Map are global. Only the
+        // selected cue's Control Set can override their physical inputs.
+        b.scope=b.functionId>0 ? ControlScope::global :
+            (ControlScope)(scope.getSelectedId()-1);
         switch (target.getSelectedId()) {
             case 1: b.target=ControlTarget::masterGain; break;
             case 2: b.target=ControlTarget::columnGain; break;
@@ -676,7 +679,12 @@ private:
         if (!numeric(low) || !numeric(high)) {
             state.setText("Enter valid minimum and maximum values.",juce::dontSendNotification); return;
         }
-        b.minimum=low.getFloatValue(); b.maximum=high.getFloatValue();
+        // Named functions exclusively own output value ranges. Learn and
+        // source updates cannot rewrite the destination's scaling or route.
+        if (b.functionId==0) {
+            b.minimum=low.getFloatValue();
+            b.maximum=high.getFloatValue();
+        }
         int row=-1,column=-1;
         const bool resolved=!editSet || resolveSource(row,column);
         const bool saved=resolved && (update ?
@@ -727,8 +735,11 @@ private:
                   b.target==ControlTarget::masterPan ? "MASTER PAN" :
                   b.target==ControlTarget::columnGain ? "CHANNEL GAIN" :
                   b.target==ControlTarget::columnPan ? "CHANNEL PAN" :
-                  b.target==ControlTarget::midiCc ? "MIDI CC" :
-                  b.target==ControlTarget::oscFloat ? "OSC" :
+                  b.target==ControlTarget::midiCc ?
+                    "MIDI CC "+juce::String(b.outputChannel)+":"+
+                      juce::String(b.outputNumber) :
+                  b.target==ControlTarget::oscFloat ?
+                    "OSC "+b.oscAddress :
                   b.target==ControlTarget::go ? "GO" : "PANIC");
         }
         if (effectivePreview.getText()!=summary)
