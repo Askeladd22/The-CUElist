@@ -76,10 +76,25 @@ void workspaceLayoutTests() {
                       geometry.timeline.getRight()==geometry.editorX &&
                       geometry.dockEditor.getRight()==geometry.editorX,
                       "Ultrawide workspace placed a panel outside its allotted lane");
-                check(geometry.inspectorPanel.getRight()<=size.x &&
-                      geometry.timeline.getBottom()<=size.y-47 &&
-                      geometry.gridSize.x<=geometry.viewport.getWidth(),
-                      "Short ultrawide show clips the footer or invents horizontal scrolling");
+                // Keep separate diagnostics: the three distinct layout
+                // invariants must not collapse to an unhelpful shared error.
+                const auto context=" at "+std::to_string(size.x)+"x"+
+                    std::to_string(size.y)+(visible ? " Inspector open" : " Inspector closed");
+                if (geometry.inspectorPanel.getRight()>size.x)
+                    throw std::runtime_error(
+                        "Ultrawide Inspector extends beyond screen"+context+
+                        ": right="+std::to_string(geometry.inspectorPanel.getRight()));
+                if (geometry.timeline.getBottom()>size.y-47)
+                    throw std::runtime_error(
+                        "Ultrawide Timeline clips footer"+context+
+                        ": bottom="+std::to_string(geometry.timeline.getBottom())+
+                        ", max="+std::to_string(size.y-47));
+                if (geometry.gridSize.x>geometry.viewport.getWidth())
+                    throw std::runtime_error(
+                        "Short ultrawide show unexpectedly scrolls horizontally"+context+
+                        ": grid="+std::to_string(geometry.gridSize.x)+
+                        ", viewport="+std::to_string(geometry.viewport.getWidth()));
+                check(true,"Ultrawide panel extents checked");
                 // More content than fits must still activate a horizontal
                 // viewport while leaving the fixed BPM lane untouched.
                 input.columnEndX=geometry.viewport.getWidth()+400;
