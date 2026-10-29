@@ -32,7 +32,7 @@ MainComponent::MainComponent(bool startAudio) {
          &goButton,&panicButton,&deviceButton,&controlButton,&collapseAllButton,&inspectorSideTab,
          &cuelistOverflowButton,&addCuelistButton,&undoButton,&redoButton,&helpButton,&dockResize,&timelineResize,&importButton,&midiEditButton,&oscEditButton,&playCellButton,&stopCellButton,&clearButton,&tempoButton,&applyButton,
          &cellTab,&rowTab,&rowGain,&rowBehaviour,&rowMute,&rowLoop,&rowName,&cellName,&bpm,&cueNotes,&behaviour,&follow,&loop,&cellAutoStop,&gainDb,&viewport,&timeline,&utilities,
-         &clipCollapseButton,&clipCloseButton,&cueHeaders,&cueMetrics,&preflightButton,&diagnosticsButton,&preferencesButton,&projectNameLabel}) addAndMakeVisible(c);
+         &clipCollapseButton,&clipCloseButton,&cueHeaders,&columnHeaders,&cueMetrics,&preflightButton,&diagnosticsButton,&preferencesButton,&projectNameLabel}) addAndMakeVisible(c);
     for (juce::TextButton* b : std::initializer_list<juce::TextButton*>{&openButton,&saveButton,&newButton,&addRowButton,&addColumnButton,&goButton,&panicButton,&deviceButton,&controlButton,&collapseAllButton,&inspectorSideTab,
                     &cuelistOverflowButton,&addCuelistButton,&undoButton,&redoButton,&helpButton,
                     &importButton,&midiEditButton,&oscEditButton,&playCellButton,&stopCellButton,&clearButton,&tempoButton,&applyButton,
@@ -42,6 +42,14 @@ MainComponent::MainComponent(bool startAudio) {
     // left edge. The right edge must meet BPM/Auto Stop without a dark gutter.
     viewport.setScrollBarThickness(9);
     viewport.setScrollBarPosition(false,true);
+    // Immediately redraw pinned headers on wheel, scrollbar drag, resize or
+    // keyboard scrolling. The grid body remains the only scrolled component.
+    viewport.onScroll=[this] {
+        cueHeaders.repaint();
+        columnHeaders.repaint();
+        cueMetrics.repaint();
+        utilities.syncScroll(viewport.getViewPositionX());
+    };
     goButton.setColour(juce::TextButton::buttonColourId,palette::go);
     goButton.setColour(juce::TextButton::textColourOffId,palette::text);
     panicButton.setColour(juce::TextButton::buttonColourId,palette::panic);
@@ -727,6 +735,14 @@ void MainComponent::resized() {
         ? viewport.getScrollBarThickness() : 0;
     cueHeaders.setBounds(geometry.cueHeaders.translated(leftScrollInset,0));
     cueHeaders.toFront(false);
+    // Place an independent 72px-high heading over every visible column.
+    // Its x is the exact right edge of the pinned cue-name lane. Column
+    // content scrolls horizontally beneath it, but cannot rise through it.
+    const int columnHeaderX=cueHeaders.getRight();
+    const int columnHeaderWidth=std::max(0,viewport.getRight()-columnHeaderX);
+    columnHeaders.setBounds(columnHeaderX,viewport.getY(),
+                            columnHeaderWidth,CueGrid::headerHeight);
+    columnHeaders.toFront(false);
     collapseAllButton.setBounds(cueHeaders.getX()+CueGrid::nameWidth-84,
                                 cueHeaders.getY()+9,77,24);
     cueMetrics.setBounds(geometry.metrics);
@@ -747,6 +763,7 @@ void MainComponent::refresh() {
             }
     syncClipEditor(); syncOscEditor(); refreshInspector(); utilities.refresh(); resized();
     cueHeaders.repaint();
+    columnHeaders.repaint();
     if (!projectNameLabel.isBeingEdited() && projectNameLabel.getText()!=show.name)
         projectNameLabel.setText(show.name,juce::dontSendNotification);
     repaint(); grid.repaint(); timeline.repaint(); cueMetrics.repaint();
@@ -1184,7 +1201,8 @@ void MainComponent::timerCallback() {
     }
     lastMidiRx=rx; lastMidiTx=tx; lastOscTx=oscTx;
     activityInitialized=true;
-    utilities.syncScroll(viewport.getViewPositionX()); utilities.refreshRouting(); grid.repaint(); cueHeaders.repaint();
+    utilities.syncScroll(viewport.getViewPositionX()); utilities.refreshRouting();
+    grid.repaint(); cueHeaders.repaint(); columnHeaders.repaint();
     displayPeak=std::max(engine.peak.load(),displayPeak*.88f);
     utilities.refreshMeters(); repaint(); timeline.repaint(); cueMetrics.repaint();
 }
