@@ -525,7 +525,11 @@ void MainComponent::paint(juce::Graphics& g) {
         const auto learnColour=quickLearnAccent();
         label(g,quickLearnMode==QuickLearnMode::midi ? "MIDI LEARN" : "OSC LEARN",
               {x+5,98,geometry.inspectorInnerWidth-10,25},19,learnColour,true);
-        label(g,quickLearnFunctionId>0 ? "Selected target blinking - move your controller" :
+        const bool midiInputMissing=quickLearnMode==QuickLearnMode::midi &&
+                                    !midiInput.connected();
+        label(g,quickLearnFunctionId>0 ?
+              (midiInputMissing ? "MIDI input missing - select device" :
+               "Selected target blinking - move your controller") :
               "Select a parameter or a named function",
               {x+5,155,geometry.inspectorInnerWidth-10,38},12,
               quickLearnFunctionId>0 ? learnColour : palette::text);
@@ -1297,6 +1301,17 @@ void MainComponent::timerCallback() {
                 physicalEdges.clear();
                 status="MIDI controller reconnected (same device).";
             }
+        }
+    }
+    // Connection status can change while a function remains selected.
+    // Keep the yellow blinking target armed, but show a truthful live
+    // warning until its explicitly selected MIDI input becomes available.
+    if (quickLearnMode==QuickLearnMode::midi && quickLearnFunctionId>0) {
+        const juce::String warning=midiInput.connected() ? juce::String() :
+                                   juce::String("MIDI input not connected");
+        if (quickLearnFeedback!=warning) {
+            quickLearnFeedback=warning;
+            repaint();
         }
     }
     // Compare monotonic counters; LEDs reflect actual RX/TX, not queued timeline events.

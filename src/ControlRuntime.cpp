@@ -662,17 +662,22 @@ void MainComponent::chooseQuickLearnTarget(int functionId) {
     if (!exists || functionId<=0) {
         status="Could not select a mappable function.";repaint();return;
     }
-    if (quickLearnMode==QuickLearnMode::midi && !midiInput.connected()) {
-        status="Connect a MIDI input through Control Mappings first.";
-        repaint();return;
-    }
+    // Physical MIDI availability must not gate the visual selection.
+    // The UI needs to show WHICH function is armed even when no input
+    // device has been selected or while the selected device reconnects.
+    // No MIDI data is captured until a device is actually connected.
+    const bool midiInputMissing=quickLearnMode==QuickLearnMode::midi &&
+                                !midiInput.connected();
     quickLearnFunctionId=functionId;
     quickLearnArmedEntryId=requestedEntryId;
     quickLearnPulseTicks=0;quickLearnPulseBright=true;
-    quickLearnFeedback.clear();
+    quickLearnFeedback=midiInputMissing ? "MIDI input not connected" :
+                       juce::String();
     if (quickLearnMode==QuickLearnMode::midi) armControlLearn();
     else armOscControlLearn();
-    status="Listening for "+juce::String(quickLearnMode==QuickLearnMode::midi ?
+    status=midiInputMissing ?
+        "MIDI target selected. Connect a MIDI input in Control Mappings to capture." :
+        "Listening for "+juce::String(quickLearnMode==QuickLearnMode::midi ?
         "MIDI" : "OSC")+" input. The next received message creates the binding.";
     updateQuickLearnVisuals();
 }

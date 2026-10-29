@@ -3,6 +3,40 @@
 
 // Test the real application workflow, not an independent routing mock.
 void quickLearnPersistenceTests() {
+    test("MIDI Quick Learn blinks the chosen function without a connected input",[] {
+        MainComponent ui(false);
+        auto* go=dynamic_cast<QuickLearnHotspot*>(
+            controlsV3::named(ui,"quickLearnGo"));
+        auto* panic=dynamic_cast<QuickLearnHotspot*>(
+            controlsV3::named(ui,"quickLearnPanic"));
+        auto* targets=dynamic_cast<QuickControlTargets*>(
+            controlsV3::named(ui,"quickControlTargets"));
+        check(go && panic && targets,"MIDI Learn GUI targets are missing.");
+        check(ui.show.controls.midiInputId.isEmpty(),
+              "Offline MIDI regression requires no selected hardware input.");
+        ui.beginQuickLearn(false);
+        check(ui.isQuickLearnActive() && go->isVisible() &&
+              go->getLearnAccent()==palette::amber,
+              "MIDI Learn must show yellow available targets without hardware.");
+        cueViewFixtures::click(*go,5.0f,5.0f);
+        check(ui.isQuickLearnAwaitingInput() && go->isArmedTarget() &&
+              go->isPulseBright() &&
+              targets->getArmedFunctionId()>0 &&
+              targets->getLearnAccent()==palette::amber,
+              "Selecting MIDI GO must activate yellow blink despite no device.");
+        check(ui.status.containsIgnoreCase("MIDI input"),
+              "Offline MIDI Learn must explain why capture is not yet possible.");
+        cueViewFixtures::click(*panic,5.0f,5.0f);
+        check(ui.isQuickLearnAwaitingInput() && panic->isArmedTarget() &&
+              !go->isArmedTarget() &&
+              panic->getLearnAccent()==palette::amber,
+              "Changing the selected MIDI target must transfer the blink.");
+        check(ui.show.controls.bindings.empty(),
+              "Selecting an offline MIDI target must not invent a hardware binding.");
+        ui.finishQuickLearn();
+        check(!ui.isQuickLearnActive() && !go->isVisible() &&
+              !panic->isVisible(),"MIDI Cancel must restore the normal GUI.");
+    });
     test("MIDI Learn highlights amber and OSC Learn highlights violet",[] {
         MainComponent ui(false);
         auto* go=dynamic_cast<QuickLearnHotspot*>(
