@@ -71,64 +71,62 @@ The **Inspector** on the right edits the selected cue and cell separately. Use i
 
 Columns can be collapsed individually or together with **Collapse all** in the cue grid header. Collapsing is a layout choice; it does not stop running media or change audio routing. The pinned BPM / Auto Stop area has a continuous visual boundary with the scrollable grid and the mixer below, including at row separators. The Cue List's **vertical scrollbar sits at its left edge**, rather than between the last cell and BPM / Auto Stop. It appears only when there are more rows than can fit on screen. The pinned row header follows that scrollbar's visible inset, keeping Play, Stop and row names aligned with the scrolling content. When no vertical scrollbar is necessary, the grid expands all the way to the BPM boundary instead of retaining an empty gutter.
 
-### Control Mapping: project functions and cue overrides (incremental implementation)
+### MIDI / OSC quick Learn, project functions and cue overrides
 
-The mapping editor can create a **named project function** with an independent
-output target, and bind an incoming hardware control to it. The destination
-is stored in the function rather than in the controller input: rebinding
-**Resolume Brightness** from Fader A to Fader B can still send MIDI CC 74
-on the configured MIDI output. These function names are project-specific.
+**Quick Learn does not open a dialog.** Click **M Learn** or **O Learn** in
+the upper-right corner next to the independent MIDI/OSC activity monitors.
+The Inspector temporarily shows a scrollable list of functions and mappable
+parameters. Click the desired target, then move/press a hardware control or
+send one OSC message. The first matching event is consumed, recorded in
+the **Default Map**, and confirmed in the status bar. No Add/Save confirmation
+is necessary. Use **Cancel Learn** to exit without assigning an input.
 
-The `Default Map` consists of the project's global function inputs.
-A Control Column cell can supply a local input for the **same function ID**.
-When that cue becomes active after GO, the local input replaces the default
-input; when moving to another cue, the default input is automatically restored
-unless the next cue also overrides it. The old input is not kept alive alongside
-its replacement. Copy/paste Control Set cells to repeat an override deliberately.
-The Control Set editor's effective preview distinguishes inherited and locally
-overridden functions. Existing direct bindings remain readable for legacy
-projects.
+Available direct internal targets include Master Gain, Master Pan, GO, PANIC
+and Gain/Pan for each audio column. The function list starts with eight MIDI
+and eight OSC slots on first mapping use; there is no eight-slot limit.
+Additional functions can be created through **Control Mappings**. Each
+function has a stable ID and a project-specific editable label, separate
+from its hardware input. For example, rebinding Resolume Brightness to a
+new fader does not rewrite its outgoing MIDI CC.
 
-**MIDI Learn / OSC Learn.** Two distinct **M Learn** and **O Learn** controls
-are positioned next to the upper-right MIDI/OSC activity monitor; they open
-the global mapping panel and arm acquisition for the **Default Map only**.
-The Control Set editor has its own MIDI Learn and OSC Learn controls for the
-selected cue. An armed Learn state is marked amber; the first learned
-message is consumed rather than dispatched to GO/PANIC. The monitor's
-OSC RX indication counts genuine incoming datagrams, independent of Learn.
+**Device requirements.** An input MIDI device must have been selected and
+connected through Control Mappings before a MIDI Learn can capture data.
+OSC Learn automatically enables the project's configured UDP listener, or
+uses port **9011** when no port has been configured. A new output-function
+slot without a matching MIDI/OSC output column can be learned but **will not
+send output** until the destination is set in Control Mappings.
 
-**OSC input configuration.** OSC input is **disabled by default**, including
-when loading older projects. The operator must explicitly configure a UDP
-input port (suggested 9011) in the mapping editor and activate OSC Learn.
-Only single OSC 1.0 float, integer or boolean messages with short printable
-ASCII addresses are supported; bundles and other argument types are ignored.
-The listener has a bounded queue and transfers mapping decisions to the
-GUI thread. It binds a UDP port on the host: use only a trusted LAN, restrict
-inbound access using the Windows firewall and never expose show-control
-inputs directly to the public Internet. OSC/UDP has no authentication or
-guaranteed delivery.
+**Control Mappings is the advanced editor.** It handles physical device
+selection, function creation/removal/ordering (**Manage functions**),
+function names and routes (**Save route**), advanced binding settings and
+Default Map preset export/import. The project's names are not included in
+portable controller presets. The modal editor is not required for normal
+global Learn.
 
-**Portable Default Map presets.** Use **Export Default Map** / **Import Default
-Map** in the global mapping editor. The exported JSON contains the physical
-assignments and function destinations, but **not** project-specific function
-names. Import matches functions by their order in the project, retains existing
-project names/IDs and local cue overrides, and rejects incompatible target
-columns without partially overwriting the show. Review the output hardware
-and all routed targets after import; device IDs may differ on another PC.
+**Control Set overrides.** Each Control Column cell owns only its cue-local
+input overrides. Open that cell's Control Set editor for local MIDI/OSC Learn;
+a captured message commits its selected mapping immediately to the **local
+Control Set**, not the Default Map. Unchanged functions inherit global
+bindings. The effective-mapping preview labels inherited and overridden
+assignments. Overrides become live on confirmed GO and are recalculated for
+every cue: they never bleed into a different cue. Copy/paste Control Set
+cells deliberately to reuse an override.
 
-**Legacy Control Column Lock migration.** The old per-column Lock button
-is no longer part of the operator interface. When opening a legacy locked
-project, The Cuelist first converts its global locked mappings into named
-Default Map functions with the **same physical inputs and output routes**.
-Any dormant per-cue mappings previously ignored by that lock are preserved
-as reusable Control Set templates, *not* activated automatically. The change
-is transactional and occurs **before playback is interrupted**; an invalid
-migration leaves the previous show in place. The migrated show is marked
-unsaved: review its inputs, routes and archived templates, then explicitly
-Save if the conversion is correct. The original file remains unchanged
-until the operator saves. The legacy file format remains readable; the
-global operator edit lock is a separate, future feature with no predefined
-list of blocked actions.
+**Operator safety.** During inline Learn, captured messages cannot fire
+live GO or PANIC, and remaining messages of the same protocol in the capture
+tick are discarded. A learned held note is tracked to prevent a spurious
+repeated press. MIDI/OSC RX/TX indicators remain independent of mapping.
+OSC accepts one numeric/boolean OSC 1.0 argument with a printable address;
+bundles and other incoming argument types are unsupported. Use only a
+trusted LAN and firewall rules; OSC/UDP has no authentication or delivery
+acknowledgement.
+
+**Legacy and pending work.** The old Control Column Lock button is no
+longer part of the operator workflow. Loading older documents still
+migrates historical locked mappings and preserves dormant data where
+possible, rather than silently discarding it. The separate general edit
+lock is not defined yet. Advanced OSC output still sends numeric floats;
+selectable non-float outgoing OSC argument types require another change.
 
 ## 4. Managing multiple Cuelists
 
@@ -244,17 +242,37 @@ Add an **OSC** column and enter the destination **host/IP address and UDP port**
 
 ### 10.1 MIDI Learn and destinations
 
-Open **Control Mapping**, select the actual MIDI input port, start **MIDI Learn**, and move a physical fader, encoder or button. The mapping subsystem recognizes CC, note events and Pitch Bend as supported and exposes destinations such as Master/Audio gain and pan, GO, Panic, MIDI CC and OSC float.
+Use the top-right **M Learn / O Learn** buttons for direct assignment:
+choose a function in the Inspector, send the hardware message, and the
+Default Map is saved immediately. No advanced mapping window opens.
+Connect the MIDI input once under **Control Mappings** if needed; OSC
+uses the configured UDP port or port 9011 on the first Learn attempt.
 
-Mapping settings can include a value range, inversion and response curves. **Jump** applies the physical value immediately; **Pickup** waits for the physical input to cross the current destination value to reduce sudden parameter changes. The configuration window groups **MIDI Input**, **Mapping Configuration**, **Cue Presets / Reusable Control Sets**, and **Saved Mappings**. The Destination column selector has a visible label; MIDI Output CC and OSC address fields are enabled only for their respective target types. When no mappings exist, the saved list explains how to create one, and Update/Remove remain disabled until a mapping is selected.
+**Control Mappings** supports the technical edits that should not interrupt
+normal Learn: source channel/message, pickup or jump, curve, inversion,
+function name, output MIDI channel/CC, OSC float address, function order,
+and the function's output column. The function destination does not change
+when the physical controller is replaced. MIDI/OSC output functions with
+an unconfigured destination column remain inert until routed.
 
-### 10.2 Scope and priority
+### 10.2 Default Map and cue-local Control Sets
 
-Mappings can be Global, Column, Preset or cue-specific. Cue-specific mapping becomes active through a **successful GO**, not merely selecting a row. Panic clears active cue-specific mapping state as designed while preserving the configured global rules.
+The Default Map provides global source-to-function assignments. Open a
+Control Column cell to view inherited functions and define a local MIDI
+or OSC input override; local Learn commits when the event arrives. A local
+override replaces the assignment for that **function ID**, not the
+destination. The Default Map is untouched. Active cue assignments change
+only after GO; selecting another Inspector row is a preview.
 
-A **Control Column** can contain per-cue Control Sets. Locking a Control Column promotes its chosen set to a low-priority default across cues; unlocking restores cue-specific sets. Unlocked columns can have Medium, High or Maximum priority. More specific/higher-priority mappings override the same physical input while unrelated inputs inherit lower-level mappings. Equal-priority conflicts resolve by the rightmost Control Column.
+Reusable Control Sets can be saved or applied to cells. Controller presets
+export and import physical assignments and output routing without copying
+project-specific function names. Legacy direct mappings remain loadable.
+The retired per-column Lock is kept only as migration metadata for older
+shows; there is no new operator lock for individual Control Columns.
 
-Reusable Control Sets can be saved and applied to cells or defaults. All mapping data is included in the project schema. **Control Mapping is experimental** and requires physical-device testing, especially hot unplug/reconnect, Pickup/Jump, key repeat and conflicting targets.
+Test all hardware paths before a show, including disconnected devices,
+conflicting physical inputs, Pickup/Jump, MIDI note release and OSC listener
+security. A general operator edit lock is a separately planned feature.
 
 ## 11. Tempo maps and Timeline
 
