@@ -549,7 +549,7 @@ private:
         if (!entries || row<0 || row>=(int)entries->size()) return;
         const auto& b=(*entries)[(size_t)row];
         ControlBinding display=b;
-        if (b.functionId>0 && editSet)
+        if (b.functionId>0)
             for (const auto& fn:owner->show.controls.functions)
                 if (fn.id==b.functionId) {
                     display.target=fn.destination.target;
