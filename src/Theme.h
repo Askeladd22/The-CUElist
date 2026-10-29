@@ -35,8 +35,8 @@ struct AppTypefaces {
         BinaryData::HindRegular_ttf,BinaryData::HindRegular_ttfSize);
     juce::Typeface::Ptr hindSemibold=juce::Typeface::createSystemTypefaceFor(
         BinaryData::HindSemiBold_ttf,BinaryData::HindSemiBold_ttfSize);
-    // Keep these registered for the entire process, so family-name fallback
-    // works even when no matching Windows fonts are installed.
+    // Noto families are embedded for explicit math/symbol rendering.
+    // Do not rely on finding system-installed typefaces.
     juce::Typeface::Ptr notoMath=juce::Typeface::createSystemTypefaceFor(
         BinaryData::NotoSansMathRegular_ttf,BinaryData::NotoSansMathRegular_ttfSize);
     juce::Typeface::Ptr notoSymbols2=juce::Typeface::createSystemTypefaceFor(
@@ -59,11 +59,9 @@ inline juce::Font font(float size,bool bold=false) {
     if (face!=nullptr) {
         const juce::Font embedded(juce::FontOptions(face)
             .withPointHeight(pt)
-            // JUCE 8 performs fallback per glyph; never change the primary
-            // Exo 2 / Hind styling for characters they already support.
-            .withFallbacks({"Noto Sans Math", "Noto Sans Symbols 2",
-                            "Segoe UI Symbol"})
-            .withFallbackEnabled(true));
+            // Noto fonts are selected explicitly for special glyph runs.
+            // Ordinary UI text always retains Exo 2 or Hind.
+            .withFallbacks({"Segoe UI Symbol"}));
         // JUCE 8 FontOptions has no withStyleFlags() member. Bold the
         // embedded Exo 2 face using the supported juce::Font API.
         return small && bold ? embedded.boldened() : embedded;
@@ -71,8 +69,23 @@ inline juce::Font font(float size,bool bold=false) {
     // Last resort only (e.g. a corrupt embedded font), never default behavior.
     return juce::Font(juce::FontOptions("Segoe UI",size,
         bold ? juce::Font::bold : juce::Font::plain).withPointHeight(pt)
-        .withFallbacks({"Noto Sans Math", "Noto Sans Symbols 2",
-                        "Segoe UI Symbol"}));
+        .withFallbacks({"Segoe UI Symbol"}));
+}
+// Explicit fonts for special glyphs. Never use these for ordinary headings,
+ // labels or transport iconography; those retain Hind/Exo 2 or vector paths.
+inline juce::Font mathFont(float size) {
+    const auto& face=appTypefaces().notoMath;
+    const auto pt=juce::jmax(10.0f,size*0.75f);
+    return face!=nullptr
+        ? juce::Font(juce::FontOptions(face).withPointHeight(pt))
+        : font(size);
+}
+inline juce::Font symbolsFont(float size) {
+    const auto& face=appTypefaces().notoSymbols2;
+    const auto pt=juce::jmax(10.0f,size*0.75f);
+    return face!=nullptr
+        ? juce::Font(juce::FontOptions(face).withPointHeight(pt))
+        : font(size);
 }
 inline void label(juce::Graphics& g,const juce::String& s,juce::Rectangle<int> r,float size=14,juce::Colour colour=palette::text,bool bold=false,int align=juce::Justification::centredLeft) {
     g.setColour(colour); g.setFont(font(size,bold)); g.drawText(s,r,align,true);

@@ -27,9 +27,12 @@ void GainMeterFader::paint(juce::Graphics& g) {
             g.drawRoundedRectangle(mid-15.0f,y-5.0f,30.0f,10.0f,2.0f,1.0f);
         }
         g.setColour(palette::muted);
-        g.setFont(font(9.0f,true));
-        g.drawText(gainDb==silenceDb ? juce::String("-∞") : juce::String((int)std::round(gainDb)),0,getHeight()-18,
-                   getWidth(),17,juce::Justification::centred,false);
+        const auto silenceText=juce::String::charToString((juce::juce_wchar)0x2212)
+                              +juce::String::charToString((juce::juce_wchar)0x221e);
+        // Math symbols always use the bundled Noto Sans Math directly.
+        g.setFont(gainDb==silenceDb ? mathFont(10.0f) : font(10.0f,true));
+        g.drawText(gainDb==silenceDb ? silenceText : juce::String((int)std::round(gainDb)),
+                   0,getHeight()-18,getWidth(),17,juce::Justification::centred,false);
         return;
     }
     const juce::Rectangle<float> backdrop(12.0f,top,28.0f,length);
@@ -66,10 +69,12 @@ void GainMeterFader::paint(juce::Graphics& g) {
         g.drawHorizontalLine((int)std::round(y),42.0f,major ? 50.0f : 46.0f);
         // Retain all tick marks but skip conflicting labels in short strips.
         if (y-previousLabel>=13.0f || previousLabel<0) {
-            g.setFont(font(10.0f));
-            g.drawText(tick==-60 ? juce::String("-∞") :
+            g.setFont(tick==-60 ? mathFont(10.0f) : font(10.0f));
+            const auto minusInfinity=juce::String::charToString((juce::juce_wchar)0x2212)
+                                    +juce::String::charToString((juce::juce_wchar)0x221e);
+            g.drawText(tick==-60 ? minusInfinity :
                        tick>0 ? "+"+juce::String(tick) : juce::String(tick),
-                       52,(int)std::round(y-7),25,14,juce::Justification::centredLeft,false);
+                       52,(int)std::round(y-7),27,14,juce::Justification::centredLeft,false);
             previousLabel=y;
         }
     }
@@ -89,9 +94,24 @@ void GainMeterFader::paint(juce::Graphics& g) {
     g.drawText("L",14,(int)bottom+3,12,14,juce::Justification::centred,false);
     g.drawText("R",29,(int)bottom+3,12,14,juce::Justification::centred,false);
     g.setColour(palette::text);
-    g.setFont(font(12.0f,true));
-    g.drawText(gainDb==silenceDb ? juce::String("-∞ dB") : juce::String(gainDb,1)+" dB",4,getHeight()-22,
-               std::max(70,getWidth()-8),20,juce::Justification::centredLeft,false);
+    const int valueY=getHeight()-22;
+    if (gainDb==silenceDb) {
+        // Draw only the mathematical part in Noto Sans Math. Exo 2 still
+        // renders the unit, so instrument typography stays consistent.
+        const auto value=juce::String::charToString((juce::juce_wchar)0x2212)
+                         +juce::String::charToString((juce::juce_wchar)0x221e);
+        const auto math=mathFont(12.0f);
+        const int symbolWidth=(int)std::ceil(juce::GlyphArrangement::getStringWidth(math,value));
+        g.setFont(math);
+        g.drawText(value,4,valueY,symbolWidth+2,20,juce::Justification::centredLeft,false);
+        g.setFont(font(12.0f,true));
+        g.drawText(" dB",4+symbolWidth,valueY,std::max(25,getWidth()-8-symbolWidth),
+                   20,juce::Justification::centredLeft,false);
+    } else {
+        g.setFont(font(12.0f,true));
+        g.drawText(juce::String(gainDb,1)+" dB",4,valueY,
+                   std::max(70,getWidth()-8),20,juce::Justification::centredLeft,false);
+    }
 }
 void GainMeterFader::mouseDown(const juce::MouseEvent& e) {
     grabKeyboardFocus();

@@ -60,26 +60,28 @@ void uiRefinementTests() {
               "Native controls bypass the shared typography hierarchy");
     });
 
-    test("Bundled Unicode fallbacks cover infinity and are preferred by UI fonts",[] {
+    test("Noto Math and Symbols 2 are explicitly chosen for their glyphs",[] {
         const auto& faces=appTypefaces();
         check(faces.notoMath!=nullptr && faces.notoSymbols2!=nullptr,
-              "Noto fallback typefaces failed to register");
-        check(faces.notoMath->getNominalGlyphForCodepoint(0x221E).has_value(),
-              "Bundled Noto Sans Math lacks infinity U+221E");
-        for (const auto size: {12.0f,20.0f}) {
-            const auto uiFont=font(size);
-            const auto families=uiFont.getPreferredFallbackFamilies();
-            check(uiFont.getFallbackEnabled() &&
-                  families.contains("Noto Sans Math") &&
-                  families.contains("Noto Sans Symbols 2"),
-                  "Exo 2 / Hind did not retain the configured glyph fallback");
-            const auto infinity=uiFont.findSuitableFontForText(
-                juce::String::charToString((juce::juce_wchar) 0x221E));
-            const auto resolved=infinity.getTypefacePtr();
-            check(resolved!=nullptr &&
-                  resolved->getNominalGlyphForCodepoint(0x221E).has_value(),
-                  "Infinity is not renderable through the configured fallback");
-        }
+              "Bundled Noto typefaces failed to register");
+        check(faces.notoMath->getNominalGlyphForCodepoint(0x221E).has_value() &&
+              faces.notoMath->getNominalGlyphForCodepoint(0x2212).has_value(),
+              "Noto Sans Math does not include minus/infinity");
+        check(faces.notoSymbols2->getNominalGlyphForCodepoint(0x25B2).has_value() &&
+              faces.notoSymbols2->getNominalGlyphForCodepoint(0x25BC).has_value() &&
+              faces.notoSymbols2->getNominalGlyphForCodepoint(0x25C0).has_value() &&
+              faces.notoSymbols2->getNominalGlyphForCodepoint(0x25B6).has_value(),
+              "Noto Sans Symbols 2 does not include directional arrows");
+        const auto body=font(12.0f),heading=font(20.0f);
+        check(body.getTypefaceName().containsIgnoreCase("Exo") &&
+              heading.getTypefaceName().containsIgnoreCase("Hind"),
+              "Standard typography must remain Exo 2 / Hind");
+        check(mathFont(12.0f).getTypefaceName().containsIgnoreCase("Noto Sans Math") &&
+              symbolsFont(12.0f).getTypefaceName().containsIgnoreCase("Noto Sans Symbols"),
+              "Noto special-purpose fonts are not selected explicitly");
+        check(!body.getPreferredFallbackFamilies().contains("Noto Sans Math") &&
+              !body.getPreferredFallbackFamilies().contains("Noto Sans Symbols 2"),
+              "Noto fonts must be explicit rather than generic text fallback");
     });
 
     test("Midnight Slate palette preserves layered dark surfaces and safety accents",[] {
@@ -549,6 +551,32 @@ void uiRefinementTests() {
         check(collapse && collapse->getTooltip().isEmpty() &&
               collapse->getBottom()<=74+CueGrid::headerHeight,
               "Expand all still creates a tooltip over the first cue");
+    });
+
+    test("Individual cell transports have 24px targets and an 8px gap",[] {
+        const auto play=CueGrid::cellPlayBounds(0,CueGrid::columnWidth,0);
+        const auto stop=CueGrid::cellStopBounds(0,CueGrid::columnWidth,0);
+        check(play.getWidth()>=24 && play.getHeight()>=23 &&
+              stop.getWidth()>=24 && stop.getHeight()>=23 &&
+              stop.getX()-play.getRight()>=8 &&
+              stop.getRight()<=CueGrid::columnWidth-7,
+              "Cell Play and Stop are cramped or overlapping");
+        check(!play.contains(stop.getCentre()) &&
+              !stop.contains(play.getCentre()),
+              "Cell transports share hit targets");
+    });
+
+    test("CPU/RAM telemetry fits compact window widths and preserves font routing",[] {
+        MainComponent ui(false);
+        for (const auto size:std::initializer_list<juce::Point<int>>{
+                 {1180,820},{1440,900},{1647,895},{1920,1080}}) {
+            ui.setSize(size.x,size.y);
+            const auto card=ui.createComponentSnapshot({size.x-516,8,132,56});
+            check(card.isValid() && card.getWidth()==132 && card.getHeight()==56,
+                  "CPU/RAM panel escaped its compact bounds");
+            check(font(10.0f).getTypefaceName().containsIgnoreCase("Exo"),
+                  "Small telemetry text lost Exo 2");
+        }
     });
 
     test("Cue list fills compact outer gutters while pinned BPM and Gain editor stay usable",[] {
