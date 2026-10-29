@@ -239,6 +239,16 @@ public:
         };
         refreshDevices(); refreshPresets(); refreshColumns();refreshTemplates();
         refreshFunctions();
+        if (!owner->show.controls.functions.empty()) {
+            const auto& f=owner->show.controls.functions.front();
+            functionName.setText(f.name,false);
+            showRoute(f.destination);
+        }
+        if (editSet) {
+            for (juce::Component* widget : std::initializer_list<juce::Component*>{
+                    &target,&outputCc,&oscAddress,&columns,&minimum,&maximum})
+                widget->setEnabled(false);
+        }
         refreshDestinationFields();
         refreshEmptyState();
         updateEffectivePreview();
@@ -251,13 +261,16 @@ public:
               "CONTROL & MAPPING",{20,15,520,31},21,palette::teal,true);
         g.setColour(palette::line);
         g.drawHorizontalLine(52,19,(float)getWidth()-19);
-        label(g,"MIDI INPUT",{20,60,350,19},12,palette::teal,true);
+        label(g,"MIDI / OSC INPUT",{20,60,350,19},12,palette::teal,true);
         label(g,"Input device",{20,83,200,18},11,palette::muted,true);
-        label(g,"MIDI Learn",{20,143,200,18},11,palette::muted,true);
+        label(g,"MIDI Learn",{20,143,116,18},11,palette::muted,true);
+        label(g,"OSC Learn",{144,143,116,18},11,palette::muted,true);
+        label(g,"UDP port",{269,143,68,18},11,palette::muted,true);
 
         g.setColour(palette::line);
         g.drawHorizontalLine(191,20,(float)getWidth()-20);
-        label(g,"MAPPING CONFIGURATION",{20,198,350,19},12,palette::teal,true);
+        // Function selection occupies the 198-224px band; do not draw
+        // a section heading over the active combo box.
         label(g,editSet?"Control Set scope":"Scope",{20,228,179,18},11,palette::muted,true);
         label(g,"Target",{214,228,178,18},11,palette::muted,true);
         label(g,"Takeover",{411,228,132,18},11,palette::muted,true);
@@ -292,10 +305,10 @@ public:
         oscLearn.setBounds(144,163,116,32);
         oscInputPort.setBounds(269,163,68,32);
         state.setBounds(347,162,w-367,33);
-        functionChoice.setBounds(20,207,185,29);
-        functionName.setBounds(213,207,228,29);
-        newFunction.setBounds(449,207,140,29);
-        saveRoute.setBounds(597,207,w-617,29);
+        functionChoice.setBounds(20,198,185,26);
+        functionName.setBounds(213,198,228,26);
+        newFunction.setBounds(449,198,140,26);
+        saveRoute.setBounds(597,198,w-617,26);
 
         scope.setBounds(20,250,176,31);
         target.setBounds(214,250,178,31);
