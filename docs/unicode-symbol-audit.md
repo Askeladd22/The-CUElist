@@ -48,6 +48,24 @@ glyphs with their underlying toggle state. The words "Mute", "Snap",
   the current accessible text and spacing; don't replace them with
   unrelated decorative Unicode.
 
+## Compact icon-button surfaces
+
+A shared `IconButtonState` / `drawIconButtonSurface()` in `src/Theme.h`
+provides consistent low-contrast outlines, sparse semantic fill, disabled
+rendering and an explicit keyboard-focus ring for the small operational buttons.
+`iconButtonInk()` defines glyph emphasis separately from the frame.
+
+The same treatment is applied to Cue List row and cell transport, reorder and
+action buttons, the Auto Stop CELLS disclosure, Master/column Mute and phase
+inversion, the Snap magnet, Control lock, Inspector grip and the JUCE single-
+character add/close/more buttons. The Master Send circle is also toned down,
+while retaining its distinctive round shape.
+
+The `Noto Sans Symbols 2` glyph lookup and visible-outline centering logic are
+unchanged; this is a surface-styling pass, not a change to font coverage.
+Full-text buttons, GO and PANIC, the limiter's actual gain-reduction indicator,
+and the custom loop icon keep their own operator-specific graphics.
+
 ## QA
 
 1. Compile with the pinned fonts and run all native UI tests.
