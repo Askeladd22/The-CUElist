@@ -522,17 +522,19 @@ void MainComponent::paint(juce::Graphics& g) {
         g.fillRoundedRectangle(geometry.inspectorPanel.toFloat(),9.0f);
         g.setColour(palette::line);
         g.drawRoundedRectangle(geometry.inspectorPanel.toFloat(),9.0f,1.25f);
+        const auto learnColour=quickLearnAccent();
         label(g,quickLearnMode==QuickLearnMode::midi ? "MIDI LEARN" : "OSC LEARN",
-              {x+5,98,geometry.inspectorInnerWidth-10,25},19,palette::amber,true);
-        label(g,quickLearnFunctionId>0 ? "Move or press the hardware control" :
+              {x+5,98,geometry.inspectorInnerWidth-10,25},19,learnColour,true);
+        label(g,quickLearnFunctionId>0 ? "Selected target blinking - move your controller" :
               "Select a parameter or a named function",
-              {x+5,155,geometry.inspectorInnerWidth-10,38},12,palette::text);
+              {x+5,155,geometry.inspectorInnerWidth-10,38},12,
+              quickLearnFunctionId>0 ? learnColour : palette::text);
         if (quickLearnFeedback.isNotEmpty())
             label(g,quickLearnFeedback,
                   {x+5,184,geometry.inspectorInnerWidth-10,20},
                   10,palette::teal,true);
         label(g,"Available parameters / functions",
-              {x+4,205,geometry.inspectorInnerWidth-8,24},11,palette::teal,true);
+              {x+4,205,geometry.inspectorInnerWidth-8,24},11,learnColour,true);
     } else {
     const int inspectorInner=geometry.inspectorInnerWidth;
     auto panel=geometry.inspectorPanel;
@@ -1319,7 +1321,15 @@ void MainComponent::timerCallback() {
         palette::amber.withAlpha(.55f) : palette::raised);
     globalOscLearn.setColour(juce::TextButton::buttonColourId,
         (quickLearnMode==QuickLearnMode::osc || oscLearnArmed) ?
-        palette::amber.withAlpha(.55f) : palette::raised);
+        palette::purple.withAlpha(.55f) : palette::raised);
+    // 25 Hz UI refresh: only the armed target pulses (~1.8 Hz).
+    // Other available controls retain their steady protocol-coloured tint.
+    if (quickLearnFunctionId>0 && quickLearnMode!=QuickLearnMode::off &&
+        ++quickLearnPulseTicks>=7) {
+        quickLearnPulseTicks=0;
+        quickLearnPulseBright=!quickLearnPulseBright;
+        updateQuickLearnVisuals();
+    }
     utilities.syncScroll(viewport.getViewPositionX()); utilities.refreshRouting();
     grid.repaint(); cueHeaders.repaint(); columnHeaders.repaint();
     displayPeak=std::max(engine.peak.load(),displayPeak*.88f);
