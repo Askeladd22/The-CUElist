@@ -95,14 +95,23 @@ WorkspaceLayout calculateWorkspaceLayout(const WorkspaceLayoutInput& input) {
     result.inspectorCueCard={result.inspectorLeft-7,162,inspectorInnerWidth+14,245};
     result.inspectorCellCard={result.inspectorLeft-7,412,inspectorInnerWidth+14,337};
 
-    // Reserve metrics clearance only when columns exceed the usable area.
-    // A small show must not gain a fake horizontal scrollbar.
-    const int cueContent=input.columnEndX+cueGridTail;
-    const int scrollWidth=cueContent; // The fixed right band never needs scroll clearance.
+    // Compute both scrollbars from actual content size. The former unconditional
+    // width-9 left an empty 9px lane beside BPM even when no vertical scrollbar
+    // was needed. A visible vertical scrollbar now lives at the far LEFT of the
+    // viewport, not between the last cue cell and the fixed BPM/Auto Stop band.
+    constexpr int cueScrollbarThickness=9;
+    const int scrollWidth=input.columnEndX+cueGridTail;
+    const int scrollHeight=input.rowHeaderHeight+
+                           input.rowCount*input.rowHeight+cueGridTail;
+    const int viewWidth=result.viewport.getWidth();
+    const int viewHeight=result.viewport.getHeight();
+    bool horizontal=scrollWidth>viewWidth;
+    bool vertical=scrollHeight>viewHeight-(horizontal?cueScrollbarThickness:0);
+    horizontal=scrollWidth>viewWidth-(vertical?cueScrollbarThickness:0);
+    vertical=scrollHeight>viewHeight-(horizontal?cueScrollbarThickness:0);
     result.gridSize={
-        std::max(result.viewport.getWidth()-9,scrollWidth),
-        std::max(result.viewport.getHeight()-14,
-                 input.rowHeaderHeight+input.rowCount*input.rowHeight+cueGridTail)};
+        std::max(viewWidth-(vertical?cueScrollbarThickness:0),scrollWidth),
+        std::max(viewHeight-(horizontal?cueScrollbarThickness:0),scrollHeight)};
     return result;
 }
 } // namespace cuelist

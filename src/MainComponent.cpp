@@ -38,8 +38,10 @@ MainComponent::MainComponent(bool startAudio) {
                     &importButton,&midiEditButton,&oscEditButton,&playCellButton,&stopCellButton,&clearButton,&tempoButton,&applyButton,
                     &preflightButton,&diagnosticsButton,&preferencesButton}) b->setWantsKeyboardFocus(false);
     viewport.setViewedComponent(&grid,false); viewport.setScrollBarsShown(true,true);
-    // Avoid a broad, dark 14px gutter next to the fixed BPM boundary.
+    // Keep drag scrolling available, but place the vertical bar at the far
+    // left edge. The right edge must meet BPM/Auto Stop without a dark gutter.
     viewport.setScrollBarThickness(9);
+    viewport.setScrollBarPosition(false,true);
     goButton.setColour(juce::TextButton::buttonColourId,palette::go);
     goButton.setColour(juce::TextButton::textColourOffId,palette::text);
     panicButton.setColour(juce::TextButton::buttonColourId,palette::panic);
@@ -638,8 +640,8 @@ void MainComponent::resized() {
     helpButton.setBounds(getWidth()-831,10,61,25);
     undoButton.setBounds(getWidth()-764,10,51,25);
     redoButton.setBounds(getWidth()-709,10,51,25);
-    collapseAllButton.setBounds(geometry.cueHeaders.getX()+CueGrid::nameWidth-84,
-                                geometry.cueHeaders.getY()+9,77,24);
+    // Collapse-all follows the pinned header after JUCE has computed the
+    // actual left scrollbar inset (see placement below).
     const bool allCollapsed=std::all_of(show.columns.begin(),show.columns.end(),
         [](const Column& col){return col.collapsed;});
     collapseAllButton.setButtonText(allCollapsed ? "Expand all" : "Collapse all");
@@ -718,8 +720,15 @@ void MainComponent::resized() {
     goButton.setBounds(14,h-282,152,48);
     panicButton.setBounds(14,h-228,152,48);
     grid.setSize(geometry.gridSize.x,geometry.gridSize.y);
-    cueHeaders.setBounds(geometry.cueHeaders);
+    // With the scrollbar on the left, JUCE also moves the content origin.
+    // Shift our separately pinned header by the identical visible inset so
+    // its text and hitboxes stay pixel-aligned with their cue rows.
+    const int leftScrollInset=viewport.getVerticalScrollBar().isVisible()
+        ? viewport.getScrollBarThickness() : 0;
+    cueHeaders.setBounds(geometry.cueHeaders.translated(leftScrollInset,0));
     cueHeaders.toFront(false);
+    collapseAllButton.setBounds(cueHeaders.getX()+CueGrid::nameWidth-84,
+                                cueHeaders.getY()+9,77,24);
     cueMetrics.setBounds(geometry.metrics);
     cueMetrics.toFront(false);
     collapseAllButton.toFront(false);
