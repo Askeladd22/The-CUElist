@@ -3,6 +3,38 @@
 #include "ControlMapping.h"
 
 void controlColumnTests() {
+    test("OSC input decodes numeric and boolean messages into learned addresses",[] {
+        OscEvent event;event.address="/show/brightness";
+        OscValue value;value.type=OscValueType::decimal;value.decimal=.75f;
+        event.arguments.push_back(value);
+        const auto bytes=encodeOscMessage(event);
+        OscControlInput::Packet packet;
+        check(OscControlInput::decode(bytes.data(),(int)bytes.size(),packet) &&
+              juce::String(packet.address.data())=="/show/brightness" &&
+              packet.value>=94 && packet.value<=97,
+              "OSC numeric control input decoded an incorrect address/value");
+        OscControlInput input;
+        input.ingestForTest(bytes.data(),(int)bytes.size());
+        ControlEvent incoming;
+        check(input.poll(incoming) && incoming.kind==ControlKind::osc &&
+              incoming.channel==1 && incoming.number==0 &&
+              incoming.deviceId=="/show/brightness" &&
+              incoming.value==packet.value,
+              "OSC Learn did not receive the parsed control event");
+        event.arguments[0].type=OscValueType::boolean;
+        event.arguments[0].boolean=true;
+        const auto on=encodeOscMessage(event);
+        check(OscControlInput::decode(on.data(),(int)on.size(),packet) &&
+              packet.value==127,"OSC true must trigger a full-scale action");
+        event.arguments[0].boolean=false;
+        const auto off=encodeOscMessage(event);
+        check(OscControlInput::decode(off.data(),(int)off.size(),packet) &&
+              packet.value==0,"OSC false must release a momentary input");
+        const uint8_t malformed[]={'/',0,0,0,',','f',0,0,0,0,0,0};
+        check(!OscControlInput::decode(malformed,sizeof(malformed),packet) ||
+              packet.address[0]=='/',
+              "Malformed OSC packet caused invalid memory access");
+    });
     test("Abstract function preserves MIDI destination when local fader changes",[] {
         ControlSettings settings;
         ControlFunction function;
