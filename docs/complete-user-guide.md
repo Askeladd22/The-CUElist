@@ -76,10 +76,19 @@ Columns can be collapsed individually or together with **Collapse all** in the c
 **Quick Learn does not open a dialog.** Click **M Learn** or **O Learn** in
 the upper-right corner next to the independent MIDI/OSC activity monitors.
 The Inspector temporarily shows a scrollable list of functions and mappable
-parameters. Click the desired target, then move/press a hardware control or
-send one OSC message. The first matching event is consumed, recorded in
-the **Default Map**, and confirmed in the status bar. No Add/Save confirmation
-is necessary. Use **Cancel Learn** to exit without assigning an input.
+parameters. The supported controls in the normal GUI (GO, PANIC, Master Gain,
+Master Pan, and each audio-strip Gain/Pan) also receive amber click targets:
+click the highlighted GUI control *or* an Inspector function, then move/press
+a hardware control or send one OSC message. The original button, fader or
+pan value is not operated by the selection click.
+
+The first matching event is consumed, recorded in the **Default Map**, and
+confirmed visually. **Learn stays active after each binding:** choose another
+highlighted GUI parameter or function and repeat, without pressing M Learn
+or O Learn again. The current protocol remains indicated in the Inspector
+and top-right Learn button. Press the same Learn button again or **Cancel
+Learn** to exit. Outside Learn, all temporary click targets disappear and
+ordinary mouse controls behave exactly as before.
 
 Available direct internal targets include Master Gain, Master Pan, GO, PANIC
 and Gain/Pan for each audio column. The function list starts with eight MIDI

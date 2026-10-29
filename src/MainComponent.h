@@ -10,6 +10,7 @@
 #include "OscControlInput.h"
 #include "ControlOutputRouter.h"
 #include "QuickControlTargets.h"
+#include "QuickLearnHotspot.h"
 #include "ControlDispatchPolicy.h"
 #include <set>
 #include "Theme.h"
@@ -279,6 +280,10 @@ public:
     void armControlLearn() { oscLearnArmed=false;controlLearnArmed=true; }
     void beginQuickLearn(bool osc);
     void chooseQuickLearnTarget(int functionId);
+    void chooseQuickLearnGuiTarget(ControlTarget target,int columnId=0);
+    bool isQuickLearnActive() const noexcept {return quickLearnMode!=QuickLearnMode::off;}
+    bool isQuickLearnAwaitingInput() const noexcept {return quickLearnFunctionId>0 && isQuickLearnActive();}
+    void refreshQuickLearnTargets();
     void completeQuickLearn(const ControlEvent& event);
     void finishQuickLearn();
     void ensureStarterControlFunctions();
@@ -360,6 +365,8 @@ private:
     juce::TextButton globalMidiLearn{"M Learn"},globalOscLearn{"O Learn"};
     QuickControlTargets quickControlTargets;
     juce::TextButton cancelQuickLearn{"Cancel Learn"};
+    QuickLearnHotspot goLearnHotspot{"Go"},panicLearnHotspot{"Panic"};
+    QuickLearnHotspot masterGainLearnHotspot{"Master Gain"},masterPanLearnHotspot{"Master Pan"};
     void refreshCuelistTabs();
     void showCuelistOverflowMenu();
     std::unique_ptr<GuideWindow> userGuideWindow;
@@ -428,6 +435,7 @@ private:
     enum class QuickLearnMode {off,midi,osc};
     QuickLearnMode quickLearnMode=QuickLearnMode::off;
     int quickLearnFunctionId=0;
+    juce::String quickLearnFeedback;
     bool controlLearnArmed=false,oscLearnArmed=false;
     std::optional<ControlEvent> learnedInput;
     juce::Component::SafePointer<juce::DialogWindow> controlDialog;
