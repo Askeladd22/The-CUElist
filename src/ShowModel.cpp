@@ -178,6 +178,29 @@ juce::Result validateShow(const Show& show) {
     for (const auto& column:show.columns) columnIds.push_back(column.id);
     if (auto controlResult=validateControls(show.controls,rowIds,columnIds); controlResult.failed())
         return controlResult;
+    for (const auto& function:show.controls.functions) {
+        const auto& route=function.destination;
+        if (route.target==ControlTarget::midiCc ||
+            route.target==ControlTarget::oscFloat ||
+            route.target==ControlTarget::columnGain ||
+            route.target==ControlTarget::columnPan) {
+            const auto it=std::find_if(show.columns.begin(),show.columns.end(),
+                [&](const Column& col){return col.id==route.targetColumnId;});
+            if (it==show.columns.end() ||
+                (route.target==ControlTarget::midiCc && it->type!=ColumnType::midi) ||
+                (route.target==ControlTarget::oscFloat && it->type!=ColumnType::osc) ||
+                ((route.target==ControlTarget::columnGain ||
+                  route.target==ControlTarget::columnPan) && it->type!=ColumnType::audio))
+                return fail("Abstract function has a missing or incompatible destination.");
+        }
+        if (((route.target==ControlTarget::masterGain ||
+              route.target==ControlTarget::columnGain) &&
+             (route.minimum<0 || route.maximum>4)) ||
+            ((route.target==ControlTarget::masterPan ||
+              route.target==ControlTarget::columnPan) &&
+             (route.minimum< -1 || route.maximum>1)))
+            return fail("Abstract function value range is invalid.");
+    }
     for (const auto& binding:show.controls.bindings) {
         if (binding.target==ControlTarget::midiCc ||
             binding.target==ControlTarget::oscFloat ||
@@ -209,6 +232,11 @@ juce::Result validateShow(const Show& show) {
     // Source-column priority conflicts are resolved deterministically at runtime.
     const auto validateSet=[&](const ControlSet& set)->juce::Result {
         if (set.bindings.size()>256) return fail("Control Set exceeds 256 mappings.");
+        std::set<int> overriddenFunctions;
+        for (const auto& input:set.bindings)
+            if (input.functionId>0 &&
+                !overriddenFunctions.insert(input.functionId).second)
+                return fail("A Control Set overrides one function more than once.");
         ControlSettings probe; probe.nextId=show.controls.nextId;
         probe.bindings=set.bindings; probe.functions=show.controls.functions;
         auto result=validateControls(probe,rowIds,columnIds);
