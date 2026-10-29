@@ -429,7 +429,8 @@ juce::String encodeShow(const Show& show) {
     }
     const auto controls=object({{"midiInputId",show.controls.midiInputId},
         {"nextId",show.controls.nextId},{"presets",presets},
-        {"bindings",bindings},{"templates",templates},{"functions",functions}});
+        {"bindings",bindings},{"templates",templates},{"functions",functions},
+        {"oscInputPort",show.controls.oscInputPort}});
     juce::Array<juce::var> cuelistObjects;
     for (size_t n=0;n<show.cuelists.size();++n) {
         // The active Cuelist already lives at root.rows. Never duplicate
@@ -469,6 +470,8 @@ juce::Result decodeShow(const juce::String& text, Show& destination) {
             const auto data=required(root,"controls");
             show.controls.midiInputId=string(data,"midiInputId");
             show.controls.nextId=integer(data,"nextId");
+            if (data.hasProperty("oscInputPort"))
+                show.controls.oscInputPort=integer(data,"oscInputPort");
             for (const auto& p:array(data,"presets"))
                 show.controls.presets.push_back({integer(p,"id"),string(p,"name")});
             // Optional v10 extension; absence is normal for older projects.
