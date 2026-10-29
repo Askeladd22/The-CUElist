@@ -27,7 +27,7 @@ public:
         functionChoice.setName("mappingAbstractFunction");
         functionName.setName("mappingAbstractFunctionName");
         functionName.setTextToShowWhenEmpty("Function name (e.g. Resolume Brightness)",palette::muted);
-        newFunction.setButtonText("New function");
+        newFunction.setButtonText("Manage functions");
         saveRoute.setButtonText("Save route");
         newFunction.setName("createControlFunction");
         saveRoute.setName("saveControlFunctionRoute");
@@ -95,7 +95,7 @@ public:
         };
         newFunction.setVisible(!editSet);
         saveRoute.setVisible(!editSet);
-        newFunction.setTooltip("Create a stable project function; its output will not change on MIDI Learn.");
+        newFunction.setTooltip("Add, delete or reorder MIDI/OSC functions. Their names remain project-specific.");
         saveRoute.setTooltip("Save the selected function destination globally; physical input assignments stay unchanged.");
         functionChoice.onChange=[this] {
             if (!owner) return;
@@ -109,16 +109,62 @@ public:
                     return;
                 }
         };
+        // Advanced function lifecycle (not part of the instant Learn flow).
         newFunction.onClick=[this] {
-            if (!owner) return;
-            const auto route=readRoute();
-            if (!route) return;
-            const int id=owner->createAbstractControlFunction(functionName.getText(),*route);
-            if (id>0) {
-                refreshFunctions();functionChoice.setSelectedId(id+1);
-                state.setText("Function created. Learn its physical input, then Add mapping.",
-                              juce::dontSendNotification);
-            } else state.setText(owner->status,juce::dontSendNotification);
+            if (!owner || editSet) return;
+            juce::PopupMenu menu;
+            menu.addItem(1,"+ Add MIDI Function");
+            menu.addItem(2,"+ Add OSC Function");
+            menu.addSeparator();
+            const bool hasFunction=functionChoice.getSelectedId()>1;
+            menu.addItem(3,"Move function up",hasFunction);
+            menu.addItem(4,"Move function down",hasFunction);
+            menu.addItem(5,"Delete function and its bindings",hasFunction);
+            auto safe=juce::Component::SafePointer<ControlPanel>(this);
+            menu.showMenuAsync(juce::PopupMenu::Options().withTargetComponent(&newFunction),
+                [safe](int choice) {
+                    if (!safe || !safe->owner || choice<=0) return;
+                    auto& panel=*safe.getComponent();
+                    auto& main=*panel.owner.getComponent();
+                    const int selectedId=panel.functionChoice.getSelectedId()-1;
+                    if (choice==1 || choice==2) {
+                        ControlBinding destination;
+                        destination.target=choice==1 ? ControlTarget::midiCc : ControlTarget::oscFloat;
+                        destination.maximum=choice==1 ? 127.0f : 1.0f;
+                        for (const auto& col:main.show.columns)
+                            if ((choice==1 && col.type==ColumnType::midi) ||
+                                (choice==2 && col.type==ColumnType::osc)) {
+                                destination.targetColumnId=col.id;break;
+                            }
+                        const juce::String base=choice==1 ? "MIDI Function " : "OSC Function ";
+                        // This field shows the selected function's current name.
+                        // Never accidentally copy it when creating a new slot.
+                        const auto name=base+juce::String((int)main.show.controls.functions.size()+1);
+                        const int id=main.createAbstractControlFunction(name,destination);
+                        if (id>0) {
+                            panel.refreshFunctions();
+                            panel.functionChoice.setSelectedId(id+1);
+                            panel.state.setText("Function created. Use Learn to assign an input.",
+                                juce::dontSendNotification);
+                        } else panel.state.setText(main.status,juce::dontSendNotification);
+                    } else if (choice==3 || choice==4) {
+                        if (main.moveAbstractControlFunction(selectedId,choice==3 ? -1 : 1)) {
+                            panel.refreshFunctions();
+                            panel.functionChoice.setSelectedId(selectedId+1,
+                                juce::dontSendNotification);
+                            panel.state.setText("Function reordered.",juce::dontSendNotification);
+                        }
+                    } else if (choice==5) {
+                        if (main.deleteAbstractControlFunction(selectedId)) {
+                            panel.selected=-1;panel.bindingList.deselectAllRows();
+                            panel.refreshFunctions();
+                            panel.bindingList.updateContent();panel.bindingList.repaint();
+                            panel.refreshEmptyState();
+                            panel.state.setText("Function and its mappings deleted.",
+                                juce::dontSendNotification);
+                        } else panel.state.setText(main.status,juce::dontSendNotification);
+                    }
+                });
         };
         saveRoute.onClick=[this] {
             if (!owner || functionChoice.getSelectedId()<2) return;
@@ -328,7 +374,7 @@ public:
     void paint(juce::Graphics& g) override {
         g.fillAll(palette::panel);
         label(g,editSet ? "CONTROL SET / Q"+juce::String(sourceRow+1) :
-              "DEFAULT MAP / CONTROL MAPPING",{20,15,620,31},21,palette::teal,true);
+              "DEFAULT MAP / CONTROL MAPPINGS",{20,15,620,31},21,palette::teal,true);
         g.setColour(palette::line);
         g.drawHorizontalLine(52,19,(float)getWidth()-19);
         label(g,"MIDI / OSC INPUT",{20,60,350,19},12,palette::teal,true);
@@ -550,9 +596,9 @@ private:
             owner->oscLearnArmed ? palette::amber.withAlpha(.58f) : palette::raised);
         if (auto event=owner->consumeLearnedInput()) {
             captured=event;
-            state.setText("Learned "+event->deviceId+" ch"+juce::String(event->channel)+
-                " / "+juce::String(event->number)+" value "+juce::String(event->value),
-                juce::dontSendNotification);
+            // Commit the selected scope as soon as a hardware event arrives.
+            const auto* entries=currentBindings();
+            createBinding(entries && selected>=0 && selected<(int)entries->size());
         }
         if (editSet) updateEffectivePreview();
     }
@@ -646,9 +692,10 @@ private:
             b.scopeId=owner->show.rows[(size_t)owner->selectedRow].id;
         else if (b.scope==ControlScope::preset)
             b.scopeId=std::max(0,presets.getSelectedId()-1);
-        if (b.scope==ControlScope::column || b.target==ControlTarget::columnGain ||
+        if (b.functionId==0 && (b.scope==ControlScope::column ||
+            b.target==ControlTarget::columnGain ||
             b.target==ControlTarget::columnPan ||
-            b.target==ControlTarget::midiCc || b.target==ControlTarget::oscFloat) {
+            b.target==ControlTarget::midiCc || b.target==ControlTarget::oscFloat)) {
             const int i=columns.getSelectedId()-1;
             if (i<0 || i>=(int)columnIds.size()) {
                 state.setText("Select a destination column.",juce::dontSendNotification);return;
@@ -676,7 +723,7 @@ private:
             b.outputChannel=b.channel;
             b.outputNumber=outputCc.getText().getIntValue();
         }
-        if (b.target==ControlTarget::oscFloat)
+        if (b.target==ControlTarget::oscFloat && b.functionId==0)
             b.oscAddress=oscAddress.getText().trim();
         const auto low=minimum.getText().trim(),high=maximum.getText().trim();
         const auto numeric=[](const juce::String& value) {
@@ -778,8 +825,10 @@ private:
         curve.setSelectedId((int)b.curve+1,juce::dontSendNotification);
         minimum.setText(juce::String(b.minimum,3),false);
         maximum.setText(juce::String(b.maximum,3),false);
-        outputCc.setText(juce::String(b.outputNumber),false);
-        oscAddress.setText(b.oscAddress,false);
+        if (b.functionId==0) {
+            outputCc.setText(juce::String(b.outputNumber),false);
+            oscAddress.setText(b.oscAddress,false);
+        }
         invert.setToggleState(b.invert,juce::dontSendNotification);
         state.setText("Editing #"+juce::String(b.id)+" — input "+b.deviceId+
             " ch"+juce::String(b.channel)+" / "+juce::String(b.number),
@@ -809,6 +858,8 @@ private:
     }
 };
 void MainComponent::openControlPanel(bool editSet) {
+    if (quickLearnMode!=QuickLearnMode::off) finishQuickLearn();
+    if (!editSet) ensureStarterControlFunctions();
     if (controlDialog) {
         auto* previous=controlDialog.getComponent();
         controlDialog=nullptr;
@@ -817,7 +868,7 @@ void MainComponent::openControlPanel(bool editSet) {
     juce::DialogWindow::LaunchOptions options;
     options.content.setOwned(new ControlPanel(*this,editSet));
     options.dialogTitle=editSet ? "The Cuelist — Control Set" :
-        "The Cuelist — Control & Mapping";
+        "The Cuelist — Control Mappings";
     options.dialogBackgroundColour=palette::panel;
     options.escapeKeyTriggersCloseButton=true;
     options.useNativeTitleBar=false;

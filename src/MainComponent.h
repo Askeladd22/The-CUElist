@@ -9,6 +9,7 @@
 #include "MidiInputManager.h"
 #include "OscControlInput.h"
 #include "ControlOutputRouter.h"
+#include "QuickControlTargets.h"
 #include "ControlDispatchPolicy.h"
 #include <set>
 #include "Theme.h"
@@ -269,11 +270,18 @@ public:
     int createAbstractControlFunction(const juce::String& name,ControlBinding destination);
     bool updateAbstractControlFunction(int id,const juce::String& name,
                                        ControlBinding destination);
+    bool deleteAbstractControlFunction(int id);
+    bool moveAbstractControlFunction(int id,int direction);
     juce::String exportControlPresetText() const;
     juce::Result importControlPresetText(const juce::String&);
     int createMappingPreset(const juce::String&);
     bool assignMappingPreset(int rowId,int presetId);
     void armControlLearn() { oscLearnArmed=false;controlLearnArmed=true; }
+    void beginQuickLearn(bool osc);
+    void chooseQuickLearnTarget(int functionId);
+    void completeQuickLearn(const ControlEvent& event);
+    void finishQuickLearn();
+    void ensureStarterControlFunctions();
     bool startOscControlInput(int port);
     void armOscControlLearn() { controlLearnArmed=false;oscLearnArmed=true; }
     std::optional<ControlEvent> consumeLearnedInput() { auto result=learnedInput; learnedInput.reset(); return result; }
@@ -350,6 +358,8 @@ private:
     juce::TextButton cuelistOverflowButton{"..."},addCuelistButton{"+"};
     juce::TextButton undoButton{"Undo"},redoButton{"Redo"};
     juce::TextButton globalMidiLearn{"M Learn"},globalOscLearn{"O Learn"};
+    QuickControlTargets quickControlTargets;
+    juce::TextButton cancelQuickLearn{"Cancel Learn"};
     void refreshCuelistTabs();
     void showCuelistOverflowMenu();
     std::unique_ptr<GuideWindow> userGuideWindow;
@@ -415,6 +425,9 @@ private:
     ControlMappingEngine controlMapping;
     ControlOutputRouter controlOutput;
     int activeCueId=0;
+    enum class QuickLearnMode {off,midi,osc};
+    QuickLearnMode quickLearnMode=QuickLearnMode::off;
+    int quickLearnFunctionId=0;
     bool controlLearnArmed=false,oscLearnArmed=false;
     std::optional<ControlEvent> learnedInput;
     juce::Component::SafePointer<juce::DialogWindow> controlDialog;

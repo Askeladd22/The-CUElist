@@ -9,6 +9,9 @@ namespace cuelist {
 // This module does not run in the audio callback.
 
 void MainComponent::resetActiveMapping() {
+    quickLearnMode=QuickLearnMode::off;quickLearnFunctionId=0;
+    controlLearnArmed=false;oscLearnArmed=false;
+    quickControlTargets.setVisible(false);cancelQuickLearn.setVisible(false);
     activeCueId=0;
     controlMapping.setActiveCue(0,0);
 }
@@ -392,6 +395,244 @@ void MainComponent::dispatchControl(const ControlEvent& input) {
                 status="OSC control: invalid destination or queue full.";
         }
     }
+}
+
+
+
+bool MainComponent::deleteAbstractControlFunction(int id) {
+    auto candidate=show;
+    auto& functions=candidate.controls.functions;
+    const auto found=std::find_if(functions.begin(),functions.end(),
+        [id](const ControlFunction& f){return f.id==id;});
+    if (found==functions.end()) return false;
+    functions.erase(found);
+    auto discard=[id](std::vector<ControlBinding>& bindings) {
+        bindings.erase(std::remove_if(bindings.begin(),bindings.end(),
+            [id](const ControlBinding& b){return b.functionId==id;}),
+            bindings.end());
+    };
+    discard(candidate.controls.bindings);
+    for (auto& item:candidate.controls.templates) discard(item.set.bindings);
+    for (auto& col:candidate.columns) discard(col.controlDefaultSet.bindings);
+    for (auto& row:candidate.rows)
+        for (auto& cell:row.cells) if (cell.controlSet)
+            discard(cell.controlSet->bindings);
+    for (auto& list:candidate.cuelists)
+        for (auto& row:list.rows)
+            for (auto& cell:row.cells) if (cell.controlSet)
+                discard(cell.controlSet->bindings);
+    if (auto valid=validateShow(candidate);valid.failed()) {
+        status=valid.getErrorMessage();return false;
+    }
+    show=std::move(candidate);refreshControlSettings();dirty=true;refresh();
+    status="Function and associated assignments removed.";return true;
+}
+bool MainComponent::moveAbstractControlFunction(int id,int direction) {
+    auto candidate=show;
+    auto& functions=candidate.controls.functions;
+    const auto it=std::find_if(functions.begin(),functions.end(),
+        [id](const ControlFunction& f){return f.id==id;});
+    if (it==functions.end() || (direction!=-1 && direction!=1)) return false;
+    const int index=(int)std::distance(functions.begin(),it);
+    const int next=index+direction;
+    if (next<0 || next>=(int)functions.size()) return false;
+    std::iter_swap(functions.begin()+index,functions.begin()+next);
+    if (auto valid=validateShow(candidate);valid.failed()) {
+        status=valid.getErrorMessage();return false;
+    }
+    show=std::move(candidate);refreshControlSettings();dirty=true;
+    status="Function order updated.";refresh();return true;
+}
+
+void MainComponent::ensureStarterControlFunctions() {
+    if (!show.controls.functions.empty()) return;
+    // Legacy locked columns are converted only when their document is loaded.
+    // Do not silently change a still-open legacy control configuration.
+    for (const auto& column:show.columns)
+        if (column.controlLocked) return;
+    auto candidate=show;
+    // New projects start with a compact 8 + 8 palette. A missing output
+    // column is represented by ID 0 and never produces output until configured.
+    auto add=[&](ControlTarget type,const juce::String& prefix,int ordinal) {
+        ControlBinding dest;
+        dest.target=type;
+        dest.minimum=0.0f;
+        dest.maximum=type==ControlTarget::midiCc ? 127.0f : 1.0f;
+        dest.oscAddress="/control/"+juce::String(ordinal);
+        for (const auto& col:candidate.columns)
+            if ((type==ControlTarget::midiCc && col.type==ColumnType::midi) ||
+                (type==ControlTarget::oscFloat && col.type==ColumnType::osc)) {
+                dest.targetColumnId=col.id;break;
+            }
+        candidate.controls.functions.push_back({
+            candidate.controls.nextId++,prefix+" "+juce::String(ordinal),dest});
+    };
+    for (int i=1;i<=8;++i) add(ControlTarget::midiCc,"MIDI Function",i);
+    for (int i=1;i<=8;++i) add(ControlTarget::oscFloat,"OSC Function",i);
+    if (auto valid=validateShow(candidate);valid.failed()) {
+        status=valid.getErrorMessage();return;
+    }
+    show=std::move(candidate);
+    refreshControlSettings();dirty=true;
+}
+void MainComponent::finishQuickLearn() {
+    quickLearnMode=QuickLearnMode::off;quickLearnFunctionId=0;
+    controlLearnArmed=false;oscLearnArmed=false;
+    quickControlTargets.setVisible(false);cancelQuickLearn.setVisible(false);
+    refresh();
+}
+void MainComponent::beginQuickLearn(bool osc) {
+    const auto mode=osc ? QuickLearnMode::osc : QuickLearnMode::midi;
+    if (quickLearnMode==mode) {
+        finishQuickLearn();status="Quick Learn cancelled.";repaint();return;
+    }
+    if (controlDialog) {
+        auto* previous=controlDialog.getComponent();
+        controlDialog=nullptr;
+        delete previous;
+    }
+    controlLearnArmed=false;oscLearnArmed=false;learnedInput.reset();
+    if (osc && oscInput.port()==0) {
+        // Normal Learn never requires navigating an advanced configuration
+        // dialog. A configured port wins; otherwise 9011 is the default.
+        if (!startOscControlInput(show.controls.oscInputPort>0 ?
+                                  show.controls.oscInputPort : 9011)) {
+            repaint();return;
+        }
+    }
+    ensureStarterControlFunctions();
+    quickLearnMode=mode;quickLearnFunctionId=0;
+    std::vector<QuickControlTargets::Entry> entries;
+    for (const auto& function:show.controls.functions) {
+        juce::String detail;
+        for (const auto& binding:show.controls.bindings)
+            if (binding.functionId==function.id) {
+                detail=binding.deviceId+" / "+juce::String(binding.channel)+
+                    ":"+juce::String(binding.number);
+                break;
+            }
+        if (detail.isEmpty()) detail="No Default Map assignment";
+        if ((function.destination.target==ControlTarget::midiCc ||
+             function.destination.target==ControlTarget::oscFloat) &&
+            function.destination.targetColumnId==0)
+            detail+="  · Configure output in Control Mappings";
+        entries.push_back({function.id,function.name,detail});
+    }
+    entries.push_back({-1,"Master Gain","Internal audio master fader"});
+    entries.push_back({-2,"Master Pan","Internal master balance"});
+    entries.push_back({-3,"GO","Transport: next cue"});
+    entries.push_back({-4,"PANIC","Emergency stop"});
+    // Every audio column has two direct Learn targets. Stable column IDs
+    // are resolved at selection time; their position in this list is UI-only.
+    for (int index=0;index<(int)show.columns.size();++index) {
+        const auto& col=show.columns[(size_t)index];
+        if (col.type!=ColumnType::audio) continue;
+        entries.push_back({-100-index*2,col.name+" Gain","Audio column fader"});
+        entries.push_back({-101-index*2,col.name+" Pan","Audio column balance"});
+    }
+    quickControlTargets.setEntries(std::move(entries));
+    inspectorVisible=true;
+    status=osc ? "OSC Learn: select a function, then send OSC." :
+                 "MIDI Learn: select a function, then move a fader or press a button.";
+    resized();repaint();
+}
+void MainComponent::chooseQuickLearnTarget(int functionId) {
+    if (quickLearnMode==QuickLearnMode::off) return;
+    if (functionId<=-100) {
+        const int encoded=-100-functionId;
+        const int index=encoded/2;
+        const bool pan=encoded%2!=0;
+        if (index<0 || index>=(int)show.columns.size() ||
+            show.columns[(size_t)index].type!=ColumnType::audio) return;
+        const int columnId=show.columns[(size_t)index].id;
+        const ControlTarget target=pan ? ControlTarget::columnPan :
+            ControlTarget::columnGain;
+        functionId=0;
+        for (const auto& fn:show.controls.functions)
+            if (fn.destination.target==target &&
+                fn.destination.targetColumnId==columnId) {
+                functionId=fn.id;break;
+            }
+        if (functionId==0) {
+            ControlBinding destination;
+            destination.target=target;destination.targetColumnId=columnId;
+            if (pan) destination.minimum=-1.0f;
+            const auto name=show.columns[(size_t)index].name+
+                (pan ? " Pan" : " Gain");
+            functionId=createAbstractControlFunction(name,destination);
+        }
+    } else if (functionId<0) {
+        const ControlTarget target=functionId==-1 ? ControlTarget::masterGain :
+            functionId==-2 ? ControlTarget::masterPan :
+            functionId==-3 ? ControlTarget::go : ControlTarget::panic;
+        const juce::String title=functionId==-1 ? "Master Gain" :
+            functionId==-2 ? "Master Pan" : functionId==-3 ? "GO" : "PANIC";
+        functionId=0;
+        for (const auto& fn:show.controls.functions)
+            if (fn.name==title && fn.destination.target==target) {
+                functionId=fn.id;break;
+            }
+        if (functionId==0) {
+            ControlBinding destination;
+            destination.target=target;
+            if (target==ControlTarget::masterPan) destination.minimum=-1.0f;
+            functionId=createAbstractControlFunction(title,destination);
+        }
+    }
+    const bool exists=std::any_of(show.controls.functions.begin(),
+        show.controls.functions.end(),
+        [functionId](const ControlFunction& f){return f.id==functionId;});
+    if (!exists || functionId<=0) {
+        status="Could not select a mappable function.";repaint();return;
+    }
+    if (quickLearnMode==QuickLearnMode::midi && !midiInput.connected()) {
+        status="Connect a MIDI input through Control Mappings first.";
+        repaint();return;
+    }
+    quickLearnFunctionId=functionId;
+    if (quickLearnMode==QuickLearnMode::midi) armControlLearn();
+    else armOscControlLearn();
+    status="Listening for "+juce::String(quickLearnMode==QuickLearnMode::midi ?
+        "MIDI" : "OSC")+" input. The next received message creates the binding.";
+    repaint();
+}
+void MainComponent::completeQuickLearn(const ControlEvent& event) {
+    if (quickLearnFunctionId<=0 ||
+        (event.kind==ControlKind::note && event.isNoteOff)) return;
+    const auto fn=std::find_if(show.controls.functions.begin(),
+        show.controls.functions.end(),
+        [this](const ControlFunction& f){return f.id==quickLearnFunctionId;});
+    if (fn==show.controls.functions.end()) return;
+    ControlBinding input=materializeFunctionBinding(ControlBinding{},*fn);
+    input.functionId=quickLearnFunctionId;
+    input.deviceId=event.deviceId;input.kind=event.kind;
+    input.channel=event.channel;input.number=event.number;
+    input.scope=ControlScope::global;input.scopeId=0;
+    input.takeover=(event.kind==ControlKind::note ||
+        event.kind==ControlKind::osc || input.target==ControlTarget::go ||
+        input.target==ControlTarget::panic) ? ControlTakeover::jump :
+        ControlTakeover::pickup;
+    // Stable function identity: Learn changes only input, never destination.
+    const auto found=std::find_if(show.controls.bindings.begin(),
+        show.controls.bindings.end(),[this](const ControlBinding& b){
+            return b.functionId==quickLearnFunctionId &&
+                b.scope==ControlScope::global;
+        });
+    const auto name=fn->name;
+    const bool ok=found!=show.controls.bindings.end() ?
+        updateControlBinding(-1,-1,found->id,input,false) :
+        addMappingBinding(input);
+    if (!ok) {
+        status="Learn failed: "+status+". Check for conflicting hardware bindings.";
+        quickLearnFunctionId=0;controlLearnArmed=false;oscLearnArmed=false;
+        repaint();return;
+    }
+    // Preserve held-button state so repeating a learned note cannot fire
+    // GO/PANIC until the physical control is released.
+    physicalEdges.recordAndWasDown(event);
+    finishQuickLearn();
+    status="Learn saved to Default Map: "+name+" ← "+event.deviceId;
+    repaint();
 }
 
 } // namespace cuelist

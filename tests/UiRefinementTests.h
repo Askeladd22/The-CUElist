@@ -294,7 +294,8 @@ void uiRefinementTests() {
               update && empty,"Control Mapping controls or empty-state label missing");
         check(pane->getHeight()>=650 && empty->isVisible() &&
               !update->isEnabled() && !remove->isEnabled() &&
-              !destination->isEnabled(),"Default mapping state is misleading");
+              target->getSelectedId()==5 && destination->isEnabled(),
+              "Starter functions or empty physical mapping state incorrect");
         // The ComboBox default is sendNotificationAsync. Drive the real
         // onChange callback synchronously before asserting dependent fields.
         target->setSelectedId(5,juce::sendNotificationSync); // MIDI CC
