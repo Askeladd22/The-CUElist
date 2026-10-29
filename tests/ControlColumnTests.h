@@ -3,6 +3,54 @@
 #include "ControlMapping.h"
 
 void controlColumnTests() {
+    test("Portable controller preset excludes names and preserves cue overrides",[] {
+        auto source=makeShow();
+        addColumn(source,ColumnType::midi,"MIDI Out");
+        ControlFunction f;f.id=source.controls.nextId++;
+        f.name="Resolume Brightness";
+        f.destination.target=ControlTarget::midiCc;
+        f.destination.targetColumnId=source.columns[1].id;
+        f.destination.outputChannel=9;
+        f.destination.outputNumber=74;
+        f.destination.maximum=127;
+        source.controls.functions.push_back(f);
+        ControlBinding input;input.id=source.controls.nextId++;
+        input.functionId=f.id;input.deviceId="physical-A";
+        input.number=20;input.target=f.destination.target;
+        input.targetColumnId=f.destination.targetColumnId;
+        source.controls.bindings.push_back(input);
+        const auto archive=exportControllerPreset(source);
+        check(!archive.contains("Resolume Brightness") &&
+              archive.contains("TheCuelistControllerPreset"),
+              "Portable preset leaked project-specific function names");
+        auto project=makeShow();
+        addColumn(project,ColumnType::midi,"Output");
+        addColumn(project,ColumnType::control,"Control");
+        ControlFunction existing=f;
+        existing.name="Project-specific name";
+        existing.destination.targetColumnId=project.columns[1].id;
+        project.controls.functions.push_back(existing);
+        project.controls.nextId=3;
+        ControlBinding local=input;local.id=project.controls.nextId++;
+        local.deviceId="physical-B";local.number=30;
+        local.targetColumnId=project.columns[1].id;
+        project.rows[0].cells[2].controlSet=ControlSet{{local}};
+        check(validateShow(project).wasOk(),"Controller preset fixture invalid");
+        check(importControllerPreset(archive,project).wasOk(),
+              "Unable to import a preset with a compatible MIDI column");
+        check(project.controls.functions[0].name=="Project-specific name" &&
+              project.controls.functions[0].destination.outputNumber==74 &&
+              project.controls.functions[0].destination.outputChannel==9 &&
+              project.controls.bindings.size()==1 &&
+              project.controls.bindings[0].deviceId=="physical-A" &&
+              project.rows[0].cells[2].controlSet->bindings.front().deviceId=="physical-B",
+              "Import changed project labels, unrelated cue override or MIDI routing");
+        auto invalid=makeShow(); // no compatible MIDI destination
+        const auto oldName=invalid.name;
+        check(importControllerPreset(archive,invalid).failed() &&
+              invalid.controls.functions.empty() && invalid.name==oldName,
+              "Failed preset import mutated an incompatible project");
+    });
     test("OSC input decodes numeric and boolean messages into learned addresses",[] {
         OscEvent event;event.address="/show/brightness";
         OscValue value;value.type=OscValueType::decimal;value.decimal=.75f;
