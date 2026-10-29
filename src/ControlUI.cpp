@@ -19,7 +19,7 @@ public:
         for (juce::Component* c : std::initializer_list<juce::Component*>{
             &device,&connect,&learn,&oscLearn,&oscInputPort,&add,&remove,&newPreset,&assignPreset,
             &presetName,&presets,&scope,&target,&takeover,&columns,&bindingList,&state,
-            &outputCc,&oscAddress,&invert,&updateSelected,&curve,&minimum,&maximum,
+            &outputCc,&outputChannel,&oscAddress,&invert,&updateSelected,&curve,&minimum,&maximum,
              &functionChoice,&functionName,&newFunction,&saveRoute,
              &saveControllerPreset,&loadControllerPreset,&effectivePreview,&templateName,&templates,&saveTemplate,&loadTemplate,
              &emptyBindings})
@@ -237,6 +237,9 @@ public:
             minimum.setText(t==7 || t==8 ? "-1" : "0",false);
             maximum.setText(t==5 ? "127" : "1",false);
         };
+        outputChannel.setName("mappingOutputMidiChannel");
+        outputChannel.setText("1");outputChannel.setInputRestrictions(2,"0123456789");
+        outputChannel.setTooltip("Outgoing MIDI channel, independent of the source controller.");
         outputCc.setName("mappingOutputCc");
         outputCc.setText("20"); outputCc.setInputRestrictions(3,"0123456789");
         oscAddress.setName("mappingOscAddress");
@@ -337,8 +340,9 @@ public:
         label(g,"Target",{214,228,178,18},11,palette::muted,true);
         label(g,"Takeover",{411,228,132,18},11,palette::muted,true);
         label(g,"Destination column",{556,228,207,18},11,palette::muted,true);
-        label(g,"Output CC",{20,285,85,18},11,palette::muted,true);
-        label(g,"OSC address",{113,285,210,18},11,palette::muted,true);
+        label(g,"OUT CH",{20,285,48,18},10,palette::muted,true);
+        label(g,"CC",{78,285,52,18},10,palette::muted,true);
+        label(g,"OSC address",{142,285,184,18},11,palette::muted,true);
         label(g,"Curve",{441,285,114,18},11,palette::muted,true);
         label(g,"Min",{573,285,84,18},11,palette::muted,true);
         label(g,"Max",{672,285,84,18},11,palette::muted,true);
@@ -376,8 +380,9 @@ public:
         target.setBounds(214,250,178,31);
         takeover.setBounds(411,250,133,31);
         columns.setBounds(556,250,w-576,31);
-        outputCc.setBounds(20,307,84,31);
-        oscAddress.setBounds(113,307,210,31);
+        outputChannel.setBounds(20,307,48,31);
+        outputCc.setBounds(78,307,54,31);
+        oscAddress.setBounds(142,307,181,31);
         invert.setBounds(336,307,96,31);
         curve.setBounds(441,307,115,31);
         minimum.setBounds(573,307,85,31);
@@ -434,7 +439,7 @@ private:
     juce::ComboBox device,presets,scope,target,takeover,columns,curve,templates,functionChoice;
     juce::TextButton connect,learn,oscLearn,add,remove,updateSelected,newPreset,assignPreset,saveTemplate,loadTemplate,
                      newFunction,saveRoute,saveControllerPreset,loadControllerPreset;
-    juce::TextEditor presetName,outputCc,oscAddress,minimum,maximum,effectivePreview,templateName,functionName,oscInputPort;
+    juce::TextEditor presetName,outputCc,outputChannel,oscAddress,minimum,maximum,effectivePreview,templateName,functionName,oscInputPort;
     juce::ToggleButton invert{"Invert"};
     juce::Label state;
     juce::ListBox bindingList;
@@ -468,6 +473,7 @@ private:
         for (size_t i=0;i<columnIds.size();++i)
             if (columnIds[i]==b.targetColumnId)
                 columns.setSelectedId((int)i+1,juce::dontSendNotification);
+        outputChannel.setText(juce::String(b.outputChannel),false);
         outputCc.setText(juce::String(b.outputNumber),false);
         oscAddress.setText(b.oscAddress,false);
         minimum.setText(juce::String(b.minimum,3),false);
@@ -499,7 +505,7 @@ private:
         }
         if (b.target==ControlTarget::midiCc) {
             b.outputNumber=outputCc.getText().getIntValue();
-            b.outputChannel=1; // Independent of the physical input channel.
+            b.outputChannel=outputChannel.getText().getIntValue(); // Not the incoming channel.
         }
         if (b.target==ControlTarget::oscFloat)
             b.oscAddress=oscAddress.getText().trim();
@@ -517,7 +523,8 @@ private:
     }
     void refreshDestinationFields() {
         const int t=target.getSelectedId();
-        outputCc.setEnabled(t==5);
+        outputChannel.setEnabled(t==5 && !editSet);
+        outputCc.setEnabled(t==5 && !editSet);
         oscAddress.setEnabled(t==6);
         columns.setEnabled(editSet || scope.getSelectedId()==2 ||
                            t==2 || t==5 || t==6 || t==7);
@@ -653,7 +660,8 @@ private:
         if (b.kind==ControlKind::note || b.target==ControlTarget::go ||
             b.target==ControlTarget::panic) b.takeover=ControlTakeover::jump;
         b.invert=invert.getToggleState();
-        if (b.target==ControlTarget::midiCc) {
+        if (b.target==ControlTarget::midiCc && b.functionId==0) {
+            // Legacy direct mappings preserve historical behavior.
             b.outputChannel=b.channel;
             b.outputNumber=outputCc.getText().getIntValue();
         }
