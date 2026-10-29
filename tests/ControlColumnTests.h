@@ -1,6 +1,7 @@
 #pragma once
 #include "MainComponent.h"
 #include "ControlMapping.h"
+#include "ControlPresetArchive.h"
 
 void controlColumnTests() {
     test("Portable controller preset excludes names and preserves cue overrides",[] {
