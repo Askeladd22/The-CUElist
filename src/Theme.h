@@ -126,7 +126,8 @@ public:
         setColour(juce::Slider::textBoxTextColourId,palette::text);
         setColour(juce::Slider::textBoxOutlineColourId,palette::line);
         setColour(juce::ResizableWindow::backgroundColourId,palette::background);
-        setColour(juce::DocumentWindow::backgroundColourId,palette::toolbar);
+        // JUCE DocumentWindow exposes textColourId only; its titlebar
+        // background comes from ResizableWindow and the LookAndFeel.
         setColour(juce::DocumentWindow::textColourId,palette::text);
         setColour(juce::ScrollBar::backgroundColourId,palette::raised);
         setColour(juce::AlertWindow::backgroundColourId,palette::panel);
