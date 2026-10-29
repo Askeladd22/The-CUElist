@@ -324,15 +324,18 @@ inline juce::Result validateControls(const ControlSettings& s,
         if (b.scope==ControlScope::preset &&
             std::none_of(s.presets.begin(),s.presets.end(),[&](const auto& p){return p.id==b.scopeId;}))
             return juce::Result::fail("Mapping refers to a missing preset.");
-        if ((b.scope==ControlScope::column || b.target==ControlTarget::columnGain ||
+        if ((b.scope==ControlScope::column || (b.functionId==0 &&
+             (b.target==ControlTarget::columnGain ||
              b.target==ControlTarget::midiCc || b.target==ControlTarget::oscFloat ||
-             b.target==ControlTarget::columnPan) &&
+             b.target==ControlTarget::columnPan))) &&
             std::find(columnIds.begin(),columnIds.end(),b.targetColumnId)==columnIds.end())
             return juce::Result::fail("Mapping refers to a missing column.");
-        if ((b.target==ControlTarget::masterGain || b.target==ControlTarget::columnGain)
+        if (b.functionId==0 &&
+            (b.target==ControlTarget::masterGain || b.target==ControlTarget::columnGain)
             && (b.minimum<0 || b.maximum>4))
             return juce::Result::fail("Gain mapping out of range.");
-        if ((b.target==ControlTarget::masterPan || b.target==ControlTarget::columnPan)
+        if (b.functionId==0 &&
+            (b.target==ControlTarget::masterPan || b.target==ControlTarget::columnPan)
             && (b.minimum< -1 || b.maximum>1))
             return juce::Result::fail("Pan mapping outside [-1, 1].");
     }
