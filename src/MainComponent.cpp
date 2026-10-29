@@ -466,8 +466,13 @@ void MainComponent::paint(juce::Graphics& g) {
     g.setColour(palette::panel);
     g.fillRect(geometry.metrics.getX(),geometry.utilities.getY(),
                geometry.metrics.getWidth(),geometry.utilities.getHeight());
+    // Continue the exact 3px accent edge from the pinned metrics down
+    // through the utility area, without a doubled boundary or dark gap.
+    g.setColour(palette::teal);
+    g.fillRect(geometry.metrics.getX(),geometry.utilities.getY(),
+               3,geometry.utilities.getHeight());
     g.setColour(palette::line);
-    g.drawVerticalLine(geometry.metrics.getX(),(float)geometry.utilities.getY(),
+    g.drawVerticalLine(geometry.metrics.getX()+3,(float)geometry.utilities.getY(),
                        (float)geometry.utilities.getBottom());
     if (!inspectorVisible) {
         // A slim, permanently visible rail provides a full-height spatial
