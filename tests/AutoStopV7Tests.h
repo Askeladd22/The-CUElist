@@ -115,7 +115,12 @@ void autoStopV7Tests() {
         check(ui.show.rows[0].cells[2].stopOnNext,"Hidden Auto Stop badge was clickable");
         auto* fixed=find<CueMetricsOverlay>(ui);
         check(fixed!=nullptr,"Fixed Auto Stop strip missing");
-        click(*fixed,96.0f,(float)CueGrid::headerHeight+44);
+        // The old x=96 click was outside the new 108..176 CELLS
+        // disclosure. Use the shared painted/hit-tested bounds instead.
+        const auto disclosure=CueMetricsOverlay::cellDetailsBounds(CueGrid::headerHeight);
+        click(*fixed,(float)disclosure.getCentreX(),(float)disclosure.getCentreY());
+        check(grid->autoStopDetailsVisible(ui.show.rows[0].id),
+              "CELLS disclosure did not expand when clicked at its centre");
         click(*grid,(float)x,(float)y);
         check(!ui.show.rows[0].cells[2].stopOnNext,"OSC cell badge did not turn OFF");
         check(ui.show.rows[0].cells[0].stopOnNext && ui.show.rows[0].cells[1].stopOnNext,
