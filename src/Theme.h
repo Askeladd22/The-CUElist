@@ -87,6 +87,16 @@ inline juce::Font symbolsFont(float size) {
         ? juce::Font(juce::FontOptions(face).withPointHeight(pt))
         : font(size);
 }
+// The Fader Range menu mixes two scripts: draw only the mathematical
+// minus/infinity pair with Noto Sans Math; the rest remains Exo 2.
+inline juce::String faderMinusInfinity() {
+    return juce::String::charToString((juce::juce_wchar)0x2212)
+         + juce::String::charToString((juce::juce_wchar)0x221e);
+}
+inline juce::String faderRangeMenuTitle(int maximumDb) {
+    return faderMinusInfinity()+" dB / "+(maximumDb>0?"+":"")
+           +juce::String(maximumDb)+" dB";
+}
 inline void label(juce::Graphics& g,const juce::String& s,juce::Rectangle<int> r,float size=14,juce::Colour colour=palette::text,bool bold=false,int align=juce::Justification::centredLeft) {
     g.setColour(colour); g.setFont(font(size,bold)); g.drawText(s,r,align,true);
 }
@@ -211,7 +221,21 @@ public:
         if (shortcut.isNotEmpty()) content.removeFromRight(70);
         g.setColour(active ? (hover ? palette::text : ink)
                            : palette::muted.withAlpha(.48f));
-        g.drawFittedText(title,content,juce::Justification::centredLeft,1);
+        if (title.startsWith(faderMinusInfinity())) {
+            const auto prefix=faderMinusInfinity();
+            const auto mathematical=mathFont(13.0f);
+            const int prefixWidth=(int)std::ceil(
+                juce::GlyphArrangement::getStringWidth(mathematical,prefix))+2;
+            const auto prefixArea=content.removeFromLeft(prefixWidth);
+            g.setFont(mathematical);
+            g.drawText(prefix,prefixArea,juce::Justification::centredLeft,false);
+            g.setFont(font(13.0f));
+            g.drawFittedText(title.substring(prefix.length()),content,
+                             juce::Justification::centredLeft,1);
+        } else {
+            g.setFont(font(13.0f));
+            g.drawFittedText(title,content,juce::Justification::centredLeft,1);
+        }
         if (shortcut.isNotEmpty()) {
             g.setColour(active ? palette::muted : palette::muted.withAlpha(.48f));
             g.setFont(font(10.5f));
@@ -237,9 +261,18 @@ public:
             height=9;
             return;
         }
-        height=juce::jmax(30,standardHeight);
-        width=juce::jmax(110,
-             (int)std::ceil(juce::GlyphArrangement::getStringWidth(font(13.0f),title))+65);
+        height=juce::jmax(34,standardHeight);
+        if (title.startsWith(faderMinusInfinity())) {
+            const auto prefix=faderMinusInfinity();
+            width=juce::jmax(142,(int)std::ceil(
+                juce::GlyphArrangement::getStringWidth(mathFont(13.0f),prefix)
+              + juce::GlyphArrangement::getStringWidth(
+                    font(13.0f),title.substring(prefix.length())))+73);
+        } else {
+            width=juce::jmax(110,
+                (int)std::ceil(juce::GlyphArrangement::getStringWidth(
+                    font(13.0f),title))+65);
+        }
     }
 
     void drawComboBox(juce::Graphics& g,int width,int height,bool isButtonDown,

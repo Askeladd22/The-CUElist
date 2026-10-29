@@ -1,4 +1,5 @@
 #include "MainComponent.h"
+#include "OperatorReportDialog.h"
 #include "ProjectSafety.h"
 #include "ProjectMediaLoader.h"
 
@@ -8,10 +9,13 @@ namespace cuelist {
 
 void MainComponent::withDiscardConfirmation(std::function<void()> action) {
     if (!hasUnsavedChanges()) { action(); return; }
-    juce::AlertWindow::showAsync(juce::MessageBoxOptions().withIconType(juce::MessageBoxIconType::QuestionIcon)
-        .withTitle("Unsaved changes").withMessage("Continuing will discard unsaved changes. To save them, cancel and click Save.")
-        .withButton("Discard and continue").withButton("Cancel").withAssociatedComponent(this),
-        [safe=juce::Component::SafePointer<MainComponent>(this),action](int result) { if (safe && result==1) action(); });
+    // Only the explicitly labelled destructive button can invoke the action.
+    // Cancel, Escape and closing the dialog leave the show untouched.
+    showUnsavedChangesConfirmation(*this,theme,
+        [safe=juce::Component::SafePointer<MainComponent>(this),
+         action=std::move(action)] {
+            if (safe && action) action();
+        });
 }
 
 void MainComponent::requestQuit() { withDiscardConfirmation([this] { stopAll(); juce::JUCEApplication::getInstance()->quit(); }); }
@@ -51,25 +55,49 @@ void MainComponent::showPreflight() {
 }
 
 void MainComponent::showDiagnostics() {
+    using Status=OperatorReportRow::Status;
     const auto stats=engine.diagnostics();
-    juce::String details="ENGINE DIAGNOSTICS\n";
-    details+="Audio device: "+juce::String(engine.connected.load()?"ONLINE":"OFFLINE");
-    details+="\nActive audio/MIDI/OSC cells: "+juce::String(engine.activeVoices.load());
-    details+="\nAudio callback commands dropped: "+juce::String(stats.audioCommandsDropped);
-    details+="\nMIDI input: "+juce::String(midiInput.connected()?"CONNECTED":"DISCONNECTED");
-    details+="\nMIDI input messages dropped: "+juce::String(midiInput.droppedCount());
-    details+="\nMIDI input reconnect attempts: "+juce::String(midiInputReconnectAttempts);
-    details+="\nMIDI output messages sent: "+juce::String(stats.midiOutputSent);
-    details+="\nMIDI output messages dropped: "+juce::String(stats.midiOutputDropped);
-    details+="\nMIDI dispatches >10 ms late: "+juce::String(stats.midiLateOver10ms);
-    details+="\nOSC UDP packets sent: "+juce::String(stats.oscSent);
-    details+="\nOSC UDP packets dropped / send failures: "+juce::String(stats.oscDropped);
-    details+="\nOSC dispatches >10 ms late: "+juce::String(stats.oscLateOver10ms);
-    details+="\nRecovery I/O failures: "+juce::String(
-        recoveryWriter ? recoveryWriter->failedWrites() : 0u);
-    details+="\n\nThese counters are local to the current process. UDP sent does not prove receiver delivery.";
-    juce::AlertWindow::showMessageBoxAsync(juce::MessageBoxIconType::InfoIcon,
-        "Diagnostics",details,"Close",this);
+    const auto online=engine.connected.load();
+    const auto midiConnected=midiInput.connected();
+    const auto count=[](auto value){ return juce::String(value); };
+    const auto drops=[](auto value){
+        return value==0 ? Status::neutral : Status::negative;
+    };
+    showOperatorReport(*this,theme,"Diagnostics",
+        "Engine diagnostics · current process",{
+            {"AUDIO",{
+                {"Device",online?"ONLINE":"OFFLINE",
+                    online?Status::positive:Status::caution},
+                {"Active audio / MIDI / OSC cells",count(engine.activeVoices.load())},
+                {"Callback commands dropped",count(stats.audioCommandsDropped),
+                    drops(stats.audioCommandsDropped)}
+            }},
+            {"MIDI",{
+                {"Input",midiConnected?"CONNECTED":"DISCONNECTED",
+                    midiConnected?Status::positive:Status::caution},
+                {"Input messages dropped",count(midiInput.droppedCount()),
+                    drops(midiInput.droppedCount())},
+                {"Reconnect attempts",count(midiInputReconnectAttempts)},
+                {"Output messages sent",count(stats.midiOutputSent)},
+                {"Output messages dropped",count(stats.midiOutputDropped),
+                    drops(stats.midiOutputDropped)},
+                {"Dispatches over 10 ms late",count(stats.midiLateOver10ms),
+                    stats.midiLateOver10ms==0?Status::neutral:Status::caution}
+            }},
+            {"OSC",{
+                {"UDP packets sent",count(stats.oscSent)},
+                {"UDP drops / send failures",count(stats.oscDropped),
+                    drops(stats.oscDropped)},
+                {"Dispatches over 10 ms late",count(stats.oscLateOver10ms),
+                    stats.oscLateOver10ms==0?Status::neutral:Status::caution}
+            }},
+            {"RECOVERY",{
+                {"I/O failures",count(recoveryWriter?recoveryWriter->failedWrites():0u),
+                    drops(recoveryWriter?recoveryWriter->failedWrites():0u)}
+            }}
+        },
+        "Counters are local to this process. UDP packets sent do not "
+        "confirm delivery to a remote receiver.");
 }
 
 bool MainComponent::activateProject(Show candidate,const juce::File& source,bool recovering) {

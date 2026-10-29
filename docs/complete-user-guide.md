@@ -42,7 +42,7 @@ A properly packaged build does not require Visual Studio, Git or CMake to run. K
 
 The sidebar provides **New**, **Open**, **Save**, the editable show title, **Audio devices**, **Preferences**, **Control Mapping** and a project overview. Near the bottom, **On Deck** identifies the next cue; **GO / SPACE** and **PANIC / ESC** remain accessible at all times.
 
-- **New** starts a fresh show and warns if current changes would be discarded.
+- **New** starts a fresh show and warns if current changes would be discarded. The compact **Unsaved changes** dialog keeps **Cancel** as the safe choice; **Discard and continue** must be selected explicitly to proceed without saving. Closing the dialog or pressing Escape also cancels the operation. To save instead, select Cancel and then Save.
 - **Open** loads an existing project, subject to preparation and validation before activation.
 - **Save** writes the project and collects referenced media.
 - **Preferences** contains Pre-flight, Diagnostics, Fader Range and Rename active Cuelist.
@@ -54,7 +54,7 @@ The shortcut hints formerly shown at the bottom of the sidebar have been removed
 
 The top row contains named **Cuelist tabs**, the **+** action, **Undo/Redo**, a 24-hour clock, Windows CPU/RAM usage and a compact MIDI RX/TX / OSC RX/TX / audio-availability monitor.
 
-The **Help** button in the top toolbar opens a menu with **Guide** and **About The Cuelist**. The Guide entry opens the content of the local `docs/complete-user-guide.md` **inside The Cuelist**, in a separate non-modal, resizable, scrollable window with headings and a built-in search. No external browser or Markdown editor is launched. The reader uses the bundled Markdown file, which is copied beside the compiled EXE and into portable packages, and reloads it each time the Guide is opened. About displays the current version derived from `VERSION.txt`, the proprietary copyright notice and the two credited co-authors, **Davide Salvatore** and **Riccardo D'Ambrosio**.
+The **Help** button in the top toolbar opens a menu with **Guide** and **About The Cuelist**. The Guide entry opens the content of the local `docs/complete-user-guide.md` **inside The Cuelist**, in a separate non-modal, resizable, scrollable window with headings and a built-in search. No external browser or Markdown editor is launched. The reader uses the bundled Markdown file, which is copied beside the compiled EXE and into portable packages, and reloads it each time the Guide is opened. About opens a compact, grouped native dialog with the version derived from `VERSION.txt`, the two credited co-authors **Davide Salvatore** and **Riccardo D'Ambrosio**, and concise copyright/licence information. It links to LICENSE and NOTICE.md without repeating the co-authors in multiple sections.
 
 - **Undo/Redo** use the existing MIDI/OSC clip-edit history; they are not general-purpose undo for show deletion, tab management or every mixer action.
 - **CPU/RAM** report system-level usage, not per-plugin or per-clip estimates. The two usage values and their horizontal meters have separate aligned positions; unsupported telemetry displays N/A.
@@ -65,9 +65,9 @@ The **Help** button in the top toolbar opens a menu with **Guide** and **About T
 
 The central cue grid has row controls on the left and columns for Audio/MIDI/OSC/Control. The **BPM** and **Auto Stop** strip is pinned to the right of the cue grid, including during horizontal scrolling. During vertical scrolling, row values, toggles and action targets remain **below** their fixed headers: controls hidden behind the header are neither visible nor clickable. Row Play/Pause, Stop and the action menu are physically separated, as are the larger Play/Stop targets inside each cell. Column Utilities and the Master Audio strip occupy the lower working area; a Timeline with zoom/grid/snap controls is underneath.
 
-The **Inspector** on the right edits the selected cue and cell separately. Use its narrow edge tab to collapse the Inspector toward the right, increasing the width of the workspace; click the tab again to reopen. The same area contains a cue-specific multiline **Notes** field.
+The **Inspector** on the right edits the selected cue and cell separately. Use its narrow edge tab (one framed surface with a directional chevron) to collapse the Inspector toward the right, increasing the width of the workspace; click the tab again to reopen. The same area contains a cue-specific multiline **Notes** field.
 
-Columns can be collapsed individually or together with **Collapse all** in the cue grid header. Collapsing is a layout choice; it does not stop running media or change audio routing.
+Columns can be collapsed individually or together with **Collapse all** in the cue grid header. Collapsing is a layout choice; it does not stop running media or change audio routing. The pinned BPM / Auto Stop area has a continuous visual boundary with the scrollable grid and the mixer below, including at row separators.
 
 ## 4. Managing multiple Cuelists
 
@@ -230,7 +230,7 @@ A checkpoint is not a substitute for `Save` and off-device copies. It may not re
 
 Use **Preferences → Pre-flight** to inspect model validity, missing or empty audio, configured device availability, potential routing collisions and OSC endpoint configuration. An OSC destination being configured is not proof that any remote server is online.
 
-Use **Preferences → Diagnostics** for local audio command queue, MIDI/OSC send/drop, late-dispatch and active-voice statistics. These measurements describe The Cuelist's workers; external cable, device and receiver latency is not measured.
+Use **Preferences → Diagnostics** for a grouped report covering **Audio**, **MIDI**, **OSC** and **Recovery**, with left-aligned metrics, right-aligned values and distinct colours for connected, disconnected, late and failure states. Counters are a snapshot of the current process, not a continuously updating hardware readout. These measurements describe The Cuelist's workers; external cable, device and receiver latency is not measured.
 
 **Recommended acceptance rehearsal:** run simultaneous audio/MIDI/OSC cues; exercise GO, Row Stop, Panic, selective Auto Stop, Direct/MAIN outputs, Master limiter, Cuelist switching, note saving, MIDI controller connection changes, and OSC receiver failure/restart. Perform a prolonged load test and record real device behavior.
 

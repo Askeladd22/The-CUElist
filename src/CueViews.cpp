@@ -632,15 +632,19 @@ void CueMetricsOverlay::paint(juce::Graphics& g) {
         if (!details) g.drawLine(cx,cy-4.f,cx,cy+4.f,1.8f);
         label(g,"CELLS",{134,y+37,39,18},10,
               details?palette::amber:palette::muted,true);
+        // The left 3px is reserved for an unbroken accent rail.
         g.setColour(palette::line);
-        g.drawHorizontalLine(y+CueGrid::rowHeight-1,0,(float)getWidth());
+        g.drawHorizontalLine(y+CueGrid::rowHeight-1,4.0f,(float)getWidth());
     }
     g.restoreState();
     // Paint the heading last and restore its divider, so no scrolling row
     // (including partially visible toggles) can appear above the boundary.
     g.setColour(palette::raised);
     g.fillRect(0,0,getWidth(),CueGrid::headerHeight);
+    // Paint the vertical boundary last, uninterrupted by row separators.
     g.setColour(palette::teal);g.fillRect(0,0,3,getHeight());
+    g.setColour(palette::line);
+    g.drawVerticalLine(3,0.0f,(float)getHeight());
     label(g,"BPM",{22,18,61,23},11,palette::text,true);
     label(g,"AUTO STOP",{100,18,78,23},10,palette::text,true);
     g.setColour(palette::line);

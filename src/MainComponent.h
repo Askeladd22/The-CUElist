@@ -36,23 +36,22 @@ public:
         g.drawRoundedRectangle(r,4.0f,1.0f);
 
         const auto cx=r.getCentreX(), cy=r.getCentreY();
-        // Small right-side panel frame and rail, derived from the supplied
-        // open/close panel icon references, instead of text characters.
-        g.setColour(palette::muted);
-        g.drawRoundedRectangle(cx-7.0f,cy-8.0f,14.0f,16.0f,2.0f,1.1f);
-        g.drawLine(cx+2.0f,cy-8.0f,cx+2.0f,cy+8.0f,1.1f);
+        // One outer hit surface, one slim panel rail and one chevron:
+        // the previous inner rounded box made the 20px grip look crowded.
+        g.setColour(palette::muted.withAlpha(.75f));
+        g.drawLine(cx+4.0f,cy-6.5f,cx+4.0f,cy+6.5f,1.1f);
         juce::Path chevron;
-        if (inspectorOpen) {
-            chevron.startNewSubPath(cx-4.8f,cy-3.3f);
-            chevron.lineTo(cx-1.6f,cy);
-            chevron.lineTo(cx-4.8f,cy+3.3f);
-        } else {
-            chevron.startNewSubPath(cx-1.5f,cy-3.3f);
-            chevron.lineTo(cx-4.8f,cy);
-            chevron.lineTo(cx-1.5f,cy+3.3f);
+        if (inspectorOpen) { // collapse towards the right
+            chevron.startNewSubPath(cx-4.0f,cy-4.0f);
+            chevron.lineTo(cx+0.0f,cy);
+            chevron.lineTo(cx-4.0f,cy+4.0f);
+        } else { // reopen towards the left
+            chevron.startNewSubPath(cx+0.0f,cy-4.0f);
+            chevron.lineTo(cx-4.0f,cy);
+            chevron.lineTo(cx+0.0f,cy+4.0f);
         }
-        g.setColour(palette::teal);
-        g.strokePath(chevron,juce::PathStrokeType(1.65f,
+        g.setColour(hovered || pressed ? palette::text : palette::teal);
+        g.strokePath(chevron,juce::PathStrokeType(1.8f,
             juce::PathStrokeType::curved,juce::PathStrokeType::rounded));
     }
 private:

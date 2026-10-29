@@ -1,4 +1,5 @@
 #include "MainComponent.h"
+#include "OperatorReportDialog.h"
 #include "HelpGuide.h"
 #include "MidiSessionPolicy.h"
 #include "ProjectSafety.h"
@@ -197,8 +198,8 @@ MainComponent::MainComponent(bool startAudio) {
         menu.addItem(1,"Pre-flight"); menu.addItem(2,"Diagnostics");
         juce::PopupMenu faderMenu;
         faderMenu.setLookAndFeel(&theme);
-        faderMenu.addItem(3,"-∞ dB / +6 dB",true,faderCeilingDb==6);
-        faderMenu.addItem(4,"-∞ dB / 0 dB",true,faderCeilingDb==0);
+        faderMenu.addItem(3,faderRangeMenuTitle(6),true,faderCeilingDb==6);
+        faderMenu.addItem(4,faderRangeMenuTitle(0),true,faderCeilingDb==0);
         menu.addSubMenu("Fader Range",faderMenu);
         menu.addSeparator();
         menu.addItem(5,"Rename active Cuelist");
@@ -465,8 +466,13 @@ void MainComponent::paint(juce::Graphics& g) {
     g.setColour(palette::panel);
     g.fillRect(geometry.metrics.getX(),geometry.utilities.getY(),
                geometry.metrics.getWidth(),geometry.utilities.getHeight());
+    // Continue the exact 3px accent edge from the pinned metrics down
+    // through the utility area, without a doubled boundary or dark gap.
+    g.setColour(palette::teal);
+    g.fillRect(geometry.metrics.getX(),geometry.utilities.getY(),
+               3,geometry.utilities.getHeight());
     g.setColour(palette::line);
-    g.drawVerticalLine(geometry.metrics.getX(),(float)geometry.utilities.getY(),
+    g.drawVerticalLine(geometry.metrics.getX()+3,(float)geometry.utilities.getY(),
                        (float)geometry.utilities.getBottom());
     if (!inspectorVisible) {
         // A slim, permanently visible rail provides a full-height spatial
@@ -784,16 +790,24 @@ void MainComponent::openUserGuide() {
 }
 
 void MainComponent::showAbout() {
-    const juce::String info=
-        "Version: "+juce::String(THE_CUELIST_VERSION)+"\n"
-        "Copyright (c) 2026 Davide Salvatore and Riccardo D'Ambrosio.\n"
-        "All rights reserved.\n\n"
-        "License: Proprietary software - no public software license.\n"
-        "Copyright holders: Davide Salvatore and Riccardo D'Ambrosio.\n\n"
-        "See LICENSE for the copyright notice and NOTICE.md "
-        "for third-party licenses, including JUCE.";
-    juce::AlertWindow::showMessageBoxAsync(
-        juce::MessageBoxIconType::InfoIcon,"About The Cuelist",info,"Close",this);
+    using Status=OperatorReportRow::Status;
+    showOperatorReport(*this,theme,"About The Cuelist",
+        "Version "+juce::String(THE_CUELIST_VERSION),{
+            {"AUTHORS",{
+                {"Davide Salvatore","Co-author",Status::neutral},
+                {"Riccardo D'Ambrosio","Co-author",Status::neutral}
+            }},
+            {"APPLICATION",{
+                {"Copyright","2026",Status::neutral},
+                {"Rights","All rights reserved",Status::neutral}
+            }},
+            {"LICENCE",{
+                {"Software","Proprietary",Status::neutral},
+                {"Public source licence","Not granted",Status::caution}
+            }}
+        },
+        "The Cuelist's copyright notice is in LICENSE. Third-party "
+        "notices (including JUCE and embedded fonts) are in NOTICE.md.");
 }
 
 void MainComponent::message(const juce::String& text) { status=text; repaint(); juce::AlertWindow::showMessageBoxAsync(juce::MessageBoxIconType::WarningIcon,"The Cuelist",text,"OK",this); }
