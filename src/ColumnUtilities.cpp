@@ -8,11 +8,11 @@ public:
     ControlLockButton() : juce::Button("controlColumnLock") {}
     void paintButton(juce::Graphics& g,bool hovered,bool pressed) override {
         const auto area=getLocalBounds().toFloat().reduced(1.0f);
-        const auto ink=getToggleState()?palette::amber:palette::teal;
-        g.setColour(palette::raised.withMultipliedBrightness(pressed?0.8f:hovered?1.18f:1.0f));
-        g.fillRoundedRectangle(area,5.0f);
-        g.setColour(ink.withAlpha(.8f));
-        g.drawRoundedRectangle(area,5.0f,1.1f);
+        const auto accent=getToggleState()?palette::amber:palette::teal;
+        const IconButtonState state{isEnabled(),hovered,pressed,getToggleState(),
+                                    hasKeyboardFocus(false)};
+        drawIconButtonSurface(g,area,accent,state,5.0f);
+        const auto ink=iconButtonInk(accent,state);
         const float cx=area.getCentreX(),cy=area.getCentreY();
         juce::Path shackle;
         if(getToggleState()) {
