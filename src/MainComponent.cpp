@@ -1228,6 +1228,10 @@ void MainComponent::timerCallback() {
     }
     lastMidiRx=rx; lastMidiTx=tx; lastOscTx=oscTx; lastOscRx=oscRx;
     activityInitialized=true;
+    globalMidiLearn.setColour(juce::TextButton::buttonColourId,
+        controlLearnArmed ? palette::amber.withAlpha(.55f) : palette::raised);
+    globalOscLearn.setColour(juce::TextButton::buttonColourId,
+        oscLearnArmed ? palette::amber.withAlpha(.55f) : palette::raised);
     utilities.syncScroll(viewport.getViewPositionX()); utilities.refreshRouting();
     grid.repaint(); cueHeaders.repaint(); columnHeaders.repaint();
     displayPeak=std::max(engine.peak.load(),displayPeak*.88f);
