@@ -263,7 +263,8 @@ public:
     bool setControlColumnLocked(int column,bool locked,int sourceRow);
     bool setControlColumnPriority(int column,int priority);
     juce::Result selectControlInput(const juce::String&);
-    bool addMappingBinding(ControlBinding);
+    bool addMappingBinding(ControlBinding, const juce::String& functionName={});
+    bool renameControlFunction(int functionId,const juce::String& name);
     bool deleteMappingBinding(int);
     int createMappingPreset(const juce::String&);
     bool assignMappingPreset(int rowId,int presetId);
