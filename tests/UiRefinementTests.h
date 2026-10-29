@@ -206,11 +206,13 @@ void uiRefinementTests() {
         check(pane->getHeight()>=650 && empty->isVisible() &&
               !update->isEnabled() && !remove->isEnabled() &&
               !destination->isEnabled(),"Default mapping state is misleading");
-        target->setSelectedId(5); // MIDI CC
+        // The ComboBox default is sendNotificationAsync. Drive the real
+        // onChange callback synchronously before asserting dependent fields.
+        target->setSelectedId(5,juce::sendNotificationSync); // MIDI CC
         check(output->isEnabled() && !osc->isEnabled() &&
               destination->isEnabled(),
               "MIDI CC target does not enable only relevant controls");
-        target->setSelectedId(6); // OSC float
+        target->setSelectedId(6,juce::sendNotificationSync); // OSC float
         check(!output->isEnabled() && osc->isEnabled(),
               "OSC target does not enable its address editor");
         delete dialog;
