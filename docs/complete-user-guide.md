@@ -144,7 +144,7 @@ Individual cell gain is expressed in **dB**. A peak meter reports **dBFS**: 0 dB
 
 ### 7.2 Column Utilities
 
-Audio column strips provide gain, stereo meters, pan, Mute, phase inversion and routing. MIDI and OSC strips expose the appropriate output controls rather than audio faders. Collapsed Audio columns retain compact meter/gain and Mute controls. **Mute** uses the embedded **Noto Sans Symbols 2** directly: **🔊** means audio/output enabled; **🔇** means muted. The same two-state icon is used for Master, Audio columns and MIDI/OSC data-output mute, while phase inversion retains its own symbol.
+Audio column strips provide gain, stereo meters, pan, Mute, phase inversion and routing. MIDI and OSC strips expose the appropriate output controls rather than audio faders. Collapsed Audio columns retain compact meter/gain and Mute controls. **Mute** uses the embedded **Noto Sans Symbols 2** directly: **🔊** means audio/output enabled; **🔇** means muted. Both are centred by their visible glyph outlines inside the compact button, rather than by the font's advance width. The same two-state icon is used for Master, Audio columns and MIDI/OSC data-output mute, while phase inversion retains its own symbol.
 
 An Audio column can send signal to the **Master** on its left/right paths and/or to a physical stereo **Direct Out** pair. Direct can be **PRE** or **POST** relative to the strip fader; post-strip Master Send is independent. Mute, pan and other per-cell/per-cue processing follow their implemented signal path.
 
