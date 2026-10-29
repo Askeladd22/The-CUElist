@@ -21,7 +21,7 @@ public:
             &presetName,&presets,&scope,&target,&takeover,&columns,&bindingList,&state,
             &outputCc,&oscAddress,&invert,&updateSelected,&curve,&minimum,&maximum,
              &functionChoice,&functionName,&newFunction,&saveRoute,
-             &effectivePreview,&templateName,&templates,&saveTemplate,&loadTemplate,
+             &saveControllerPreset,&loadControllerPreset,&effectivePreview,&templateName,&templates,&saveTemplate,&loadTemplate,
              &emptyBindings})
             addAndMakeVisible(c);
         functionChoice.setName("mappingAbstractFunction");
@@ -31,6 +31,68 @@ public:
         saveRoute.setButtonText("Save route");
         newFunction.setName("createControlFunction");
         saveRoute.setName("saveControlFunctionRoute");
+        saveControllerPreset.setName("exportControllerPreset");
+        loadControllerPreset.setName("importControllerPreset");
+        saveControllerPreset.setButtonText("Export Default Map");
+        loadControllerPreset.setButtonText("Import Default Map");
+        saveControllerPreset.setVisible(!editSet);
+        loadControllerPreset.setVisible(!editSet);
+        saveControllerPreset.setTooltip("Export hardware inputs and destinations without project-specific function names.");
+        loadControllerPreset.setTooltip("Import routing by function order; preserve project names, other functions and cue-local overrides.");
+        saveControllerPreset.onClick=[this] {
+            if (!owner) return;
+            const auto preset=owner->exportControlPresetText();
+            presetFileChooser=std::make_unique<juce::FileChooser>(
+                "Export Default Map",juce::File::getSpecialLocation(
+                    juce::File::userDocumentsDirectory)
+                    .getChildFile("TheCuelist-DefaultMap.json"),"*.json");
+            auto safe=juce::Component::SafePointer<ControlPanel>(this);
+            presetFileChooser->launchAsync(
+                juce::FileBrowserComponent::saveMode |
+                juce::FileBrowserComponent::canSelectFiles,
+                [safe,preset](const juce::FileChooser& chooser) {
+                    if (!safe) return;
+                    const auto path=chooser.getResult();
+                    if (path==juce::File()) return;
+                    safe->state.setText(path.replaceWithText(preset) ?
+                        "Default Map preset exported without function labels." :
+                        "Could not save mapping preset.",juce::dontSendNotification);
+                });
+        };
+        loadControllerPreset.onClick=[this] {
+            if (!owner) return;
+            presetFileChooser=std::make_unique<juce::FileChooser>(
+                "Import Default Map",juce::File::getSpecialLocation(
+                    juce::File::userDocumentsDirectory),"*.json");
+            auto safe=juce::Component::SafePointer<ControlPanel>(this);
+            presetFileChooser->launchAsync(
+                juce::FileBrowserComponent::openMode |
+                juce::FileBrowserComponent::canSelectFiles,
+                [safe](const juce::FileChooser& chooser) {
+                    if (!safe || !safe->owner) return;
+                    const auto file=chooser.getResult();
+                    if (file==juce::File()) return;
+                    if (file.getSize()>256*1024) {
+                        safe->state.setText("Mapping preset exceeds 256KB.",
+                                            juce::dontSendNotification);
+                        return;
+                    }
+                    const auto result=safe->owner->importControlPresetText(
+                        file.loadFileAsString());
+                    if (result.wasOk()) {
+                        safe->refreshFunctions();
+                        safe->bindingList.updateContent();
+                        safe->bindingList.repaint();
+                        safe->selected=-1;
+                        safe->remove.setEnabled(false);
+                        safe->updateSelected.setEnabled(false);
+                        safe->refreshEmptyState();
+                    }
+                    safe->state.setText(result.wasOk() ?
+                        "Imported routes and inputs; project labels retained." :
+                        result.getErrorMessage(),juce::dontSendNotification);
+                });
+        };
         newFunction.setVisible(!editSet);
         saveRoute.setVisible(!editSet);
         newFunction.setTooltip("Create a stable project function; its output will not change on MIDI Learn.");
@@ -289,7 +351,7 @@ public:
             label(g,"New preset name",{388,347,220,18},11,palette::muted,true);
         }
         label(g,editSet?"MAPPINGS IN THIS CONTROL SET":"SAVED MAPPINGS",
-              {20,editSet?534:425,380,18},12,palette::teal,true);
+              {20,editSet?534:434,380,15},11,palette::teal,true);
         g.setColour(palette::line);
         g.drawHorizontalLine(getHeight()-48,20,(float)getWidth()-20);
         label(g,editSet ?
@@ -331,6 +393,8 @@ public:
         presetName.setBounds(388,370,w-548,31);
         newPreset.setBounds(w-149,370,129,31);
 
+        saveControllerPreset.setBounds(20,403,173,29);
+        loadControllerPreset.setBounds(201,403,173,29);
         const int listY=editSet?558:449;
         const int listHeight=editSet?136:157;
         bindingList.setBounds(20,listY,w-239,listHeight);
@@ -369,7 +433,7 @@ private:
     }
     juce::ComboBox device,presets,scope,target,takeover,columns,curve,templates,functionChoice;
     juce::TextButton connect,learn,oscLearn,add,remove,updateSelected,newPreset,assignPreset,saveTemplate,loadTemplate,
-                     newFunction,saveRoute;
+                     newFunction,saveRoute,saveControllerPreset,loadControllerPreset;
     juce::TextEditor presetName,outputCc,oscAddress,minimum,maximum,effectivePreview,templateName,functionName,oscInputPort;
     juce::ToggleButton invert{"Invert"};
     juce::Label state;
@@ -378,6 +442,7 @@ private:
     std::vector<juce::String> deviceIds;
     std::vector<int> columnIds;
     std::optional<ControlEvent> captured;
+    std::unique_ptr<juce::FileChooser> presetFileChooser;
     int selected=-1;
     void refreshFunctions() {
         if (!owner) return;
