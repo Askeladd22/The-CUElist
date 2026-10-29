@@ -163,17 +163,23 @@ void cuelistGuiMockupTests() {
         for (const auto& c:ui.show.columns)
             check(!c.collapsed,"Expand-all missed a column");
         auto* toggle=controlsV3::named(ui,"toggleAllColumns");
+        auto* headers=cueViewFixtures::find<PinnedCueHeaders>(ui);
         auto* notes=controlsV3::named(ui,"cueNotes");
         auto* mapping=controlsV3::named(ui,"controlMapping");
         auto* plus=controlsV3::named(ui,"newCuelist");
-        check(toggle && notes && mapping && plus,
+        check(toggle && headers && notes && mapping && plus,
               "Mockup controls are missing");
         for (const auto window:std::initializer_list<juce::Point<int>>{
                  {1180,820},{1440,900},{1647,895},{1920,1080}}) {
             ui.setSize(window.x,window.y);
             ui.resized();
-            check(toggle->isVisible() && toggle->getX()>=182 &&
-                  toggle->getRight()<=472 && toggle->getBottom()<=150,
+            // Keep the button inside the actual pinned header. Its width
+            // changed when the cue-name lane grew to fit Play/Stop safely.
+            check(toggle->isVisible() &&
+                  toggle->getX()>=headers->getX() &&
+                  toggle->getRight()<=headers->getRight() &&
+                  toggle->getY()>=headers->getY() &&
+                  toggle->getBottom()<=headers->getY()+CueGrid::headerHeight,
                   "Collapse-all escaped the Cue List header");
             check(mapping->isVisible() && mapping->getX()>=0 &&
                   mapping->getRight()<=180,
