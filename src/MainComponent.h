@@ -82,6 +82,9 @@ public:
     int totalColumnsWidth() const;
     void toggleAutoStopDetails(int row);
     void clickRowHeader(int row,int x,int localY,int clicks,juce::Point<int> screen);
+    // Shared by the scrolled grid and the fixed column-header overlay.
+    void clickColumnHeader(int gridX,int y,int clicks,juce::Point<int> screen);
+    void doubleClickColumnHeader(int gridX,int y);
     bool autoStopDetailsVisible(int rowId) const { return autoStopVisibleRows.count(rowId)>0; }
     static juce::Colour cueColour(int id);
     bool isInterestedInFileDrag(const juce::StringArray&) override;
@@ -115,6 +118,19 @@ public:
     void mouseDown(const juce::MouseEvent&) override;
     void mouseDoubleClick(const juce::MouseEvent&) override;
     void mouseWheelMove(const juce::MouseEvent&,const juce::MouseWheelDetails&) override;
+private:
+    MainComponent& owner;
+};
+// Draws the same column header as CueGrid, but stays above scrolling rows.
+ // Horizontal scrolling changes its content offset, not its screen bounds.
+class PinnedColumnHeaders final : public juce::Component {
+public:
+    explicit PinnedColumnHeaders(MainComponent& parent):owner(parent) {}
+    void paint(juce::Graphics&) override;
+    void mouseDown(const juce::MouseEvent&) override;
+    void mouseDoubleClick(const juce::MouseEvent&) override;
+    void mouseWheelMove(const juce::MouseEvent&,const juce::MouseWheelDetails&) override;
+    int gridXAt(int localX) const;
 private:
     MainComponent& owner;
 };
@@ -298,12 +314,22 @@ public:
     int selectedRow=0, selectedColumn=0;
     AudioEngine engine;
 private:
-    friend class CueGrid; friend class PinnedCueHeaders; friend class CueMetricsOverlay; friend class Timeline; friend class MidiUndoAction; friend class ColumnUtilities; friend class ControlPanel;
+    friend class CueGrid; friend class PinnedCueHeaders; friend class PinnedColumnHeaders; friend class CueMetricsOverlay; friend class Timeline; friend class MidiUndoAction; friend class ColumnUtilities; friend class ControlPanel;
     Theme theme;
     std::unique_ptr<juce::PropertiesFile> appPreferences;
     int faderCeilingDb=6;
     juce::TooltipWindow tooltip{this,600};
-    CueGrid grid{*this}; PinnedCueHeaders cueHeaders{*this}; CueMetricsOverlay cueMetrics{*this}; Timeline timeline{*this}; juce::Viewport viewport;
+    // Native scrolling moves the grid; these overlay siblings keep the
+    // entire 72px heading fixed and repaint on every visible-area change.
+    struct CueViewport final : juce::Viewport {
+        std::function<void()> onScroll;
+        void visibleAreaChanged(const juce::Rectangle<int>&) override {
+            if(onScroll) onScroll();
+        }
+    };
+    CueGrid grid{*this}; PinnedCueHeaders cueHeaders{*this};
+    PinnedColumnHeaders columnHeaders{*this}; CueMetricsOverlay cueMetrics{*this};
+    Timeline timeline{*this}; CueViewport viewport;
     ColumnUtilities utilities{*this};
     juce::TextButton openButton{"Open"},saveButton{"Save"},newButton{"New"},addRowButton{"+"},addColumnButton{"+"};
     juce::TextButton preferencesButton{"Preferences"},helpButton{"Help"};
