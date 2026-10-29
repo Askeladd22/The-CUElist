@@ -9,10 +9,13 @@ namespace cuelist {
 
 void MainComponent::withDiscardConfirmation(std::function<void()> action) {
     if (!hasUnsavedChanges()) { action(); return; }
-    juce::AlertWindow::showAsync(juce::MessageBoxOptions().withIconType(juce::MessageBoxIconType::QuestionIcon)
-        .withTitle("Unsaved changes").withMessage("Continuing will discard unsaved changes. To save them, cancel and click Save.")
-        .withButton("Discard and continue").withButton("Cancel").withAssociatedComponent(this),
-        [safe=juce::Component::SafePointer<MainComponent>(this),action](int result) { if (safe && result==1) action(); });
+    // Only the explicitly labelled destructive button can invoke the action.
+    // Cancel, Escape and closing the dialog leave the show untouched.
+    showUnsavedChangesConfirmation(*this,theme,
+        [safe=juce::Component::SafePointer<MainComponent>(this),
+         action=std::move(action)] {
+            if (safe && action) action();
+        });
 }
 
 void MainComponent::requestQuit() { withDiscardConfirmation([this] { stopAll(); juce::JUCEApplication::getInstance()->quit(); }); }
