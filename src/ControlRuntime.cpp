@@ -577,6 +577,14 @@ void MainComponent::updateQuickLearnVisuals() {
     utilities.refreshLearnVisuals();
     quickControlTargets.setLearnPresentation(colour,quickLearnFunctionId,
         quickLearnArmedEntryId,bright);
+    // Protocol buttons remain coloured for the whole session. They do
+    // not blink: only the chosen destination should draw attention.
+    globalMidiLearn.setColour(juce::TextButton::buttonColourId,
+        quickLearnMode==QuickLearnMode::midi ?
+        palette::amber.withAlpha(.55f) : palette::raised);
+    globalOscLearn.setColour(juce::TextButton::buttonColourId,
+        quickLearnMode==QuickLearnMode::osc ?
+        palette::purple.withAlpha(.55f) : palette::raised);
     if (quickLearnMode!=QuickLearnMode::off) repaint();
 }
 void MainComponent::chooseQuickLearnGuiTarget(ControlTarget target,int columnId) {

@@ -3,6 +3,42 @@
 
 // Test the real application workflow, not an independent routing mock.
 void quickLearnPersistenceTests() {
+    test("MIDI Learn highlights amber and OSC Learn highlights violet",[] {
+        MainComponent ui(false);
+        auto* go=dynamic_cast<QuickLearnHotspot*>(
+            controlsV3::named(ui,"quickLearnGo"));
+        auto* list=dynamic_cast<QuickControlTargets*>(
+            controlsV3::named(ui,"quickControlTargets"));
+        check(go && list,"Quick Learn colour test requires GUI and Inspector.");
+        ui.beginQuickLearn(false);
+        check(ui.quickLearnAccent()==palette::amber &&
+              go->isVisible() && go->getLearnAccent()==palette::amber &&
+              list->getLearnAccent()==palette::amber,
+              "MIDI targets must use the yellow/amber palette.");
+        ui.beginQuickLearn(true);
+        check(ui.quickLearnAccent()==palette::purple &&
+              go->getLearnAccent()==palette::purple &&
+              list->getLearnAccent()==palette::purple,
+              "OSC targets must turn violet, not amber.");
+        check(!go->isArmedTarget(),"An unselected function must not blink.");
+        cueViewFixtures::click(*go,5.0f,5.0f);
+        check(ui.isQuickLearnAwaitingInput() && go->isArmedTarget() &&
+              go->isPulseBright() && list->getArmedFunctionId()>0,
+              "Selecting GO must arm and highlight the chosen function.");
+        const auto id=list->getArmedFunctionId();
+        go->setLearnPresentation(palette::purple,true,false);
+        list->setLearnPresentation(palette::purple,id,-3,false);
+        check(!go->isPulseBright() && !list->isPulseBright(),
+              "The selected target must support dim and bright blink frames.");
+        ui.updateQuickLearnVisuals();
+        ui.completeQuickLearn({"/test/violet",ControlKind::osc,1,0,60,false});
+        check(ui.isQuickLearnActive() && !ui.isQuickLearnAwaitingInput() &&
+              !go->isArmedTarget() && list->getArmedFunctionId()==0 &&
+              go->getLearnAccent()==palette::purple,
+              "Learn should remain violet but stop blinking after capture.");
+        ui.finishQuickLearn();
+        check(!go->isVisible(),"Stopping Learn must hide all colour overlays.");
+    });
     test("GUI Learn overlays appear only during Learn, including audio strips",[] {
         MainComponent ui(false);
         const std::function<int(juce::Component&)> count=[&](juce::Component& c)->int {
