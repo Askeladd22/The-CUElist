@@ -159,6 +159,33 @@ void uiRefinementTests() {
         }
     });
 
+    test("Shared editor prompts use Hind/Exo styling and explicit form fields",[] {
+        OperatorTextPrompt single("Rename cue","Enter a cue name.",
+                                  "Cue name","Scena",false,"Apply",[](juce::String){});
+        OperatorTextPrompt tempo("Cue tempo map","Each line is beat BPM.",
+                                 "Tempo changes","0 120\\n16 140",true,"Apply",
+                                 [](juce::String){});
+        check(single.getWidth()==510 && single.getHeight()==256 &&
+              tempo.getHeight()==400,
+              "Native editing surfaces have unexpected dimensions");
+        check(single.getEditor().getName()=="value" &&
+              single.getEditor().getText()=="Scena" &&
+              tempo.getEditor().isMultiLine() &&
+              tempo.getEditor().getText().contains("16 140"),
+              "Shared prompt lost editable text or tempo multiline support");
+        for (auto* editor :std::initializer_list<OperatorTextPrompt*>{&single,&tempo}) {
+            auto* apply=controlsV3::named(*editor,"operatorPromptAccept");
+            auto* cancel=controlsV3::named(*editor,"operatorPromptCancel");
+            check(apply && cancel && apply->getRight()+7<=cancel->getX() &&
+                  cancel->getBottom()<editor->getHeight(),
+                  "Prompt action buttons overlap or leave the dialog");
+            check(editor->getEditor().getBounds().getWidth()>=450,
+                  "Cue editor field is not visibly sized");
+            const auto image=editor->createComponentSnapshot(editor->getLocalBounds());
+            check(image.isValid(),"Shared editor failed native render");
+        }
+    });
+
     test("Midnight Slate palette preserves layered dark surfaces and safety accents",[] {
         const auto brightness=[](juce::Colour colour) {
             return 0.2126f*(float)colour.getRed()+
