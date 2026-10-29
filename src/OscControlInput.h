@@ -52,7 +52,11 @@ public:
                 static_assert(sizeof(float)==sizeof(uint32_t),"IEEE754 required");
                 std::memcpy(&number,&bits,sizeof(number));
                 if (!std::isfinite(number)) return false;
-                value=juce::jlimit(0,127,(int)std::lround(number*127.0f));
+                // OSC floats can be any finite IEEE-754 value, not only [0,1].
+                // Clamp BEFORE rounding/converting to int: a large finite
+                // value would otherwise overflow lround and the int cast.
+                const float unit=juce::jlimit(0.0f,1.0f,number);
+                value=(int)std::lround(unit*127.0f);
             } else {
                 const auto number=(int32_t)bits;
                 value=juce::jlimit(0,127,(int)number);
