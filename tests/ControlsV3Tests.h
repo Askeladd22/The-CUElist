@@ -14,11 +14,13 @@ void controlsV3Tests() {
         auto* title=dynamic_cast<juce::TextEditor*>(controlsV3::named(ui,"cueName"));
         title->setText("Scena",false); title->onReturnKey();
         ui.renameTitle(false,0);
-        auto* modal=dynamic_cast<juce::AlertWindow*>(juce::ModalComponentManager::getInstance()->getModalComponent(0));
-        check(modal!=nullptr,"Rename dialog absent");
-        auto* editor=modal->getTextEditor("value");
-        const bool focused=editor && editor->hasKeyboardFocus(false);
-        const bool selected=editor && editor->getHighlightedRegion().getLength()==5;
+        auto* modal=dynamic_cast<juce::DialogWindow*>(
+            juce::ModalComponentManager::getInstance()->getModalComponent(0));
+        auto* prompt=modal ? dynamic_cast<OperatorTextPrompt*>(modal->getContentComponent()) : nullptr;
+        check(prompt!=nullptr,"Shared rename dialog absent");
+        auto* editor=&prompt->getEditor();
+        const bool focused=editor->hasKeyboardFocus(false);
+        const bool selected=editor->getHighlightedRegion().getLength()==5;
         delete modal;
         check(focused,"Rename field did not receive keyboard focus"); check(selected,"Rename text not selected");
     });
