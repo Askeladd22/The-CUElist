@@ -4,30 +4,59 @@
 
 namespace cuelist {
 
-// Shared channel/master mixer controls: identical pan geometry and mute icon.
+// Shared channel/master mixer controls. Mute switches between two *explicit*
+// Noto Sans Symbols 2 glyphs; phase inversion keeps its separate vector icon.
 class UtilityIcon final : public juce::ToggleButton {
 public:
+    static constexpr juce::juce_wchar speakerCodepoint(bool muted) noexcept {
+        return static_cast<juce::juce_wchar>(muted ? 0x1F507 : 0x1F50A);
+    }
     explicit UtilityIcon(bool invert) : phase(invert) {
         setButtonText(invert ? "Phase inversion" : "Mute");
     }
     void paintButton(juce::Graphics& g,bool hover,bool down) override {
         const auto box=getLocalBounds().toFloat().reduced(2);
-        const auto active=phase ? palette::teal : palette::red;
-        g.setColour(getToggleState() ? active.withAlpha(.18f) : palette::raised);
+        const bool muted=!phase && getToggleState();
+        const auto ink=phase ? (getToggleState() ? palette::teal : palette::muted)
+                             : muted ? palette::red
+                             : (hover || down ? palette::text : palette::teal);
+        g.setColour(getToggleState() ? ink.withAlpha(.16f) : palette::raised);
         g.fillRoundedRectangle(box,4);
-        g.setColour(getToggleState() ? active : hover || down ? palette::text : palette::muted);
-        g.drawRoundedRectangle(box,4,getToggleState() ? 1.4f : .7f);
+        g.setColour(ink);
+        g.drawRoundedRectangle(box,4,getToggleState() ? 1.4f : .9f);
         const auto icon=juce::Rectangle<float>(20,20).withCentre(box.getCentre());
         if (phase) {
             g.drawEllipse(icon.reduced(2),2.3f);
             g.drawLine(icon.getX()+3,icon.getBottom(),icon.getRight()-3,icon.getY(),2.8f);
+            return;
+        }
+
+        const auto symbol=speakerCodepoint(muted);
+        const auto& symbols=appTypefaces().notoSymbols2;
+        if (symbols && symbols->getNominalGlyphForCodepoint(symbol).has_value()) {
+            // This is not font fallback: choose the bundled Symbols 2
+            // typeface explicitly for both active and muted speakers.
+            g.setFont(symbolsFont(20.0f));
+            g.drawText(juce::String::charToString(symbol),
+                       getLocalBounds().reduced(2),
+                       juce::Justification::centred,false);
+            return;
+        }
+        // Defensive vector alternative for a damaged/replaced embedded font.
+        const float x=icon.getX(),y=icon.getY();
+        juce::Path speaker;
+        speaker.startNewSubPath(x+2,y+7);
+        speaker.lineTo(x+7,y+7); speaker.lineTo(x+13,y+2);
+        speaker.lineTo(x+13,y+18); speaker.lineTo(x+7,y+13);
+        speaker.lineTo(x+2,y+13); speaker.closeSubPath();
+        g.fillPath(speaker);
+        if (muted) {
+            g.drawLine(x+1,y+1,x+19,y+19,2.3f);
         } else {
-            const float x=icon.getX(),y=icon.getY();
-            juce::Path speaker; speaker.startNewSubPath(x+2,y+7);
-            speaker.lineTo(x+7,y+7); speaker.lineTo(x+14,y+2);
-            speaker.lineTo(x+14,y+18); speaker.lineTo(x+7,y+13);
-            speaker.lineTo(x+2,y+13); speaker.closeSubPath(); g.fillPath(speaker);
-            g.drawLine(x+1,y+1,x+19,y+19,3.0f);
+            juce::Path waves;
+            waves.startNewSubPath(x+14,y+6);
+            waves.quadraticTo(x+20,y+10,x+14,y+14);
+            g.strokePath(waves,juce::PathStrokeType(1.8f));
         }
     }
 private:
