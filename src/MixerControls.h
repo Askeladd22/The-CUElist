@@ -31,10 +31,27 @@ public:
             return;
         }
 
-        // Use the same audited, explicit glyph path as the other UI icons.
-        if (drawNotoSymbol(g,speakerCodepoint(muted),
-                           getLocalBounds().reduced(2),20.0f,ink))
-            return;
+        // The font's advance width is not the visible speaker shape:
+        // ordinary centred text appears offset on small MUTE buttons.
+        // Draw the *actual embedded Noto glyph outline* and centre its ink
+        // bounds optically inside the button, for BOTH muted/unmuted states.
+        const auto& symbols=appTypefaces().notoSymbols2;
+        if (symbols) {
+            if (const auto glyph=symbols->getNominalGlyphForCodepoint(
+                    speakerCodepoint(muted))) {
+                juce::Path outline;
+                symbols->getOutlineForGlyph(juce::TypefaceMetricsKind::portable,
+                                            static_cast<int>(*glyph),outline);
+                if (!outline.isEmpty()) {
+                    const auto target=juce::Rectangle<float>(18.0f,18.0f)
+                        .withCentre(box.getCentre());
+                    g.setColour(ink);
+                    g.fillPath(outline,outline.getTransformToScaleToFit(
+                        target,true,juce::Justification::centred));
+                    return;
+                }
+            }
+        }
         // Defensive vector alternative for a damaged/replaced embedded font.
         const float x=icon.getX(),y=icon.getY();
         juce::Path speaker;
