@@ -202,13 +202,15 @@ juce::Result validateShow(const Show& show) {
         allControlBindingIds.insert(binding.id);
     for (const auto& preset:show.controls.presets)
         allControlBindingIds.insert(preset.id);
+    for (const auto& function:show.controls.functions)
+        allControlBindingIds.insert(function.id);
     for (const auto& item:show.controls.templates)
         allControlBindingIds.insert(item.id);
     // Source-column priority conflicts are resolved deterministically at runtime.
     const auto validateSet=[&](const ControlSet& set)->juce::Result {
         if (set.bindings.size()>256) return fail("Control Set exceeds 256 mappings.");
         ControlSettings probe; probe.nextId=show.controls.nextId;
-        probe.bindings=set.bindings;
+        probe.bindings=set.bindings; probe.functions=show.controls.functions;
         auto result=validateControls(probe,rowIds,columnIds);
         if (result.failed()) return result;
         for (const auto& binding:set.bindings) {
@@ -286,7 +288,8 @@ juce::var controlSetObject(const ControlSet& set) {
             {"outputNumber",b.outputNumber},{"outputDeviceId",b.outputDeviceId},
             {"oscHost",b.oscHost},{"oscPort",b.oscPort},{"oscAddress",b.oscAddress},
             {"minimum",b.minimum},{"maximum",b.maximum},{"invert",b.invert},
-            {"enabled",b.enabled},{"takeover",(int)b.takeover},{"curve",(int)b.curve}}));
+            {"enabled",b.enabled},{"takeover",(int)b.takeover},{"curve",(int)b.curve},
+            {"functionId",b.functionId}}));
     return object({{"bindings",bindings}});
 }
 ControlSet parseControlSet(const juce::var& data) {
@@ -307,6 +310,7 @@ ControlSet parseControlSet(const juce::var& data) {
         b.invert=boolean(item,"invert"); b.enabled=boolean(item,"enabled");
         b.takeover=(ControlTakeover)integer(item,"takeover");
         if (item.hasProperty("curve")) b.curve=(ControlCurve)integer(item,"curve");
+        if (item.hasProperty("functionId")) b.functionId=integer(item,"functionId");
         set.bindings.push_back(std::move(b));
     }
     return set;
@@ -383,14 +387,21 @@ juce::String encodeShow(const Show& show) {
             {"outputNumber",binding.outputNumber},{"outputDeviceId",binding.outputDeviceId},
             {"oscHost",binding.oscHost},{"oscPort",binding.oscPort},{"oscAddress",binding.oscAddress},
             {"minimum",binding.minimum},{"maximum",binding.maximum},{"invert",binding.invert},
-            {"enabled",binding.enabled},{"takeover",(int)binding.takeover},{"curve",(int)binding.curve}}));
+            {"enabled",binding.enabled},{"takeover",(int)binding.takeover},
+            {"curve",(int)binding.curve},{"functionId",binding.functionId}}));
     juce::Array<juce::var> templates;
     for (const auto& item:show.controls.templates)
         templates.add(object({{"id",item.id},{"name",item.name},
                               {"set",controlSetObject(item.set)}}));
+    juce::Array<juce::var> functions;
+    for (const auto& f:show.controls.functions) {
+        ControlSet route;route.bindings.push_back(f.destination);
+        functions.add(object({{"id",f.id},{"name",f.name},
+                              {"route",controlSetObject(route)}}));
+    }
     const auto controls=object({{"midiInputId",show.controls.midiInputId},
         {"nextId",show.controls.nextId},{"presets",presets},
-        {"bindings",bindings},{"templates",templates}});
+        {"bindings",bindings},{"templates",templates},{"functions",functions}});
     juce::Array<juce::var> cuelistObjects;
     for (size_t n=0;n<show.cuelists.size();++n) {
         // The active Cuelist already lives at root.rows. Never duplicate
@@ -438,6 +449,15 @@ juce::Result decodeShow(const juce::String& text, Show& destination) {
                     show.controls.templates.push_back({
                         integer(item,"id"),string(item,"name"),
                         parseControlSet(required(item,"set"))});
+            if (data.hasProperty("functions"))
+                for (const auto& item:array(data,"functions")) {
+                    auto route=parseControlSet(required(item,"route"));
+                    if (route.bindings.size()!=1)
+                        throw std::runtime_error("Invalid control function route.");
+                    show.controls.functions.push_back({
+                        integer(item,"id"),string(item,"name"),
+                        std::move(route.bindings.front())});
+                }
             for (const auto& item:array(data,"bindings")) {
                 ControlBinding b;
                 b.id=integer(item,"id"); b.deviceId=string(item,"deviceId");
@@ -455,6 +475,7 @@ juce::Result decodeShow(const juce::String& text, Show& destination) {
                 b.invert=boolean(item,"invert"); b.enabled=boolean(item,"enabled");
                 b.takeover=(ControlTakeover)integer(item,"takeover");
                 if (item.hasProperty("curve")) b.curve=(ControlCurve)integer(item,"curve");
+                if (item.hasProperty("functionId")) b.functionId=integer(item,"functionId");
                 show.controls.bindings.push_back(std::move(b));
             }
         }
