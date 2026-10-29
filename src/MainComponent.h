@@ -347,6 +347,7 @@ private:
     std::array<std::unique_ptr<juce::TextButton>,12> cuelistCloseButtons;
     juce::TextButton cuelistOverflowButton{"..."},addCuelistButton{"+"};
     juce::TextButton undoButton{"Undo"},redoButton{"Redo"};
+    juce::TextButton globalMidiLearn{"M Learn"},globalOscLearn{"O Learn"};
     void refreshCuelistTabs();
     void showCuelistOverflowMenu();
     std::unique_ptr<GuideWindow> userGuideWindow;
