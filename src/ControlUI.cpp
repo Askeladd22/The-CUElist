@@ -20,9 +20,52 @@ public:
             &device,&connect,&learn,&add,&remove,&newPreset,&assignPreset,
             &presetName,&presets,&scope,&target,&takeover,&columns,&bindingList,&state,
             &outputCc,&oscAddress,&invert,&updateSelected,&curve,&minimum,&maximum,
+             &functionChoice,&functionName,&newFunction,&saveRoute,
              &effectivePreview,&templateName,&templates,&saveTemplate,&loadTemplate,
              &emptyBindings})
             addAndMakeVisible(c);
+        functionChoice.setName("mappingAbstractFunction");
+        functionName.setName("mappingAbstractFunctionName");
+        functionName.setTextToShowWhenEmpty("Function name (e.g. Resolume Brightness)",palette::muted);
+        newFunction.setButtonText("New function");
+        saveRoute.setButtonText("Save route");
+        newFunction.setName("createControlFunction");
+        saveRoute.setName("saveControlFunctionRoute");
+        newFunction.setVisible(!editSet);
+        saveRoute.setVisible(!editSet);
+        newFunction.setTooltip("Create a stable project function; its output will not change on MIDI Learn.");
+        saveRoute.setTooltip("Save the selected function destination globally; physical input assignments stay unchanged.");
+        functionChoice.onChange=[this] {
+            if (!owner) return;
+            const int id=functionChoice.getSelectedId()-1;
+            for (const auto& item:owner->show.controls.functions)
+                if (item.id==id) {
+                    functionName.setText(item.name,juce::dontSendNotification);
+                    showRoute(item.destination);
+                    return;
+                }
+        };
+        newFunction.onClick=[this] {
+            if (!owner) return;
+            const auto route=readRoute();
+            if (!route) return;
+            const int id=owner->createAbstractControlFunction(functionName.getText(),*route);
+            if (id>0) {
+                refreshFunctions();functionChoice.setSelectedId(id+1);
+                state.setText("Function created. Learn its physical input, then Add mapping.",
+                              juce::dontSendNotification);
+            } else state.setText(owner->status,juce::dontSendNotification);
+        };
+        saveRoute.onClick=[this] {
+            if (!owner || functionChoice.getSelectedId()<2) return;
+            const auto route=readRoute();
+            if (!route) return;
+            const bool ok=owner->updateAbstractControlFunction(
+                functionChoice.getSelectedId()-1,functionName.getText(),*route);
+            state.setText(ok ? "Function output updated; input assignment unchanged." :
+                           owner->status,juce::dontSendNotification);
+            if (ok) refreshFunctions();
+        };
         device.setName("controlInputDevice");
         device.setTooltip("Select a device explicitly. No automatic fallback on disconnect.");
         connect.setButtonText("Refresh ports");
@@ -174,6 +217,7 @@ public:
                 state.setText("Preset assigned to selected cue.",juce::dontSendNotification);
         };
         refreshDevices(); refreshPresets(); refreshColumns();refreshTemplates();
+        refreshFunctions();
         refreshDestinationFields();
         refreshEmptyState();
         updateEffectivePreview();
@@ -225,6 +269,10 @@ public:
         connect.setBounds(w-143,105,123,31);
         learn.setBounds(20,163,128,32);
         state.setBounds(160,162,w-180,33);
+        functionChoice.setBounds(20,207,185,29);
+        functionName.setBounds(213,207,228,29);
+        newFunction.setBounds(449,207,140,29);
+        saveRoute.setBounds(597,207,w-617,29);
 
         scope.setBounds(20,250,176,31);
         target.setBounds(214,250,178,31);
@@ -283,9 +331,10 @@ private:
         const auto& cell=owner->show.rows[(size_t)row].cells[(size_t)columnIndex];
         return cell.controlSet ? &cell.controlSet->bindings : nullptr;
     }
-    juce::ComboBox device,presets,scope,target,takeover,columns,curve,templates;
-    juce::TextButton connect,learn,add,remove,updateSelected,newPreset,assignPreset,saveTemplate,loadTemplate;
-    juce::TextEditor presetName,outputCc,oscAddress,minimum,maximum,effectivePreview,templateName;
+    juce::ComboBox device,presets,scope,target,takeover,columns,curve,templates,functionChoice;
+    juce::TextButton connect,learn,add,remove,updateSelected,newPreset,assignPreset,saveTemplate,loadTemplate,
+                     newFunction,saveRoute;
+    juce::TextEditor presetName,outputCc,oscAddress,minimum,maximum,effectivePreview,templateName,functionName;
     juce::ToggleButton invert{"Invert"};
     juce::Label state;
     juce::ListBox bindingList;
@@ -294,6 +343,77 @@ private:
     std::vector<int> columnIds;
     std::optional<ControlEvent> captured;
     int selected=-1;
+    void refreshFunctions() {
+        if (!owner) return;
+        const int old=functionChoice.getSelectedId();
+        functionChoice.clear(juce::dontSendNotification);
+        functionChoice.addItem("Legacy direct mapping",1);
+        for (const auto& f:owner->show.controls.functions)
+            functionChoice.addItem(f.name,f.id+1);
+        functionChoice.setSelectedId(old>0 && functionChoice.indexOfItemId(old)>=0 ?
+            old : owner->show.controls.functions.empty() ? 1 :
+                  owner->show.controls.functions.front().id+1,juce::dontSendNotification);
+    }
+    void showRoute(const ControlBinding& b) {
+        const int targetIndex=b.target==ControlTarget::masterGain ? 1 :
+            b.target==ControlTarget::columnGain ? 2 :
+            b.target==ControlTarget::go ? 3 :
+            b.target==ControlTarget::panic ? 4 :
+            b.target==ControlTarget::midiCc ? 5 :
+            b.target==ControlTarget::oscFloat ? 6 :
+            b.target==ControlTarget::columnPan ? 7 : 8;
+        target.setSelectedId(targetIndex,juce::dontSendNotification);
+        refreshColumns();
+        for (size_t i=0;i<columnIds.size();++i)
+            if (columnIds[i]==b.targetColumnId)
+                columns.setSelectedId((int)i+1,juce::dontSendNotification);
+        outputCc.setText(juce::String(b.outputNumber),false);
+        oscAddress.setText(b.oscAddress,false);
+        minimum.setText(juce::String(b.minimum,3),false);
+        maximum.setText(juce::String(b.maximum,3),false);
+        refreshDestinationFields();
+    }
+    std::optional<ControlBinding> readRoute() {
+        ControlBinding b;
+        switch (target.getSelectedId()) {
+            case 1: b.target=ControlTarget::masterGain;break;
+            case 2: b.target=ControlTarget::columnGain;break;
+            case 3: b.target=ControlTarget::go;break;
+            case 4: b.target=ControlTarget::panic;break;
+            case 5: b.target=ControlTarget::midiCc;break;
+            case 6: b.target=ControlTarget::oscFloat;break;
+            case 7: b.target=ControlTarget::columnPan;break;
+            case 8: b.target=ControlTarget::masterPan;break;
+            default:return {};
+        }
+        if (b.target==ControlTarget::columnGain ||
+            b.target==ControlTarget::columnPan ||
+            b.target==ControlTarget::midiCc || b.target==ControlTarget::oscFloat) {
+            const int index=columns.getSelectedId()-1;
+            if (index<0 || index>=(int)columnIds.size()) {
+                state.setText("Choose a valid output column.",juce::dontSendNotification);
+                return {};
+            }
+            b.targetColumnId=columnIds[(size_t)index];
+        }
+        if (b.target==ControlTarget::midiCc) {
+            b.outputNumber=outputCc.getText().getIntValue();
+            b.outputChannel=1; // Independent of the physical input channel.
+        }
+        if (b.target==ControlTarget::oscFloat)
+            b.oscAddress=oscAddress.getText().trim();
+        const auto low=minimum.getText().trim(), high=maximum.getText().trim();
+        const auto valid=[](const juce::String& v) {
+            return v.isNotEmpty() && v.containsAnyOf("0123456789") &&
+                v.retainCharacters("0123456789.-+")==v;
+        };
+        if (!valid(low) || !valid(high)) {
+            state.setText("Enter valid minimum and maximum.",juce::dontSendNotification);
+            return {};
+        }
+        b.minimum=low.getFloatValue();b.maximum=high.getFloatValue();
+        return b;
+    }
     void refreshDestinationFields() {
         const int t=target.getSelectedId();
         outputCc.setEnabled(t==5);
@@ -371,6 +491,9 @@ private:
                 juce::dontSendNotification); return;
         }
         ControlBinding b=update ? (*existing)[(size_t)selected] : ControlBinding{};
+        // A Control Set overrides only which physical input invokes the
+        // function. Target/destination remain owned by the project function.
+        b.functionId=std::max(0,functionChoice.getSelectedId()-1);
         if (captured) {
             b.deviceId=captured->deviceId;
             b.kind=captured->kind; b.channel=captured->channel; b.number=captured->number;
@@ -403,6 +526,17 @@ private:
             }
             b.targetColumnId=columnIds[(size_t)i];
             if (b.scope==ControlScope::column) b.scopeId=b.targetColumnId;
+        }
+        if (b.functionId>0) {
+            const auto it=std::find_if(owner->show.controls.functions.begin(),
+                owner->show.controls.functions.end(),
+                [&](const ControlFunction& f){return f.id==b.functionId;});
+            if (it==owner->show.controls.functions.end()) {
+                state.setText("Select an existing function.",juce::dontSendNotification);
+                return;
+            }
+            const auto input=b;
+            b=materializeFunctionBinding(input,*it);
         }
         if (b.kind==ControlKind::note || b.target==ControlTarget::go ||
             b.target==ControlTarget::panic) b.takeover=ControlTakeover::jump;
@@ -487,7 +621,13 @@ private:
         const auto& b=(*entries)[(size_t)row];
         captured.reset();
         scope.setSelectedId((int)b.scope+1,juce::dontSendNotification);
-        target.setSelectedId((int)b.target+1,juce::dontSendNotification);
+        if (b.functionId>0)
+            functionChoice.setSelectedId(b.functionId+1,juce::dontSendNotification);
+        // Combo target item order differs from ControlTarget enumeration.
+        const ControlBinding* route=&b;
+        for (const auto& f:owner->show.controls.functions)
+            if (f.id==b.functionId) {route=&f.destination;break;}
+        showRoute(*route);
         refreshColumns();
         refreshDestinationFields();
         for (size_t i=0;i<columnIds.size();++i)
