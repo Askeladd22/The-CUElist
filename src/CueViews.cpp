@@ -21,12 +21,8 @@ void smallButton(juce::Graphics& g, const juce::String& text, juce::Rectangle<in
         const auto cp=(juce::juce_wchar)(
             text=="^" ? 0x25B2 : text=="v" ? 0x25BC :
             text=="<" ? 0x25C0 : 0x25B6);
-        const auto& symbols=appTypefaces().notoSymbols2;
         g.setColour(ink);
-        if (symbols!=nullptr && symbols->getNominalGlyphForCodepoint(cp).has_value()) {
-            g.setFont(symbolsFont(12.0f));
-            g.drawText(juce::String::charToString(cp),box,juce::Justification::centred,false);
-        } else {
+        if (!drawNotoSymbol(g,cp,box,12.0f,ink)) {
             const auto c=box.toFloat().getCentre();
             juce::Path triangle;
             if (text=="^") triangle.addTriangle(c.x,c.y-4.2f,c.x-5.f,c.y+3.5f,c.x+5.f,c.y+3.5f);
@@ -34,6 +30,15 @@ void smallButton(juce::Graphics& g, const juce::String& text, juce::Rectangle<in
             if (text=="<") triangle.addTriangle(c.x-4.2f,c.y,c.x+3.5f,c.y-5.f,c.x+3.5f,c.y+5.f);
             if (text==">") triangle.addTriangle(c.x+4.2f,c.y,c.x-3.5f,c.y-5.f,c.x-3.5f,c.y+5.f);
             g.fillPath(triangle);
+        }
+    } else if (text=="...") {
+        // The operational menu uses an actual midline ellipsis, not three
+        // punctuation characters from the ordinary label font.
+        if (!drawNotoSymbol(g,(juce::juce_wchar)0x22EF,box,15.5f,ink)) {
+            const auto c=box.toFloat().getCentre();
+            g.setColour(ink);
+            for (int offset=-1;offset<=1;++offset)
+                g.fillEllipse(c.x+offset*4.0f-1.1f,c.y-1.1f,2.2f,2.2f);
         }
     } else if (text=="x") {
         // Deletion must remain legible regardless of Unicode coverage.
@@ -84,6 +89,10 @@ void playPauseIcon(juce::Graphics& g,juce::Rectangle<int> box,bool pause) {
     g.setColour(palette::raised); g.fillRoundedRectangle(box.toFloat(),5);
     g.setColour(palette::line); g.drawRoundedRectangle(box.toFloat().reduced(.5f),5,1);
     g.setColour(palette::teal);
+    if (drawNotoSymbol(g,(juce::juce_wchar)(pause ? 0x23F8 : 0x25B6),
+                       box,17.5f,palette::teal))
+        return;
+    // Keep the previous vector drawing as a reliable fallback.
     const float cx=(float)box.getCentreX(),cy=(float)box.getCentreY();
     if (pause) {
         g.fillRoundedRectangle(cx-5.5f,cy-5.f,3.5f,10.f,0.7f);
@@ -98,7 +107,12 @@ void transportButton(juce::Graphics& g,juce::Rectangle<int> box,bool stop,bool e
     g.fillRoundedRectangle(box.toFloat(),5);
     g.setColour((stop ? palette::red : palette::teal).withAlpha(enabled ? .75f : .30f));
     g.drawRoundedRectangle(box.toFloat().reduced(.5f),5,1);
-    g.setColour((stop ? palette::red : palette::teal).withAlpha(enabled ? 1.0f : .25f));
+    const auto ink=(stop ? palette::red : palette::teal)
+                  .withAlpha(enabled ? 1.0f : .25f);
+    g.setColour(ink);
+    if (drawNotoSymbol(g,(juce::juce_wchar)(stop ? 0x23F9 : 0x25B6),
+                       box,17.5f,ink))
+        return;
     const float x=(float)box.getCentreX(),y=(float)box.getCentreY();
     if (stop) g.fillRect(x-4,y-4,8.0f,8.0f);
     else { juce::Path triangle; triangle.addTriangle(x-3,y-5,x-3,y+5,x+5,y); g.fillPath(triangle); }

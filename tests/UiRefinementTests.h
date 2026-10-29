@@ -86,6 +86,38 @@ void uiRefinementTests() {
               "Noto fonts must be explicit rather than generic text fallback");
     });
 
+    test("UI symbol audit uses only embedded Noto glyphs with safe coverage checks",[] {
+        const auto& symbols=appTypefaces().notoSymbols2;
+        check(symbols!=nullptr,"Bundled Noto Sans Symbols 2 is unavailable");
+        const int icons[]={
+            0x25B2, // row up
+            0x25BC, // row down
+            0x25C0, // column left
+            0x25B6, // column right / Play
+            0x23F8, // Pause
+            0x23F9, // Stop
+            0x22EF, // More actions
+            0x2139, // Information
+            0x26A0, // Caution
+            0x1F50A, // Audible
+            0x1F507  // Muted
+        };
+        for (const int codepoint:icons) {
+            const bool included=symbols!=nullptr &&
+                symbols->getNominalGlyphForCodepoint(
+                    (juce::juce_wchar)codepoint).has_value();
+            juce::Image image(juce::Image::ARGB,36,36,true);
+            juce::Graphics graphics(image);
+            const bool drawn=drawNotoSymbol(graphics,
+                (juce::juce_wchar)codepoint,{0,0,36,36},22.0f,palette::teal);
+            check(drawn==included,
+                  "The symbol drawing helper used a fallback font or ignored glyph coverage");
+        }
+        // Keep primary UI labels in Exo 2 / Hind, even after adding symbols.
+        check(!font(12.0f).getPreferredFallbackFamilies().contains("Noto Sans Symbols 2"),
+              "Noto must be explicitly selected, not a global font fallback");
+    });
+
     test("Fader Range menu explicitly draws Noto Math instead of a fallback",[] {
         const auto leading=faderMinusInfinity();
         check(leading.length()==2 && leading[0]==(juce::juce_wchar)0x2212 &&
@@ -678,6 +710,43 @@ void uiRefinementTests() {
         for (int y=0;y<rail.getHeight();y+=7)
             check(rail.getPixelAt(1,y)==palette::teal,
                   "Row separators interrupt the pinned metrics accent rail");
+    });
+
+    test("32:9 live UI keeps cue, columns and BPM headers locked together",[] {
+        for (const auto size:std::initializer_list<juce::Point<int>>{
+                 {3840,1080},{5120,1440}}) {
+            MainComponent ui(false);
+            for (int i=0;i<22;++i) addRow(ui.show,"Ultrawide cue");
+            for (int i=0;i<3;++i) addColumn(ui.show,ColumnType::audio,{});
+            ui.setSize(size.x,size.y);
+            auto* names=cueViewFixtures::find<PinnedCueHeaders>(ui);
+            auto* columns=cueViewFixtures::find<PinnedColumnHeaders>(ui);
+            auto* metrics=cueViewFixtures::find<CueMetricsOverlay>(ui);
+            juce::Viewport* viewport=nullptr;
+            for (auto* child:ui.getChildren())
+                if (auto* candidate=dynamic_cast<juce::Viewport*>(child))
+                    viewport=candidate;
+            check(names && columns && metrics && viewport,
+                  "Ultrawide pinned heading/viewport components missing");
+            if (!(names && columns && metrics && viewport)) continue;
+            check(columns->getX()==names->getRight() &&
+                  columns->getRight()==viewport->getRight() &&
+                  metrics->getX()==viewport->getRight() &&
+                  columns->getHeight()==CueGrid::headerHeight &&
+                  metrics->getRight()<size.x &&
+                  viewport->getWidth()>2000,
+                  "Ultrawide UI leaves gaps or overlaps between fixed headings");
+            viewport->setViewPosition(0,146);
+            check(viewport->getViewPositionY()==146 &&
+                  columns->getY()==viewport->getY() &&
+                  columns->gridXAt(0)==CueGrid::nameWidth,
+                  "32:9 vertical scrolling detached column headers from cue cells");
+            const auto headerImage=columns->createComponentSnapshot(
+                {0,0,std::min(300,columns->getWidth()),CueGrid::headerHeight});
+            check(headerImage.isValid() &&
+                  headerImage.getHeight()==CueGrid::headerHeight,
+                  "Ultrawide clipped or failed to paint the pinned header");
+        }
     });
 
     test("Audio MIDI OSC headers remain fixed while cue rows scroll",[] {
