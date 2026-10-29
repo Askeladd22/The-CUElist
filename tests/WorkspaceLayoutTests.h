@@ -68,7 +68,7 @@ void workspaceLayoutTests() {
                 check(geometry.editorX==size.x-inspectorRail &&
                       geometry.viewport.getX()==182 &&
                       geometry.viewport.getWidth()>0 &&
-                      geometry.viewport.getHeight()>CueGrid::headerHeight &&
+                      geometry.viewport.getHeight()>input.rowHeaderHeight &&
                       geometry.metrics.getX()==geometry.viewport.getRight() &&
                       geometry.metrics.getRight()==geometry.editorX &&
                       geometry.cueHeaders.getX()==geometry.viewport.getX() &&
