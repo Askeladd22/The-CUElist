@@ -47,11 +47,16 @@ endfunction()
 cuelist_fetch_font("Exo2.ttf" "exo2" "Exo2%5Bwght%5D.ttf" 303940)
 cuelist_fetch_font("Hind-Regular.ttf" "hind" "Hind-Regular.ttf" 299532)
 cuelist_fetch_font("Hind-SemiBold.ttf" "hind" "Hind-SemiBold.ttf" 281940)
+# Pin the supplemental glyph families at the same audited Google Fonts revision.
+cuelist_fetch_font("NotoSansMath-Regular.ttf" "notosansmath" "NotoSansMath-Regular.ttf" 1015396)
+cuelist_fetch_font("NotoSansSymbols2-Regular.ttf" "notosanssymbols2" "NotoSansSymbols2-Regular.ttf" 1233128)
 juce_add_binary_data(CuelistAssets SOURCES
     assets/thecuelist_icon.png
     "${THE_CUELIST_FONT_CACHE}/Exo2.ttf"
     "${THE_CUELIST_FONT_CACHE}/Hind-Regular.ttf"
-    "${THE_CUELIST_FONT_CACHE}/Hind-SemiBold.ttf")
+    "${THE_CUELIST_FONT_CACHE}/Hind-SemiBold.ttf"
+    "${THE_CUELIST_FONT_CACHE}/NotoSansMath-Regular.ttf"
+    "${THE_CUELIST_FONT_CACHE}/NotoSansSymbols2-Regular.ttf")
 add_library(CuelistCore STATIC src/MidiSessionPolicy.cpp src/ShowModel.cpp src/ControlDispatchPolicy.cpp src/ControlLayerBuilder.cpp src/ShowEditOperations.cpp src/ProjectSafety.cpp src/ProjectMediaLoader.cpp src/AudioEngine.cpp src/MidiClip.cpp src/MidiOutputRouter.cpp src/OscClip.cpp src/OscOutputRouter.cpp src/ControlOutputRouter.cpp)
 target_include_directories(CuelistCore PUBLIC src vendor/JUCE/modules)
 target_compile_definitions(CuelistCore PUBLIC JUCE_GLOBAL_MODULE_SETTINGS_INCLUDED=1 JUCE_WEB_BROWSER=0 JUCE_USE_CURL=0 JUCE_MODAL_LOOPS_PERMITTED=0 JUCE_ASIO=0 JUCE_USE_MP3AUDIOFORMAT=1)
