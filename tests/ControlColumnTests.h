@@ -175,6 +175,8 @@ void controlColumnTests() {
         ControlBinding override=global;
         override.id=3;override.deviceId="hardware-B";override.number=25;
         override.target=ControlTarget::oscFloat;override.outputNumber=12;
+        override.outputChannel=4;override.oscAddress="/wrong-route";
+        override.minimum=0.25f;override.maximum=0.75f;
         ControlLayer local;local.columnId=100;local.cueId=202;
         local.priority=2;local.set.bindings.push_back(override);
         ControlMappingEngine mapping;
@@ -191,8 +193,11 @@ void controlColumnTests() {
         check(action && action->binding.functionId==1 &&
               action->binding.outputNumber==74 &&
               action->binding.outputChannel==9 &&
-              action->binding.target==ControlTarget::midiCc,
-              "Local fader changed the abstract function destination");
+              action->binding.target==ControlTarget::midiCc &&
+              action->binding.minimum==0.0f &&
+              action->binding.maximum==127.0f &&
+              action->binding.oscAddress==function.destination.oscAddress,
+              "Local fader changed the function destination, CC, OSC route or range");
         mapping.setActiveCue(203,0);
         check(mapping.matched(a)!=nullptr && mapping.matched(b)==nullptr,
               "Cue transition retained a stale Control Set override");
