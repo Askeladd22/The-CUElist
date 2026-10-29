@@ -1206,9 +1206,10 @@ void MainComponent::timerCallback() {
         controlMapping.setActiveCue(activeCueId,preset);
     }
     ControlEvent control; int processed=0;
+    const bool consumeMidiTick=quickLearnMode==QuickLearnMode::midi;
     while (processed++<256 && midiInput.poll(control)) {
         // A quick-Learn input is consumed, never dispatched to live GO/PANIC.
-        if (quickLearnMode==QuickLearnMode::midi) {
+        if (consumeMidiTick) {
             if (quickLearnFunctionId>0 && controlLearnArmed) {
                 controlLearnArmed=false;
                 completeQuickLearn(control);
@@ -1217,8 +1218,9 @@ void MainComponent::timerCallback() {
             dispatchControl(control);
     }
     int oscProcessed=0;
+    const bool consumeOscTick=quickLearnMode==QuickLearnMode::osc;
     while (oscProcessed++<256 && oscInput.poll(control)) {
-        if (quickLearnMode==QuickLearnMode::osc) {
+        if (consumeOscTick) {
             if (quickLearnFunctionId>0 && oscLearnArmed) {
                 oscLearnArmed=false;
                 completeQuickLearn(control);

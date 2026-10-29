@@ -512,6 +512,14 @@ void MainComponent::beginQuickLearn(bool osc) {
     entries.push_back({-2,"Master Pan","Internal master balance"});
     entries.push_back({-3,"GO","Transport: next cue"});
     entries.push_back({-4,"PANIC","Emergency stop"});
+    // Every audio column has two direct Learn targets. Stable column IDs
+    // are resolved at selection time; their position in this list is UI-only.
+    for (int index=0;index<(int)show.columns.size();++index) {
+        const auto& col=show.columns[(size_t)index];
+        if (col.type!=ColumnType::audio) continue;
+        entries.push_back({-100-index*2,col.name+" Gain","Audio column fader"});
+        entries.push_back({-101-index*2,col.name+" Pan","Audio column balance"});
+    }
     quickControlTargets.setEntries(std::move(entries));
     inspectorVisible=true;
     status=osc ? "OSC Learn: select a function, then send OSC." :
@@ -520,7 +528,30 @@ void MainComponent::beginQuickLearn(bool osc) {
 }
 void MainComponent::chooseQuickLearnTarget(int functionId) {
     if (quickLearnMode==QuickLearnMode::off) return;
-    if (functionId<0) {
+    if (functionId<=-100) {
+        const int encoded=-100-functionId;
+        const int index=encoded/2;
+        const bool pan=encoded%2!=0;
+        if (index<0 || index>=(int)show.columns.size() ||
+            show.columns[(size_t)index].type!=ColumnType::audio) return;
+        const int columnId=show.columns[(size_t)index].id;
+        const ControlTarget target=pan ? ControlTarget::columnPan :
+            ControlTarget::columnGain;
+        functionId=0;
+        for (const auto& fn:show.controls.functions)
+            if (fn.destination.target==target &&
+                fn.destination.targetColumnId==columnId) {
+                functionId=fn.id;break;
+            }
+        if (functionId==0) {
+            ControlBinding destination;
+            destination.target=target;destination.targetColumnId=columnId;
+            if (pan) destination.minimum=-1.0f;
+            const auto name=show.columns[(size_t)index].name+
+                (pan ? " Pan" : " Gain");
+            functionId=createAbstractControlFunction(name,destination);
+        }
+    } else if (functionId<0) {
         const ControlTarget target=functionId==-1 ? ControlTarget::masterGain :
             functionId==-2 ? ControlTarget::masterPan :
             functionId==-3 ? ControlTarget::go : ControlTarget::panic;
@@ -556,7 +587,8 @@ void MainComponent::chooseQuickLearnTarget(int functionId) {
     repaint();
 }
 void MainComponent::completeQuickLearn(const ControlEvent& event) {
-    if (quickLearnFunctionId<=0) return;
+    if (quickLearnFunctionId<=0 ||
+        (event.kind==ControlKind::note && event.isNoteOff)) return;
     const auto fn=std::find_if(show.controls.functions.begin(),
         show.controls.functions.end(),
         [this](const ControlFunction& f){return f.id==quickLearnFunctionId;});
@@ -585,6 +617,9 @@ void MainComponent::completeQuickLearn(const ControlEvent& event) {
         quickLearnFunctionId=0;controlLearnArmed=false;oscLearnArmed=false;
         repaint();return;
     }
+    // Preserve held-button state so repeating a learned note cannot fire
+    // GO/PANIC until the physical control is released.
+    physicalEdges.recordAndWasDown(event);
     finishQuickLearn();
     status="Learn saved to Default Map: "+name+" ← "+event.deviceId;
     repaint();
