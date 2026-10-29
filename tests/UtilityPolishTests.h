@@ -3,6 +3,57 @@
 #include "GainMeterFader.h"
 
 void utilityPolishTests() {
+    test("Noto mute icons switch between sound and silence",[] {
+        const auto& symbols=appTypefaces().notoSymbols2;
+        check(symbols!=nullptr &&
+              symbols->getNominalGlyphForCodepoint(
+                  UtilityIcon::speakerCodepoint(false)).has_value() &&
+              symbols->getNominalGlyphForCodepoint(
+                  UtilityIcon::speakerCodepoint(true)).has_value(),
+              "Embedded Noto Symbols 2 lacks speaker ON/OFF glyphs");
+        UtilityIcon mute(false);
+        mute.setSize(34,31);
+        mute.setToggleState(false,juce::dontSendNotification);
+        const auto audible=mute.createComponentSnapshot(mute.getLocalBounds());
+        mute.setToggleState(true,juce::dontSendNotification);
+        const auto silenced=mute.createComponentSnapshot(mute.getLocalBounds());
+        bool changed=false;
+        if (audible.isValid() && silenced.isValid()) {
+            for (int y=0;y<audible.getHeight() && !changed;y+=2)
+                for (int x=0;x<audible.getWidth();x+=2)
+                    if (audible.getPixelAt(x,y)!=silenced.getPixelAt(x,y)) {
+                        changed=true;break;
+                    }
+        }
+        check(changed,"Mute icon looks identical in audible and muted states");
+        check(mute.getToggleState(),"Mute icon lost toggle state");
+    });
+    test("Timeline Snap magnet has visibly different ON and OFF states",[] {
+        MainComponent ui(false);
+        ui.setSize(1440,900);
+        auto* snap=dynamic_cast<juce::TextButton*>(
+            controlsV3::named(ui,"timelineSnapToggle"));
+        check(snap!=nullptr && snap->getToggleState(),
+              "Timeline Snap toggle not found or enabled by default");
+        const auto on=snap->createComponentSnapshot(snap->getLocalBounds());
+        snap->onClick();
+        const auto off=snap->createComponentSnapshot(snap->getLocalBounds());
+        bool changed=false;
+        if (on.isValid() && off.isValid()) {
+            for (int y=0;y<on.getHeight() && !changed;y+=2)
+                for (int x=0;x<on.getWidth();x+=2)
+                    if (on.getPixelAt(x,y)!=off.getPixelAt(x,y)) {
+                        changed=true;break;
+                    }
+        }
+        check(!snap->getToggleState() &&
+              snap->getTooltip().contains("Snap OFF") && changed,
+              "Snap OFF icon/state is not visually distinguishable");
+        snap->onClick();
+        check(snap->getToggleState() &&
+              snap->getTooltip().contains("Snap ON"),
+              "Snap could not return to the enabled state");
+    });
     test("Collapsed audio utility keeps functional compact gain and mute",[] {
         MainComponent ui(false);
         ui.setSize(1500,900);

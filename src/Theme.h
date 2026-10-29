@@ -87,6 +87,23 @@ inline juce::Font symbolsFont(float size) {
         ? juce::Font(juce::FontOptions(face).withPointHeight(pt))
         : font(size);
 }
+// Draw a symbol only when it actually exists in the embedded Symbols 2 font.
+// Do not ask JUCE to substitute an OS font or an emoji. Callers must supply a
+// small vector fallback if this glyph is absent from the pinned font.
+inline bool drawNotoSymbol(juce::Graphics& g,juce::juce_wchar codepoint,
+                           juce::Rectangle<int> area,float size,juce::Colour ink) {
+    const auto& symbols=appTypefaces().notoSymbols2;
+    if (symbols==nullptr ||
+        !symbols->getNominalGlyphForCodepoint(codepoint).has_value())
+        return false;
+    g.saveState();
+    g.setColour(ink);
+    g.setFont(symbolsFont(size));
+    g.drawText(juce::String::charToString(codepoint),area,
+               juce::Justification::centred,false);
+    g.restoreState();
+    return true;
+}
 // The Fader Range menu mixes two scripts: draw only the mathematical
 // minus/infinity pair with Noto Sans Math; the rest remains Exo 2.
 inline juce::String faderMinusInfinity() {

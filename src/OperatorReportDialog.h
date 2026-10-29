@@ -42,12 +42,17 @@ public:
     }
     void paint(juce::Graphics& g) override {
         g.fillAll(palette::panel);
-        g.setColour(palette::teal.withAlpha(.15f));
-        g.fillEllipse(22.0f,20.0f,25.0f,25.0f);
-        g.setColour(palette::teal);
-        g.drawEllipse(22.5f,20.5f,24.0f,24.0f,1.0f);
-        label(g,"i",{23,20,23,24},15,palette::teal,true,
-              juce::Justification::centred);
+        // Prefer the font's dedicated information symbol. This is explicit
+        // Noto Sans Symbols 2, never a substituted text or emoji glyph.
+        if (!drawNotoSymbol(g,(juce::juce_wchar)0x2139,
+                            {23,20,24,25},20.0f,palette::teal)) {
+            g.setColour(palette::teal.withAlpha(.15f));
+            g.fillEllipse(22.0f,20.0f,25.0f,25.0f);
+            g.setColour(palette::teal);
+            g.drawEllipse(22.5f,20.5f,24.0f,24.0f,1.0f);
+            label(g,"i",{23,20,23,24},15,palette::teal,true,
+                  juce::Justification::centred);
+        }
         label(g,heading,{59,15,getWidth()-83,31},22,palette::text,true);
         label(g,subheading,{60,47,getWidth()-86,22},13.5f,palette::muted);
         g.setColour(palette::line);
@@ -128,13 +133,17 @@ public:
     }
     void paint(juce::Graphics& g) override {
         g.fillAll(palette::panel);
-        g.setColour(palette::amber.withAlpha(.12f));
-        g.fillEllipse(23.0f,22.0f,30.0f,30.0f);
-        g.setColour(palette::amber);
-        g.drawEllipse(23.5f,22.5f,29.0f,29.0f,1.2f);
-        // A 12px vector exclamation replaces the oversized QuestionIcon.
-        g.fillRoundedRectangle(37.0f,29.0f,2.6f,11.0f,1.2f);
-        g.fillEllipse(36.7f,42.5f,3.2f,3.2f);
+        // Small, dedicated caution symbol. Keep the existing geometric
+        // warning mark when this glyph is absent in the pinned font.
+        if (!drawNotoSymbol(g,(juce::juce_wchar)0x26A0,
+                            {25,21,27,30},24.0f,palette::amber)) {
+            g.setColour(palette::amber.withAlpha(.12f));
+            g.fillEllipse(23.0f,22.0f,30.0f,30.0f);
+            g.setColour(palette::amber);
+            g.drawEllipse(23.5f,22.5f,29.0f,29.0f,1.2f);
+            g.fillRoundedRectangle(37.0f,29.0f,2.6f,11.0f,1.2f);
+            g.fillEllipse(36.7f,42.5f,3.2f,3.2f);
+        }
         label(g,"Unsaved changes",{67,20,getWidth()-92,32},
               22,palette::text,true);
         label(g,"Your current show contains changes that have not been saved.",

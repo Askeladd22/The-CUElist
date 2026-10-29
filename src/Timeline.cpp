@@ -30,27 +30,40 @@ juce::Rectangle<int> zoomButton(int width,int index) {
 }
 }
 void Timeline::MagnetToggle::paintButton(juce::Graphics& g,bool hovered,bool pressed) {
-    const auto active=getToggleState();
+    const bool enabled=getToggleState();
     const auto bounds=getLocalBounds().toFloat().reduced(2.0f);
-    g.setColour(active ? palette::teal.withAlpha(.23f) : palette::raised);
+    g.setColour(enabled ? palette::teal.withAlpha(.19f) : palette::raised);
     g.fillRoundedRectangle(bounds,5.0f);
-    g.setColour(active ? palette::teal : hovered || pressed ? palette::text : palette::line);
-    g.drawRoundedRectangle(bounds,5.0f,active ? 1.6f : 1.0f);
+    g.setColour(enabled ? palette::teal :
+                hovered || pressed ? palette::text : palette::line);
+    g.drawRoundedRectangle(bounds,5.0f,enabled ? 1.5f : 1.0f);
 
-    // U-shaped magnet glyph, with contrasting poles and a visible on/off state.
-    const float x=bounds.getCentreX()-12, y=bounds.getCentreY()-12;
+    // The Unicode magnet U+1F9F2 is absent from our embedded Symbols 2
+    // revision. Render a precise magnet *icon* instead of a missing glyph
+    // or a platform-dependent colour emoji. Centre it in the 41x25 control.
+    const float cx=bounds.getCentreX(),cy=bounds.getCentreY();
+    const float x=cx-9.0f,y=cy-9.0f;
     juce::Path magnet;
-    magnet.startNewSubPath(x+5,y+4);
-    magnet.lineTo(x+5,y+16);
-    magnet.quadraticTo(x+12,y+26,x+19,y+16);
-    magnet.lineTo(x+19,y+4);
-    g.setColour(active ? palette::teal : palette::muted);
-    g.strokePath(magnet,juce::PathStrokeType(3.5f,juce::PathStrokeType::curved,juce::PathStrokeType::rounded));
-    g.setColour(palette::red);
-    g.fillRect(x+3,y+3,4.0f,5.0f);
-    g.setColour(palette::text);
-    g.fillRect(x+17,y+3,4.0f,5.0f);
+    magnet.startNewSubPath(x+3.0f,y+2.5f);
+    magnet.lineTo(x+3.0f,y+11.3f);
+    magnet.cubicTo(x+3.0f,y+20.7f,x+15.0f,y+20.7f,x+15.0f,y+11.3f);
+    magnet.lineTo(x+15.0f,y+2.5f);
+    g.setColour(enabled ? palette::teal : palette::muted);
+    g.strokePath(magnet,juce::PathStrokeType(
+        2.9f,juce::PathStrokeType::curved,juce::PathStrokeType::rounded));
+    g.setColour(enabled ? palette::red : palette::muted);
+    g.fillRoundedRectangle(x+1.6f,y+1.1f,3.0f,5.0f,1.0f);
+    g.setColour(enabled ? palette::text : palette::muted);
+    g.fillRoundedRectangle(x+13.4f,y+1.1f,3.0f,5.0f,1.0f);
+    if (!enabled) {
+        // A clear slash differentiates OFF from a merely dimmed ON icon.
+        g.setColour(palette::panel);
+        g.drawLine(x+1.5f,y+1.5f,x+17.5f,y+18.0f,4.0f);
+        g.setColour(palette::red);
+        g.drawLine(x+1.5f,y+1.5f,x+17.5f,y+18.0f,1.8f);
+    }
 }
+
 Timeline::Timeline(MainComponent& p) : owner(p) {
     addAndMakeVisible(horizontalScroll);
     horizontalScroll.setAutoHide(false);
