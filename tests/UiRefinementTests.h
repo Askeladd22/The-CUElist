@@ -482,6 +482,75 @@ void uiRefinementTests() {
               "Expanded column positions are inconsistent");
     });
 
+    test("Scrolled cues remain below pinned headings and header targets are protected",[] {
+        MainComponent ui(false);
+        for (int i=0;i<11;++i) addRow(ui.show,"Extra cue");
+        ui.setSize(1180,820);
+        auto* metrics=cueViewFixtures::find<CueMetricsOverlay>(ui);
+        auto* headers=cueViewFixtures::find<PinnedCueHeaders>(ui);
+        juce::Viewport* view=nullptr;
+        for (auto* child:ui.getChildren())
+            if (auto* candidate=dynamic_cast<juce::Viewport*>(child)) {
+                view=candidate;break;
+            }
+        check(metrics && headers && view,"Pinned heading fixture unavailable");
+        const auto heading=juce::Rectangle<int>(0,0,metrics->getWidth(),CueGrid::headerHeight);
+        const auto cueHeading=juce::Rectangle<int>(0,0,headers->getWidth(),CueGrid::headerHeight);
+        const auto metricBefore=metrics->createComponentSnapshot(heading);
+        const auto cueBefore=headers->createComponentSnapshot(cueHeading);
+        view->setViewPosition(0,115);
+        check(view->getViewPositionY()==115,"Test did not scroll the cue grid");
+        const auto metricAfter=metrics->createComponentSnapshot(heading);
+        const auto cueAfter=headers->createComponentSnapshot(cueHeading);
+        const auto unchanged=[](const juce::Image& before,const juce::Image& after) {
+            if (!before.isValid() || !after.isValid() ||
+                before.getWidth()!=after.getWidth() || before.getHeight()!=after.getHeight())
+                return false;
+            for (int y=0;y<before.getHeight();y+=3)
+                for (int x=0;x<before.getWidth();x+=3)
+                    if (before.getPixelAt(x,y)!=after.getPixelAt(x,y))
+                        return false;
+            return true;
+        };
+        check(unchanged(metricBefore,metricAfter) &&
+              unchanged(cueBefore,cueAfter),
+              "Scrolled cue text or toggles leaked through a fixed heading");
+        const auto oldSelection=ui.selectedRow;
+        juce::Array<bool> stopBefore;
+        for (const auto& row:ui.show.rows) stopBefore.add(row.stopOnNext);
+        cueViewFixtures::click(*metrics,118.0f,45.0f);
+        cueViewFixtures::click(*headers,120.0f,45.0f);
+        check(ui.selectedRow==oldSelection,
+              "A scrolled cue was selected through the pinned header");
+        bool stopUnchanged=true;
+        for (int i=0;i<(int)ui.show.rows.size();++i)
+            stopUnchanged &= (ui.show.rows[(size_t)i].stopOnNext==stopBefore[i]);
+        check(stopUnchanged,"Auto Stop was toggled through the fixed BPM header");
+        ui.select(0,0);
+        check(view->getViewPositionY()==0,
+              "Selecting the first cue leaves it hidden behind the pinned heading");
+    });
+
+    test("Cue transport buttons have independent visible and clickable bounds",[] {
+        const auto play=CueGrid::rowPlayBounds(0);
+        const auto stop=CueGrid::rowStopBounds(0);
+        const auto menu=CueGrid::rowMenuBounds(0);
+        check(play.getWidth()>=28 && stop.getWidth()>=28 && menu.getWidth()>=28 &&
+              play.getHeight()>=24 && stop.getHeight()>=24 && menu.getHeight()>=24,
+              "Cue transport buttons are too small");
+        check(play.getRight()+8<=stop.getX() &&
+              stop.getRight()+8<=menu.getX() &&
+              menu.getRight()<=CueGrid::nameWidth-7 &&
+              107+CueGrid::nameWidth-224<play.getX(),
+              "Cue Play, Stop, menu or title overlap");
+        MainComponent ui(false);
+        auto* collapse=dynamic_cast<juce::TextButton*>(
+            controlsV3::named(ui,"toggleAllColumns"));
+        check(collapse && collapse->getTooltip().isEmpty() &&
+              collapse->getBottom()<=74+CueGrid::headerHeight,
+              "Expand all still creates a tooltip over the first cue");
+    });
+
     test("Cue list fills compact outer gutters while pinned BPM and Gain editor stay usable",[] {
         MainComponent ui(false);
         ui.setSize(1647,895);

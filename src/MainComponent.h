@@ -87,7 +87,12 @@ public:
     static juce::Colour cueColour(int id);
     bool isInterestedInFileDrag(const juce::StringArray&) override;
     void filesDropped(const juce::StringArray&,int,int) override;
-    static constexpr int rowHeight=62, headerHeight=72, nameWidth=290, columnWidth=152, compressedWidth=48;
+    // Wider title/transport lane gives operators distinct Play, Stop and
+    // actions targets without increasing cue row height.
+    static constexpr int rowHeight=62, headerHeight=72, nameWidth=318, columnWidth=152, compressedWidth=48;
+    static juce::Rectangle<int> rowPlayBounds(int y) { return {nameWidth-114,y+11,29,26}; }
+    static juce::Rectangle<int> rowStopBounds(int y) { return {nameWidth-75,y+11,29,26}; }
+    static juce::Rectangle<int> rowMenuBounds(int y) { return {nameWidth-36,y+11,29,26}; }
     static constexpr int rowContentInset=4; // visual padding, used by both paint and hit-testing
 private:
     MainComponent& owner;

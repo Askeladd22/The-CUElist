@@ -121,7 +121,8 @@ MainComponent::MainComponent(bool startAudio) {
         repaint();
     };
     collapseAllButton.setName("toggleAllColumns");
-    collapseAllButton.setTooltip("Collapse or expand all columns. Audio/MIDI/OSC playback is unaffected.");
+    // The button already says "Collapse all" or "Expand all". A hover tooltip
+    // would obscure the first cue's transport controls during a live show.
     collapseAllButton.onClick=[this] {
         const bool allCollapsed=std::all_of(show.columns.begin(),show.columns.end(),
             [](const Column& col){return col.collapsed;});
@@ -734,7 +735,12 @@ bool MainComponent::select(int row,int column) {
     nextCue=row; selectedRow=row; selectedColumn=column; syncClipEditor(); syncOscEditor(); refreshInspector();
     const int top=CueGrid::headerHeight+row*CueGrid::rowHeight, bottom=top+CueGrid::rowHeight;
     int viewY=viewport.getViewPositionY();
-    if (top<viewY) viewY=top; else if (bottom>viewY+viewport.getViewHeight()) viewY=bottom-viewport.getViewHeight();
+    // The top 72px are occupied by a pinned heading, not usable row space.
+    // Otherwise selecting the first cue while scrolled can hide it under BPM.
+    if (top<viewY+CueGrid::headerHeight)
+        viewY=std::max(0,top-CueGrid::headerHeight);
+    else if (bottom>viewY+viewport.getViewHeight())
+        viewY=bottom-viewport.getViewHeight();
     viewport.setViewPosition(viewport.getViewPositionX(),std::max(0,viewY));
     repaint(); grid.repaint(); timeline.repaint(); return true;
 }
