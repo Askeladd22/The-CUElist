@@ -1237,6 +1237,11 @@ void MainComponent::timerCallback() {
                 !(control.kind==ControlKind::note && control.isNoteOff)) {
                 controlLearnArmed=false;
                 completeQuickLearn(control);
+            } else {
+                // Learn suppresses live actions, but must still track note
+                // releases. Otherwise a button mapped during persistent
+                // Learn can remain logically held after Cancel Learn.
+                physicalEdges.recordAndWasDown(control);
             }
         } else if (!consumeMidiLearnEvent(controlLearnArmed,learnedInput,control))
             dispatchControl(control);
