@@ -311,7 +311,8 @@ public:
         }
         if (editSet) {
             for (juce::Component* widget : std::initializer_list<juce::Component*>{
-                    &target,&outputCc,&oscAddress,&columns,&minimum,&maximum})
+                    &target,&outputChannel,&outputCc,&oscAddress,&columns,
+                    &minimum,&maximum,&functionName})
                 widget->setEnabled(false);
         }
         refreshDestinationFields();
@@ -525,9 +526,9 @@ private:
         const int t=target.getSelectedId();
         outputChannel.setEnabled(t==5 && !editSet);
         outputCc.setEnabled(t==5 && !editSet);
-        oscAddress.setEnabled(t==6);
-        columns.setEnabled(editSet || scope.getSelectedId()==2 ||
-                           t==2 || t==5 || t==6 || t==7);
+        oscAddress.setEnabled(!editSet && t==6);
+        columns.setEnabled(!editSet &&
+            (scope.getSelectedId()==2 || t==2 || t==5 || t==6 || t==7));
     }
     void refreshEmptyState() {
         emptyBindings.setVisible(getNumRows()==0);
