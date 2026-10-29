@@ -30,7 +30,7 @@ MainComponent::MainComponent(bool startAudio) {
     setLookAndFeel(&theme); setWantsKeyboardFocus(true); setSize(1440,900);
     for (juce::Component* c : std::initializer_list<juce::Component*>{&openButton,&saveButton,&newButton,&addRowButton,&addColumnButton,
          &goButton,&panicButton,&deviceButton,&controlButton,&collapseAllButton,&inspectorSideTab,
-         &cuelistOverflowButton,&addCuelistButton,&undoButton,&redoButton,&globalMidiLearn,&globalOscLearn,&quickControlTargets,&cancelQuickLearn,&helpButton,&dockResize,&timelineResize,&importButton,&midiEditButton,&oscEditButton,&playCellButton,&stopCellButton,&clearButton,&tempoButton,&applyButton,
+         &cuelistOverflowButton,&addCuelistButton,&undoButton,&redoButton,&globalMidiLearn,&globalOscLearn,&quickControlTargets,&cancelQuickLearn,&goLearnHotspot,&panicLearnHotspot,&helpButton,&dockResize,&timelineResize,&importButton,&midiEditButton,&oscEditButton,&playCellButton,&stopCellButton,&clearButton,&tempoButton,&applyButton,
          &cellTab,&rowTab,&rowGain,&rowBehaviour,&rowMute,&rowLoop,&rowName,&cellName,&bpm,&cueNotes,&behaviour,&follow,&loop,&cellAutoStop,&gainDb,&viewport,&timeline,&utilities,
          &clipCollapseButton,&clipCloseButton,&cueHeaders,&columnHeaders,&cueMetrics,&preflightButton,&diagnosticsButton,&preferencesButton,&projectNameLabel}) addAndMakeVisible(c);
     for (juce::TextButton* b : std::initializer_list<juce::TextButton*>{&openButton,&saveButton,&newButton,&addRowButton,&addColumnButton,&goButton,&panicButton,&deviceButton,&controlButton,&collapseAllButton,&inspectorSideTab,
@@ -282,6 +282,16 @@ MainComponent::MainComponent(bool startAudio) {
     quickControlTargets.onPick=[this](int functionId) {chooseQuickLearnTarget(functionId);};
     cancelQuickLearn.onClick=[this] {finishQuickLearn();};
     cancelQuickLearn.setName("cancelQuickLearn");
+    goLearnHotspot.onPick=[this] {chooseQuickLearnGuiTarget(ControlTarget::go);};
+    panicLearnHotspot.onPick=[this] {chooseQuickLearnGuiTarget(ControlTarget::panic);};
+    masterGainLearnHotspot.onPick=[this] {chooseQuickLearnGuiTarget(ControlTarget::masterGain);};
+    masterPanLearnHotspot.onPick=[this] {chooseQuickLearnGuiTarget(ControlTarget::masterPan);};
+    utilities.addAndMakeVisible(masterGainLearnHotspot);
+    utilities.addAndMakeVisible(masterPanLearnHotspot);
+    masterGainLearnHotspot.setVisible(false);
+    masterPanLearnHotspot.setVisible(false);
+    goLearnHotspot.setVisible(false);
+    panicLearnHotspot.setVisible(false);
     globalMidiLearn.setName("globalMidiLearn");
     globalOscLearn.setName("globalOscLearn");
     globalMidiLearn.setTooltip("Inline MIDI Learn: choose a parameter, move a control, done.");
@@ -517,8 +527,12 @@ void MainComponent::paint(juce::Graphics& g) {
         label(g,quickLearnFunctionId>0 ? "Move or press the hardware control" :
               "Select a parameter or a named function",
               {x+5,155,geometry.inspectorInnerWidth-10,38},12,palette::text);
+        if (quickLearnFeedback.isNotEmpty())
+            label(g,quickLearnFeedback,
+                  {x+5,184,geometry.inspectorInnerWidth-10,20},
+                  10,palette::teal,true);
         label(g,"Available parameters / functions",
-              {x+4,202,geometry.inspectorInnerWidth-8,24},11,palette::teal,true);
+              {x+4,205,geometry.inspectorInnerWidth-8,24},11,palette::teal,true);
     } else {
     const int inspectorInner=geometry.inspectorInnerWidth;
     auto panel=geometry.inspectorPanel;
@@ -757,6 +771,11 @@ void MainComponent::resized() {
     }
     goButton.setBounds(14,h-282,152,48);
     panicButton.setBounds(14,h-228,152,48);
+    const bool learning=quickLearnMode!=QuickLearnMode::off;
+    goLearnHotspot.setBounds(goButton.getBounds());
+    panicLearnHotspot.setBounds(panicButton.getBounds());
+    goLearnHotspot.setLearnActive(learning);
+    panicLearnHotspot.setLearnActive(learning);
     grid.setSize(geometry.gridSize.x,geometry.gridSize.y);
     // With the scrollbar on the left, JUCE also moves the content origin.
     // Shift our separately pinned header by the identical visible inset so
@@ -779,6 +798,10 @@ void MainComponent::resized() {
     cueMetrics.toFront(false);
     collapseAllButton.toFront(false);
     inspectorSideTab.toFront(false);
+    if (learning) {
+        goLearnHotspot.toFront(false);
+        panicLearnHotspot.toFront(false);
+    }
     const bool learnVisible=inspectorVisible && quickLearnMode!=QuickLearnMode::off;
     quickControlTargets.setVisible(learnVisible);
     cancelQuickLearn.setVisible(learnVisible);
