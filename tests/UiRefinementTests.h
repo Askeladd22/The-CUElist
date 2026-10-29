@@ -86,6 +86,38 @@ void uiRefinementTests() {
               "Noto fonts must be explicit rather than generic text fallback");
     });
 
+    test("UI symbol audit uses only embedded Noto glyphs with safe coverage checks",[] {
+        const auto& symbols=appTypefaces().notoSymbols2;
+        check(symbols!=nullptr,"Bundled Noto Sans Symbols 2 is unavailable");
+        const int icons[]={
+            0x25B2, // row up
+            0x25BC, // row down
+            0x25C0, // column left
+            0x25B6, // column right / Play
+            0x23F8, // Pause
+            0x23F9, // Stop
+            0x22EF, // More actions
+            0x2139, // Information
+            0x26A0, // Caution
+            0x1F50A, // Audible
+            0x1F507  // Muted
+        };
+        for (const int codepoint:icons) {
+            const bool included=symbols!=nullptr &&
+                symbols->getNominalGlyphForCodepoint(
+                    (juce::juce_wchar)codepoint).has_value();
+            juce::Image image(juce::Image::ARGB,36,36,true);
+            juce::Graphics graphics(image);
+            const bool drawn=drawNotoSymbol(graphics,
+                (juce::juce_wchar)codepoint,{0,0,36,36},22.0f,palette::teal);
+            check(drawn==included,
+                  "The symbol drawing helper used a fallback font or ignored glyph coverage");
+        }
+        // Keep primary UI labels in Exo 2 / Hind, even after adding symbols.
+        check(!font(12.0f).getPreferredFallbackFamilies().contains("Noto Sans Symbols 2"),
+              "Noto must be explicitly selected, not a global font fallback");
+    });
+
     test("Fader Range menu explicitly draws Noto Math instead of a fallback",[] {
         const auto leading=faderMinusInfinity();
         check(leading.length()==2 && leading[0]==(juce::juce_wchar)0x2212 &&
