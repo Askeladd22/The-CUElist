@@ -26,6 +26,38 @@ inline juce::Colour type(int i) {
            juce::Colour(0xff82baf4);
 }
 }
+// Small icon buttons share one restrained surface, but retain their own
+// glyphs, colours, geometry and event handling. Ordinary text buttons are
+// intentionally not forced into this visual treatment.
+struct IconButtonState {
+    bool enabled=true;
+    bool hovered=false;
+    bool pressed=false;
+    bool active=false;
+    bool keyboardFocus=false;
+};
+inline juce::Colour iconButtonInk(juce::Colour accent,const IconButtonState& state) {
+    if (!state.enabled) return palette::muted.withAlpha(.44f);
+    return accent.withAlpha(state.active || state.hovered || state.pressed ? 1.0f : .90f);
+}
+inline void drawIconButtonSurface(juce::Graphics& g,juce::Rectangle<float> bounds,
+                                  juce::Colour accent,const IconButtonState& state,
+                                  float radius=4.5f) {
+    if (bounds.isEmpty()) return;
+    const auto rect=bounds.reduced(.65f);
+    const auto fill=state.active ? accent.withAlpha(state.pressed ? .18f : .12f) :
+                    state.pressed ? palette::raised.withAlpha(.82f) :
+                    palette::raised.withAlpha(state.hovered ? .68f : .47f);
+    g.setColour(state.enabled ? fill : fill.withMultipliedAlpha(.40f));
+    g.fillRoundedRectangle(rect,radius);
+    const auto stroke=state.keyboardFocus ? palette::teal :
+        state.active ? accent.withAlpha(.58f) :
+        state.hovered ? palette::line.withAlpha(.48f) :
+                        palette::line.withAlpha(.27f);
+    g.setColour(state.enabled ? stroke : stroke.withMultipliedAlpha(.45f));
+    g.drawRoundedRectangle(rect,radius,state.keyboardFocus ? 1.65f :
+                                         state.active ? .95f : .8f);
+}
 // Embedded OFL typefaces are registered once and kept alive for the app's
 // lifetime. No user-installed fonts, startup network or Windows font state.
 struct AppTypefaces {
@@ -166,6 +198,16 @@ public:
     juce::Font getAlertWindowFont() override { return font(14.0f); }
     juce::Font getSliderPopupFont(juce::Slider&) override { return font(14.0f); }
     void drawButtonBackground(juce::Graphics& g,juce::Button& b,const juce::Colour& colour,bool over,bool down) override {
+        const auto caption=b.getButtonText();
+        // Only icon-only JUCE TextButtons. Keep full-text controls, the
+        // emergency PANIC action and the GO button visually unchanged.
+        if (caption=="+" || caption=="x" || caption=="..." || caption=="⋯") {
+            const IconButtonState state{b.isEnabled(),over,down,
+                b.getToggleState(),b.hasKeyboardFocus(false)};
+            drawIconButtonSurface(g,b.getLocalBounds().toFloat(),
+                                  caption=="x" ? palette::red : palette::teal,state);
+            return;
+        }
         const auto r=b.getLocalBounds().toFloat().reduced(0.8f);
         const auto fill=colour.withMultipliedBrightness(down ? 0.87f : over ? 1.14f : 1.0f);
         g.setColour(b.isEnabled() ? fill : fill.withAlpha(0.46f));
