@@ -9,6 +9,7 @@
 #include "MidiInputManager.h"
 #include "OscControlInput.h"
 #include "ControlOutputRouter.h"
+#include "QuickControlTargets.h"
 #include "ControlDispatchPolicy.h"
 #include <set>
 #include "Theme.h"
@@ -276,6 +277,11 @@ public:
     int createMappingPreset(const juce::String&);
     bool assignMappingPreset(int rowId,int presetId);
     void armControlLearn() { oscLearnArmed=false;controlLearnArmed=true; }
+    void beginQuickLearn(bool osc);
+    void chooseQuickLearnTarget(int functionId);
+    void completeQuickLearn(const ControlEvent& event);
+    void finishQuickLearn();
+    void ensureStarterControlFunctions();
     bool startOscControlInput(int port);
     void armOscControlLearn() { controlLearnArmed=false;oscLearnArmed=true; }
     std::optional<ControlEvent> consumeLearnedInput() { auto result=learnedInput; learnedInput.reset(); return result; }
@@ -352,6 +358,8 @@ private:
     juce::TextButton cuelistOverflowButton{"..."},addCuelistButton{"+"};
     juce::TextButton undoButton{"Undo"},redoButton{"Redo"};
     juce::TextButton globalMidiLearn{"M Learn"},globalOscLearn{"O Learn"};
+    QuickControlTargets quickControlTargets;
+    juce::TextButton cancelQuickLearn{"Cancel Learn"};
     void refreshCuelistTabs();
     void showCuelistOverflowMenu();
     std::unique_ptr<GuideWindow> userGuideWindow;
