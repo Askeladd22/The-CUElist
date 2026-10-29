@@ -1039,22 +1039,23 @@ void uiRefinementTests() {
         check((int)ui.show.rows.size()==old+1 && ui.selectedRow==old,
               "Contextual add-cue button did not create a new cue");
     });
-    test("Control lock icon follows actual priority and lock model",[] {
-        MainComponent ui(false);addColumn(ui.show,ColumnType::control,"Control");
+    test("Control Column exposes cue overrides without a legacy lock",[] {
+        MainComponent ui(false);
+        addColumn(ui.show,ColumnType::control,"Control");
         auto* utility=cueViewFixtures::find<ColumnUtilities>(ui);
         utility->refresh();
         auto* strip=utility->getChildComponent(0)->getChildComponent(1);
-        auto* lock=dynamic_cast<juce::Button*>(controlsV3::named(*strip,"controlColumnLock"));
-        check(lock && !lock->isVisible() && !lock->getToggleState(),
-              "Legacy lock is still exposed for new Control Sets");
-        check(ui.setControlColumnLocked(1,true,0),"Could not lock Control Column");
-        utility->refresh();
-        check(lock->getToggleState() && ui.show.columns[1].controlPriority==1,
-              "Closed-lock icon and model disagreed");
-        check(ui.setControlColumnLocked(1,false,0),"Could not unlock Control Column");
-        utility->refresh();
-        check(!lock->getToggleState() && !lock->isVisible(),
-              "Legacy lock remained visible after explicit unlock");
+        auto* lock=controlsV3::named(*strip,"controlColumnLock");
+        auto* priority=dynamic_cast<juce::TextButton*>(
+            controlsV3::named(*strip,"controlColumnPriority"));
+        auto* editor=dynamic_cast<juce::TextButton*>(
+            controlsV3::named(*strip,"controlColumnEditSet"));
+        check(lock==nullptr && priority!=nullptr && editor!=nullptr,
+              "Retired per-column Lock is still mounted in the UI");
+        check(!ui.show.columns[1].controlLocked &&
+              ui.show.columns[1].controlPriority==2 &&
+              editor->getButtonText()=="Edit Q set",
+              "Cue-local Control Set UI is not the new default");
     });
     test("MIDI RX activity counts accepted physical input callbacks, not connections",[] {
         MidiInputManager input;
