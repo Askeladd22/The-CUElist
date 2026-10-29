@@ -858,6 +858,7 @@ private:
     }
 };
 void MainComponent::openControlPanel(bool editSet) {
+    if (quickLearnMode!=QuickLearnMode::off) finishQuickLearn();
     if (!editSet) ensureStarterControlFunctions();
     if (controlDialog) {
         auto* previous=controlDialog.getComponent();

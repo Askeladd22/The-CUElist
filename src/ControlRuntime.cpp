@@ -9,6 +9,9 @@ namespace cuelist {
 // This module does not run in the audio callback.
 
 void MainComponent::resetActiveMapping() {
+    quickLearnMode=QuickLearnMode::off;quickLearnFunctionId=0;
+    controlLearnArmed=false;oscLearnArmed=false;
+    quickControlTargets.setVisible(false);cancelQuickLearn.setVisible(false);
     activeCueId=0;
     controlMapping.setActiveCue(0,0);
 }
@@ -480,7 +483,14 @@ void MainComponent::finishQuickLearn() {
 }
 void MainComponent::beginQuickLearn(bool osc) {
     const auto mode=osc ? QuickLearnMode::osc : QuickLearnMode::midi;
-    if (quickLearnMode==mode) {finishQuickLearn();return;}
+    if (quickLearnMode==mode) {
+        finishQuickLearn();status="Quick Learn cancelled.";repaint();return;
+    }
+    if (controlDialog) {
+        auto* previous=controlDialog.getComponent();
+        controlDialog=nullptr;
+        delete previous;
+    }
     controlLearnArmed=false;oscLearnArmed=false;learnedInput.reset();
     if (osc && oscInput.port()==0) {
         // Normal Learn never requires navigating an advanced configuration
