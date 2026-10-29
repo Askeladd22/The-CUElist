@@ -86,11 +86,15 @@ public:
         };
         effectivePreview.setColour(juce::TextEditor::outlineColourId,palette::line);
         remove.setButtonText("Remove selected");
+        remove.setName("mappingRemoveSelected");
         newPreset.setButtonText("New preset");
         assignPreset.setButtonText("Assign to cue");
         presetName.setTextToShowWhenEmpty("New preset name",palette::muted);
         state.setName("mappingStatus");
         state.setJustificationType(juce::Justification::centredLeft);
+        scope.setName("mappingScope");
+        columns.setName("mappingDestinationColumn");
+        target.setName("mappingTarget");
         scope.addItemList({"Global","Column","Preset","Single cue"},1);
         scope.setSelectedId(1);
         scope.onChange=[this] { refreshDestinationFields(); };
