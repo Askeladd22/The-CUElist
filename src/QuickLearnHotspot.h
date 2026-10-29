@@ -6,7 +6,7 @@ namespace cuelist {
 // Only real mapping destinations use this temporary hit target.
 // It sits above the normal control while Learn is active, preventing
 // playback or changing a gain/pan value when the operator selects it.
-class QuickLearnHotspot final : public juce::Component {
+class QuickLearnHotspot final : public juce::Component, public juce::SettableTooltipClient {
 public:
     explicit QuickLearnHotspot(juce::String label):title(std::move(label)) {
         setName("quickLearn"+title.removeCharacters(" "));
