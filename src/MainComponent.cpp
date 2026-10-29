@@ -665,9 +665,9 @@ void MainComponent::resized() {
     refreshCuelistTabs();
     // Undo/Redo live in the unused upper-right band before the clock,
     // separate from the 43px-high Cuelist tab row.
-    helpButton.setBounds(getWidth()-831,10,61,25);
-    undoButton.setBounds(getWidth()-764,10,51,25);
-    redoButton.setBounds(getWidth()-709,10,51,25);
+    helpButton.setBounds(getWidth()-966,10,61,25);
+    undoButton.setBounds(getWidth()-899,10,51,25);
+    redoButton.setBounds(getWidth()-844,10,51,25);
     // Collapse-all follows the pinned header after JUCE has computed the
     // actual left scrollbar inset (see placement below).
     const bool allCollapsed=std::all_of(show.columns.begin(),show.columns.end(),
