@@ -600,6 +600,11 @@ private:
         // A Control Set overrides only which physical input invokes the
         // function. Target/destination remain owned by the project function.
         b.functionId=std::max(0,functionChoice.getSelectedId()-1);
+        if (!update && b.functionId==0 && !owner->show.controls.functions.empty()) {
+            state.setText("Choose a named function for new mappings.",
+                          juce::dontSendNotification);
+            return;
+        }
         if (captured) {
             b.deviceId=captured->deviceId;
             b.kind=captured->kind; b.channel=captured->channel; b.number=captured->number;
