@@ -4,6 +4,80 @@
 #include "ControlPresetArchive.h"
 
 void controlColumnTests() {
+    test("Legacy Control Column lock migrates without implicitly activating dormant Q sets",[] {
+        Show original=makeShow();
+        addColumn(original,ColumnType::control,"Legacy control");
+        addColumn(original,ColumnType::midi,"External MIDI");
+        addRow(original,"Next Q");
+        const int controlIndex=1;
+        auto& col=original.columns[(size_t)controlIndex];
+        col.controlLocked=true;
+        col.controlPriority=1;
+        col.controlDefaultSourceRowId=original.rows.front().id;
+        ControlBinding old;
+        old.id=original.controls.nextId++;
+        old.deviceId="fader-A";old.kind=ControlKind::cc;
+        old.channel=1;old.number=20;
+        old.target=ControlTarget::midiCc;
+        old.targetColumnId=original.columns[2].id;
+        old.outputNumber=74;old.outputChannel=9;
+        old.minimum=0;old.maximum=127;
+        old.takeover=ControlTakeover::jump;
+        col.controlDefaultSet.bindings.push_back(old);
+        ControlBinding dormant=old;
+        dormant.id=original.controls.nextId++;
+        dormant.deviceId="fader-B";dormant.number=25;
+        original.rows.front().cells[controlIndex].controlSet=
+            ControlSet{{dormant}};
+        check(validateShow(original).wasOk(),
+              "Legacy locked show fixture is invalid");
+        Show migrated=original;
+        bool changed=false;
+        check(migrateLegacyControlColumns(migrated,changed).wasOk() && changed,
+              "Legacy migration failed");
+        check(!migrated.columns[controlIndex].controlLocked &&
+              migrated.columns[controlIndex].controlPriority==2 &&
+              migrated.columns[controlIndex].controlDefaultSet.bindings.empty(),
+              "Per-column lock was not retired");
+        check(migrated.controls.functions.size()==1 &&
+              migrated.controls.bindings.size()==1 &&
+              migrated.controls.templates.size()==1 &&
+              !migrated.rows.front().cells[controlIndex].controlSet,
+              "Legacy global input or dormant Q set was lost/activated");
+        const auto& function=migrated.controls.functions.front();
+        check(function.destination.target==ControlTarget::midiCc &&
+              function.destination.outputNumber==74 &&
+              function.destination.outputChannel==9,
+              "Migration altered the destination's MIDI CC 74");
+        ControlMappingEngine mapping;
+        mapping.setSettings(migrated.controls);
+        mapping.setLayers(buildControlLayers(migrated));
+        mapping.setActiveCue(migrated.rows.front().id,0);
+        const auto* effective=mapping.matched(
+            {"fader-A",ControlKind::cc,1,20,85,false});
+        check(effective && effective->functionId==function.id &&
+              effective->outputNumber==74,
+              "Default Map did not inherit the migrated input");
+        check(mapping.matched({"fader-B",ControlKind::cc,1,25,85,false})==nullptr,
+              "Dormant Q set unexpectedly fired after migration");
+        check(validateShow(migrated).wasOk(),
+              "Migrated Control Map failed complete Show validation");
+        const auto snapshot=encodeShow(migrated);
+        Show loaded;
+        check(decodeShow(snapshot,loaded).wasOk() &&
+              loaded.controls.functions.size()==1 &&
+              loaded.controls.templates.size()==1,
+              "Migrated map or archived template did not persist");
+        const auto before=encodeShow(migrated);
+        changed=true;
+        check(migrateLegacyControlColumns(migrated,changed).wasOk() &&
+              !changed && encodeShow(migrated)==before,
+              "Legacy migration was not idempotent");
+        check(original.columns[controlIndex].controlLocked &&
+              original.rows.front().cells[controlIndex].controlSet.has_value(),
+              "Migration mutated the input model");
+    });
+
     test("Portable controller preset excludes names and preserves cue overrides",[] {
         auto source=makeShow();
         addColumn(source,ColumnType::midi,"MIDI Out");
