@@ -712,6 +712,43 @@ void uiRefinementTests() {
                   "Row separators interrupt the pinned metrics accent rail");
     });
 
+    test("32:9 live UI keeps cue, columns and BPM headers locked together",[] {
+        for (const auto size:std::initializer_list<juce::Point<int>>{
+                 {3840,1080},{5120,1440}}) {
+            MainComponent ui(false);
+            for (int i=0;i<22;++i) addRow(ui.show,"Ultrawide cue");
+            for (int i=0;i<3;++i) addColumn(ui.show,ColumnType::audio,{});
+            ui.setSize(size.x,size.y);
+            auto* names=cueViewFixtures::find<PinnedCueHeaders>(ui);
+            auto* columns=cueViewFixtures::find<PinnedColumnHeaders>(ui);
+            auto* metrics=cueViewFixtures::find<CueMetricsOverlay>(ui);
+            juce::Viewport* viewport=nullptr;
+            for (auto* child:ui.getChildren())
+                if (auto* candidate=dynamic_cast<juce::Viewport*>(child))
+                    viewport=candidate;
+            check(names && columns && metrics && viewport,
+                  "Ultrawide pinned heading/viewport components missing");
+            if (!(names && columns && metrics && viewport)) continue;
+            check(columns->getX()==names->getRight() &&
+                  columns->getRight()==viewport->getRight() &&
+                  metrics->getX()==viewport->getRight() &&
+                  columns->getHeight()==CueGrid::headerHeight &&
+                  metrics->getRight()<size.x &&
+                  viewport->getWidth()>2000,
+                  "Ultrawide UI leaves gaps or overlaps between fixed headings");
+            viewport->setViewPosition(0,146);
+            check(viewport->getViewPositionY()==146 &&
+                  columns->getY()==viewport->getY() &&
+                  columns->gridXAt(0)==CueGrid::nameWidth,
+                  "32:9 vertical scrolling detached column headers from cue cells");
+            const auto headerImage=columns->createComponentSnapshot(
+                {0,0,std::min(300,columns->getWidth()),CueGrid::headerHeight});
+            check(headerImage.isValid() &&
+                  headerImage.getHeight()==CueGrid::headerHeight,
+                  "Ultrawide clipped or failed to paint the pinned header");
+        }
+    });
+
     test("Audio MIDI OSC headers remain fixed while cue rows scroll",[] {
         MainComponent ui(false);
         for (int i=0;i<12;++i) addRow(ui.show,"Scrolled cue");
