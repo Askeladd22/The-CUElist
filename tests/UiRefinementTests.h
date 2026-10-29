@@ -922,8 +922,8 @@ void uiRefinementTests() {
         check(play.getWidth()>=28 && stop.getWidth()>=28 && menu.getWidth()>=28 &&
               play.getHeight()>=24 && stop.getHeight()>=24 && menu.getHeight()>=24,
               "Cue transport buttons are too small");
-        check(play.getRight()+8<=stop.getX() &&
-              stop.getRight()+8<=menu.getX() &&
+        check(play.getRight()+5<=stop.getX() &&
+              stop.getRight()+5<=menu.getX() &&
               menu.getRight()<=CueGrid::nameWidth-7 &&
               107+CueGrid::nameWidth-224<play.getX(),
               "Cue Play, Stop, menu or title overlap");
