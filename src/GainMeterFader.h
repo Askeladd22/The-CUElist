@@ -88,7 +88,9 @@ private:
     bool compact=false;
     float ceilingDb=6.0f;
     float topY() const noexcept { return compact ? 7.0f : 12.0f; }
-    float bottomY() const noexcept { return (float)std::max(15,getHeight()-(compact ? 19 : 35)); }
+    // Leave separate lanes for L/R legends and the gain readout, including
+    // the longer Noto Math infinity glyph at silence.
+    float bottomY() const noexcept { return (float)std::max(15,getHeight()-(compact ? 19 : 48)); }
     void setFromMouse(float y) {
         const auto raw=dbForY(y,topY(),bottomY(),ceilingDb);
         const auto db=raw==silenceDb ? raw : std::round(raw*10.0f)*0.1f;
