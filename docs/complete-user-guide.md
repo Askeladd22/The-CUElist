@@ -63,7 +63,7 @@ The **Help** button in the top toolbar opens a menu with **Guide** and **About T
 
 ### 3.3 Cue grid, Inspector, mixer and Timeline
 
-The central cue grid has row controls on the left and columns for Audio/MIDI/OSC/Control. The **BPM** and **Auto Stop** strip is pinned to the right of the cue grid, including during horizontal scrolling. During vertical scrolling, row values, toggles and action targets remain **below** their fixed headers: controls hidden behind the header are neither visible nor clickable. Row Play/Pause, Stop and the action menu are physically separated, as are the larger Play/Stop targets inside each cell. Column Utilities and the Master Audio strip occupy the lower working area; a Timeline with zoom/grid/snap controls is underneath.
+The central cue grid has row controls on the left and columns for Audio/MIDI/OSC/Control. Its Cuelist title and all Audio/MIDI/OSC/Control column headings stay **fixed during vertical scrolling**. Column headings track their cells during horizontal scrolling. The **BPM** and **Auto Stop** strip remains fixed at the right, including during horizontal scrolling. During vertical scrolling, row values, toggles and action targets remain **below** their fixed headers: controls hidden behind the header are neither visible nor clickable. Row Play/Pause, Stop and the action menu are physically separated, as are the larger Play/Stop targets inside each cell. Column Utilities and the Master Audio strip occupy the lower working area; a Timeline with zoom/grid/snap controls is underneath.
 
 The **Inspector** on the right edits the selected cue and cell separately. Use its narrow edge tab (one framed surface with a directional chevron) to collapse the Inspector toward the right, increasing the width of the workspace; click the tab again to reopen. The same area contains a cue-specific multiline **Notes** field.
 
@@ -144,7 +144,7 @@ Individual cell gain is expressed in **dB**. A peak meter reports **dBFS**: 0 dB
 
 ### 7.2 Column Utilities
 
-Audio column strips provide gain, stereo meters, pan, Mute, phase inversion and routing. MIDI and OSC strips expose the appropriate output controls rather than audio faders. Collapsed Audio columns retain compact meter/gain and Mute controls. **Mute** uses the embedded **Noto Sans Symbols 2** directly: **🔊** means audio/output enabled; **🔇** means muted. The same two-state icon is used for Master, Audio columns and MIDI/OSC data-output mute, while phase inversion retains its own symbol.
+Audio column strips provide gain, stereo meters, pan, Mute, phase inversion and routing. MIDI and OSC strips expose the appropriate output controls rather than audio faders. Collapsed Audio columns retain compact meter/gain and Mute controls. **Mute** uses the embedded **Noto Sans Symbols 2** directly: **🔊** means audio/output enabled; **🔇** means muted. Both are centred by their visible glyph outlines inside the compact button, rather than by the font's advance width. The same two-state icon is used for Master, Audio columns and MIDI/OSC data-output mute, while phase inversion retains its own symbol.
 
 An Audio column can send signal to the **Master** on its left/right paths and/or to a physical stereo **Direct Out** pair. Direct can be **PRE** or **POST** relative to the strip fader; post-strip Master Send is independent. Mute, pan and other per-cell/per-cue processing follow their implemented signal path.
 

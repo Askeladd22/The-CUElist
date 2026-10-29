@@ -52,6 +52,47 @@ void workspaceLayoutTests() {
               "Single-column show acquired unwanted horizontal scrolling");
     });
 
+    test("32:9 ultrawide windows preserve all cue, mixer and Inspector boundaries",[] {
+        for (const auto size:std::initializer_list<juce::Point<int>>{
+                 {3840,1080},{5120,1440}}) {
+            WorkspaceLayoutInput input;
+            input.width=size.x;
+            input.height=size.y;
+            input.pinnedHeaderWidth=318;
+            input.columnEndX=318+3*152;
+            input.rowCount=4;
+            for (bool visible:{true,false}) {
+                input.inspectorVisible=visible;
+                const auto geometry=calculateWorkspaceLayout(input);
+                const int inspectorRail=visible ? 288 : 26;
+                check(geometry.editorX==size.x-inspectorRail &&
+                      geometry.viewport.getX()==182 &&
+                      geometry.viewport.getWidth()>0 &&
+                      geometry.viewport.getHeight()>input.rowHeaderHeight &&
+                      geometry.metrics.getX()==geometry.viewport.getRight() &&
+                      geometry.metrics.getRight()==geometry.editorX &&
+                      geometry.cueHeaders.getX()==geometry.viewport.getX() &&
+                      geometry.utilities.getRight()==geometry.metrics.getX() &&
+                      geometry.timeline.getRight()==geometry.editorX &&
+                      geometry.dockEditor.getRight()==geometry.editorX,
+                      "Ultrawide workspace placed a panel outside its allotted lane");
+                check(geometry.inspectorPanel.getRight()<=size.x &&
+                      geometry.timeline.getBottom()<=size.y-47 &&
+                      geometry.gridSize.x<=geometry.viewport.getWidth(),
+                      "Short ultrawide show clips the footer or invents horizontal scrolling");
+                // More content than fits must still activate a horizontal
+                // viewport while leaving the fixed BPM lane untouched.
+                input.columnEndX=geometry.viewport.getWidth()+400;
+                const auto full=calculateWorkspaceLayout(input);
+                check(full.gridSize.x>full.viewport.getWidth() &&
+                      full.metrics==geometry.metrics &&
+                      full.utilities==geometry.utilities,
+                      "Ultrawide horizontal scrolling shifted BPM or mixer geometry");
+                input.columnEndX=318+3*152;
+            }
+        }
+    });
+
     test("Compact and wide windows preserve top/right gutters and pinned metrics",[] {
         for (const auto& dimensions:std::initializer_list<juce::Point<int>>{
                  {1180,820},{1440,900},{1647,895},{1920,1080}}) {
