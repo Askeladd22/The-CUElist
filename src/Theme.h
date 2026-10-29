@@ -127,13 +127,21 @@ inline bool drawNotoSymbol(juce::Graphics& g,juce::juce_wchar codepoint,
     const auto& symbols=appTypefaces().notoSymbols2;
     if (symbols==nullptr) return false;
     const auto glyph=symbols->getNominalGlyphForCodepoint(codepoint);
-    if (!glyph) return false;
-    g.saveState();
-    g.setColour(ink);
+    if (!glyph || static_cast<int>(*glyph)==0) return false;
     juce::Path outline;
     symbols->getOutlineForGlyph(juce::TypefaceMetricsKind::portable,
                                 static_cast<int>(*glyph),outline);
-    if (!outline.isEmpty()) {
+    // A nominal glyph lookup is not enough: some characters map to a
+    // missing/notdef glyph, or JUCE has no drawable path for that glyph.
+    // Reporting success here used to leave empty Play/Stop icons instead of
+    // running the caller's well-tested vector fallback.
+    const auto inkBounds=outline.getBounds();
+    if (outline.isEmpty() || inkBounds.getWidth()<=0.0f ||
+        inkBounds.getHeight()<=0.0f)
+        return false;
+    g.saveState();
+    g.setColour(ink);
+    {
         // Do not centre by font advance/baseline: optical (ink) bounds can
         // differ substantially, especially for ▶, ⏹ and directional arrows.
         // Preserve proportions and leave 2px of breathing room on each side.
@@ -144,11 +152,6 @@ inline bool drawNotoSymbol(juce::Graphics& g,juce::juce_wchar codepoint,
             .withCentre(area.toFloat().getCentre());
         g.fillPath(outline,outline.getTransformToScaleToFit(
             target,true,juce::Justification::centred));
-    } else {
-        // Embedded Noto text rendering only; never OS emoji substitution.
-        g.setFont(symbolsFont(size));
-        g.drawText(juce::String::charToString(codepoint),area,
-                   juce::Justification::centred,false);
     }
     g.restoreState();
     return true;
