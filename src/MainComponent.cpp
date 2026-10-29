@@ -30,7 +30,7 @@ MainComponent::MainComponent(bool startAudio) {
     setLookAndFeel(&theme); setWantsKeyboardFocus(true); setSize(1440,900);
     for (juce::Component* c : std::initializer_list<juce::Component*>{&openButton,&saveButton,&newButton,&addRowButton,&addColumnButton,
          &goButton,&panicButton,&deviceButton,&controlButton,&collapseAllButton,&inspectorSideTab,
-         &cuelistOverflowButton,&addCuelistButton,&undoButton,&redoButton,&globalMidiLearn,&globalOscLearn,&helpButton,&dockResize,&timelineResize,&importButton,&midiEditButton,&oscEditButton,&playCellButton,&stopCellButton,&clearButton,&tempoButton,&applyButton,
+         &cuelistOverflowButton,&addCuelistButton,&undoButton,&redoButton,&globalMidiLearn,&globalOscLearn,&quickControlTargets,&cancelQuickLearn,&helpButton,&dockResize,&timelineResize,&importButton,&midiEditButton,&oscEditButton,&playCellButton,&stopCellButton,&clearButton,&tempoButton,&applyButton,
          &cellTab,&rowTab,&rowGain,&rowBehaviour,&rowMute,&rowLoop,&rowName,&cellName,&bpm,&cueNotes,&behaviour,&follow,&loop,&cellAutoStop,&gainDb,&viewport,&timeline,&utilities,
          &clipCollapseButton,&clipCloseButton,&cueHeaders,&columnHeaders,&cueMetrics,&preflightButton,&diagnosticsButton,&preferencesButton,&projectNameLabel}) addAndMakeVisible(c);
     for (juce::TextButton* b : std::initializer_list<juce::TextButton*>{&openButton,&saveButton,&newButton,&addRowButton,&addColumnButton,&goButton,&panicButton,&deviceButton,&controlButton,&collapseAllButton,&inspectorSideTab,
@@ -277,28 +277,17 @@ MainComponent::MainComponent(bool startAudio) {
     redoButton.onClick=[this] {redoEdit();};
     undoButton.setEnabled(false);
     redoButton.setEnabled(false);
+    quickControlTargets.setVisible(false);
+    cancelQuickLearn.setVisible(false);
+    quickControlTargets.onPick=[this](int functionId) {chooseQuickLearnTarget(functionId);};
+    cancelQuickLearn.onClick=[this] {finishQuickLearn();};
+    cancelQuickLearn.setName("cancelQuickLearn");
     globalMidiLearn.setName("globalMidiLearn");
     globalOscLearn.setName("globalOscLearn");
-    globalMidiLearn.setTooltip("Learn a MIDI input for the Default Map. Select its function in the mapping panel.");
-    globalOscLearn.setTooltip("Learn an OSC address for the Default Map; configure UDP input port in the mapping panel.");
-    globalMidiLearn.onClick=[this] {
-        openControlPanel(false);
-        if (!midiInput.connected()) {
-            controlLearnArmed=false;
-            status="Select and connect a MIDI input before arming Default Map Learn.";
-            repaint();
-            return;
-        }
-        armControlLearn();
-        repaint();
-    };
-    globalOscLearn.onClick=[this] {
-        openControlPanel(false);
-        if (show.controls.oscInputPort>0 && oscInput.port()>0)
-            armOscControlLearn();
-        else status="Configure and activate an OSC input port in Control Mapping first.";
-        repaint();
-    };
+    globalMidiLearn.setTooltip("Inline MIDI Learn: choose a parameter, move a control, done.");
+    globalOscLearn.setTooltip("Inline OSC Learn: choose a parameter, send a message, done.");
+    globalMidiLearn.onClick=[this] {beginQuickLearn(false);};
+    globalOscLearn.onClick=[this] {beginQuickLearn(true);};
     controlButton.setName("controlMapping");
     controlButton.setTooltip("MIDI input, MIDI Learn, and global/per-cue mappings.");
     controlButton.onClick=[this] {
@@ -517,6 +506,20 @@ void MainComponent::paint(juce::Graphics& g) {
         g.drawVerticalLine(geometry.editorX,76.0f,(float)h-47.0f);
     }
     if (inspectorVisible) {
+    if (quickLearnMode!=QuickLearnMode::off) {
+        const int x=geometry.inspectorLeft;
+        g.setColour(palette::panel);
+        g.fillRoundedRectangle(geometry.inspectorPanel.toFloat(),9.0f);
+        g.setColour(palette::line);
+        g.drawRoundedRectangle(geometry.inspectorPanel.toFloat(),9.0f,1.25f);
+        label(g,quickLearnMode==QuickLearnMode::midi ? "MIDI LEARN" : "OSC LEARN",
+              {x+5,98,geometry.inspectorInnerWidth-10,25},19,palette::amber,true);
+        label(g,quickLearnFunctionId>0 ? "Move or press the hardware control" :
+              "Select a parameter or a named function",
+              {x+5,155,geometry.inspectorInnerWidth-10,38},12,palette::text);
+        label(g,"Available parameters / functions",
+              {x+4,202,geometry.inspectorInnerWidth-8,24},11,palette::teal,true);
+    } else {
     const int inspectorInner=geometry.inspectorInnerWidth;
     auto panel=geometry.inspectorPanel;
     g.setColour(palette::panel); g.fillRoundedRectangle(panel.toFloat(),9);
@@ -561,6 +564,7 @@ void MainComponent::paint(juce::Graphics& g) {
                            (float)notesHeight,7.0f,1.0f);
     label(g,"NOTES  /  CUE "+juce::String(selectedRow+1).paddedLeft('0',2),
           {x+3,notesTop+5,inspectorInner-6,20},11,palette::teal,true);
+    }
     }
     label(g,status,{geometry.viewport.getX(),h-35,std::max(1,geometry.editorX-200),25},12,palette::muted);
 }
@@ -775,6 +779,23 @@ void MainComponent::resized() {
     cueMetrics.toFront(false);
     collapseAllButton.toFront(false);
     inspectorSideTab.toFront(false);
+    const bool learnVisible=inspectorVisible && quickLearnMode!=QuickLearnMode::off;
+    quickControlTargets.setVisible(learnVisible);
+    cancelQuickLearn.setVisible(learnVisible);
+    if (learnVisible) {
+        // Learning temporarily replaces Inspector content; no extra window.
+        for (juce::Component* c:std::initializer_list<juce::Component*>{
+                 &rowName,&bpm,&tempoButton,&rowLoop,&cellName,&gainDb,&follow,
+                 &loop,&midiEditButton,&oscEditButton,&importButton,&cueNotes,
+                 &cellAutoStop,&rowMute,&rowGain,&rowBehaviour,&behaviour})
+            c->setVisible(false);
+        cancelQuickLearn.setBounds(x+4,126,inner-8,29);
+        const int top=231;
+        quickControlTargets.setBounds(x+4,top,inner-8,
+            std::max(60,geometry.inspectorPanel.getBottom()-top-20));
+        quickControlTargets.toFront(false);
+        cancelQuickLearn.toFront(false);
+    }
 }
 void MainComponent::refresh() {
     selectedRow=juce::jlimit(0,(int)show.rows.size()-1,selectedRow);
@@ -1186,15 +1207,23 @@ void MainComponent::timerCallback() {
     }
     ControlEvent control; int processed=0;
     while (processed++<256 && midiInput.poll(control)) {
-        // MIDI Learn consumes its first event without dispatching GO/PANIC.
-        if (!consumeMidiLearnEvent(controlLearnArmed,learnedInput,control))
+        // A quick-Learn input is consumed, never dispatched to live GO/PANIC.
+        if (quickLearnMode==QuickLearnMode::midi) {
+            if (quickLearnFunctionId>0 && controlLearnArmed) {
+                controlLearnArmed=false;
+                completeQuickLearn(control);
+            }
+        } else if (!consumeMidiLearnEvent(controlLearnArmed,learnedInput,control))
             dispatchControl(control);
     }
-    // OSC datagrams are decoded off-thread and safely dispatched here.
-    // Learn consumes the first input without triggering a live cue.
     int oscProcessed=0;
     while (oscProcessed++<256 && oscInput.poll(control)) {
-        if (oscLearnArmed) {
+        if (quickLearnMode==QuickLearnMode::osc) {
+            if (quickLearnFunctionId>0 && oscLearnArmed) {
+                oscLearnArmed=false;
+                completeQuickLearn(control);
+            }
+        } else if (oscLearnArmed) {
             learnedInput=control;oscLearnArmed=false;
         } else dispatchControl(control);
     }

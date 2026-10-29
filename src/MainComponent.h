@@ -415,6 +415,9 @@ private:
     ControlMappingEngine controlMapping;
     ControlOutputRouter controlOutput;
     int activeCueId=0;
+    enum class QuickLearnMode {off,midi,osc};
+    QuickLearnMode quickLearnMode=QuickLearnMode::off;
+    int quickLearnFunctionId=0;
     bool controlLearnArmed=false,oscLearnArmed=false;
     std::optional<ControlEvent> learnedInput;
     juce::Component::SafePointer<juce::DialogWindow> controlDialog;
