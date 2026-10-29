@@ -86,8 +86,11 @@ void OscClipEditor::resized() {
     remove.setBounds(53,7,70,26); duplicate.setBounds(128,7,83,26);
     grid.setBounds(219,7,69,26); snap.setBounds(291,7,60,26);
     resolution.setBounds(353,8,78,24);
-    zoomOut.setBounds(435,7,29,26); zoomIn.setBounds(468,7,29,26);
-    zoomFit.setBounds(501,7,30,26);
+    // In compact docks the window actions and zoom tools occupy row two.
+    const bool compact=w<950;
+    zoomOut.setBounds(compact ? 13 : 435,compact ? 39 : 7,29,26);
+    zoomIn.setBounds(compact ? 46 : 468,compact ? 39 : 7,29,26);
+    zoomFit.setBounds(compact ? 79 : 501,compact ? 39 : 7,30,26);
     repaint();
 }
 float OscClipEditor::xForTime(double time) const {
@@ -193,9 +196,12 @@ void OscClipEditor::createTrack() {
 }
 void OscClipEditor::paint(juce::Graphics& g) {
     g.fillAll(palette::panel);
-    label(g,"OSC  /  TIMELINE",{13,38,225,24},13,palette::teal,true);
-    label(g,"Double-click: ramp/edit   •   Shift-click: point   •   Right-click: actions",
-          {215,38,std::max(1,getWidth()-225),24},10,palette::muted);
+    const bool compact=getWidth()<950;
+    label(g,"OSC  /  TIMELINE",{compact ? 120 : 13,38,
+          compact ? 166 : 235,24},13,palette::teal,true);
+    if (!compact)
+        label(g,"Double-click: ramp / edit | Shift-click: point | Right-click: menu",
+              {255,38,std::max(1,getWidth()-275),24},12,palette::muted);
     const int left=axisLeft(),right=left+axisWidth();
     const auto ruler=juce::Rectangle<float>((float)left,rulerTop,(float)axisWidth(),rulerBottom-rulerTop);
     g.setColour(palette::background); g.fillRect(ruler);
@@ -210,13 +216,19 @@ void OscClipEditor::paint(juce::Graphics& g) {
     }
     for (int i=0;i<=8;++i) {
         const double t=viewStart+visible*i/8.0;
-        label(g,juce::String(t,clip.useBeats?2:2),
-              {(int)xForTime(t)-8,rulerTop+4,62,18},9,palette::muted);
+        const int tick=(int)xForTime(t);
+        const int labelX=juce::jlimit(left,right-58,tick-29);
+        label(g,juce::String(t,2),
+              {labelX,rulerTop+3,58,19},11,palette::muted,
+              false,juce::Justification::centred);
     }
     // Ruler and toolbar remain fixed. Events, their labels and every track
     // share one clip region and one vertical offset.
     g.saveState();
-    g.reduceClipRegion(0,rulerBottom,getWidth(),std::max(0,getHeight()-rulerBottom));
+    // Keep the footer band outside the drawing region for every track.
+    const int laneBottom=getHeight()-26;
+    g.reduceClipRegion(0,rulerBottom,getWidth(),
+                       std::max(0,laneBottom-rulerBottom));
     const int eventsY=eventLaneTop();
     g.setColour(palette::raised);
     g.fillRoundedRectangle((float)left,(float)eventsY,(float)axisWidth(),(float)eventHeight,3);
@@ -238,19 +250,20 @@ void OscClipEditor::paint(juce::Graphics& g) {
         const bool placeholder=track==(int)clip.tracks.size();
         if (placeholder && clip.tracks.size()>=16) break;
         const int y=laneTop(track);
-        if (y>=getHeight() || y+laneHeight<rulerBottom) continue;
+        if (y>=laneBottom || y+laneHeight<rulerBottom) continue;
         g.setColour(track%2 ? palette::raised : palette::background);
         g.fillRect(left,y,axisWidth(),laneHeight-4);
         const bool selected=track==selectedTrack;
         label(g,placeholder ? "+ TRACK" : "OSC "+juce::String(track+1),
-              {6,y+5,70,18},9,selected?palette::amber:palette::teal,true);
+              {6,y+5,70,20},12,selected?palette::amber:palette::teal,true);
         const auto& address=placeholder ? juce::String("Double-click to add a ramp")
             : clip.tracks[(size_t)track].message.address;
-        label(g,address,{left+9,y+2,std::max(1,axisWidth()-16),17},10,palette::muted);
+        label(g,address,{left+9,y+3,std::max(1,axisWidth()-18),20},
+              12,palette::muted);
         if (placeholder) continue;
         const auto& lane=clip.tracks[(size_t)track];
-        label(g,juce::String(lane.rangeMax,2),{4,y+25,68,15},9,palette::muted);
-        label(g,juce::String(lane.rangeMin,2),{4,y+laneHeight-26,68,15},9,palette::muted);
+        label(g,juce::String(lane.rangeMax,2),{4,y+27,68,17},11,palette::muted);
+        label(g,juce::String(lane.rangeMin,2),{4,y+laneHeight-29,68,17},11,palette::muted);
         for (int i=0;i<(int)clip.automations.size();++i) {
             if (trackForAutomation(i)!=track) continue;
             const auto& a=clip.automations[(size_t)i];
@@ -260,8 +273,9 @@ void OscClipEditor::paint(juce::Graphics& g) {
             g.setColour(palette::teal.withAlpha(active ? .22f : .12f));
             g.fillRoundedRectangle(x0,(float)y+20,std::max(1.0f,x1-x0),
                                    (float)laneHeight-24,3.0f);
-            g.setColour(active ? palette::amber : palette::teal);
-            g.fillRoundedRectangle(x1-4,(float)y+22,8,(float)laneHeight-28,2.0f);
+            g.setColour((active ? palette::amber : palette::teal).withAlpha(.85f));
+            // Small resize grip; preserve the existing x1 drag hit area.
+            g.fillRoundedRectangle(x1-2,(float)y+laneHeight-37,4,18,2.0f);
             juce::Path curve;
             for (int p=0;p<(int)a.points.size();++p) {
                 const auto& point=a.points[(size_t)p];
@@ -276,13 +290,20 @@ void OscClipEditor::paint(juce::Graphics& g) {
         }
     }
     g.restoreState();
+    g.setColour(palette::panel);
+    g.fillRect(0,std::max(0,getHeight()-26),getWidth(),26);
+    g.setColour(palette::line.withAlpha(.65f));
+    g.drawHorizontalLine(std::max(0,getHeight()-26),0,(float)getWidth());
     g.setColour(palette::amber.withAlpha(.7f));
-    g.drawVerticalLine((int)xForTime(cursor),(float)rulerTop,(float)getHeight());
+    g.drawVerticalLine((int)xForTime(cursor),(float)rulerTop,
+                       (float)std::max(rulerTop,getHeight()-26));
     if (editHint.isNotEmpty())
-        label(g,editHint,{13,getHeight()-17,std::max(1,getWidth()-20),16},9,palette::amber);
+        label(g,editHint,{13,getHeight()-24,std::max(1,getWidth()-26),20},
+              11,palette::amber);
     else
-        label(g,"OSC i / f · Right-click a point to delete · Ctrl+wheel to zoom",
-            {13,getHeight()-17,std::max(1,getWidth()-20),16},9,palette::muted);
+        label(g,"OSC int / float | Right-click: delete point | Ctrl+wheel: zoom",
+              {13,getHeight()-24,std::max(1,getWidth()-26),20},
+              11,palette::muted);
 }
 void OscClipEditor::chooseEvent(int index) {
     selectedEvent=index; selectedTrack=selectedAutomation=selectedPoint=-1; repaint();

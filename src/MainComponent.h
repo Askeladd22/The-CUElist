@@ -395,9 +395,13 @@ private:
             setMouseCursor(juce::MouseCursor::UpDownResizeCursor);
         }
         void paint(juce::Graphics& g) override {
-            g.setColour(palette::muted);
-            g.fillRoundedRectangle(getLocalBounds().toFloat()
-                .withSizeKeepingCentre(86,3),1.5f);
+            // Recessed splitter, not a detached bright scrollbar-like line.
+            const auto area=getLocalBounds().toFloat();
+            g.setColour(palette::background.withAlpha(.92f));
+            g.fillRoundedRectangle(area.reduced(0.0f,1.0f),3.0f);
+            g.setColour(palette::line.withAlpha(.80f));
+            g.fillRoundedRectangle(area.withSizeKeepingCentre(57.0f,3.0f),
+                                   1.5f);
         }
         void mouseDown(const juce::MouseEvent&) override {
             original=owner.workspaceLayout().effectiveTimelineAdjustment;

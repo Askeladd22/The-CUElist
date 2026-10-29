@@ -726,8 +726,18 @@ void MainComponent::resized() {
         dockResize.toFront(false);
     }
     if (docked) {
-        clipCollapseButton.setBounds(geometry.dockCollapse);
-        clipCloseButton.setBounds(geometry.dockClose);
+        if (oscEditor && !oscWindow) {
+            // OSC dock actions have fixed slots, clear of its controls.
+            // The compact arrangement uses the second toolbar row.
+            const bool compact=geometry.dockEditor.getWidth()<950;
+            const int x=geometry.dockEditor.getX();
+            const int y=geometry.dockY+(compact ? 36 : 4);
+            clipCollapseButton.setBounds(x+(compact ? 290 : 541),y,86,26);
+            clipCloseButton.setBounds(x+(compact ? 383 : 634),y,82,26);
+        } else {
+            clipCollapseButton.setBounds(geometry.dockCollapse);
+            clipCloseButton.setBounds(geometry.dockClose);
+        }
         clipCollapseButton.toFront(false); clipCloseButton.toFront(false);
         if (clipEditor && !clipWindow) {
             clipEditor->setVisible(!clipCollapsed);
