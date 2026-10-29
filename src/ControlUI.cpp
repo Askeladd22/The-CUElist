@@ -450,6 +450,11 @@ private:
     }
     void timerCallback() override {
         if (!owner) return;
+        // Armed Learn is an operator-critical state, not a transient tooltip.
+        learn.setColour(juce::TextButton::buttonColourId,
+            owner->controlLearnArmed ? palette::amber.withAlpha(.58f) : palette::raised);
+        oscLearn.setColour(juce::TextButton::buttonColourId,
+            owner->oscLearnArmed ? palette::amber.withAlpha(.58f) : palette::raised);
         if (auto event=owner->consumeLearnedInput()) {
             captured=event;
             state.setText("Learned "+event->deviceId+" ch"+juce::String(event->channel)+
