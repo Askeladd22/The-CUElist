@@ -537,5 +537,7 @@ void MainComponent::openControlPanel(bool editSet) {
     options.useNativeTitleBar=false;
     options.resizable=true;
     controlDialog=options.launchAsync();
+    if (controlDialog)
+        controlDialog->setLookAndFeel(&theme); // Match Exo/Hind and Midnight Slate
 }
 }
