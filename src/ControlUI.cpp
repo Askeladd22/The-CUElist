@@ -19,7 +19,7 @@ public:
         for (juce::Component* c : std::initializer_list<juce::Component*>{
             &device,&connect,&learn,&add,&remove,&newPreset,&assignPreset,
             &presetName,&presets,&scope,&target,&takeover,&columns,&bindingList,&state,
-            &outputCc,&oscAddress,&invert,&updateSelected,&curve,&minimum,&maximum,
+            &outputCc,&outputChannel,&oscAddress,&invert,&updateSelected,&curve,&minimum,&maximum,
              &effectivePreview,&templateName,&templates,&saveTemplate,&loadTemplate,
              &emptyBindings,&functionChoice,&functionName,&renameFunction})
             addAndMakeVisible(c);
@@ -126,6 +126,8 @@ public:
             minimum.setText(t==7 || t==8 ? "-1" : "0",false);
             maximum.setText(t==5 ? "127" : "1",false);
         };
+        outputChannel.setName("mappingOutputChannel");
+        outputChannel.setText("1");outputChannel.setInputRestrictions(2,"0123456789");
         outputCc.setName("mappingOutputCc");
         outputCc.setText("20"); outputCc.setInputRestrictions(3,"0123456789");
         oscAddress.setName("mappingOscAddress");
@@ -214,7 +216,7 @@ public:
         label(g,"Target",{214,276,178,18},11,palette::muted,true);
         label(g,"Takeover",{411,276,132,18},11,palette::muted,true);
         label(g,"Destination column",{556,276,207,18},11,palette::muted,true);
-        label(g,"Output CC",{20,333,85,18},11,palette::muted,true);
+        label(g,"MIDI CH / CC",{20,333,120,18},11,palette::muted,true);
         label(g,"OSC address",{113,333,210,18},11,palette::muted,true);
         label(g,"Curve",{441,333,114,18},11,palette::muted,true);
         label(g,"Min",{573,333,84,18},11,palette::muted,true);
@@ -250,7 +252,8 @@ public:
         target.setBounds(214,298,178,31);
         takeover.setBounds(411,298,133,31);
         columns.setBounds(556,298,w-576,31);
-        outputCc.setBounds(20,355,84,31);
+        outputChannel.setBounds(20,355,34,31);
+        outputCc.setBounds(58,355,46,31);
         oscAddress.setBounds(113,355,210,31);
         invert.setBounds(336,355,96,31);
         curve.setBounds(441,355,115,31);
@@ -305,7 +308,7 @@ private:
     }
     juce::ComboBox device,presets,scope,target,takeover,columns,curve,templates,functionChoice;
     juce::TextButton connect,learn,add,remove,updateSelected,newPreset,assignPreset,saveTemplate,loadTemplate,renameFunction;
-    juce::TextEditor presetName,outputCc,oscAddress,minimum,maximum,effectivePreview,templateName,functionName;
+    juce::TextEditor presetName,outputCc,outputChannel,oscAddress,minimum,maximum,effectivePreview,templateName,functionName;
     juce::ToggleButton invert{"Invert"};
     juce::Label state;
     juce::ListBox bindingList;
@@ -317,6 +320,7 @@ private:
     void refreshDestinationFields() {
         const int t=target.getSelectedId();
         outputCc.setEnabled(t==5);
+        outputChannel.setEnabled(t==5);
         oscAddress.setEnabled(t==6);
         columns.setEnabled(editSet || scope.getSelectedId()==2 ||
                            t==2 || t==5 || t==6 || t==7);
@@ -359,6 +363,7 @@ private:
         for (size_t i=0;i<columnIds.size();++i)
             if (columnIds[i]==b.targetColumnId)
                 columns.setSelectedId((int)i+1,juce::dontSendNotification);
+        outputChannel.setText(juce::String(b.outputChannel),false);
         outputCc.setText(juce::String(b.outputNumber),false);
         oscAddress.setText(b.oscAddress,false);
         minimum.setText(juce::String(b.minimum,3),false);
@@ -429,9 +434,6 @@ private:
         if (editSet && functionId<=0) {
             state.setText("Choose a Default Map function.",juce::dontSendNotification);return;
         }
-        if (update && !editSet && functionId<=0) {
-            state.setText("Choose a function to update.",juce::dontSendNotification);return;
-        }
         b.functionId=std::max(0,functionId);
         b.scope=(ControlScope)(scope.getSelectedId()-1);
         switch (target.getSelectedId()) {
@@ -466,7 +468,7 @@ private:
             b.target==ControlTarget::panic) b.takeover=ControlTakeover::jump;
         b.invert=invert.getToggleState();
         if (b.target==ControlTarget::midiCc) {
-            b.outputChannel=b.channel;
+            b.outputChannel=outputChannel.getText().getIntValue();
             b.outputNumber=outputCc.getText().getIntValue();
         }
         if (b.target==ControlTarget::oscFloat)
@@ -546,22 +548,35 @@ private:
         remove.setEnabled(entries && row>=0 && row<(int)entries->size());
         if (!entries || row<0 || row>=(int)entries->size()) return;
         const auto& b=(*entries)[(size_t)row];
+        ControlBinding display=b;
+        if (b.functionId>0 && editSet)
+            for (const auto& fn:owner->show.controls.functions)
+                if (fn.id==b.functionId) {
+                    display.target=fn.destination.target;
+                    display.targetColumnId=fn.destination.targetColumnId;
+                    display.outputChannel=fn.destination.outputChannel;
+                    display.outputNumber=fn.destination.outputNumber;
+                    display.oscAddress=fn.destination.oscAddress;
+                    display.minimum=fn.destination.minimum;
+                    display.maximum=fn.destination.maximum;
+                    break;
+                }
         functionChoice.setSelectedId(b.functionId>0 ? b.functionId+1 : 1,juce::dontSendNotification);
         if (b.functionId>0) loadFunctionDestination();
         captured.reset();
         scope.setSelectedId((int)b.scope+1,juce::dontSendNotification);
-        target.setSelectedId((int)b.target+1,juce::dontSendNotification);
+        target.setSelectedId((int)display.target+1,juce::dontSendNotification);
         refreshColumns();
         refreshDestinationFields();
         for (size_t i=0;i<columnIds.size();++i)
-            if (columnIds[i]==b.targetColumnId)
+            if (columnIds[i]==display.targetColumnId)
                 columns.setSelectedId((int)i+1,juce::dontSendNotification);
         takeover.setSelectedId((int)b.takeover+1,juce::dontSendNotification);
         curve.setSelectedId((int)b.curve+1,juce::dontSendNotification);
-        minimum.setText(juce::String(b.minimum,3),false);
-        maximum.setText(juce::String(b.maximum,3),false);
-        outputCc.setText(juce::String(b.outputNumber),false);
-        oscAddress.setText(b.oscAddress,false);
+        minimum.setText(juce::String(display.minimum,3),false);
+        maximum.setText(juce::String(display.maximum,3),false);
+        outputCc.setText(juce::String(display.outputNumber),false);
+        oscAddress.setText(display.oscAddress,false);
         invert.setToggleState(b.invert,juce::dontSendNotification);
         state.setText("Editing #"+juce::String(b.id)+" — input "+b.deviceId+
             " ch"+juce::String(b.channel)+" / "+juce::String(b.number),
