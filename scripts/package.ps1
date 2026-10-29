@@ -23,6 +23,8 @@ Copy-Item -LiteralPath (Join-Path $repo 'NOTICE.md') -Destination $package
 New-Item -ItemType Directory -Path (Join-Path $package 'fonts') -Force | Out-Null
 Copy-Item -LiteralPath (Join-Path $repo 'assets\fonts\Exo2-OFL.txt') -Destination (Join-Path $package 'fonts\Exo2-OFL.txt')
 Copy-Item -LiteralPath (Join-Path $repo 'assets\fonts\Hind-OFL.txt') -Destination (Join-Path $package 'fonts\Hind-OFL.txt')
+Copy-Item -LiteralPath (Join-Path $repo 'assets\fonts\NotoSansMath-OFL.txt') -Destination (Join-Path $package 'fonts\NotoSansMath-OFL.txt')
+Copy-Item -LiteralPath (Join-Path $repo 'assets\fonts\NotoSansSymbols2-OFL.txt') -Destination (Join-Path $package 'fonts\NotoSansSymbols2-OFL.txt')
 Copy-Item -LiteralPath (Join-Path $repo 'vendor\JUCE\LICENSE.md') -Destination (Join-Path $package 'JUCE-LICENSE.md')
 @"
 THE CUELIST $version - WINDOWS x64
