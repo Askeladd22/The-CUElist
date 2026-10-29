@@ -1,5 +1,6 @@
 #include "MainComponent.h"
 #include "ControlLayerBuilder.h"
+#include "ControlPresetArchive.h"
 #include <algorithm>
 #include <cmath>
 
@@ -52,6 +53,19 @@ juce::Result MainComponent::selectControlInput(const juce::String& id) {
     status=result.wasOk() ? (id.isEmpty() ? "MIDI input disabled." :
         "MIDI input connected.") : result.getErrorMessage();
     repaint(); return result;
+}
+
+juce::String MainComponent::exportControlPresetText() const {
+    return exportControllerPreset(show);
+}
+juce::Result MainComponent::importControlPresetText(const juce::String& text) {
+    auto candidate=show;
+    const auto result=importControllerPreset(text,candidate);
+    if(result.failed()) {status=result.getErrorMessage();return result;}
+    show=std::move(candidate);
+    refreshControlSettings();dirty=true;
+    status="Default Map preset imported; project function names and cue overrides preserved.";
+    refresh();return juce::Result::ok();
 }
 
 int MainComponent::createAbstractControlFunction(
