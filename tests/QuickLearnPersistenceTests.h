@@ -24,8 +24,11 @@ void quickLearnPersistenceTests() {
         ui.show.controls.oscInputPort=49153; // isolated, explicit test listener
         ui.beginQuickLearn(true);
         check(ui.isQuickLearnActive(),"OSC Learn did not activate.");
-        ui.chooseQuickLearnGuiTarget(ControlTarget::go);
-        check(ui.isQuickLearnAwaitingInput(),"Clicking GO did not arm OSC input.");
+        auto* goTarget=controlsV3::named(ui,"quickLearnGo");
+        check(goTarget && goTarget->isVisible() && goTarget->getWidth()>0,
+              "GO must have a real highlighted GUI selection target.");
+        cueViewFixtures::click(*goTarget,5.0f,5.0f);
+        check(ui.isQuickLearnAwaitingInput(),"Clicking highlighted GO did not arm OSC input.");
         const ControlEvent go{"/test/quick-go",ControlKind::osc,1,0,127,false};
         ui.completeQuickLearn(go);
         check(ui.isQuickLearnActive() && !ui.isQuickLearnAwaitingInput(),
@@ -34,7 +37,10 @@ void quickLearnPersistenceTests() {
               ui.show.controls.bindings.front().scope==ControlScope::global &&
               ui.show.controls.bindings.front().deviceId==go.deviceId,
               "First quick binding must enter only Default Map.");
-        ui.chooseQuickLearnGuiTarget(ControlTarget::masterPan);
+        auto* masterPanTarget=controlsV3::named(ui,"quickLearnMasterPan");
+        check(masterPanTarget && masterPanTarget->isVisible(),
+              "Master Pan must be selectable through the live GUI.");
+        cueViewFixtures::click(*masterPanTarget,5.0f,5.0f);
         check(ui.isQuickLearnAwaitingInput(),
               "Next GUI target must arm capture without toggling Learn.");
         const ControlEvent pan{"/test/quick-pan",ControlKind::osc,1,0,32,false};
