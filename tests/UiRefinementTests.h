@@ -109,6 +109,32 @@ void uiRefinementTests() {
         }
     });
 
+    test("Unsaved changes confirmation remains compact and Cancel is safe",[] {
+        int discardCount=0;
+        UnsavedChangesPanel panel([&]{ ++discardCount; });
+        check(panel.getWidth()==510 && panel.getHeight()==228,
+              "Discard confirmation no longer fits a compact dialog");
+        auto* cancel=dynamic_cast<juce::TextButton*>(
+            controlsV3::named(panel,"cancelUnsavedChanges"));
+        auto* discard=dynamic_cast<juce::TextButton*>(
+            controlsV3::named(panel,"discardUnsavedChanges"));
+        check(cancel && discard,"Confirm/Cancel actions are missing");
+        check(cancel->getButtonText()=="Cancel" &&
+              discard->getButtonText()=="Discard and continue" &&
+              discard->getRight()+10<=cancel->getX() &&
+              discard->getBottom()<=panel.getHeight() &&
+              cancel->getBottom()<=panel.getHeight(),
+              "Confirmation buttons overlap or have incorrect labels");
+        auto rendered=panel.createComponentSnapshot(panel.getLocalBounds());
+        check(rendered.isValid() && rendered.getWidth()==510,
+              "Unsaved changes confirmation did not render");
+        cancel->onClick();
+        check(discardCount==0,"Cancel discarded unsaved work");
+        discard->onClick();
+        check(discardCount==1,
+              "Destructive action must run only after explicit confirmation");
+    });
+
     test("About and Diagnostics use compact aligned panels without InfoIcon",[] {
         OperatorReportPanel about("About The Cuelist","Version 0.9",{
             {"AUTHORS",{{"Davide Salvatore","Co-author"},
