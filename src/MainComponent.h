@@ -92,15 +92,20 @@ public:
     // Wider title/transport lane gives operators distinct Play, Stop and
     // actions targets without increasing cue row height.
     static constexpr int rowHeight=62, headerHeight=72, nameWidth=318, columnWidth=152, compressedWidth=48;
+    // Compact the cue row actions to consistent 5px gaps.
     static juce::Rectangle<int> rowPlayBounds(int y) { return {nameWidth-114,y+11,29,26}; }
-    static juce::Rectangle<int> rowStopBounds(int y) { return {nameWidth-75,y+11,29,26}; }
-    static juce::Rectangle<int> rowMenuBounds(int y) { return {nameWidth-36,y+11,29,26}; }
+    static juce::Rectangle<int> rowStopBounds(int y) { return {nameWidth-80,y+11,29,26}; }
+    static juce::Rectangle<int> rowMenuBounds(int y) { return {nameWidth-46,y+11,29,26}; }
     // Shared by the painter and input handling to prevent discrepancies.
     static juce::Rectangle<int> cellPlayBounds(int x,int width,int y) {
         return {x+width-64,y+23,24,23};
     }
     static juce::Rectangle<int> cellStopBounds(int x,int width,int y) {
         return {x+width-32,y+23,24,23};
+    }
+    // Small on-screen buttons; keep larger 24x23 mouse hit rectangles.
+    static juce::Rectangle<int> cellButtonVisualBounds(juce::Rectangle<int> hit) {
+        return hit.reduced(2,1);
     }
     static constexpr int rowContentInset=4; // visual padding, used by both paint and hit-testing
 private:

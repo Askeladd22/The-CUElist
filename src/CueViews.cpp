@@ -101,14 +101,15 @@ void playPauseIcon(juce::Graphics& g,juce::Rectangle<int> box,bool pause) {
         g.fillPath(p);
     }
 }
-void transportButton(juce::Graphics& g,juce::Rectangle<int> box,bool stop,bool enabled) {
+void transportButton(juce::Graphics& g,juce::Rectangle<int> box,bool stop,
+                     bool enabled,float iconSize=17.5f) {
     const auto accent=stop ? palette::red : palette::teal;
     const IconButtonState state{enabled,false,false,false,false};
     drawIconButtonSurface(g,box.toFloat(),accent,state);
     const auto ink=iconButtonInk(accent,state);
     g.setColour(ink);
     if (drawNotoSymbol(g,(juce::juce_wchar)(stop ? 0x23F9 : 0x25B6),
-                       box,17.5f,ink))
+                       box,iconSize,ink))
         return;
     const float x=(float)box.getCentreX(),y=(float)box.getCentreY();
     if (stop) g.fillRect(x-4,y-4,8.0f,8.0f);
@@ -298,9 +299,12 @@ void CueGrid::paint(juce::Graphics& g) {
                       active?palette::teal:palette::amber,true,juce::Justification::centred);
             }
             if (column.type!=ColumnType::control) {
-                // 24x23 px individual transports, with an 8px safety gap.
-                transportButton(g,cellPlayBounds(x,w,y),false,loaded);
-                transportButton(g,cellStopBounds(x,w,y),true,loaded);
+                // Visual transport buttons are smaller, but their original
+                // 24x23 hit targets and 8px separation are unchanged.
+                transportButton(g,cellButtonVisualBounds(cellPlayBounds(x,w,y)),
+                                false,loaded,15.0f);
+                transportButton(g,cellButtonVisualBounds(cellStopBounds(x,w,y)),
+                                true,loaded,15.0f);
             }
         }
         g.restoreState();

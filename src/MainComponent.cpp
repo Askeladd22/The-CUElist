@@ -1,4 +1,5 @@
 #include "MainComponent.h"
+#include "HeaderTelemetry.h"
 #include "OperatorReportDialog.h"
 #include "HelpGuide.h"
 #include "MidiSessionPolicy.h"
@@ -413,40 +414,39 @@ void MainComponent::paint(juce::Graphics& g) {
     // Keep the left half free for cue-list tabs. Telemetry panels are
     // fixed to the right and never cover the source/utility workspace.
     g.setColour(palette::teal); g.fillRect(190,70,122,2);
-    const int clockX=w-650, cpuX=w-516;
+    const auto telemetry=HeaderTelemetryLayout::atWidth(w);
     g.setColour(palette::panel);
-    g.fillRoundedRectangle((float)clockX,8.0f,124.0f,56.0f,5.0f);
-    g.fillRoundedRectangle((float)cpuX,8.0f,132.0f,56.0f,5.0f);
+    g.fillRoundedRectangle(telemetry.clock.toFloat(),5.0f);
+    g.fillRoundedRectangle(telemetry.usage.toFloat(),5.0f);
     g.setColour(palette::line.withAlpha(.85f));
-    g.drawRoundedRectangle((float)clockX,8.0f,124.0f,56.0f,5.0f,1.0f);
-    g.drawRoundedRectangle((float)cpuX,8.0f,132.0f,56.0f,5.0f,1.0f);
-    // Narrow telemetry cards use aligned value and meter columns.
-    label(g,"CLOCK / 24H",{clockX+10,11,104,17},10,palette::muted,true);
+    g.drawRoundedRectangle(telemetry.clock.toFloat(),5.0f,1.0f);
+    g.drawRoundedRectangle(telemetry.usage.toFloat(),5.0f,1.0f);
+    // Only the centred 24-hour time, no redundant CLOCK / 24H heading.
     label(g,juce::Time::getCurrentTime().formatted("%H:%M:%S"),
-          {clockX+10,30,104,26},18,palette::text,true);
-    label(g,"CPU / RAM",{cpuX+9,11,115,16},10,palette::muted,true);
-    const auto cpu=systemCpuPercent<0 ? juce::String("N/A") :
-                  juce::String(systemCpuPercent,0)+"%";
-    const auto ram=systemRamPercent<0 ? juce::String("N/A") :
-                  juce::String(systemRamPercent,0)+"%";
-    label(g,"CPU",{cpuX+9,29,29,16},10,palette::text,true);
-    label(g,cpu,{cpuX+39,29,44,16},10,palette::text,true,
+          telemetry.timeText,20,palette::text,true,
+          juce::Justification::centred);
+    // Two balanced CPU/RAM rows, with one decimal only for CPU.
+    label(g,"CPU",telemetry.cpuLabel,11,palette::text,true);
+    label(g,HeaderTelemetryLayout::percentage(systemCpuPercent,true),
+          telemetry.cpuValue,11,palette::text,true,
           juce::Justification::centredRight);
-    label(g,"RAM",{cpuX+9,45,29,16},10,palette::text,true);
-    label(g,ram,{cpuX+39,45,44,16},10,palette::text,true,
+    label(g,"RAM",telemetry.ramLabel,11,palette::text,true);
+    label(g,HeaderTelemetryLayout::percentage(systemRamPercent,false),
+          telemetry.ramValue,11,palette::text,true,
           juce::Justification::centredRight);
-    const auto meter=[&](int y,float percentage,juce::Colour colour) {
-        constexpr float width=34.0f;
+    const auto meter=[&](juce::Rectangle<float> bounds,float percentage,
+                         juce::Colour colour) {
         g.setColour(palette::line);
-        g.fillRoundedRectangle((float)cpuX+87,(float)y,width,6.0f,2.5f);
-        if (percentage>=0) {
+        g.fillRoundedRectangle(bounds,2.5f);
+        if (std::isfinite(percentage) && percentage>=0) {
             g.setColour(colour);
-            g.fillRoundedRectangle((float)cpuX+87,(float)y,
-                width*juce::jlimit(0.0f,1.0f,percentage/100.0f),6.0f,2.5f);
+            g.fillRoundedRectangle(bounds.withWidth(
+                bounds.getWidth()*juce::jlimit(0.0f,1.0f,
+                                              percentage/100.0f)),2.5f);
         }
     };
-    meter(33,systemCpuPercent,palette::teal);
-    meter(49,systemRamPercent,palette::amber);
+    meter(telemetry.cpuMeter,systemCpuPercent,palette::teal);
+    meter(telemetry.ramMeter,systemRamPercent,palette::amber);
 
     // A compact but prominent shared signal monitor: 2x2 traffic
     // indicators and independent audio availability, all inside one card.

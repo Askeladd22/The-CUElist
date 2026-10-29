@@ -1,0 +1,27 @@
+#pragma once
+#include <juce_gui_basics/juce_gui_basics.h>
+#include <cmath>
+
+namespace cuelist {
+// Header telemetry cards with consistent vertical rhythm and a 14px gutter.
+struct HeaderTelemetryLayout final {
+    juce::Rectangle<int> clock,usage;
+    juce::Rectangle<int> timeText,cpuLabel,cpuValue,ramLabel,ramValue;
+    juce::Rectangle<float> cpuMeter,ramMeter;
+    static HeaderTelemetryLayout atWidth(int windowWidth) {
+        const int cx=windowWidth-652, ux=windowWidth-514;
+        return {
+            {cx,8,124,56},{ux,8,132,56},
+            {cx+7,16,110,39},
+            {ux+10,16,28,19},{ux+39,16,48,19},
+            {ux+10,39,28,19},{ux+39,39,48,19},
+            {(float)ux+95,23.5f,27.0f,6.0f},
+            {(float)ux+95,46.5f,27.0f,6.0f}
+        };
+    }
+    static juce::String percentage(float value,bool cpu) {
+        if (!std::isfinite(value) || value<0) return "N/A";
+        return juce::String(value,cpu ? 1 : 0)+"%";
+    }
+};
+} // namespace cuelist
