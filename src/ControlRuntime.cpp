@@ -526,6 +526,7 @@ void MainComponent::completeQuickLearn(const ControlEvent& event) {
             return b.functionId==quickLearnFunctionId &&
                 b.scope==ControlScope::global;
         });
+    const auto name=fn->name;
     const bool ok=found!=show.controls.bindings.end() ?
         updateControlBinding(-1,-1,found->id,input,false) :
         addMappingBinding(input);
@@ -534,7 +535,6 @@ void MainComponent::completeQuickLearn(const ControlEvent& event) {
         quickLearnFunctionId=0;controlLearnArmed=false;oscLearnArmed=false;
         repaint();return;
     }
-    const auto name=fn->name;
     finishQuickLearn();
     status="Learn saved to Default Map: "+name+" ← "+event.deviceId;
     repaint();

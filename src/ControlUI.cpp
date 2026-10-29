@@ -550,9 +550,9 @@ private:
             owner->oscLearnArmed ? palette::amber.withAlpha(.58f) : palette::raised);
         if (auto event=owner->consumeLearnedInput()) {
             captured=event;
-            state.setText("Learned "+event->deviceId+" ch"+juce::String(event->channel)+
-                " / "+juce::String(event->number)+" value "+juce::String(event->value),
-                juce::dontSendNotification);
+            // Commit the selected scope as soon as a hardware event arrives.
+            const auto* entries=currentBindings();
+            createBinding(entries && selected>=0 && selected<(int)entries->size());
         }
         if (editSet) updateEffectivePreview();
     }
@@ -646,9 +646,10 @@ private:
             b.scopeId=owner->show.rows[(size_t)owner->selectedRow].id;
         else if (b.scope==ControlScope::preset)
             b.scopeId=std::max(0,presets.getSelectedId()-1);
-        if (b.scope==ControlScope::column || b.target==ControlTarget::columnGain ||
+        if (b.functionId==0 && (b.scope==ControlScope::column ||
+            b.target==ControlTarget::columnGain ||
             b.target==ControlTarget::columnPan ||
-            b.target==ControlTarget::midiCc || b.target==ControlTarget::oscFloat) {
+            b.target==ControlTarget::midiCc || b.target==ControlTarget::oscFloat)) {
             const int i=columns.getSelectedId()-1;
             if (i<0 || i>=(int)columnIds.size()) {
                 state.setText("Select a destination column.",juce::dontSendNotification);return;
@@ -676,7 +677,7 @@ private:
             b.outputChannel=b.channel;
             b.outputNumber=outputCc.getText().getIntValue();
         }
-        if (b.target==ControlTarget::oscFloat)
+        if (b.target==ControlTarget::oscFloat && b.functionId==0)
             b.oscAddress=oscAddress.getText().trim();
         const auto low=minimum.getText().trim(),high=maximum.getText().trim();
         const auto numeric=[](const juce::String& value) {
@@ -778,8 +779,10 @@ private:
         curve.setSelectedId((int)b.curve+1,juce::dontSendNotification);
         minimum.setText(juce::String(b.minimum,3),false);
         maximum.setText(juce::String(b.maximum,3),false);
-        outputCc.setText(juce::String(b.outputNumber),false);
-        oscAddress.setText(b.oscAddress,false);
+        if (b.functionId==0) {
+            outputCc.setText(juce::String(b.outputNumber),false);
+            oscAddress.setText(b.oscAddress,false);
+        }
         invert.setToggleState(b.invert,juce::dontSendNotification);
         state.setText("Editing #"+juce::String(b.id)+" — input "+b.deviceId+
             " ch"+juce::String(b.channel)+" / "+juce::String(b.number),

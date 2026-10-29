@@ -5,6 +5,22 @@
 #include <limits>
 
 void controlMappingV10Tests() {
+    test("unconfigured abstract outputs remain inert and preserve stable IDs",[] {
+        auto show=makeShow();
+        ControlBinding midi,osc;
+        midi.target=ControlTarget::midiCc;midi.targetColumnId=0;
+        midi.maximum=127.0f;
+        osc.target=ControlTarget::oscFloat;osc.targetColumnId=0;
+        show.controls.functions={{1,"MIDI Function 1",midi},
+                                 {2,"OSC Function 1",osc}};
+        show.controls.nextId=3;
+        check(validateShow(show).wasOk(),"Unconfigured output placeholders rejected");
+        Show loaded;
+        check(decodeShow(encodeShow(show),loaded).wasOk() &&
+              loaded.controls.functions.size()==2,"Function placeholders lost on reload");
+        loaded.controls.functions[0].destination.targetColumnId=99999;
+        check(validateShow(loaded).failed(),"Invalid nonzero output accepted");
+    });
     test("Control Mapping v10 roundtrip, saved preset and v9 migration",[] {
         auto show=makeShow();
         show.controls.midiInputId="controller-id";

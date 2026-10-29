@@ -180,10 +180,13 @@ juce::Result validateShow(const Show& show) {
         return controlResult;
     for (const auto& function:show.controls.functions) {
         const auto& route=function.destination;
-        if (route.target==ControlTarget::midiCc ||
-            route.target==ControlTarget::oscFloat ||
-            route.target==ControlTarget::columnGain ||
-            route.target==ControlTarget::columnPan) {
+        // ID zero means this newly created output is not configured yet.
+        // The function remains editable and inert until an output is chosen.
+        if (route.targetColumnId!=0 &&
+            (route.target==ControlTarget::midiCc ||
+             route.target==ControlTarget::oscFloat ||
+             route.target==ControlTarget::columnGain ||
+             route.target==ControlTarget::columnPan)) {
             const auto it=std::find_if(show.columns.begin(),show.columns.end(),
                 [&](const Column& col){return col.id==route.targetColumnId;});
             if (it==show.columns.end() ||
