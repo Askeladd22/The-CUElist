@@ -72,6 +72,11 @@ int MainComponent::createAbstractControlFunction(
         const juce::String& name,ControlBinding destination) {
     const auto title=name.trim();
     if (title.isEmpty() || title.length()>120) return 0;
+    for (const auto& column:show.columns)
+        if (column.controlLocked) {
+            status="Unlock legacy Control Columns before adding named functions.";
+            return 0;
+        }
     auto candidate=show;
     // The source fields are *never* part of the output function identity.
     destination.id=0;destination.functionId=0;
@@ -260,7 +265,8 @@ bool MainComponent::applyControlSetTemplate(int row,int column,int templateId) {
 bool MainComponent::setControlColumnLocked(int column,bool locked,int sourceRow) {
     if (column<0 || column>=(int)show.columns.size() ||
         show.columns[(size_t)column].type!=ColumnType::control ||
-        sourceRow<0 || sourceRow>=(int)show.rows.size()) return false;
+        sourceRow<0 || sourceRow>=(int)show.rows.size() ||
+        (locked && !show.controls.functions.empty())) return false;
     auto candidate=show;
     auto& col=candidate.columns[(size_t)column];
     if (locked && !col.controlLocked) {
