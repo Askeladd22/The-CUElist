@@ -15,23 +15,24 @@ void smallButton(juce::Graphics& g, const juce::String& text, juce::Rectangle<in
     g.setColour(palette::line.withAlpha(enabled ? 1.0f : .4f));
     g.drawRoundedRectangle(box.toFloat().reduced(.5f),5,1);
     const auto ink=colour.withAlpha(enabled ? 1.0f : .45f);
-    if (text=="^" || text=="v") {
-        // Geometric arrows are symbols, not Exo 2 letters. Ask the bundled
-        // Noto Sans Symbols 2 typeface explicitly; use vector triangles if
-        // this particular font revision does not provide the glyph.
-        const auto cp=(juce::juce_wchar)(text=="^" ? 0x25B2 : 0x25BC);
+    if (text=="^" || text=="v" || text=="<" || text==">") {
+        // Unicode directional symbols are rendered in embedded Noto Sans
+        // Symbols 2, rather than text-shaped ^, v, < or > placeholders.
+        const auto cp=(juce::juce_wchar)(
+            text=="^" ? 0x25B2 : text=="v" ? 0x25BC :
+            text=="<" ? 0x25C0 : 0x25B6);
         const auto& symbols=appTypefaces().notoSymbols2;
         g.setColour(ink);
         if (symbols!=nullptr && symbols->getNominalGlyphForCodepoint(cp).has_value()) {
             g.setFont(symbolsFont(12.0f));
             g.drawText(juce::String::charToString(cp),box,juce::Justification::centred,false);
         } else {
-            const auto centre=box.toFloat().getCentre();
+            const auto c=box.toFloat().getCentre();
             juce::Path triangle;
-            const float direction=text=="^" ? -1.0f : 1.0f;
-            triangle.addTriangle(centre.x,centre.y+direction*4.2f,
-                centre.x-5.1f,centre.y-direction*3.5f,
-                centre.x+5.1f,centre.y-direction*3.5f);
+            if (text=="^") triangle.addTriangle(c.x,c.y-4.2f,c.x-5.f,c.y+3.5f,c.x+5.f,c.y+3.5f);
+            if (text=="v") triangle.addTriangle(c.x,c.y+4.2f,c.x-5.f,c.y-3.5f,c.x+5.f,c.y-3.5f);
+            if (text=="<") triangle.addTriangle(c.x-4.2f,c.y,c.x+3.5f,c.y-5.f,c.x+3.5f,c.y+5.f);
+            if (text==">") triangle.addTriangle(c.x+4.2f,c.y,c.x-3.5f,c.y-5.f,c.x-3.5f,c.y+5.f);
             g.fillPath(triangle);
         }
     } else if (text=="x") {
