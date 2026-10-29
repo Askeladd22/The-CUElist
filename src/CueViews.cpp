@@ -14,7 +14,40 @@ void smallButton(juce::Graphics& g, const juce::String& text, juce::Rectangle<in
     g.fillRoundedRectangle(box.toFloat(),5);
     g.setColour(palette::line.withAlpha(enabled ? 1.0f : .4f));
     g.drawRoundedRectangle(box.toFloat().reduced(.5f),5,1);
-    label(g,text,box,12,colour.withAlpha(enabled ? 1.0f : .45f),true,juce::Justification::centred);
+    const auto ink=colour.withAlpha(enabled ? 1.0f : .45f);
+    if (text=="^" || text=="v") {
+        // Geometric arrows are symbols, not Exo 2 letters. Ask the bundled
+        // Noto Sans Symbols 2 typeface explicitly; use vector triangles if
+        // this particular font revision does not provide the glyph.
+        const auto cp=(juce::juce_wchar)(text=="^" ? 0x25B2 : 0x25BC);
+        const auto& symbols=appTypefaces().notoSymbols2;
+        g.setColour(ink);
+        if (symbols!=nullptr && symbols->getNominalGlyphForCodepoint(cp).has_value()) {
+            g.setFont(symbolsFont(12.0f));
+            g.drawText(juce::String::charToString(cp),box,juce::Justification::centred,false);
+        } else {
+            const auto centre=box.toFloat().getCentre();
+            juce::Path triangle;
+            const float direction=text=="^" ? -1.0f : 1.0f;
+            triangle.addTriangle(centre.x,centre.y+direction*4.2f,
+                centre.x-5.1f,centre.y-direction*3.5f,
+                centre.x+5.1f,centre.y-direction*3.5f);
+            g.fillPath(triangle);
+        }
+    } else if (text=="x") {
+        // Deletion must remain legible regardless of Unicode coverage.
+        const auto c=box.toFloat().getCentre();
+        juce::Path cross;
+        cross.startNewSubPath(c.x-3.8f,c.y-3.8f);
+        cross.lineTo(c.x+3.8f,c.y+3.8f);
+        cross.startNewSubPath(c.x+3.8f,c.y-3.8f);
+        cross.lineTo(c.x-3.8f,c.y+3.8f);
+        g.setColour(ink);
+        g.strokePath(cross,juce::PathStrokeType(1.9f,juce::PathStrokeType::curved,
+                                               juce::PathStrokeType::rounded));
+    } else {
+        label(g,text,box,12,ink,true,juce::Justification::centred);
+    }
 }
 // Draw the loop glyph as vector geometry: never rely on a missing Unicode glyph.
 void drawLoopIcon(juce::Graphics& g,juce::Rectangle<int> bounds,juce::Colour colour) {
@@ -227,10 +260,10 @@ void CueGrid::paint(juce::Graphics& g) {
                     playback.playing=playback.paused=playback.waiting=false;
                 const auto name=cell.name.isNotEmpty()?cell.name:cell.midi?"MIDI":cell.osc?"OSC":
                     juce::File(cell.file).getFileNameWithoutExtension();
-                label(g,name,{x+9,y+4,w-53,21},12,palette::text,true);
+                label(g,name,{x+9,y+4,w-70,21},12,palette::text,true);
                 const auto seconds=owner.clipDuration(r,c);
                 label(g,playback.waiting?"WAITING":timeText(playback.positionSeconds)+" / "+timeText(seconds),
-                     {x+9,y+26,w-59,16},10,tone);
+                     {x+9,y+26,w-74,16},10,tone);
                 const auto progress=seconds>0?juce::jlimit(0.,1.,playback.positionSeconds/seconds):0.;
                 g.setColour(palette::line);g.fillRect(x+7,y+45,w-14,3);
                 g.setColour(playback.waiting||playback.paused?palette::amber:tone);
@@ -253,8 +286,9 @@ void CueGrid::paint(juce::Graphics& g) {
                       active?palette::teal:palette::amber,true,juce::Justification::centred);
             }
             if (column.type!=ColumnType::control) {
-                transportButton(g,{x+w-49,y+25,19,18},false,loaded);
-                transportButton(g,{x+w-26,y+25,19,18},true,loaded);
+                // 24x23 px individual transports, with an 8px safety gap.
+                transportButton(g,{x+w-64,y+23,24,23},false,loaded);
+                transportButton(g,{x+w-32,y+23,24,23},true,loaded);
             }
         }
         g.restoreState();
@@ -418,12 +452,12 @@ void CueGrid::mouseDown(const juce::MouseEvent& e) {
             owner.setCellAutoStop(row,column,!owner.show.rows[(size_t)row].cells[(size_t)column].stopOnNext);
         return;
     }
-    if (col.type!=ColumnType::control && localY>=25 && localY<43) {
-        if (localX>=w-49 && localX<w-30) {
+    if (col.type!=ColumnType::control && localY>=23 && localY<46) {
+        if (localX>=w-64 && localX<w-40) {
             if (e.getNumberOfClicks()==1 && owner.hasClip(row,column)) owner.triggerCellAt(row,column);
             return;
         }
-        if (localX>=w-26 && localX<w-7) {
+        if (localX>=w-32 && localX<w-8) {
             if (e.getNumberOfClicks()==1 && owner.hasClip(row,column)) owner.stopCellAt(row,column);
             return;
         }
@@ -470,7 +504,7 @@ void CueGrid::mouseDoubleClick(const juce::MouseEvent& e) {
     if (e.x>=107 && e.x<rowPlayBounds(0).getX()-4) owner.renameTitle(false,row);
     else if (column>=0 && !owner.show.columns[(size_t)column].collapsed) {
         const int localX=e.x-columnX(column),localY=(e.y-headerHeight)%rowHeight-rowContentInset;
-        if (localY>=25 && localY<43 && localX>=columnWidthAt(column)-49) return;
+        if (localY>=23 && localY<46 && localX>=columnWidthAt(column)-64) return;
         if (owner.select(row,column)) {
             const auto type=owner.show.columns[(size_t)column].type;
             if (type==ColumnType::midi) owner.editMidiClip();
@@ -575,16 +609,26 @@ void CueMetricsOverlay::paint(juce::Graphics& g) {
             g.setColour(cueTone.withAlpha(.28f));g.fillRect(3,y,getWidth()-3,CueGrid::rowHeight);
         }
         label(g,juce::String(row.tempo.front().bpm,1),{22,y+14,65,24},14,palette::text,true);
+        // Separate the master toggle from cell-level disclosure within
+        // the 62px row. The disclosure looks actionable even when collapsed.
         g.setColour(row.stopOnNext?palette::teal.withAlpha(.3f):palette::muted.withAlpha(.2f));
-        g.fillRoundedRectangle(105.f,(float)y+12,31.f,19.f,9.f);
+        g.fillRoundedRectangle(105.f,(float)y+10,31.f,19.f,9.f);
         g.setColour(row.stopOnNext?palette::teal:palette::muted);
-        g.fillEllipse(row.stopOnNext?121.f:108.f,(float)y+15,13.f,13.f);
-        label(g,row.stopOnNext?"ON":"OFF",{139,y+11,39,22},10,
+        g.fillEllipse(row.stopOnNext?121.f:108.f,(float)y+13,13.f,13.f);
+        label(g,row.stopOnNext?"ON":"OFF",{141,y+9,36,21},10,
               row.stopOnNext?palette::teal:palette::muted,true);
         const bool details=owner.grid.autoStopDetailsVisible(row.id);
-        label(g,details?"-":"+",
-              {117,y+36,24,20},15,details?palette::amber:palette::muted,true,
-              juce::Justification::centred);
+        const juce::Rectangle<float> disclose(108.f,(float)y+36,68.f,20.f);
+        g.setColour(palette::raised);
+        g.fillRoundedRectangle(disclose,4.0f);
+        g.setColour((details?palette::amber:palette::line).withAlpha(.85f));
+        g.drawRoundedRectangle(disclose.reduced(.5f),4.0f,1.0f);
+        g.setColour(details?palette::amber:palette::text);
+        const float cx=121.f,cy=(float)y+46;
+        g.drawLine(cx-4.f,cy,cx+4.f,cy,1.8f);
+        if (!details) g.drawLine(cx,cy-4.f,cx,cy+4.f,1.8f);
+        label(g,"CELLS",{134,y+37,39,18},10,
+              details?palette::amber:palette::muted,true);
         g.setColour(palette::line);
         g.drawHorizontalLine(y+CueGrid::rowHeight-1,0,(float)getWidth());
     }
@@ -614,8 +658,10 @@ void CueMetricsOverlay::mouseDown(const juce::MouseEvent& e) {
     if (row<0 || row>=(int)owner.show.rows.size()) return;
     const int localY=(e.y+scroll-CueGrid::headerHeight)%CueGrid::rowHeight;
     if (e.x<91) owner.editRowBpm(row);
-    else if (localY>=32) owner.grid.toggleAutoStopDetails(row);
-    else owner.setAutoStop(row,!owner.show.rows[(size_t)row].stopOnNext);
+    else if (e.x>=104 && e.x<180 && localY>=34 && localY<59)
+        owner.grid.toggleAutoStopDetails(row);
+    else if (e.x>=102 && e.x<180 && localY>=8 && localY<34)
+        owner.setAutoStop(row,!owner.show.rows[(size_t)row].stopOnNext);
     repaint();
 }
 void CueMetricsOverlay::mouseWheelMove(const juce::MouseEvent& e,const juce::MouseWheelDetails& wheel) {
