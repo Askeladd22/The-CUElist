@@ -195,7 +195,7 @@ public:
     }
     const ControlBinding* matched(const ControlEvent& e) const {
         const ControlBinding* best=nullptr;
-        for (const auto& b:settings.bindings) if (samePhysicalInput(b,e)
+        for (const auto& b:settings.bindings) if (b.functionId==0 && samePhysicalInput(b,e)
             && scopeApplies(b,activeCueId,activePresetId)) {
             if (!best || priority(b.scope)>priority(best->scope) ||
                 (priority(b.scope)==priority(best->scope) && b.id<best->id)) best=&b;
@@ -209,7 +209,7 @@ public:
         int winningPriority=0;
         for (const auto& layer:layers) {
             if (!layer.locked && (activeCueId<=0 || layer.cueId!=activeCueId)) continue;
-            for (const auto& b:layer.set.bindings) if (samePhysicalInput(b,e)) {
+            for (const auto& b:layer.set.bindings) if (b.functionId==0 && samePhysicalInput(b,e)) {
                 if (layer.priority>=winningPriority) {
                     best=&b; winningPriority=layer.priority;
                 }
