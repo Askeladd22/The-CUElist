@@ -4,6 +4,7 @@
 #include "OperatorReportDialog.h"
 #include "OperatorTextPrompt.h"
 #include "OscEditor.h"
+#include "HeaderTelemetry.h"
 void uiRefinementTests() {
     using namespace cueViewFixtures;
     test("Native Guide renders Markdown and supports section search",[] {
@@ -934,7 +935,16 @@ void uiRefinementTests() {
               "Expand all still creates a tooltip over the first cue");
     });
 
-    test("Individual cell transports have 24px targets and an 8px gap",[] {
+    test("Cue-row Play Stop More have compact, equal spacing",[] {
+        const auto play=CueGrid::rowPlayBounds(0);
+        const auto stop=CueGrid::rowStopBounds(0);
+        const auto menu=CueGrid::rowMenuBounds(0);
+        check(stop.getX()-play.getRight()==5 &&
+              menu.getX()-stop.getRight()==5 &&
+              menu.getRight()<=CueGrid::nameWidth-7,
+              "Cue-row action gaps must be 5px and stay within the title column");
+    });
+    test("Individual cell transports have smaller visuals with full-size hitboxes",[] {
         const auto play=CueGrid::cellPlayBounds(0,CueGrid::columnWidth,0);
         const auto stop=CueGrid::cellStopBounds(0,CueGrid::columnWidth,0);
         check(play.getWidth()>=24 && play.getHeight()>=23 &&
@@ -945,17 +955,39 @@ void uiRefinementTests() {
         check(!play.contains(stop.getCentre()) &&
               !stop.contains(play.getCentre()),
               "Cell transports share hit targets");
+        const auto visualPlay=CueGrid::cellButtonVisualBounds(play);
+        const auto visualStop=CueGrid::cellButtonVisualBounds(stop);
+        check(visualPlay.getWidth()==20 && visualPlay.getHeight()==21 &&
+              visualStop.getWidth()==20 && visualStop.getHeight()==21 &&
+              play.contains(visualPlay) && stop.contains(visualStop),
+              "Cell button visuals must be smaller than their 24x23 hit areas");
     });
 
-    test("CPU/RAM telemetry fits compact window widths and preserves font routing",[] {
+    test("Header telemetry has balanced cards and CPU one-decimal formatting",[] {
         MainComponent ui(false);
+        check(HeaderTelemetryLayout::percentage(5.8593f,true)=="5.9%" &&
+              HeaderTelemetryLayout::percentage(47.0f,false)=="47%" &&
+              HeaderTelemetryLayout::percentage(-1.0f,true)=="N/A",
+              "CPU must show one decimal, RAM a whole percent, or N/A");
         for (const auto size:std::initializer_list<juce::Point<int>>{
                  {1180,820},{1440,900},{1647,895},{1920,1080}}) {
             ui.setSize(size.x,size.y);
-            const auto card=ui.createComponentSnapshot({size.x-516,8,132,56});
-            check(card.isValid() && card.getWidth()==132 && card.getHeight()==56,
-                  "CPU/RAM panel escaped its compact bounds");
-            check(font(10.0f).getTypefaceName().containsIgnoreCase("Exo"),
+            const auto layout=HeaderTelemetryLayout::atWidth(size.x);
+            check(layout.clock.getRight()+14==layout.usage.getX() &&
+                  layout.clock.getY()==layout.usage.getY() &&
+                  layout.clock.getHeight()==layout.usage.getHeight(),
+                  "Clock and CPU/RAM panels need a consistent 14px gutter");
+            check(layout.usage.contains(layout.cpuValue) &&
+                  layout.usage.contains(layout.ramValue) &&
+                  layout.usage.contains(layout.cpuMeter.toNearestInt()) &&
+                  layout.usage.contains(layout.ramMeter.toNearestInt()),
+                  "CPU/RAM labels and meters must fit inside the card");
+            const auto clock=ui.createComponentSnapshot(layout.clock);
+            const auto cpu=ui.createComponentSnapshot(layout.usage);
+            check(clock.isValid() && clock.getWidth()==124 &&
+                  cpu.isValid() && cpu.getWidth()==132,
+                  "Header cards must render at compact window widths");
+            check(font(11.0f).getTypefaceName().containsIgnoreCase("Exo"),
                   "Small telemetry text lost Exo 2");
         }
     });
