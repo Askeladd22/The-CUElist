@@ -8,7 +8,7 @@
 #include <vector>
 
 namespace cuelist {
-enum class ControlKind { cc, note, pitchBend };
+enum class ControlKind { cc, note, pitchBend, osc };
 enum class ControlScope { global, column, preset, cue };
 enum class ControlTarget { go, panic, masterGain, columnGain, midiCc, oscFloat, columnPan, masterPan };
 enum class ControlTakeover { pickup, jump };
@@ -89,6 +89,9 @@ struct ControlSettings {
     std::vector<ControlSetTemplate> templates;
     // Functions belong to the project, not reusable controller presets.
     std::vector<ControlFunction> functions;
+    // Zero disables the OSC input socket. Operator explicitly configures a
+    // UDP port before network OSC can trigger any mappings.
+    int oscInputPort=0;
 };
 struct EffectiveControl {
     ControlBinding binding;
@@ -264,6 +267,7 @@ private:
 inline juce::Result validateControls(const ControlSettings& s,
         const std::vector<int>& rowIds,const std::vector<int>& columnIds) {
     if (s.midiInputId.length()>255 || s.nextId<1 || s.nextId>=1000000000 ||
+        (s.oscInputPort!=0 && (s.oscInputPort<1 || s.oscInputPort>65535)) ||
         s.bindings.size()>2048 || s.presets.size()>256 ||
         s.templates.size()>128 || s.functions.size()>512)
         return juce::Result::fail("MIDI mapping limits exceeded.");
@@ -303,10 +307,12 @@ inline juce::Result validateControls(const ControlSettings& s,
         if (b.id<1 || b.id>=s.nextId || !ids.insert(b.id).second || b.deviceId.length()>255
             || (b.functionId>0 && std::none_of(s.functions.begin(),s.functions.end(),
                 [&](const ControlFunction& f){return f.id==b.functionId;}))
-            || (int)b.kind<0 || (int)b.kind>2 || (int)b.scope<0 || (int)b.scope>3
+            || (int)b.kind<0 || (int)b.kind>3 || (int)b.scope<0 || (int)b.scope>3
             || (int)b.target<0 || (int)b.target>7 || (int)b.takeover<0 || (int)b.takeover>1
             || (int)b.curve<0 || (int)b.curve>2
             || b.channel<1 || b.channel>16 || b.number<0 || b.number>127
+            || (b.kind==ControlKind::osc &&
+                (!b.deviceId.startsWithChar('/') || b.channel!=1 || b.number!=0))
             || b.outputChannel<1 || b.outputChannel>16 || b.outputNumber<0 || b.outputNumber>127
             || b.oscPort<1 || b.oscPort>65535 || b.oscHost.isEmpty() || b.oscHost.length()>255
             || b.oscAddress.isEmpty() || !b.oscAddress.startsWithChar('/')
