@@ -1,5 +1,6 @@
 #pragma once
 #include "ControlMapping.h"
+#include "ControlPresetArchive.h"
 #include "MidiInputManager.h"
 #include "ControlOutputRouter.h"
 #include <limits>
