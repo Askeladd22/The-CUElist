@@ -42,7 +42,7 @@ A properly packaged build does not require Visual Studio, Git or CMake to run. K
 
 The sidebar provides **New**, **Open**, **Save**, the editable show title, **Audio devices**, **Preferences**, **Control Mapping** and a project overview. Near the bottom, **On Deck** identifies the next cue; **GO / SPACE** and **PANIC / ESC** remain accessible at all times.
 
-- **New** starts a fresh show and warns if current changes would be discarded.
+- **New** starts a fresh show and warns if current changes would be discarded. The compact **Unsaved changes** dialog keeps **Cancel** as the safe choice; **Discard and continue** must be selected explicitly to proceed without saving. Closing the dialog or pressing Escape also cancels the operation. To save instead, select Cancel and then Save.
 - **Open** loads an existing project, subject to preparation and validation before activation.
 - **Save** writes the project and collects referenced media.
 - **Preferences** contains Pre-flight, Diagnostics, Fader Range and Rename active Cuelist.
