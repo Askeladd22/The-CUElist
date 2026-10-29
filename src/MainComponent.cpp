@@ -386,28 +386,33 @@ void MainComponent::paint(juce::Graphics& g) {
     g.setColour(palette::line.withAlpha(.85f));
     g.drawRoundedRectangle((float)clockX,8.0f,124.0f,56.0f,5.0f,1.0f);
     g.drawRoundedRectangle((float)cpuX,8.0f,132.0f,56.0f,5.0f,1.0f);
-    label(g,"CLOCK  /  24H",{clockX+10,11,104,17},10,palette::muted,true);
+    // Narrow telemetry cards use aligned value and meter columns.
+    label(g,"CLOCK / 24H",{clockX+10,11,104,17},10,palette::muted,true);
     label(g,juce::Time::getCurrentTime().formatted("%H:%M:%S"),
-          {clockX+10,29,104,28},19,palette::text,true);
-    label(g,"CPU / RAM METER",{cpuX+9,11,115,16},10,palette::muted,true);
+          {clockX+10,30,104,26},18,palette::text,true);
+    label(g,"CPU / RAM",{cpuX+9,11,115,16},10,palette::muted,true);
     const auto cpu=systemCpuPercent<0 ? juce::String("N/A") :
                   juce::String(systemCpuPercent,0)+"%";
     const auto ram=systemRamPercent<0 ? juce::String("N/A") :
                   juce::String(systemRamPercent,0)+"%";
-    label(g,"CPU "+cpu,{cpuX+9,29,76,16},11,palette::text,true);
-    label(g,"RAM "+ram,{cpuX+9,45,76,16},11,palette::text,true);
+    label(g,"CPU",{cpuX+9,29,29,16},10,palette::text,true);
+    label(g,cpu,{cpuX+39,29,44,16},10,palette::text,true,
+          juce::Justification::centredRight);
+    label(g,"RAM",{cpuX+9,45,29,16},10,palette::text,true);
+    label(g,ram,{cpuX+39,45,44,16},10,palette::text,true,
+          juce::Justification::centredRight);
     const auto meter=[&](int y,float percentage,juce::Colour colour) {
-        constexpr float width=33.0f;
+        constexpr float width=34.0f;
         g.setColour(palette::line);
-        g.fillRoundedRectangle((float)cpuX+90,(float)y,width,5.0f,2.0f);
+        g.fillRoundedRectangle((float)cpuX+87,(float)y,width,6.0f,2.5f);
         if (percentage>=0) {
             g.setColour(colour);
-            g.fillRoundedRectangle((float)cpuX+90,(float)y,
-                width*juce::jlimit(0.0f,1.0f,percentage/100.0f),5.0f,2.0f);
+            g.fillRoundedRectangle((float)cpuX+87,(float)y,
+                width*juce::jlimit(0.0f,1.0f,percentage/100.0f),6.0f,2.5f);
         }
     };
-    meter(34,systemCpuPercent,palette::teal);
-    meter(50,systemRamPercent,palette::amber);
+    meter(33,systemCpuPercent,palette::teal);
+    meter(49,systemRamPercent,palette::amber);
 
     // A compact but prominent shared signal monitor: 2x2 traffic
     // indicators and independent audio availability, all inside one card.
