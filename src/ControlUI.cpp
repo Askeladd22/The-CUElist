@@ -100,6 +100,8 @@ public:
         functionChoice.onChange=[this] {
             if (!owner) return;
             const int id=functionChoice.getSelectedId()-1;
+            scope.setSelectedId(1,juce::dontSendNotification);
+            scope.setEnabled(id==0 && !editSet);
             for (const auto& item:owner->show.controls.functions)
                 if (item.id==id) {
                     functionName.setText(item.name,false);
@@ -159,8 +161,10 @@ public:
         updateSelected.setEnabled(false);
         remove.setEnabled(false);
         emptyBindings.setName("mappingEmptyState");
-        emptyBindings.setText("No mappings yet. Use MIDI Learn, then Add mapping.",
-                              juce::dontSendNotification);
+        emptyBindings.setText(editSet ?
+             "No local overrides. Functions inherit the Default Map." :
+             "No Default Map inputs. Create a function, then use Learn.",
+             juce::dontSendNotification);
         emptyBindings.setColour(juce::Label::textColourId,palette::muted);
         emptyBindings.setFont(font(13.5f));
         emptyBindings.setJustificationType(juce::Justification::centred);
@@ -324,7 +328,7 @@ public:
     void paint(juce::Graphics& g) override {
         g.fillAll(palette::panel);
         label(g,editSet ? "CONTROL SET / Q"+juce::String(sourceRow+1) :
-              "CONTROL & MAPPING",{20,15,520,31},21,palette::teal,true);
+              "DEFAULT MAP / CONTROL MAPPING",{20,15,620,31},21,palette::teal,true);
         g.setColour(palette::line);
         g.drawHorizontalLine(52,19,(float)getWidth()-19);
         label(g,"MIDI / OSC INPUT",{20,60,350,19},12,palette::teal,true);
@@ -608,8 +612,8 @@ private:
         // A Control Set overrides only which physical input invokes the
         // function. Target/destination remain owned by the project function.
         b.functionId=std::max(0,functionChoice.getSelectedId()-1);
-        if (!update && b.functionId==0 && !owner->show.controls.functions.empty()) {
-            state.setText("Choose a named function for new mappings.",
+        if (!update && b.functionId==0) {
+            state.setText("Create or select a named function in Default Map first.",
                           juce::dontSendNotification);
             return;
         }
@@ -714,7 +718,8 @@ private:
             "PREVIEW Q"+juce::String(row+1)+" — changes take effect after GO";
         if (resolved.empty()) summary+="\nNo active Control Column mappings.";
         for (const auto& item:resolved) {
-            juce::String source="Global / legacy";
+            juce::String source=item.binding.functionId>0 ?
+                "Default Map" : "Global / legacy";
             for (const auto& col:owner->show.columns)
                 if (col.id==item.columnId) {source=col.name;break;}
             const auto& b=item.binding;
@@ -758,6 +763,7 @@ private:
         const auto& b=(*entries)[(size_t)row];
         captured.reset();
         scope.setSelectedId((int)b.scope+1,juce::dontSendNotification);
+        scope.setEnabled(!editSet && b.functionId==0);
         functionChoice.setSelectedId(b.functionId>0 ? b.functionId+1 : 1,
                                      juce::dontSendNotification);
         // Combo target item order differs from ControlTarget enumeration.
