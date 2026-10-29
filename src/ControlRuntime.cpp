@@ -37,6 +37,44 @@ juce::Result MainComponent::selectControlInput(const juce::String& id) {
     repaint(); return result;
 }
 
+int MainComponent::createAbstractControlFunction(
+        const juce::String& name,ControlBinding destination) {
+    const auto title=name.trim();
+    if (title.isEmpty() || title.length()>120) return 0;
+    auto candidate=show;
+    // The source fields are *never* part of the output function identity.
+    destination.id=0;destination.functionId=0;
+    destination.deviceId={};destination.scope=ControlScope::global;
+    destination.scopeId=0;
+    const int id=candidate.controls.nextId++;
+    candidate.controls.functions.push_back({id,title,std::move(destination)});
+    if (const auto valid=validateShow(candidate);valid.failed()) {
+        status=valid.getErrorMessage();return 0;
+    }
+    show=std::move(candidate);refreshControlSettings();dirty=true;
+    status="Abstract function created: "+title;refresh();return id;
+}
+bool MainComponent::updateAbstractControlFunction(
+        int id,const juce::String& name,ControlBinding destination) {
+    const auto title=name.trim();
+    if (title.isEmpty() || title.length()>120) return false;
+    auto candidate=show;
+    const auto it=std::find_if(candidate.controls.functions.begin(),
+        candidate.controls.functions.end(),
+        [id](const ControlFunction& f){return f.id==id;});
+    if (it==candidate.controls.functions.end()) return false;
+    destination.id=0;destination.functionId=0;
+    destination.deviceId={};destination.scope=ControlScope::global;
+    destination.scopeId=0;
+    it->name=title;it->destination=std::move(destination);
+    if (const auto valid=validateShow(candidate);valid.failed()) {
+        status=valid.getErrorMessage();return false;
+    }
+    show=std::move(candidate);refreshControlSettings();dirty=true;
+    status="Function route updated without changing its hardware inputs.";
+    refresh();return true;
+}
+
 bool MainComponent::addMappingBinding(ControlBinding b) {
     auto candidate=show;
     b.id=candidate.controls.nextId++;
