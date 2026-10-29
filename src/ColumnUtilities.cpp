@@ -85,7 +85,7 @@ struct ColumnUtilities::Strip final : juce::Component {
         controlLock.setName("controlColumnLock");
         controlPriority.setName("controlColumnPriority");
         controlEdit.setName("controlColumnEditSet");
-        controlLock.setTooltip("Lock this Control Column as a low-priority default for all cues.");
+        controlLock.setTooltip("Legacy Control Column lock. Unlock before migrating to abstract functions.");
         controlLock.onClick=[this] {
             const auto& col=owner.show.columns[(size_t)index];
             owner.setControlColumnLocked(index,!col.controlLocked,owner.selectedRow);
@@ -173,13 +173,16 @@ struct ColumnUtilities::Strip final : juce::Component {
         oscDestination.setVisible(col.type==ColumnType::osc && !col.collapsed);
         output.setVisible(!col.collapsed && (col.type==ColumnType::audio || col.type==ColumnType::midi));
         const bool control=col.type==ColumnType::control;
-        controlLock.setVisible(control);
+        // The old column lock cannot be enabled on a new Default Map.
+        // Show only already-locked legacy projects so the operator may
+        // explicitly unlock and migrate without losing their old settings.
+        controlLock.setVisible(control && col.controlLocked &&
+                               owner.show.controls.functions.empty());
         controlPriority.setVisible(control && !col.collapsed);
         controlEdit.setVisible(control && !col.collapsed);
         if (control) {
             controlLock.setToggleState(col.controlLocked,juce::dontSendNotification);
-            controlLock.setTooltip(col.controlLocked ? "Locked: click to unlock this Control Column." :
-                "Unlocked: click to lock this Control Column.");
+            controlLock.setTooltip("Legacy lock active: unlock before using named functions.");
             controlPriority.setButtonText(col.controlLocked ? "Low" :
                 col.controlPriority==4 ? "Maximum" :
                 col.controlPriority==3 ? "High" : "Medium");
