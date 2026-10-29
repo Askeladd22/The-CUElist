@@ -101,8 +101,12 @@ function has a stable ID and a project-specific editable label, separate
 from its hardware input. For example, rebinding Resolume Brightness to a
 new fader does not rewrite its outgoing MIDI CC.
 
-**Device requirements.** An input MIDI device must have been selected and
-connected through Control Mappings before a MIDI Learn can capture data.
+**Device requirements.** You can select a MIDI function without any
+connected hardware: the chosen function still blinks amber, but the
+Inspector displays **MIDI input not connected**. This preserves the
+visual feedback and never pretends to have received data. An input MIDI
+device must be selected and connected through Control Mappings before
+a MIDI Learn can actually capture a physical message.
 OSC Learn automatically enables the project's configured UDP listener, or
 uses port **9011** when no port has been configured. A new output-function
 slot without a matching MIDI/OSC output column can be learned but **will not
