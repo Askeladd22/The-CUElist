@@ -1,6 +1,7 @@
 #pragma once
 #include "MainComponent.h"
 #include "ControlMapping.h"
+#include <limits>
 #include "ControlPresetArchive.h"
 
 void controlColumnTests() {
@@ -155,6 +156,23 @@ void controlColumnTests() {
               incoming.deviceId=="/show/brightness" &&
               incoming.value==packet.value,
               "OSC Learn did not receive the parsed control event");
+        // A finite OSC float may be far beyond [0,1]. Conversion must
+        // saturate safely before lround rather than overflowing integer range.
+        event.arguments[0].decimal=std::numeric_limits<float>::max();
+        const auto hugePositive=encodeOscMessage(event);
+        check(OscControlInput::decode(hugePositive.data(),(int)hugePositive.size(),packet) &&
+              packet.value==127,
+              "Finite high OSC float did not saturate to the maximum MIDI value");
+        event.arguments[0].decimal=-std::numeric_limits<float>::max();
+        const auto hugeNegative=encodeOscMessage(event);
+        check(OscControlInput::decode(hugeNegative.data(),(int)hugeNegative.size(),packet) &&
+              packet.value==0,
+              "Finite negative OSC float did not saturate to zero");
+        event.arguments[0].decimal=0.5f;
+        const auto midpoint=encodeOscMessage(event);
+        check(OscControlInput::decode(midpoint.data(),(int)midpoint.size(),packet) &&
+              packet.value==64,
+              "In-range OSC float quantization changed unexpectedly");
         event.arguments[0].type=OscValueType::boolean;
         event.arguments[0].boolean=true;
         const auto on=encodeOscMessage(event);
