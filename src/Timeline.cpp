@@ -179,8 +179,12 @@ void Timeline::paint(juce::Graphics& g) {
     }
     if (getHeight()>=detailedToolbarHeight) for (int i=0;i<3;++i) {
         const auto box=zoomButton(getWidth(),i);
-        g.setColour(palette::raised); g.fillRoundedRectangle(box.toFloat(),3);
-        label(g,i==0 ? "-" : i==1 ? "+" : "Fit",box,12,palette::text,true,juce::Justification::centred);
+        // Timeline zoom controls use the same restrained icon-only surface;
+        // their click geometry and zoom/fit behavior are unchanged.
+        drawIconButtonSurface(g,box.toFloat(),palette::teal,
+                              IconButtonState{true,false,false,false,false},3.5f);
+        label(g,i==0 ? "-" : i==1 ? "+" : "Fit",box,12,palette::text,true,
+              juce::Justification::centred);
     }
     g.setColour(palette::line); g.drawHorizontalLine(45,0,(float)getWidth());
     // At minimum height even the ruler is outside the supported content
