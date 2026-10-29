@@ -1045,15 +1045,16 @@ void uiRefinementTests() {
         utility->refresh();
         auto* strip=utility->getChildComponent(0)->getChildComponent(1);
         auto* lock=dynamic_cast<juce::Button*>(controlsV3::named(*strip,"controlColumnLock"));
-        check(lock && lock->isVisible() && !lock->getToggleState(),
-              "Unlocked icon state missing");
+        check(lock && !lock->isVisible() && !lock->getToggleState(),
+              "Legacy lock is still exposed for new Control Sets");
         check(ui.setControlColumnLocked(1,true,0),"Could not lock Control Column");
         utility->refresh();
         check(lock->getToggleState() && ui.show.columns[1].controlPriority==1,
               "Closed-lock icon and model disagreed");
         check(ui.setControlColumnLocked(1,false,0),"Could not unlock Control Column");
         utility->refresh();
-        check(!lock->getToggleState(),"Opened-lock icon did not update");
+        check(!lock->getToggleState() && !lock->isVisible(),
+              "Legacy lock remained visible after explicit unlock");
     });
     test("MIDI RX activity counts accepted physical input callbacks, not connections",[] {
         MidiInputManager input;
