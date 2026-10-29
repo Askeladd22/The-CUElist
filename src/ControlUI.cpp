@@ -136,10 +136,10 @@ public:
                                 (choice==2 && col.type==ColumnType::osc)) {
                                 destination.targetColumnId=col.id;break;
                             }
-                        const auto base=choice==1 ? "MIDI Function " : "OSC Function ";
-                        auto name=panel.functionName.getText().trim();
-                        if (name.isEmpty())
-                            name=base+juce::String((int)main.show.controls.functions.size()+1);
+                        const juce::String base=choice==1 ? "MIDI Function " : "OSC Function ";
+                        // This field shows the selected function's current name.
+                        // Never accidentally copy it when creating a new slot.
+                        const auto name=base+juce::String((int)main.show.controls.functions.size()+1);
                         const int id=main.createAbstractControlFunction(name,destination);
                         if (id>0) {
                             panel.refreshFunctions();
@@ -374,7 +374,7 @@ public:
     void paint(juce::Graphics& g) override {
         g.fillAll(palette::panel);
         label(g,editSet ? "CONTROL SET / Q"+juce::String(sourceRow+1) :
-              "DEFAULT MAP / CONTROL MAPPING",{20,15,620,31},21,palette::teal,true);
+              "DEFAULT MAP / CONTROL MAPPINGS",{20,15,620,31},21,palette::teal,true);
         g.setColour(palette::line);
         g.drawHorizontalLine(52,19,(float)getWidth()-19);
         label(g,"MIDI / OSC INPUT",{20,60,350,19},12,palette::teal,true);
@@ -868,7 +868,7 @@ void MainComponent::openControlPanel(bool editSet) {
     juce::DialogWindow::LaunchOptions options;
     options.content.setOwned(new ControlPanel(*this,editSet));
     options.dialogTitle=editSet ? "The Cuelist — Control Set" :
-        "The Cuelist — Control & Mapping";
+        "The Cuelist — Control Mappings";
     options.dialogBackgroundColour=palette::panel;
     options.escapeKeyTriggersCloseButton=true;
     options.useNativeTitleBar=false;
