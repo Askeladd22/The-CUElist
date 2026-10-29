@@ -150,11 +150,14 @@ public:
                 const auto b=withFunctionDestination(raw);
                 int highestConflict=-1;
                 bool replaced=false;
-                for (const auto& current:result) {
+                size_t insertion=result.size();
+                for (size_t i=0;i<result.size();++i) {
+                    const auto& current=result[i];
                     const bool sameFunction=b.functionId>0 &&
                         current.binding.functionId==b.functionId;
                     if (sameFunction || sameSource(current.binding,b)) {
                         highestConflict=std::max(highestConflict,current.priority);
+                        insertion=std::min(insertion,i);
                         replaced=true;
                     }
                 }
@@ -164,7 +167,9 @@ public:
                         return sameSource(current.binding,b) ||
                             (b.functionId>0 && current.binding.functionId==b.functionId);
                     }),result.end());
-                result.push_back({b,layer.columnId,layer.priority,layer.locked,replaced});
+                // Stable display order matters for inherited/override previews.
+                result.insert(result.begin()+std::min(insertion,result.size()),
+                              {b,layer.columnId,layer.priority,layer.locked,replaced});
             }
         }
         return result;
