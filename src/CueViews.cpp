@@ -641,14 +641,14 @@ void CueMetricsOverlay::paint(juce::Graphics& g) {
     // (including partially visible toggles) can appear above the boundary.
     g.setColour(palette::raised);
     g.fillRect(0,0,getWidth(),CueGrid::headerHeight);
-    // Paint the vertical boundary last, uninterrupted by row separators.
-    g.setColour(palette::teal);g.fillRect(0,0,3,getHeight());
-    g.setColour(palette::line);
-    g.drawVerticalLine(3,0.0f,(float)getHeight());
     label(g,"BPM",{22,18,61,23},11,palette::text,true);
     label(g,"AUTO STOP",{100,18,78,23},10,palette::text,true);
     g.setColour(palette::line);
-    g.drawHorizontalLine(CueGrid::headerHeight-1,0.0f,(float)getWidth());
+    g.drawHorizontalLine(CueGrid::headerHeight-1,4.0f,(float)getWidth());
+    // Draw the accent after every horizontal rule: no one-pixel gaps.
+    g.setColour(palette::teal);g.fillRect(0,0,3,getHeight());
+    g.setColour(palette::line);
+    g.drawVerticalLine(3,0.0f,(float)getHeight());
 }
 void CueMetricsOverlay::mouseDown(const juce::MouseEvent& e) {
     if (e.y<CueGrid::headerHeight) return;
