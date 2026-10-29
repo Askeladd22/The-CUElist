@@ -529,7 +529,7 @@ void MainComponent::openControlPanel(bool editSet) {
         "The Cuelist — Control & Mapping";
     options.dialogBackgroundColour=palette::panel;
     options.escapeKeyTriggersCloseButton=true;
-    options.useNativeTitleBar=true;
+    options.useNativeTitleBar=false;
     options.resizable=true;
     controlDialog=options.launchAsync();
 }
