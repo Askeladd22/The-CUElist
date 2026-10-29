@@ -680,6 +680,64 @@ void uiRefinementTests() {
                   "Row separators interrupt the pinned metrics accent rail");
     });
 
+    test("Audio MIDI OSC headers remain fixed while cue rows scroll",[] {
+        MainComponent ui(false);
+        for (int i=0;i<12;++i) addRow(ui.show,"Scrolled cue");
+        for (int i=0;i<7;++i) addColumn(ui.show,ColumnType::audio,{});
+        ui.setSize(1180,820);
+        auto* columns=cueViewFixtures::find<PinnedColumnHeaders>(ui);
+        auto* names=cueViewFixtures::find<PinnedCueHeaders>(ui);
+        auto* metrics=cueViewFixtures::find<CueMetricsOverlay>(ui);
+        auto* grid=cueViewFixtures::find<CueGrid>(ui);
+        juce::Viewport* view=nullptr;
+        for (auto* child:ui.getChildren())
+            if (auto* candidate=dynamic_cast<juce::Viewport*>(child))
+                view=candidate;
+        check(columns && names && metrics && grid && view,
+              "Fixed column heading or viewport is missing");
+        check(columns->getHeight()==CueGrid::headerHeight &&
+              columns->getY()==view->getY() &&
+              columns->getX()==names->getRight() &&
+              columns->getRight()==view->getRight() &&
+              metrics->getX()==view->getRight(),
+              "Cue, column and BPM headings do not share one fixed boundary");
+        const auto heading=juce::Rectangle<int>(
+            0,0,columns->getWidth(),CueGrid::headerHeight);
+        const auto before=columns->createComponentSnapshot(heading);
+        view->setViewPosition(0,115);
+        check(view->getViewPositionY()==115,
+              "Vertical scrolling did not move the underlying cue rows");
+        const auto after=columns->createComponentSnapshot(heading);
+        bool same=before.isValid() && after.isValid() &&
+                  before.getBounds()==after.getBounds();
+        if(same)
+            for (int y=0;y<before.getHeight() && same;y+=4)
+                for (int x=0;x<before.getWidth();x+=4)
+                    if (before.getPixelAt(x,y)!=after.getPixelAt(x,y)) {
+                        same=false;break;
+                    }
+        check(same,"Column headings move or leak cue rows during vertical scrolling");
+        check(columns->getY()==view->getY(),
+              "Column heading shifted after vertical scrolling");
+
+        view->setViewPosition(160,0);
+        check(view->getViewPositionX()==160,
+              "Horizontal scroll does not reach additional audio columns");
+        check(columns->gridXAt(0)==CueGrid::nameWidth+160,
+              "Header and body are not using the same horizontal offset");
+        // Local x=40 is now inside Audio 2; selecting the header should
+        // choose that column, not a cell in the underlying first cue.
+        const int selectedRow=ui.selectedRow;
+        cueViewFixtures::click(*columns,40.0f,45.0f);
+        check(ui.selectedColumn==1 && ui.selectedRow==selectedRow,
+              "Pinned column-header click used unscrolled hit targets");
+        view->setViewPosition(0,0);
+        const bool wasCollapsed=ui.show.columns[0].collapsed;
+        cueViewFixtures::click(*columns,(float)CueGrid::columnWidth-15,47.0f);
+        check(ui.show.columns[0].collapsed!=wasCollapsed,
+              "Column header collapse is no longer clickable above the scroll");
+    });
+
     test("Scrolled cues remain below pinned headings and header targets are protected",[] {
         MainComponent ui(false);
         for (int i=0;i<11;++i) addRow(ui.show,"Extra cue");
