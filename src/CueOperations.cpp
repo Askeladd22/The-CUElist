@@ -453,6 +453,20 @@ void MainComponent::renameTitle(bool column,int index) {
     beginInlineRename(column ? InlineRenameKind::column : InlineRenameKind::cue,index);
 }
 
+bool MainComponent::moveCueRow(int from,int to) {
+    if (from<0 || to<0 || from>=(int)show.rows.size() ||
+        to>=(int)show.rows.size() || from==to) return false;
+    if (isInlineRenaming() && !commitInlineRename()) return false;
+    if (!applyInspector()) return false;
+    auto moving=std::move(show.rows[(size_t)from]);
+    show.rows.erase(show.rows.begin()+from);
+    show.rows.insert(show.rows.begin()+to,std::move(moving));
+    selectedRow=nextCue=to;
+    // Same safety behavior as existing cue arrow controls: editing cue
+    // order stops active playback and resets layered control state.
+    changed("Cue moved within Cuelist. Playback stopped.",true);
+    return true;
+}
 void MainComponent::reorderRow(int index,int delta) {
     int target=index+delta;
     if (index<0 || index>=(int)show.rows.size() || target<0 || target>=(int)show.rows.size() || !applyInspector()) return;

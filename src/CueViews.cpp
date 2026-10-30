@@ -574,8 +574,18 @@ void PinnedCueHeaders::paint(juce::Graphics& g) {
     g.setColour(palette::line);
     g.drawHorizontalLine(CueGrid::headerHeight-1,0.0f,(float)getWidth());
     g.drawVerticalLine(getWidth()-1,0,(float)getHeight());
+    if (draggingCue && dropCueRow>=0) {
+        const int y=CueGrid::headerHeight+dropCueRow*CueGrid::rowHeight-
+                    owner.viewport.getViewPositionY();
+        if (y>=CueGrid::headerHeight && y<getHeight()) {
+            g.setColour(palette::teal);
+            g.fillRect(101,y+1,
+                std::max(0,CueGrid::rowPlayBounds(0).getX()-104),3);
+        }
+    }
 }
 void PinnedCueHeaders::mouseDown(const juce::MouseEvent& e) {
+    dragCueId=dropCueRow=-1;draggingCue=false;
     // A row scrolled behind the fixed header must never receive input.
     if (e.y<CueGrid::headerHeight) return;
     const int y=e.y+owner.viewport.getViewPositionY();
@@ -594,10 +604,34 @@ void PinnedCueHeaders::mouseDown(const juce::MouseEvent& e) {
         owner.addCue(); return;
     }
     if (row<0 || row>=(int)owner.show.rows.size()) return;
+    if (e.x>=107 && e.x<CueGrid::rowPlayBounds(0).getX()-4 &&
+        e.getNumberOfClicks()==1)
+        dragCueId=owner.show.rows[(size_t)row].id;
     owner.grabKeyboardFocus();
     owner.grid.clickRowHeader(row,e.x,
         (y-CueGrid::headerHeight)%CueGrid::rowHeight-CueGrid::rowContentInset,
         e.getNumberOfClicks(),e.getScreenPosition());
+}
+void PinnedCueHeaders::mouseDrag(const juce::MouseEvent& e) {
+    if (dragCueId<0 || !e.mods.isLeftButtonDown() ||
+        e.getDistanceFromDragStart()<6) return;
+    draggingCue=true;
+    const int y=e.y+owner.viewport.getViewPositionY();
+    const int target=y>=CueGrid::headerHeight ?
+        (y-CueGrid::headerHeight)/CueGrid::rowHeight : -1;
+    dropCueRow=juce::jlimit(0,(int)owner.show.rows.size()-1,target);
+    repaint();
+}
+void PinnedCueHeaders::mouseUp(const juce::MouseEvent&) {
+    if (draggingCue && dragCueId>=0 && dropCueRow>=0) {
+        int from=-1;
+        for (int i=0;i<(int)owner.show.rows.size();++i)
+            if (owner.show.rows[(size_t)i].id==dragCueId) {from=i;break;}
+        if (from>=0 && from!=dropCueRow)
+            owner.moveCueRow(from,dropCueRow);
+    }
+    dragCueId=dropCueRow=-1;draggingCue=false;
+    repaint();
 }
 void PinnedCueHeaders::mouseDoubleClick(const juce::MouseEvent& e) {
     if (e.y<CueGrid::headerHeight) {

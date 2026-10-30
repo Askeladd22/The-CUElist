@@ -1253,6 +1253,10 @@ bool MainComponent::keyPressed(const juce::KeyPress& key) {
             return moveCuelist(show.activeCuelist,show.activeCuelist-1);
         if (key.getKeyCode()==juce::KeyPress::rightKey)
             return moveCuelist(show.activeCuelist,show.activeCuelist+1);
+        if (key.getKeyCode()==juce::KeyPress::upKey)
+            return moveCueRow(selectedRow,selectedRow-1);
+        if (key.getKeyCode()==juce::KeyPress::downKey)
+            return moveCueRow(selectedRow,selectedRow+1);
     }
     if (key.getModifiers().isCommandDown() && !dynamic_cast<juce::TextEditor*>(juce::Component::getCurrentlyFocusedComponent())) {
         if (key.getKeyCode()=='C' || key.getKeyCode()=='c') return copySelectedCell();

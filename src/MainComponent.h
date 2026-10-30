@@ -154,10 +154,14 @@ public:
     explicit PinnedCueHeaders(MainComponent& p):owner(p) {}
     void paint(juce::Graphics&) override;
     void mouseDown(const juce::MouseEvent&) override;
+    void mouseDrag(const juce::MouseEvent&) override;
+    void mouseUp(const juce::MouseEvent&) override;
     void mouseDoubleClick(const juce::MouseEvent&) override;
     void mouseWheelMove(const juce::MouseEvent&,const juce::MouseWheelDetails&) override;
 private:
     MainComponent& owner;
+    int dragCueId=-1,dropCueRow=-1;
+    bool draggingCue=false;
 };
 // Draws the same column header as CueGrid, but stays above scrolling rows.
  // Horizontal scrolling changes its content offset, not its screen bounds.
@@ -359,6 +363,7 @@ public:
         return inlineRenameKind!=InlineRenameKind::none;
     }
     void reorderRow(int index,int delta);
+    bool moveCueRow(int from,int to);
     void reorderColumn(int index,int delta);
     bool copyRow(int index);
     bool pasteRowAfter(int index);
