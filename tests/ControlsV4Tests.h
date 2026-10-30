@@ -30,8 +30,18 @@ void controlsV4Tests() {
             for (const auto* name : {"columnGainDb","columnPan","columnMute","columnPhase"})
                 check(controlsV3::named(*strip,name)->isVisible()==(c==0),"MIDI OSC utility area is not blank");
         }
-        int combos=0; for (auto* child : ui.getChildren()) if (dynamic_cast<juce::ComboBox*>(child)) ++combos;
-        check(combos==2,"Unexpected combo box in inspector after meter selector removal");
+        // The contextual Learn map selector is a new third ComboBox but must
+        // remain invisible outside a MIDI/OSC Learn session.
+        int ordinaryCombos=0;
+        juce::ComboBox* learnMapSelector=nullptr;
+        for (auto* child:ui.getChildren())
+            if (auto* combo=dynamic_cast<juce::ComboBox*>(child)) {
+                if (combo->getName()=="quickLearnMapSelector") learnMapSelector=combo;
+                else ++ordinaryCombos;
+            }
+        check(ordinaryCombos==2,"Unexpected regular Inspector combo after meter selector removal");
+        check(learnMapSelector!=nullptr && !learnMapSelector->isVisible(),
+              "Contextual Learn map selector must be hidden when Learn is off");
     });
     test("column output combo reroutes actual PCM live without changing inspector drafts", [] {
         MainComponent ui(false); ui.show.columns[0].output=2;

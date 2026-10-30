@@ -975,14 +975,14 @@ private:
             b.target==ControlTarget::limiterToggle ? "LIMITER" :
             b.target==ControlTarget::oscFloat ? "OSC" :
             b.target==ControlTarget::midiCc ? "MIDI CC" : "GAIN";
-        juce::String functionName=targetName;
+        juce::String displayFunctionName=targetName;
         for (const auto& function:owner->show.controls.functions)
             if (function.id==b.functionId) {
-                functionName=function.name+" / "+targetName;break;
+                displayFunctionName=function.name+" / "+targetName;break;
             }
         label(g,"#"+juce::String(b.id)+"   ch"+juce::String(b.channel)+
             " "+(b.kind==ControlKind::cc?"CC ":b.kind==ControlKind::note?"NOTE ":"BEND ")+
-            juce::String(b.number)+" → "+functionName+
+            juce::String(b.number)+" → "+displayFunctionName+
             "  ["+juce::String((int)b.scope)+"]",
             {7,0,width-14,height},12,active?palette::text:palette::muted);
     }

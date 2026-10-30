@@ -293,6 +293,7 @@ public:
     void setMasterMute(bool muted);
     void setMasterOutput(int channel);
     void setSafetyLimiter(bool enabled);
+    void showDevices(); // Audio settings selector; directly testable for lifetime safety.
     void openControlPanel(bool editSet=false);
     void editControlSet(int row,int column);
     bool createEmptyControlSet(int row,int column);
@@ -595,7 +596,6 @@ private:
     void openProject();
     void saveProject();
     void withDiscardConfirmation(std::function<void()>);
-    void showDevices();
     void editTempo();
     void message(const juce::String&);
     bool send(int id,bool row,bool stop=false);

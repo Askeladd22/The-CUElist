@@ -234,16 +234,17 @@ int main() {
         check(restored.name=="Show 001","Backup did not preserve previous version");
         check(saveShow(show,folder.getChildFile("missing-parent").getChildFile("show.cuelist")).failed(),"Invalid destination accepted");
     });
-    test("device selector is destroyed before its audio manager", [] {
+    test("audio settings selector is destroyed before its audio manager", [] {
         juce::Component::SafePointer<juce::Component> dialog;
         {
             MainComponent ui(false);
-            for (auto* child : ui.getChildren()) if (auto* button=dynamic_cast<juce::TextButton*>(child))
-                if (button->getButtonText()=="Audio devices") button->onClick();
+            // The Settings -> Audio Devices menu uses this same action.
+            // Direct invocation keeps the lifetime test independent of menu labels.
+            ui.showDevices();
             dialog=juce::ModalComponentManager::getInstance()->getModalComponent(0);
-            check(dialog!=nullptr,"Device selector did not open");
+            check(dialog!=nullptr,"Settings audio selector did not open");
         }
-        check(dialog==nullptr,"Device selector outlived audio manager");
+        check(dialog==nullptr,"Settings audio selector outlived audio manager");
     });
     if (failures==0) {
         // Native JUCE snapshots remain useful for manual visual inspection.
