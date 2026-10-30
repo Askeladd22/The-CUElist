@@ -832,6 +832,8 @@ void MainComponent::updateQuickLearnVisuals() {
         isQuickLearnTargetSelected(ControlTarget::masterGain),bright);
     masterPanLearnHotspot.setLearnPresentation(colour,
         isQuickLearnTargetSelected(ControlTarget::masterPan),bright);
+    masterLimiterLearnHotspot.setLearnPresentation(colour,
+        isQuickLearnTargetSelected(ControlTarget::limiterToggle),bright);
     utilities.refreshLearnVisuals();
     quickControlTargets.setLearnPresentation(colour,quickLearnFunctionId,
         quickLearnArmedEntryId,bright);

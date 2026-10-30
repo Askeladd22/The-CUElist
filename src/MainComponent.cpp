@@ -416,10 +416,14 @@ MainComponent::MainComponent(bool startAudio) {
     panicLearnHotspot.onPick=[this] {chooseQuickLearnGuiTarget(ControlTarget::panic);};
     masterGainLearnHotspot.onPick=[this] {chooseQuickLearnGuiTarget(ControlTarget::masterGain);};
     masterPanLearnHotspot.onPick=[this] {chooseQuickLearnGuiTarget(ControlTarget::masterPan);};
+    masterLimiterLearnHotspot.onPick=[this] {chooseQuickLearnGuiTarget(ControlTarget::limiterToggle);};
     utilities.addAndMakeVisible(masterGainLearnHotspot);
     utilities.addAndMakeVisible(masterPanLearnHotspot);
+    utilities.addAndMakeVisible(masterLimiterLearnHotspot);
     masterGainLearnHotspot.setVisible(false);
     masterPanLearnHotspot.setVisible(false);
+    masterLimiterLearnHotspot.setName("quickLearnMasterLimiter");
+    masterLimiterLearnHotspot.setVisible(false);
     goLearnHotspot.setVisible(false);
     panicLearnHotspot.setVisible(false);
     globalMidiLearn.setName("globalMidiLearn");

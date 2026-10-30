@@ -7,7 +7,9 @@ struct ColumnUtilities::Strip final : juce::Component {
     int id, index;
     GainMeterFader gain;
     juce::Slider pan;
-    QuickLearnHotspot gainLearnHotspot{"Column Gain"},panLearnHotspot{"Column Pan"};
+    QuickLearnHotspot gainLearnHotspot{"Column Gain"},panLearnHotspot{"Column Pan"},
+        muteLearnHotspot{"Column Mute"},phaseLearnHotspot{"Column Polarity"},
+        sendLearnHotspot{"L/R Send"};
     UtilityIcon mute{false},phase{true},dataMute{false};
     MidiActivityLed midiActivity,oscActivity;
     uint64_t lastOscSent=0;
@@ -33,13 +35,28 @@ struct ColumnUtilities::Strip final : juce::Component {
         addAndMakeVisible(pan);
         addAndMakeVisible(gainLearnHotspot);
         addAndMakeVisible(panLearnHotspot);
+        addAndMakeVisible(muteLearnHotspot);
+        addAndMakeVisible(phaseLearnHotspot);
+        addAndMakeVisible(sendLearnHotspot);
         gainLearnHotspot.setVisible(false);
         panLearnHotspot.setVisible(false);
+        muteLearnHotspot.setVisible(false);
+        phaseLearnHotspot.setVisible(false);
+        sendLearnHotspot.setVisible(false);
         gainLearnHotspot.onPick=[this] {
             owner.chooseQuickLearnGuiTarget(ControlTarget::columnGain,id);
         };
         panLearnHotspot.onPick=[this] {
             owner.chooseQuickLearnGuiTarget(ControlTarget::columnPan,id);
+        };
+        muteLearnHotspot.onPick=[this] {
+            owner.chooseQuickLearnGuiTarget(ControlTarget::columnMute,id);
+        };
+        phaseLearnHotspot.onPick=[this] {
+            owner.chooseQuickLearnGuiTarget(ControlTarget::columnPolarity,id);
+        };
+        sendLearnHotspot.onPick=[this] {
+            owner.chooseQuickLearnGuiTarget(ControlTarget::columnSend,id);
         };
         configureMixerPan(pan);
         gain.setName("columnGainDb"); pan.setName("columnPan"); mute.setName("columnMute"); phase.setName("columnPhase");
@@ -141,6 +158,12 @@ struct ColumnUtilities::Strip final : juce::Component {
                                       col.type==ColumnType::audio);
         panLearnHotspot.setLearnActive(owner.isQuickLearnActive() &&
                                      col.type==ColumnType::audio && !col.collapsed);
+        muteLearnHotspot.setLearnActive(owner.isQuickLearnActive() &&
+                                      col.type==ColumnType::audio);
+        phaseLearnHotspot.setLearnActive(owner.isQuickLearnActive() &&
+                                       col.type==ColumnType::audio && !col.collapsed);
+        sendLearnHotspot.setLearnActive(owner.isQuickLearnActive() &&
+                                      col.type==ColumnType::audio && !col.collapsed);
         refreshLearnVisuals();
         phase.setVisible(col.type==ColumnType::audio && !col.collapsed);
         masterSend.setVisible(col.type==ColumnType::audio && !col.collapsed);
@@ -168,6 +191,12 @@ struct ColumnUtilities::Strip final : juce::Component {
             owner.isQuickLearnTargetSelected(ControlTarget::columnGain,id),bright);
         panLearnHotspot.setLearnPresentation(colour,
             owner.isQuickLearnTargetSelected(ControlTarget::columnPan,id),bright);
+        muteLearnHotspot.setLearnPresentation(colour,
+            owner.isQuickLearnTargetSelected(ControlTarget::columnMute,id),bright);
+        phaseLearnHotspot.setLearnPresentation(colour,
+            owner.isQuickLearnTargetSelected(ControlTarget::columnPolarity,id),bright);
+        sendLearnHotspot.setLearnPresentation(colour,
+            owner.isQuickLearnTargetSelected(ControlTarget::columnSend,id),bright);
     }
     void syncRouting() {
         const auto& col=owner.show.columns[index]; int channels=2;
@@ -262,12 +291,16 @@ struct ColumnUtilities::Strip final : juce::Component {
         const int reserve=juce::jmin(47,std::max(0,gain.getHeight()-32));
         gainLearnHotspot.setBounds(gain.getBounds().withTrimmedBottom(reserve));
         panLearnHotspot.setBounds(pan.getBounds());
-        if (gainLearnHotspot.isVisible()) gainLearnHotspot.toFront(false);
-        if (panLearnHotspot.isVisible()) panLearnHotspot.toFront(false);
         masterSend.setBounds(w-48,117,26,26);
         mute.setBounds(collapsed ? (w-30)/2 : w-77,h-36,
                        collapsed ? 30 : 32,29);
         phase.setBounds(w-42,h-36,32,29);
+        muteLearnHotspot.setBounds(mute.getBounds());
+        phaseLearnHotspot.setBounds(phase.getBounds());
+        sendLearnHotspot.setBounds(masterSend.getBounds());
+        for (auto* hotspot : {&gainLearnHotspot,&panLearnHotspot,&muteLearnHotspot,
+                              &phaseLearnHotspot,&sendLearnHotspot})
+            if (hotspot->isVisible()) hotspot->toFront(false);
         dataMute.setBounds(collapsed ? (w-30)/2 : (w-32)/2,h-36,30,29);
         midiActivity.setBounds(collapsed ? (w-22)/2 : 12,collapsed ? 40 : 42,
                                 collapsed ? 23 : 46,17);
@@ -339,6 +372,7 @@ void ColumnUtilities::refresh() {
     if (owner.isQuickLearnActive()) {
         owner.masterGainLearnHotspot.toFront(false);
         owner.masterPanLearnHotspot.toFront(false);
+        owner.masterLimiterLearnHotspot.toFront(false);
     }
 
     resized(); repaint();
@@ -389,6 +423,10 @@ void ColumnUtilities::resized() {
     owner.masterMute.setBounds(198,146,34,31);
     owner.masterOutput.setBounds(104,59,85,25);
     owner.safetyLimiter.setBounds(104,127,86,30);
+    owner.masterLimiterLearnHotspot.setBounds(owner.safetyLimiter.getBounds());
+    owner.masterLimiterLearnHotspot.setLearnActive(owner.isQuickLearnActive());
+    if (owner.masterLimiterLearnHotspot.isVisible())
+        owner.masterLimiterLearnHotspot.toFront(false);
     for (size_t i=0;i<strips.size();++i)
         strips[i]->setBounds(owner.grid.columnX((int)i)-masterWidth-scrollX,1,
                               owner.grid.columnWidthAt((int)i),getHeight()-2);

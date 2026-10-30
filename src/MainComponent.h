@@ -451,7 +451,8 @@ private:
     int quickLearnMapRowId=0,quickLearnMapColumnId=0;
     juce::TextButton cancelQuickLearn{"Cancel Learn"};
     QuickLearnHotspot goLearnHotspot{"Go"},panicLearnHotspot{"Panic"};
-    QuickLearnHotspot masterGainLearnHotspot{"Master Gain"},masterPanLearnHotspot{"Master Pan"};
+    QuickLearnHotspot masterGainLearnHotspot{"Master Gain"},masterPanLearnHotspot{"Master Pan"},
+        masterLimiterLearnHotspot{"Limiter On/Off"};
     void refreshCuelistTabs();
     void showCuelistOverflowMenu();
     std::unique_ptr<GuideWindow> userGuideWindow;
