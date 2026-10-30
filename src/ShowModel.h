@@ -40,7 +40,11 @@ struct Cell {
     std::optional<MidiClip> midi;
     std::optional<OscClip> osc;
     std::optional<ControlSet> controlSet;
+    int assignedMapId=0; // 0 = local/none; otherwise a reusable Control Map in controls.templates
 };
+inline bool hasControlMapAssignment(const Cell& cell) noexcept {
+    return cell.assignedMapId>0 || cell.controlSet.has_value();
+}
 struct Row {
     int id = 0; juce::String name; juce::String notes; std::vector<TempoPoint> tempo {{}}; std::vector<Cell> cells;
     float gain = 1.0f;

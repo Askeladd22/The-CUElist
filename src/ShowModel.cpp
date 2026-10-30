@@ -121,7 +121,13 @@ juce::Result validateShow(const Show& show) {
             if (show.columns[i].type==ColumnType::control) {
                 if (c.midi || c.osc || c.file.isNotEmpty())
                     return fail("Invalid Control Column cell.");
-            } else if (c.controlSet) return fail("Control Set in a non-Control column.");
+                if (c.assignedMapId<0 ||
+                    (c.assignedMapId>0 &&
+                     std::none_of(show.controls.templates.begin(),show.controls.templates.end(),
+                         [&c](const ControlSetTemplate& m){return m.id==c.assignedMapId;})))
+                    return fail("Control Map assignment refers to a missing saved map.");
+            } else if (c.controlSet || c.assignedMapId!=0)
+                return fail("Control Map assignment in a non-Control column.");
             if (!unique(c.id) || !std::isfinite(c.gain) || c.gain < 0 || c.gain > 4 || (int)c.behaviour < 0 || (int)c.behaviour > 3
                 || !std::isfinite(c.startSeconds) || c.startSeconds < 0 || c.startSeconds > 86400)
                 return fail("Invalid cell.");
@@ -402,7 +408,8 @@ juce::String encodeShow(const Show& show) {
             }
             cells.add(object({{"id",c.id},{"name",c.name},{"file",c.file},{"followsRow",c.followsRow},
                 {"loop",c.loop},{"stopOnNext",c.stopOnNext},{"gain",c.gain},{"startSeconds",c.startSeconds},{"behaviour",(int)c.behaviour},{"midi",midi},{"osc",osc},
-                {"controlSet",c.controlSet ? controlSetObject(*c.controlSet) : juce::var()}}));
+                {"controlSet",c.controlSet ? controlSetObject(*c.controlSet) : juce::var()},
+                {"assignedMapId",c.assignedMapId}}));
         }
         rows.add(object({{"id",r.id},{"name",r.name},{"notes",r.notes},{"tempo",tempo},{"cells",cells},{"gain",r.gain},
             {"muted",r.muted},{"loop",r.loop},{"overrideBehaviour",r.overrideBehaviour},{"behaviour",(int)r.behaviour},{"stopOnNext",r.stopOnNext},
@@ -578,6 +585,7 @@ juce::Result decodeShow(const juce::String& text, Show& destination) {
                         auto value=c.getProperty("controlSet",{});
                         if (!value.isVoid()) cell.controlSet=parseControlSet(value);
                     }
+                if (c.hasProperty("assignedMapId")) cell.assignedMapId=integer(c,"assignedMapId");
                 if (version >= 7) cell.stopOnNext=boolean(c,"stopOnNext");
                 if (version>=5) {
                     const auto m=required(c,"midi");

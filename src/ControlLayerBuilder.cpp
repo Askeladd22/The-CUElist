@@ -14,9 +14,19 @@ std::vector<ControlLayer> buildControlLayers(const Show& show) {
                 // A corrupted/ragged in-memory model must not crash the
                 // mapping refresh before it can be diagnosed/validated.
                 if (column>=row.cells.size()) continue;
-                if (row.cells[column].controlSet)
-                    layers.push_back({col.id,row.id,col.controlPriority,false,
-                                      *row.cells[column].controlSet});
+                const auto& cell=row.cells[column];
+                if (cell.assignedMapId>0) {
+                    const auto found=std::find_if(show.controls.templates.begin(),
+                        show.controls.templates.end(),
+                        [&cell](const ControlSetTemplate& item) {
+                            return item.id==cell.assignedMapId;
+                        });
+                    // Invalid references never produce phantom live mappings.
+                    if (found!=show.controls.templates.end())
+                        layers.push_back({col.id,row.id,col.controlPriority,false,found->set});
+                } else if (cell.controlSet) {
+                    layers.push_back({col.id,row.id,col.controlPriority,false,*cell.controlSet});
+                }
             }
         }
     }

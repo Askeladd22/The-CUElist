@@ -347,6 +347,55 @@ int MainComponent::createReusableControlMap(const juce::String& name,
     status="Reusable map created: "+title;
     return result;
 }
+int MainComponent::reusableControlMapUsage(int mapId) const {
+    const auto used=[mapId](const std::vector<Row>& rows) {
+        int result=0;
+        for (const auto& row:rows)
+            for (const auto& cell:row.cells)
+                if (cell.assignedMapId==mapId) ++result;
+        return result;
+    };
+    int count=used(show.rows);
+    for (int i=0;i<(int)show.cuelists.size();++i)
+        if (i!=show.activeCuelist) count+=used(show.cuelists[(size_t)i].rows);
+    return count;
+}
+bool MainComponent::renameReusableControlMap(int mapId,const juce::String& name) {
+    const auto title=name.trim();
+    if (title.isEmpty() || title.length()>120) {
+        status="Map name must contain 1–120 characters.";return false;
+    }
+    auto candidate=show;
+    const auto found=std::find_if(candidate.controls.templates.begin(),
+        candidate.controls.templates.end(),[mapId](const ControlSetTemplate& m){return m.id==mapId;});
+    if (found==candidate.controls.templates.end()) return false;
+    for (const auto& item:candidate.controls.templates)
+        if (item.id!=mapId && item.name.equalsIgnoreCase(title)) {
+            status="A map with this name already exists.";return false;
+        }
+    found->name=title;
+    if (auto valid=validateShow(candidate);valid.failed()) {
+        status=valid.getErrorMessage();return false;
+    }
+    show=std::move(candidate);dirty=true;refresh();status="Control Map renamed.";return true;
+}
+bool MainComponent::deleteReusableControlMap(int mapId) {
+    if (reusableControlMapUsage(mapId)>0) {
+        status="This Control Map is assigned to cues. Reassign or remove those references first.";
+        repaint();return false;
+    }
+    auto candidate=show;
+    const auto found=std::find_if(candidate.controls.templates.begin(),
+        candidate.controls.templates.end(),[mapId](const ControlSetTemplate& m){return m.id==mapId;});
+    if (found==candidate.controls.templates.end()) return false;
+    candidate.controls.templates.erase(found);
+    if (auto valid=validateShow(candidate);valid.failed()) {
+        status=valid.getErrorMessage();return false;
+    }
+    show=std::move(candidate);dirty=true;refreshControlSettings();refresh();
+    status="Unused saved Control Map deleted.";return true;
+}
+
 bool MainComponent::modifyReusableControlBinding(int mapId,int oldBindingId,
                                                   ControlBinding binding,int operation) {
     if (operation<0 || operation>2) return false; // 0 add, 1 edit, 2 delete
@@ -386,9 +435,10 @@ bool MainComponent::clearControlCellMap(int row,int column) {
         column>=(int)show.columns.size() ||
         show.columns[(size_t)column].type!=ColumnType::control ||
         show.columns[(size_t)column].controlLocked ||
-        !show.rows[(size_t)row].cells[(size_t)column].controlSet) return false;
+        !hasControlMapAssignment(show.rows[(size_t)row].cells[(size_t)column])) return false;
     auto candidate=show;
     candidate.rows[(size_t)row].cells[(size_t)column].controlSet.reset();
+    candidate.rows[(size_t)row].cells[(size_t)column].assignedMapId=0;
     if (auto valid=validateShow(candidate);valid.failed()) {
         status=valid.getErrorMessage();return false;
     }
@@ -405,9 +455,12 @@ int MainComponent::saveControlSetTemplate(int row,int column,const juce::String&
     if (label.isEmpty() || label.length()>120) return 0;
     auto candidate=show;
     auto& col=candidate.columns[(size_t)column];
+    const auto& cell=candidate.rows[(size_t)row].cells[(size_t)column];
     const ControlSet* source=col.controlLocked ? &col.controlDefaultSet :
-        (candidate.rows[(size_t)row].cells[(size_t)column].controlSet ?
-         &*candidate.rows[(size_t)row].cells[(size_t)column].controlSet : nullptr);
+        (cell.controlSet ? &*cell.controlSet : nullptr);
+    if (!col.controlLocked && cell.assignedMapId>0)
+        for (const auto& saved:candidate.controls.templates)
+            if (saved.id==cell.assignedMapId) {source=&saved.set;break;}
     if (!source || source->bindings.empty()) return 0;
     ControlSetTemplate item;
     item.id=candidate.controls.nextId++;
@@ -438,7 +491,11 @@ bool MainComponent::applyControlSetTemplate(int row,int column,int templateId) {
         binding.id=candidate.controls.nextId++;
     auto& col=candidate.columns[(size_t)column];
     if (col.controlLocked) col.controlDefaultSet=std::move(copy);
-    else candidate.rows[(size_t)row].cells[(size_t)column].controlSet=std::move(copy);
+    else {
+        auto& cell=candidate.rows[(size_t)row].cells[(size_t)column];
+        cell.controlSet=std::move(copy); // copy retained as independent legacy/export snapshot
+        cell.assignedMapId=templateId;  // live reusable map; share across cues
+    }
     if (auto valid=validateShow(candidate);valid.failed()) {
         status=valid.getErrorMessage();return false;
     }
@@ -718,7 +775,11 @@ void MainComponent::refreshQuickLearnMaps() {
         for (int c=0;c<(int)show.columns.size();++c) {
             const auto& column=show.columns[(size_t)c];
             if (column.type!=ColumnType::control || column.controlLocked) continue;
-            if (!show.rows[(size_t)r].cells[(size_t)c].controlSet) continue;
+            const auto& cell=show.rows[(size_t)r].cells[(size_t)c];
+            // A named map must only appear once, as an independent archive
+            // entry. Learning into a cue-local copy would otherwise have no
+            // effect on that cue's live shared-map reference.
+            if (!cell.controlSet || cell.assignedMapId>0) continue;
             quickLearnMapLocations.push_back({show.rows[(size_t)r].id,column.id});
             const int id=(int)quickLearnMapLocations.size();
             quickLearnMapSelector.addItem("Q"+juce::String(r+1)+" / "+column.name,id);

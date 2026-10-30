@@ -241,7 +241,10 @@ void CueGrid::paint(juce::Graphics& g) {
             const auto& column=show.columns[(size_t)c];
             const auto& cell=row.cells[(size_t)c];
             const int x=columnX(c),w=columnWidthAt(c);
-            const bool loaded=owner.hasClip(r,c),missing=cell.file.isNotEmpty()&&!loaded;
+            const bool assigned=column.type==ColumnType::control &&
+                (column.controlLocked || hasControlMapAssignment(cell));
+            const bool loaded=owner.hasClip(r,c) || assigned;
+            const bool missing=cell.file.isNotEmpty()&&!loaded;
             const auto tone=missing?palette::red:palette::type((int)column.type);
             if (column.collapsed) {
                 g.setColour(loaded?tone.withAlpha(.37f):palette::background.withAlpha(.66f));
@@ -263,10 +266,21 @@ void CueGrid::paint(juce::Graphics& g) {
             if (column.type==ColumnType::control) {
                 const ControlSet* set=column.controlLocked?&column.controlDefaultSet:
                     (cell.controlSet?&*cell.controlSet:nullptr);
+                juce::String mapTitle;
+                if (cell.assignedMapId>0)
+                    for (const auto& map:show.controls.templates)
+                        if (map.id==cell.assignedMapId) {
+                            mapTitle=map.name;
+                            set=&map.set;break;
+                        }
                 const int count=set?(int)set->bindings.size():0;
-                label(g,column.controlLocked?"DEFAULT / LOCKED":count?"CONTROL SET":"+ Control Set",
-                      {x+8,y+6,w-16,18},11,count?tone:palette::muted,true);
-                if (count) label(g,juce::String(count)+" mappings",{x+8,y+26,w-16,16},10,palette::muted);
+                label(g,column.controlLocked?"DEFAULT / LOCKED":
+                        mapTitle.isNotEmpty()?mapTitle:
+                        assigned?"CONTROL MAP":" + Control Map",
+                      {x+8,y+6,w-16,18},11,assigned?tone:palette::muted,true);
+                if (assigned)
+                    label(g,count>0 ? juce::String(count)+" mappings" : "Empty map",
+                          {x+8,y+26,w-16,16},10, count>0?palette::text:palette::muted);
             } else if (loaded) {
                 auto playback=owner.engine.getCellPlayback(cell.id);
                 if (!owner.engine.connected.load())
@@ -451,7 +465,10 @@ void CueGrid::mouseDown(const juce::MouseEvent& e) {
     const int column=columnAt(e.x);
     if (e.mods.isPopupMenu()) {
         if (row>=0 && row<(int)owner.show.rows.size()) {
-            if(column>=0) showCellMenu(row,column,e.getScreenPosition());
+            if (column>=0 && owner.show.columns[(size_t)column].type==ColumnType::control &&
+                !owner.show.columns[(size_t)column].controlLocked)
+                owner.showControlCellMenu(row,column,e.getScreenPosition());
+            else if(column>=0) showCellMenu(row,column,e.getScreenPosition());
             else showRowMenu(row,e.getScreenPosition());
         }
         return;
