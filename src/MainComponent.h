@@ -296,6 +296,7 @@ public:
     void openControlPanel(bool editSet=false);
     void editControlSet(int row,int column);
     bool createEmptyControlSet(int row,int column);
+    bool duplicateControlSet(int sourceRow,int sourceColumn,int destRow,int destColumn);
     bool addControlSetBinding(int row,int column,ControlBinding);
     bool deleteControlSetBinding(int row,int column,int id);
     bool updateControlBinding(int row,int column,int id,ControlBinding updated,bool inControlSet);

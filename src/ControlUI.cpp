@@ -24,6 +24,37 @@ bool MainComponent::createEmptyControlSet(int row,int column) {
     refresh();return true;
 }
 
+bool MainComponent::duplicateControlSet(int sr,int sc,int tr,int tc) {
+    if (tr<0 || tr>=(int)show.rows.size() || tc<0 ||
+        tc>=(int)show.columns.size() ||
+        show.columns[(size_t)tc].type!=ColumnType::control ||
+        show.columns[(size_t)tc].controlLocked ||
+        show.rows[(size_t)tr].cells[(size_t)tc].controlSet) return false;
+    ControlSet clone;
+    if (sr<0) {
+        for (const auto& b:show.controls.bindings)
+            if (b.functionId>0 && b.scope==ControlScope::global)
+                clone.bindings.push_back(b);
+    } else {
+        if (sr>=(int)show.rows.size() || sc<0 || sc>=(int)show.columns.size())
+            return false;
+        const auto& source=show.rows[(size_t)sr].cells[(size_t)sc].controlSet;
+        if (!source) return false;
+        clone=*source;
+    }
+    auto next=show;
+    for (auto& b:clone.bindings) {
+        b.id=next.controls.nextId++;
+        b.scope=ControlScope::global;b.scopeId=0;
+    }
+    next.rows[(size_t)tr].cells[(size_t)tc].controlSet=std::move(clone);
+    if (auto valid=validateShow(next);valid.failed()) {
+        status=valid.getErrorMessage();return false;
+    }
+    show=std::move(next);dirty=true;refreshControlSettings();
+    status="Control Map duplicated.";refresh();return true;
+}
+
 class ControlPanel final : public juce::Component, private juce::Timer,
                            private juce::ListBoxModel {
 public:
@@ -38,8 +69,40 @@ public:
             &outputCc,&outputChannel,&oscAddress,&invert,&updateSelected,&curve,&minimum,&maximum,
              &functionChoice,&functionName,&newFunction,&saveRoute,
              &saveControllerPreset,&loadControllerPreset,&effectivePreview,&templateName,&templates,&saveTemplate,&loadTemplate,
-             &emptyBindings})
+             &emptyBindings,&mapChooser,&newMap,&cloneMap})
             addAndMakeVisible(c);
+        mapChooser.setName("mappingMapSelector");
+        newMap.setName("mappingNewMap");
+        cloneMap.setName("mappingDuplicateMap");
+        newMap.setButtonText("New Map");
+        cloneMap.setButtonText("Duplicate");
+        mapChooser.addItem("Default Map (fallback)",1);
+        int initial=1;
+        for (int row=0;row<(int)owner->show.rows.size();++row)
+            for (int col=0;col<(int)owner->show.columns.size();++col) {
+                const auto& column=owner->show.columns[(size_t)col];
+                if (column.type!=ColumnType::control || column.controlLocked ||
+                    !owner->show.rows[(size_t)row].cells[(size_t)col].controlSet) continue;
+                availableMaps.push_back({row,col});
+                const int id=(int)availableMaps.size()+1;
+                mapChooser.addItem("Q"+juce::String(row+1)+" / "+column.name,id);
+                if (editSet && row==sourceRow && col==sourceColumn) initial=id;
+            }
+        mapChooser.setSelectedId(initial,juce::dontSendNotification);
+        mapChooser.onChange=[this] {
+            if (!owner) return;
+            const int index=mapChooser.getSelectedId()-2;
+            const auto maps=availableMaps;
+            auto safe=juce::Component::SafePointer<MainComponent>(owner.getComponent());
+            juce::MessageManager::callAsync([safe,maps,index] {
+                if (!safe) return;
+                if (index<0) safe->openControlPanel(false);
+                else if (index<(int)maps.size())
+                    safe->editControlSet(maps[(size_t)index].first,maps[(size_t)index].second);
+            });
+        };
+        newMap.onClick=[this]{createMap(false);};
+        cloneMap.onClick=[this]{createMap(true);};
         functionChoice.setName("mappingAbstractFunction");
         functionName.setName("mappingAbstractFunctionName");
         functionName.setTextToShowWhenEmpty("Function name (e.g. Resolume Brightness)",palette::muted);
@@ -369,6 +432,8 @@ public:
                                            std::max(0,presets.getSelectedId()-1)))
                 state.setText("Preset assigned to selected cue.",juce::dontSendNotification);
         };
+        device.setVisible(false);connect.setVisible(false);oscInputPort.setVisible(false);
+        learn.setVisible(false);oscLearn.setVisible(false);
         refreshDevices(); refreshPresets(); refreshColumns();refreshTemplates();
         refreshFunctions();
         if (!owner->show.controls.functions.empty()) {
@@ -394,11 +459,9 @@ public:
               "DEFAULT MAP / CONTROL MAPPINGS",{20,15,620,31},21,palette::teal,true);
         g.setColour(palette::line);
         g.drawHorizontalLine(52,19,(float)getWidth()-19);
-        label(g,"MIDI / OSC INPUT",{20,60,350,19},12,palette::teal,true);
-        label(g,"Input device",{20,83,200,18},11,palette::muted,true);
-        label(g,"MIDI Learn",{20,143,116,18},11,palette::muted,true);
-        label(g,"OSC Learn",{144,143,116,18},11,palette::muted,true);
-        label(g,"UDP port",{269,143,68,18},11,palette::muted,true);
+        label(g,"MAP SELECTION",{20,60,350,19},12,palette::teal,true);
+        label(g,"Default Map is always the fallback. Cue Control Maps override only selected functions.",
+              {20,140,getWidth()-40,28},12,palette::muted);
 
         g.setColour(palette::line);
         g.drawHorizontalLine(191,20,(float)getWidth()-20);
@@ -433,6 +496,9 @@ public:
     }
     void resized() override {
         const int w=getWidth();
+        mapChooser.setBounds(20,97,w-314,31);
+        newMap.setBounds(w-285,97,125,31);
+        cloneMap.setBounds(w-150,97,130,31);
         device.setBounds(20,105,w-177,31);
         connect.setBounds(w-143,105,123,31);
         learn.setBounds(20,163,116,32);
@@ -504,7 +570,36 @@ private:
         const auto& cell=owner->show.rows[(size_t)row].cells[(size_t)columnIndex];
         return cell.controlSet ? &cell.controlSet->bindings : nullptr;
     }
-    juce::ComboBox device,presets,scope,target,takeover,columns,curve,templates,functionChoice;
+    juce::ComboBox device,presets,scope,target,takeover,columns,curve,templates,functionChoice,mapChooser;
+    juce::TextButton newMap,cloneMap;
+    std::vector<std::pair<int,int>> availableMaps;
+    void createMap(bool duplicate) {
+        if (!owner || owner->show.rows.empty()) return;
+        int row=-1,column=-1;
+        const int start=juce::jlimit(0,(int)owner->show.rows.size()-1,owner->selectedRow);
+        for (int step=0;step<(int)owner->show.rows.size();++step) {
+            int r=(start+step)%(int)owner->show.rows.size();
+            for (int c=0;c<(int)owner->show.columns.size();++c)
+                if (owner->show.columns[(size_t)c].type==ColumnType::control &&
+                    !owner->show.columns[(size_t)c].controlLocked &&
+                    !owner->show.rows[(size_t)r].cells[(size_t)c].controlSet) {
+                    row=r;column=c;break;
+                }
+            if (row>=0) break;
+        }
+        if (row<0) {
+            state.setText("Add an empty Control Column cell to create another map.",
+                          juce::dontSendNotification);return;
+        }
+        const bool ok=duplicate ?
+            owner->duplicateControlSet(editSet?sourceRow:-1,editSet?sourceColumn:-1,row,column) :
+            owner->createEmptyControlSet(row,column);
+        if (!ok) {state.setText(owner->status,juce::dontSendNotification);return;}
+        auto safe=juce::Component::SafePointer<MainComponent>(owner.getComponent());
+        juce::MessageManager::callAsync([safe,row,column]{
+            if(safe) safe->editControlSet(row,column);
+        });
+    }
     juce::TextButton connect,learn,oscLearn,add,remove,updateSelected,newPreset,assignPreset,saveTemplate,loadTemplate,
                      newFunction,saveRoute,saveControllerPreset,loadControllerPreset;
     juce::TextEditor presetName,outputCc,outputChannel,oscAddress,minimum,maximum,effectivePreview,templateName,functionName,oscInputPort;
