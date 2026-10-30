@@ -1467,7 +1467,12 @@ void MainComponent::timerCallback() {
         } else dispatchControl(control);
     }
     if (++midiRefreshTicks>=25) {
-        midiRefreshTicks=0; engine.refreshMidiOutputs();
+        midiRefreshTicks=0;
+        // Reapply persisted output switches for devices connected after startup.
+        if (appPreferences) for (const auto& dev:juce::MidiOutput::getAvailableDevices())
+            engine.setMidiOutputEnabled(dev.identifier,
+                appPreferences->getBoolValue("midiOutputEnabled_"+dev.identifier,true));
+        engine.refreshMidiOutputs();
         // Take one inventory snapshot per refresh. The policy checks exact
         // device identifiers and never substitutes a similarly named port.
         const auto devices=juce::MidiInput::getAvailableDevices();
