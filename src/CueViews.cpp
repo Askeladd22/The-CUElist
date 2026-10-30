@@ -465,7 +465,10 @@ void CueGrid::mouseDown(const juce::MouseEvent& e) {
     const int column=columnAt(e.x);
     if (e.mods.isPopupMenu()) {
         if (row>=0 && row<(int)owner.show.rows.size()) {
-            if(column>=0) showCellMenu(row,column,e.getScreenPosition());
+            if (column>=0 && owner.show.columns[(size_t)column].type==ColumnType::control &&
+                !owner.show.columns[(size_t)column].controlLocked)
+                owner.showControlCellMenu(row,column,e.getScreenPosition());
+            else if(column>=0) showCellMenu(row,column,e.getScreenPosition());
             else showRowMenu(row,e.getScreenPosition());
         }
         return;

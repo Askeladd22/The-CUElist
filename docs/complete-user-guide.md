@@ -134,10 +134,12 @@ Default Map remains distinct and excludes project-specific names.
 This is different from the unassigned state (+ Control Map) even when
 there are zero bindings. The cell's appearance remains stable across cue
 selection and after a show roundtrip, including collapsed Control Columns.
-Click a populated cell to edit the local or shared map, save a new reusable
-copy, assign a saved map (including to multiple cues) or remove its
-assignment. Removing it restores inheritance from Default Map; replacing
-one cue's assignment never modifies another cue. Medium/High/Maximum
+Right-click an unassigned Control Column cell to assign a saved map
+**without first creating a local override**. Click a populated cell to edit
+the local or shared map, save a new reusable copy, assign a saved map
+(including to multiple cues) or remove its assignment. Removing it
+restores inheritance from Default Map; replacing one cue's assignment
+never modifies another cue. Medium/High/Maximum
 priority still resolves overlapping Control Column maps.
 
 **Operational precautions:** physical controller Learn events cannot
