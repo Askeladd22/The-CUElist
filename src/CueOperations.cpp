@@ -68,6 +68,39 @@ void MainComponent::activateCuelist(int index) {
     refresh();
 }
 
+bool MainComponent::moveCuelist(int from,int to) {
+    const int count=(int)show.cuelists.size();
+    if (from<0 || from>=count || to<0 || to>=count || from==to) return false;
+    // A pending inline rename and Inspector draft must not be lost.
+    if (isInlineRenaming() && !commitInlineRename()) return false;
+    if (!applyInspector()) return false;
+
+    // Active cue rows are operational state, and the Cuelist vector is its
+    // persisted snapshot. Synchronize it before moving the list itself.
+    show.cuelists[(size_t)show.activeCuelist].rows=show.rows;
+    const auto movedName=show.cuelists[(size_t)from].name;
+    auto moved=std::move(show.cuelists[(size_t)from]);
+    show.cuelists.erase(show.cuelists.begin()+from);
+    show.cuelists.insert(show.cuelists.begin()+to,std::move(moved));
+
+    int active=show.activeCuelist;
+    if (active==from) active=to;
+    else if (from<active && to>=active) --active;
+    else if (from>active && to<=active) ++active;
+    show.activeCuelist=active;
+    // Reordering is metadata only: do not stop cues, reset MIDI/OSC,
+    // destroy Clip Editors, or activate a different Cuelist.
+    show.rows=show.cuelists[(size_t)active].rows;
+    dirty=true;
+    status="Cuelist moved: "+movedName+". Save to persist order.";
+    refreshCuelistTabs();
+    cueHeaders.repaint();
+    grid.repaint();
+    timeline.repaint();
+    repaint();
+    return true;
+}
+
 void MainComponent::createCuelist() {
     if (show.cuelists.size()>=12) {message("A show supports up to 12 Cuelists.");return;}
     if (!applyInspector()) return;
