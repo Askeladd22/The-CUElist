@@ -43,6 +43,16 @@ void controlRuntimeTests() {
               layers[0].set.bindings[0].number==32 &&
               layers[1].set.bindings[0].number==32,
               "Shared map edit did not reach all referencing cues");
+        ControlMappingEngine engine;
+        engine.setSettings(ui.show.controls);
+        engine.setLayers(layers);
+        const ControlEvent changed{"desk",ControlKind::cc,1,32,127,false};
+        const ControlEvent previous{"desk",ControlKind::cc,1,31,127,false};
+        for (const auto& cue:ui.show.rows) {
+            engine.setActiveCue(cue.id,0);
+            check(engine.matched(changed)!=nullptr && engine.matched(previous)==nullptr,
+                  "Live GO mapping did not switch to the edited shared map for this cue");
+        }
         const int mapB=ui.createReusableControlMap("Lights B",{});
         check(mapB>0 && ui.applyControlSetTemplate(1,1,mapB),
               "Reassigning one cue to another saved map failed");

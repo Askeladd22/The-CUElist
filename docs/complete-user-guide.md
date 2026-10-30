@@ -31,7 +31,7 @@ A properly packaged build does not require Visual Studio, Git or CMake to run. K
 1. Open **Audio devices** in the left sidebar and choose the intended audio interface and output configuration.
 2. Open an existing `.cuelist` or create a new show. Verify the media referenced by each cue.
 3. Configure audio routing, MIDI ports and OSC host/port under the individual Column Utilities.
-4. Connect any MIDI controller and select its actual input device under **Control Mapping**; verify MIDI Learn only after physical input is present.
+4. Enable the intended MIDI input under **Settings → MIDI Devices**; verify MIDI Learn after the physical device is connected.
 5. Select **Preferences → Pre-flight**, read the warnings and resolve missing files, routes and devices.
 6. Test cell Play/Stop, **GO**, **Panic**, loop and Auto Stop with the connected equipment before relying on the show sequence.
 7. Save the show and make a separate external backup.
@@ -40,13 +40,13 @@ A properly packaged build does not require Visual Studio, Git or CMake to run. K
 
 ### 3.1 Left sidebar
 
-The sidebar provides **New**, **Open**, **Save**, the editable show title, **Audio devices**, **Preferences**, **Control Mapping** and a project overview. Near the bottom, **On Deck** identifies the next cue; **GO / SPACE** and **PANIC / ESC** remain accessible at all times.
+The sidebar provides **New**, **Open**, **Save**, the editable show title, **Settings**, **Control Mappings** and a project overview. Near the bottom, **On Deck** identifies the next cue; **GO / SPACE** and **PANIC / ESC** remain accessible at all times.
 
 - **New** starts a fresh show and warns if current changes would be discarded. The compact **Unsaved changes** dialog keeps **Cancel** as the safe choice; **Discard and continue** must be selected explicitly to proceed without saving. Closing the dialog or pressing Escape also cancels the operation. To save instead, select Cancel and then Save.
 - **Open** loads an existing project, subject to preparation and validation before activation.
 - **Save** writes the project and collects referenced media.
 - **Preferences** contains Pre-flight, Diagnostics, Fader Range and Rename active Cuelist.
-- **Control Mapping** opens the controller configuration view. Depending on selection, this can expose the Control Set editor or legacy MIDI mapping interface.
+- **Control Mappings** opens the independent map archive, with Default Map selected by default; the per-cue editor is available from a Control Column cell.
 
 The shortcut hints formerly shown at the bottom of the sidebar have been removed; the keyboard shortcuts still work.
 
