@@ -6,7 +6,9 @@ namespace cuelist {
 
 void MainComponent::editControlSet(int row,int column) {
     if (!select(row,column) || show.columns[(size_t)column].type!=ColumnType::control) return;
-    openControlPanel(true);
+    const auto mapId=show.rows[(size_t)row].cells[(size_t)column].assignedMapId;
+    if (mapId>0) openControlPanel(false,mapId);
+    else openControlPanel(true);
 }
 
 bool MainComponent::createEmptyControlSet(int row,int column) {
@@ -14,9 +16,10 @@ bool MainComponent::createEmptyControlSet(int row,int column) {
         column<0 || column>=(int)show.columns.size() ||
         show.columns[(size_t)column].type!=ColumnType::control) return false;
     if (show.columns[(size_t)column].controlLocked ||
-        show.rows[(size_t)row].cells[(size_t)column].controlSet) return true;
+        hasControlMapAssignment(show.rows[(size_t)row].cells[(size_t)column])) return true;
     auto candidate=show;
     candidate.rows[(size_t)row].cells[(size_t)column].controlSet.emplace();
+    candidate.rows[(size_t)row].cells[(size_t)column].assignedMapId=0;
     if (const auto result=validateShow(candidate);result.failed()) {
         status=result.getErrorMessage();return false;
     }
@@ -30,7 +33,7 @@ bool MainComponent::duplicateControlSet(int sr,int sc,int tr,int tc) {
         tc>=(int)show.columns.size() ||
         show.columns[(size_t)tc].type!=ColumnType::control ||
         show.columns[(size_t)tc].controlLocked ||
-        show.rows[(size_t)tr].cells[(size_t)tc].controlSet) return false;
+        hasControlMapAssignment(show.rows[(size_t)tr].cells[(size_t)tc])) return false;
     ControlSet clone;
     if (sr<0) {
         for (const auto& b:show.controls.bindings)
@@ -49,6 +52,7 @@ bool MainComponent::duplicateControlSet(int sr,int sc,int tr,int tc) {
         b.scope=ControlScope::global;b.scopeId=0;
     }
     next.rows[(size_t)tr].cells[(size_t)tc].controlSet=std::move(clone);
+    next.rows[(size_t)tr].cells[(size_t)tc].assignedMapId=0;
     if (auto valid=validateShow(next);valid.failed()) {
         status=valid.getErrorMessage();return false;
     }
@@ -64,7 +68,7 @@ void MainComponent::showControlCellMenu(int row,int column,
         show.columns[(size_t)column].controlLocked) return;
     const int rowId=show.rows[(size_t)row].id;
     const int columnId=show.columns[(size_t)column].id;
-    const bool present=show.rows[(size_t)row].cells[(size_t)column].controlSet.has_value();
+    const bool present=hasControlMapAssignment(show.rows[(size_t)row].cells[(size_t)column]);
     juce::PopupMenu menu;
     menu.addItem(1,present ? "Edit Control Map" : "Create empty Control Map");
     juce::PopupMenu saved;
@@ -102,7 +106,15 @@ void MainComponent::showControlCellMenu(int row,int column,
                                 for (int col=0;col<(int)safe->show.columns.size();++col)
                                     if (safe->show.columns[(size_t)col].id==columnId) {
                                         const auto& cell=safe->show.rows[(size_t)row].cells[(size_t)col];
-                                        if (cell.controlSet)
+                                        if (cell.assignedMapId>0) {
+                                            const auto found=std::find_if(safe->show.controls.templates.begin(),
+                                                safe->show.controls.templates.end(),
+                                                [&cell](const ControlSetTemplate& map){
+                                                    return map.id==cell.assignedMapId;
+                                                });
+                                            if (found!=safe->show.controls.templates.end())
+                                                safe->createReusableControlMap(name,found->set);
+                                        } else if (cell.controlSet)
                                             safe->createReusableControlMap(name,*cell.controlSet);
                                         return;
                                     }
