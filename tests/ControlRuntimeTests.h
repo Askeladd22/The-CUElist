@@ -3,6 +3,67 @@
 #include "ShowEditOperations.h"
 
 void controlRuntimeTests() {
+    test("MIDI and OSC update real-time master and column controls without GO",[] {
+        MainComponent ui(false);
+        // Locate actual JUCE controls instead of merely asserting that the Show
+        // model changed. This fails if audio is updated but the fader stays stale.
+        auto findNamed=[](juce::Component& root,const juce::String& name)->juce::Component* {
+            std::vector<juce::Component*> pending{&root};
+            while (!pending.empty()) {
+                auto* candidate=pending.back();pending.pop_back();
+                if (candidate->getName()==name) return candidate;
+                for (auto* child:candidate->getChildren()) pending.push_back(child);
+            }
+            return nullptr;
+        };
+        auto* master=dynamic_cast<GainMeterFader*>(findNamed(ui,"masterAudioDb"));
+        auto* masterPan=dynamic_cast<juce::Slider*>(findNamed(ui,"masterPan"));
+        check(master && masterPan,"Master controls missing from the GUI");
+        const auto add=[&](juce::String device,ControlKind kind,int number,
+                           ControlTarget target,float minimum,float maximum,int column=0) {
+            ControlBinding binding;
+            binding.deviceId=device;binding.kind=kind;binding.channel=1;
+            binding.number=number;binding.target=target;
+            binding.minimum=minimum;binding.maximum=maximum;
+            binding.targetColumnId=column;binding.takeover=ControlTakeover::jump;
+            check(ui.addMappingBinding(binding),"Could not configure real-time control binding");
+        };
+        add("controller",ControlKind::cc,20,ControlTarget::masterGain,0.0f,1.0f);
+        add("controller",ControlKind::cc,21,ControlTarget::masterPan,-1.0f,1.0f);
+        add("/master/gain",ControlKind::osc,0,ControlTarget::masterGain,0.0f,1.0f);
+        const int audioId=ui.show.columns.front().id;
+        add("controller",ControlKind::cc,22,ControlTarget::columnGain,0.0f,1.0f,audioId);
+        auto* column=dynamic_cast<GainMeterFader*>(findNamed(ui,"columnGainDb"));
+        check(column!=nullptr,"Audio column fader missing");
+        const auto send=[&](juce::String device,ControlKind kind,int number,int value) {
+            ui.dispatchControlForTest({device,kind,1,number,value,false});
+        };
+        check(ui.activeCueMappingId()==0,"A cue unexpectedly became active");
+        send("controller",ControlKind::cc,20,64);
+        check(std::abs(ui.show.masterGain-64.0f/127.0f)<0.00001f,
+              "Incoming MIDI CC did not update the real master gain");
+        check(std::abs(master->getGainDb()-GainMeterFader::fromLinear(ui.show.masterGain))<0.15f,
+              "MIDI master gain changed internally but the visible fader stayed stale");
+        send("controller",ControlKind::cc,21,32);
+        check(std::abs(ui.show.masterPan-(-1.0f+64.0f/127.0f))<0.00001f,
+              "MIDI CC did not update master pan");
+        check(std::abs((float)masterPan->getValue()-ui.show.masterPan)<0.0001f,
+              "MIDI pan updated internally without moving its GUI control");
+        send("controller",ControlKind::cc,22,28);
+        check(std::abs(ui.show.columns.front().gain-28.0f/127.0f)<0.00001f,
+              "Incoming MIDI CC did not update the column gain");
+        check(std::abs(column->getGainDb()-
+                       GainMeterFader::fromLinear(ui.show.columns.front().gain))<0.15f,
+              "The column fader did not follow external MIDI input");
+        send("/master/gain",ControlKind::osc,0,100);
+        check(std::abs(ui.show.masterGain-100.0f/127.0f)<0.00001f &&
+              std::abs(master->getGainDb()-GainMeterFader::fromLinear(ui.show.masterGain))<0.15f,
+              "OSC changed neither the master value nor its live fader");
+        send("controller",ControlKind::cc,20,96);
+        check(std::abs(master->getGainDb()-GainMeterFader::fromLinear(ui.show.masterGain))<0.15f,
+              "Repeated MIDI movement was not reflected immediately");
+        check(ui.activeCueMappingId()==0,"An external fader triggered an unintended GO");
+    });
     test("saved maps are independent from columns, shared by reference, and safe to delete",[] {
         MainComponent ui(false);
         const int mapA=ui.createReusableControlMap("Lights A",{});
