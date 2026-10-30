@@ -102,6 +102,46 @@ void cuelistGuiMockupTests() {
               "Invalid move indices must not change the show.");
     });
 
+    test("Drag cues within the Cuelist and keyboard arrows preserve their cell identities",[] {
+        MainComponent ui(false);
+        addRow(ui.show,"Second");
+        addRow(ui.show,"Third");
+        const int firstId=ui.show.rows[0].id;
+        const int secondId=ui.show.rows[1].id;
+        const int thirdId=ui.show.rows[2].id;
+        const int firstCell=ui.show.rows[0].cells[0].id;
+        auto* pinned=cueViewFixtures::find<PinnedCueHeaders>(ui);
+        check(pinned!=nullptr,"Pinned cue header missing.");
+        const juce::Point<float> from{156.0f,
+            (float)CueGrid::headerHeight+CueGrid::rowContentInset+20};
+        const juce::Point<float> to{156.0f,
+            from.y+2*CueGrid::rowHeight};
+        pinned->mouseDown(event(*pinned,from,from));
+        pinned->mouseDrag(event(*pinned,to,from,1,true));
+        pinned->mouseUp(event(*pinned,to,from,1,true));
+        check(ui.show.rows[0].id==secondId &&
+              ui.show.rows[1].id==thirdId &&
+              ui.show.rows[2].id==firstId &&
+              ui.show.rows[2].cells[0].id==firstCell &&
+              ui.selectedRow==2,
+              "Cue drag failed to move the complete row with its cells.");
+        const juce::ModifierKeys mods(
+            juce::ModifierKeys::ctrlModifier |
+            juce::ModifierKeys::shiftModifier);
+        check(ui.keyPressed(juce::KeyPress(juce::KeyPress::upKey,mods,0)) &&
+              ui.selectedRow==1 && ui.show.rows[1].id==firstId,
+              "Ctrl+Shift+Up did not move the selected cue.");
+        check(ui.keyPressed(juce::KeyPress(juce::KeyPress::downKey,mods,0)) &&
+              ui.selectedRow==2 && ui.show.rows[2].id==firstId,
+              "Ctrl+Shift+Down did not move the selected cue.");
+        check(validateShow(ui.show).wasOk(),
+              "Cue row reordering invalidated project model.");
+        Show restored;
+        check(decodeShow(encodeShow(ui.show),restored).wasOk() &&
+              restored.rows[2].id==firstId,
+              "Cue drag order was not persisted.");
+    });
+
     test("Cuelist names update active tab and Cue List header bidirectionally",[] {
         MainComponent ui(false);
         ui.createCuelist();

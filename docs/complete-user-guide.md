@@ -63,6 +63,13 @@ The **Help** button in the top toolbar opens a menu with **Guide** and **About T
 
 ### 3.3 Cue grid, Inspector, mixer and Timeline
 
+Within a Cuelist, you can **drag a cue's title up or down** to change
+its position, or use **Ctrl+Shift+Up / Ctrl+Shift+Down** to move the selected
+cue by one row. The existing up/down arrows beside each cue remain available.
+As with the existing row arrows, moving a cue is a structural edit that
+**stops active playback** before changing cue order; the cue's cells, media
+references and notes move with it.
+
 The central cue grid has row controls on the left and columns for Audio/MIDI/OSC/Control. Its Cuelist title and all Audio/MIDI/OSC/Control column headings stay **fixed during vertical scrolling**. Column headings track their cells during horizontal scrolling. The **BPM** and **Auto Stop** strip remains fixed at the right, including during horizontal scrolling. During vertical scrolling, row values, toggles and action targets remain **below** their fixed headers: controls hidden behind the header are neither visible nor clickable. Row Play/Pause, Stop and the action menu are physically separated, as are the larger Play/Stop targets inside each cell. Column Utilities and the Master Audio strip occupy the lower working area; a Timeline with zoom/grid/snap controls is underneath.
 
 Small icon buttons across the workspace use a restrained shared visual style: the glyph carries the semantic colour while the border stays subtle. Hover, pressed, toggled, disabled and keyboard-focus states remain distinguishable. This affects the appearance, **not** the Play/Stop/GO/PANIC actions, selection, saved shows or clicking areas. Destructive actions still use red/pink symbols. A visible focus outline indicates keyboard focus; the critical GO and PANIC actions retain their distinct treatment.
