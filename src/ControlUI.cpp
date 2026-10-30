@@ -1,4 +1,5 @@
 #include "MainComponent.h"
+#include "OperatorTextPrompt.h"
 #include <cmath>
 
 namespace cuelist {
@@ -53,6 +54,68 @@ bool MainComponent::duplicateControlSet(int sr,int sc,int tr,int tc) {
     }
     show=std::move(next);dirty=true;refreshControlSettings();
     status="Control Map duplicated.";refresh();return true;
+}
+
+void MainComponent::showControlCellMenu(int row,int column,
+                                         juce::Point<int> screenPosition) {
+    if (row<0 || row>=(int)show.rows.size() || column<0 ||
+        column>=(int)show.columns.size() ||
+        show.columns[(size_t)column].type!=ColumnType::control ||
+        show.columns[(size_t)column].controlLocked) return;
+    const int rowId=show.rows[(size_t)row].id;
+    const int columnId=show.columns[(size_t)column].id;
+    const bool present=show.rows[(size_t)row].cells[(size_t)column].controlSet.has_value();
+    juce::PopupMenu menu;
+    menu.addItem(1,present ? "Edit Control Map" : "Create empty Control Map");
+    juce::PopupMenu saved;
+    for (const auto& item:show.controls.templates)
+        saved.addItem(item.id,item.name);
+    menu.addSubMenu(present?"Replace with saved map":"Load saved map",saved,
+                    !show.controls.templates.empty());
+    if (present) {
+        menu.addItem(2,"Save map for reuse...");
+        menu.addItem(3,"Remove override (inherit Default Map)");
+    }
+    auto safe=juce::Component::SafePointer<MainComponent>(this);
+    menu.showMenuAsync(juce::PopupMenu::Options().withTargetScreenArea(
+        {screenPosition.x,screenPosition.y,1,1}),
+        [safe,rowId,columnId](int choice) {
+            if (!safe || choice<=0) return;
+            int r=-1,c=-1;
+            for (int i=0;i<(int)safe->show.rows.size();++i)
+                if (safe->show.rows[(size_t)i].id==rowId) r=i;
+            for (int i=0;i<(int)safe->show.columns.size();++i)
+                if (safe->show.columns[(size_t)i].id==columnId) c=i;
+            if (r<0 || c<0 || safe->show.columns[(size_t)c].type!=ColumnType::control ||
+                safe->show.columns[(size_t)c].controlLocked) return;
+            if (choice==1) {
+                if (safe->createEmptyControlSet(r,c)) safe->editControlSet(r,c);
+            } else if (choice==2) {
+                if (!safe->show.rows[(size_t)r].cells[(size_t)c].controlSet) return;
+                showOperatorTextPrompt(*safe,safe->theme,"Save reusable Control Map",
+                    "Save an independent copy. Editing it later will not rewrite existing cue overrides.",
+                    "Map name","Map "+juce::String(safe->show.controls.templates.size()+1),
+                    false,"Save",[safe,rowId,columnId](juce::String name) {
+                        if (!safe) return;
+                        for (int row=0;row<(int)safe->show.rows.size();++row)
+                            if (safe->show.rows[(size_t)row].id==rowId)
+                                for (int col=0;col<(int)safe->show.columns.size();++col)
+                                    if (safe->show.columns[(size_t)col].id==columnId) {
+                                        const auto& cell=safe->show.rows[(size_t)row].cells[(size_t)col];
+                                        if (cell.controlSet)
+                                            safe->createReusableControlMap(name,*cell.controlSet);
+                                        return;
+                                    }
+                    });
+            } else if (choice==3) {
+                safe->clearControlCellMap(r,c);
+            } else {
+                const auto exists=std::any_of(safe->show.controls.templates.begin(),
+                    safe->show.controls.templates.end(),
+                    [choice](const ControlSetTemplate& t){return t.id==choice;});
+                if (exists) safe->applyControlSetTemplate(r,c,choice);
+            }
+        });
 }
 
 class ControlPanel final : public juce::Component, private juce::Timer,

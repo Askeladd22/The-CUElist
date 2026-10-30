@@ -298,6 +298,10 @@ public:
     void editControlSet(int row,int column);
     bool createEmptyControlSet(int row,int column);
     bool duplicateControlSet(int sourceRow,int sourceColumn,int destRow,int destColumn);
+    bool clearControlCellMap(int row,int column);
+    int createReusableControlMap(const juce::String& name,const ControlSet& original);
+    bool modifyReusableControlBinding(int mapId,int oldBindingId,ControlBinding binding,int operation);
+    void showControlCellMenu(int row,int column,juce::Point<int> screenPosition);
     bool addControlSetBinding(int row,int column,ControlBinding);
     bool deleteControlSetBinding(int row,int column,int id);
     bool updateControlBinding(int row,int column,int id,ControlBinding updated,bool inControlSet);

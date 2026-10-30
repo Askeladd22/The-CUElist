@@ -314,6 +314,89 @@ bool MainComponent::updateControlBinding(int row,int column,int id,ControlBindin
     dirty=true;status="Mapping updated.";refresh();return true;
 }
 
+int MainComponent::createReusableControlMap(const juce::String& name,
+                                            const ControlSet& original) {
+    const auto title=name.trim();
+    if (title.isEmpty() || title.length()>120) {
+        status="Map name must contain 1–120 characters.";return 0;
+    }
+    auto candidate=show;
+    if (candidate.controls.templates.size()>=128 || original.bindings.size()>256 ||
+        candidate.controls.nextId>=999999000) {
+        status="Map capacity or identifier limit reached.";return 0;
+    }
+    for (const auto& item:candidate.controls.templates)
+        if (item.name.equalsIgnoreCase(title)) {
+            status="A reusable map with this name already exists.";return 0;
+        }
+    ControlSetTemplate map;
+    map.id=candidate.controls.nextId++;
+    map.name=title;
+    map.set=original;
+    for (auto& b:map.set.bindings) {
+        b.id=candidate.controls.nextId++;
+        b.scope=ControlScope::global;b.scopeId=0;
+    }
+    const int result=map.id;
+    candidate.controls.templates.push_back(std::move(map));
+    if (auto valid=validateShow(candidate);valid.failed()) {
+        status=valid.getErrorMessage();return 0;
+    }
+    show=std::move(candidate);
+    dirty=true;refreshControlSettings();refresh();
+    status="Reusable map created: "+title;
+    return result;
+}
+bool MainComponent::modifyReusableControlBinding(int mapId,int oldBindingId,
+                                                  ControlBinding binding,int operation) {
+    if (operation<0 || operation>2) return false; // 0 add, 1 edit, 2 delete
+    auto candidate=show;
+    auto map=std::find_if(candidate.controls.templates.begin(),
+        candidate.controls.templates.end(),
+        [mapId](const ControlSetTemplate& item){return item.id==mapId;});
+    if (map==candidate.controls.templates.end()) {
+        status="Saved map no longer exists.";return false;
+    }
+    auto& entries=map->set.bindings;
+    if (operation==0) {
+        binding.id=candidate.controls.nextId++;
+        binding.scope=ControlScope::global;binding.scopeId=0;
+        entries.push_back(std::move(binding));
+    } else {
+        auto found=std::find_if(entries.begin(),entries.end(),
+            [oldBindingId](const ControlBinding& item){return item.id==oldBindingId;});
+        if (found==entries.end()) {
+            status="Saved mapping no longer exists.";return false;
+        }
+        if (operation==2) entries.erase(found);
+        else {
+            binding.id=oldBindingId;
+            binding.scope=ControlScope::global;binding.scopeId=0;
+            *found=std::move(binding);
+        }
+    }
+    if (auto valid=validateShow(candidate);valid.failed()) {
+        status=valid.getErrorMessage();return false;
+    }
+    show=std::move(candidate);dirty=true;
+    refreshControlSettings();refresh();status="Saved map updated.";return true;
+}
+bool MainComponent::clearControlCellMap(int row,int column) {
+    if (row<0 || row>=(int)show.rows.size() || column<0 ||
+        column>=(int)show.columns.size() ||
+        show.columns[(size_t)column].type!=ColumnType::control ||
+        show.columns[(size_t)column].controlLocked ||
+        !show.rows[(size_t)row].cells[(size_t)column].controlSet) return false;
+    auto candidate=show;
+    candidate.rows[(size_t)row].cells[(size_t)column].controlSet.reset();
+    if (auto valid=validateShow(candidate);valid.failed()) {
+        status=valid.getErrorMessage();return false;
+    }
+    show=std::move(candidate);dirty=true;
+    refreshControlSettings();refresh();
+    status="Override removed; Default Map restored.";return true;
+}
+
 int MainComponent::saveControlSetTemplate(int row,int column,const juce::String& name) {
     if (row<0 || row>=(int)show.rows.size() || column<0 ||
         column>=(int)show.columns.size() ||

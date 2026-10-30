@@ -497,7 +497,9 @@ void CueGrid::mouseDown(const juce::MouseEvent& e) {
     if (!owner.select(row,column)) return;
     if (col.type==ColumnType::control) {
         const auto& cell=owner.show.rows[(size_t)row].cells[(size_t)column];
-        if (col.controlLocked || cell.controlSet) owner.editControlSet(row,column);
+        if (!col.controlLocked && cell.controlSet)
+            owner.showControlCellMenu(row,column,e.getScreenPosition());
+        else if (col.controlLocked) owner.editControlSet(row,column);
     } else if (owner.hasClip(row,column)) {
         dragRow=row; dragColumn=column;
     }
@@ -543,7 +545,8 @@ void CueGrid::mouseDoubleClick(const juce::MouseEvent& e) {
             if (type==ColumnType::midi) owner.editMidiClip();
             else if (type==ColumnType::osc) owner.editOscClip();
             else if (type==ColumnType::control) {
-                if (owner.createEmptyControlSet(row,column)) owner.editControlSet(row,column);
+                // An empty cell creates the override without opening a dialog.
+                owner.createEmptyControlSet(row,column);
             }
             else owner.triggerCell();
         }
