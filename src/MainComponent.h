@@ -294,7 +294,7 @@ public:
     void setMasterOutput(int channel);
     void setSafetyLimiter(bool enabled);
     void showDevices(); // Audio settings selector; directly testable for lifetime safety.
-    void openControlPanel(bool editSet=false);
+    void openControlPanel(bool editSet=false,int templateId=0);
     void editControlSet(int row,int column);
     bool createEmptyControlSet(int row,int column);
     bool duplicateControlSet(int sourceRow,int sourceColumn,int destRow,int destColumn);

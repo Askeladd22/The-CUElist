@@ -121,8 +121,9 @@ void MainComponent::showControlCellMenu(int row,int column,
 class ControlPanel final : public juce::Component, private juce::Timer,
                            private juce::ListBoxModel {
 public:
-    explicit ControlPanel(MainComponent& main,bool useSet):owner(&main),
-        editSet(useSet),sourceRow(main.selectedRow),sourceColumn(main.selectedColumn),
+    explicit ControlPanel(MainComponent& main,bool useSet,int templateId=0):owner(&main),
+        editSet(useSet || templateId>0),editTemplateId(templateId),
+        sourceRow(main.selectedRow),sourceColumn(main.selectedColumn),
         sourceRowId(main.show.rows[(size_t)main.selectedRow].id),
         sourceColumnId(main.show.columns[(size_t)main.selectedColumn].id) {
         setName("controlMappingPanel");
@@ -151,17 +152,26 @@ public:
                 mapChooser.addItem("Q"+juce::String(row+1)+" / "+column.name,id);
                 if (editSet && row==sourceRow && col==sourceColumn) initial=id;
             }
+        for (const auto& map:owner->show.controls.templates) {
+            availableTemplateIds.push_back(map.id);
+            const int index=(int)availableMaps.size()+(int)availableTemplateIds.size()+1;
+            mapChooser.addItem("Saved: "+map.name,index);
+            if (editTemplateId==map.id) initial=index;
+        }
         mapChooser.setSelectedId(initial,juce::dontSendNotification);
         mapChooser.onChange=[this] {
             if (!owner) return;
             const int index=mapChooser.getSelectedId()-2;
             const auto maps=availableMaps;
+            const auto templates=availableTemplateIds;
             auto safe=juce::Component::SafePointer<MainComponent>(owner.getComponent());
-            juce::MessageManager::callAsync([safe,maps,index] {
+            juce::MessageManager::callAsync([safe,maps,templates,index] {
                 if (!safe) return;
                 if (index<0) safe->openControlPanel(false);
                 else if (index<(int)maps.size())
                     safe->editControlSet(maps[(size_t)index].first,maps[(size_t)index].second);
+                else if (index<(int)maps.size()+(int)templates.size())
+                    safe->openControlPanel(false,templates[(size_t)(index-(int)maps.size())]);
             });
         };
         newMap.onClick=[this]{createMap(false);};
@@ -369,8 +379,10 @@ public:
         effectivePreview.setReadOnly(true);
         effectivePreview.setScrollbarsShown(true);
         effectivePreview.setVisible(editSet);
-        templateName.setVisible(editSet); templates.setVisible(editSet);
-        saveTemplate.setVisible(editSet); loadTemplate.setVisible(editSet);
+        templateName.setVisible(editSet && editTemplateId==0);
+        templates.setVisible(editSet && editTemplateId==0);
+        saveTemplate.setVisible(editSet && editTemplateId==0);
+        loadTemplate.setVisible(editSet && editTemplateId==0);
         templateName.setTextToShowWhenEmpty("Reusable Set name",palette::muted);
         templateName.setName("controlTemplateName");
         templates.setName("controlTemplates");
@@ -472,9 +484,11 @@ public:
             if (!owner || !bindings || selected<0 || selected>=(int)bindings->size()) return;
             const int id=(*bindings)[(size_t)selected].id;
             int row=-1,column=-1;
-            const bool removed=editSet ?
-                (resolveSource(row,column) && owner->deleteControlSetBinding(row,column,id)) :
-                owner->deleteMappingBinding(id);
+            const bool removed=editTemplateId>0 ?
+                owner->modifyReusableControlBinding(editTemplateId,id,{},2) :
+                editSet ? (resolveSource(row,column) &&
+                    owner->deleteControlSetBinding(row,column,id)) :
+                    owner->deleteMappingBinding(id);
             if (removed) {
                 selected=-1; bindingList.updateContent(); bindingList.repaint();
                 updateSelected.setEnabled(false);
@@ -518,7 +532,8 @@ public:
     ~ControlPanel() override {stopTimer();bindingList.setModel(nullptr);}
     void paint(juce::Graphics& g) override {
         g.fillAll(palette::panel);
-        label(g,editSet ? "CONTROL SET / Q"+juce::String(sourceRow+1) :
+        label(g,editTemplateId>0 ? "SAVED CONTROL MAP" :
+              editSet ? "CONTROL SET / Q"+juce::String(sourceRow+1) :
               "DEFAULT MAP / CONTROL MAPPINGS",{20,15,620,31},21,palette::teal,true);
         g.setColour(palette::line);
         g.drawHorizontalLine(52,19,(float)getWidth()-19);
@@ -543,18 +558,21 @@ public:
 
         if (editSet) {
             label(g,"EFFECTIVE MAPPING",{20,347,330,18},12,palette::teal,true);
-            label(g,"REUSABLE CONTROL SETS",{20,456,330,18},12,palette::teal,true);
+            if (editTemplateId==0)
+                label(g,"REUSABLE CONTROL MAPS",{20,456,330,18},12,palette::teal,true);
         } else {
             label(g,"CUE PRESETS",{20,347,250,18},12,palette::teal,true);
             label(g,"New preset name",{388,347,220,18},11,palette::muted,true);
         }
-        label(g,editSet?"MAPPINGS IN THIS CONTROL SET":"SAVED MAPPINGS",
+        label(g,editTemplateId>0 ? "MAPPINGS IN SAVED MAP" :
+              editSet?"MAPPINGS IN THIS CONTROL SET":"DEFAULT MAP ASSIGNMENTS",
               {20,editSet?534:434,380,15},11,palette::teal,true);
         g.setColour(palette::line);
         g.drawHorizontalLine(getHeight()-48,20,(float)getWidth()-20);
-        label(g,editSet ?
-            "Control Set overrides apply after GO; remove one to inherit Default Map." :
-            "Cue mappings become active after GO, not when selecting a cue.",
+        label(g,editTemplateId>0 ?
+            "Saved maps are reusable snapshots. Apply one from a Control Column cell." :
+            editSet ? "Control overrides apply after GO; removing one restores Default Map." :
+            "Default Map always remains active as the lowest-priority fallback.",
             {20,getHeight()-40,getWidth()-40,23},11,palette::muted);
     }
     void resized() override {
@@ -609,6 +627,7 @@ public:
 private:
     juce::Component::SafePointer<MainComponent> owner;
     bool editSet=false;
+    int editTemplateId=0;
     int sourceRow=0,sourceColumn=0;
     int sourceRowId=0,sourceColumnId=0;
     bool resolveSource(int& row,int& column) const {
@@ -624,6 +643,11 @@ private:
     }
     const std::vector<ControlBinding>* currentBindings() const {
         if (!owner) return nullptr;
+        if (editTemplateId>0) {
+            for (const auto& map:owner->show.controls.templates)
+                if (map.id==editTemplateId) return &map.set.bindings;
+            return nullptr;
+        }
         if (!editSet) return &owner->show.controls.bindings;
         int row=-1,columnIndex=-1;
         if (!resolveSource(row,columnIndex)) return nullptr;
@@ -636,31 +660,35 @@ private:
     juce::ComboBox device,presets,scope,target,takeover,columns,curve,templates,functionChoice,mapChooser;
     juce::TextButton newMap,cloneMap;
     std::vector<std::pair<int,int>> availableMaps;
+    std::vector<int> availableTemplateIds;
     void createMap(bool duplicate) {
-        if (!owner || owner->show.rows.empty()) return;
-        int row=-1,column=-1;
-        const int start=juce::jlimit(0,(int)owner->show.rows.size()-1,owner->selectedRow);
-        for (int step=0;step<(int)owner->show.rows.size();++step) {
-            int r=(start+step)%(int)owner->show.rows.size();
-            for (int c=0;c<(int)owner->show.columns.size();++c)
-                if (owner->show.columns[(size_t)c].type==ColumnType::control &&
-                    !owner->show.columns[(size_t)c].controlLocked &&
-                    !owner->show.rows[(size_t)r].cells[(size_t)c].controlSet) {
-                    row=r;column=c;break;
-                }
-            if (row>=0) break;
+        if (!owner) return;
+        ControlSet source;
+        if (duplicate) {
+            const auto* bindings=currentBindings();
+            if (!bindings) {
+                state.setText("No map selected to duplicate.",juce::dontSendNotification);
+                return;
+            }
+            source.bindings=*bindings;
         }
-        if (row<0) {
-            state.setText("Add an empty Control Column cell to create another map.",
-                          juce::dontSendNotification);return;
+        // Reusable maps are independent from Control Columns until assigned.
+        const auto& saved=owner->show.controls.templates;
+        juce::String title;
+        int number=1;
+        for (;;) {
+            title=(duplicate ? "Copy of Map " : "Map ")+juce::String(number++);
+            const bool exists=std::any_of(saved.begin(),saved.end(),
+                [&title](const ControlSetTemplate& t){return t.name.equalsIgnoreCase(title);});
+            if (!exists) break;
         }
-        const bool ok=duplicate ?
-            owner->duplicateControlSet(editSet?sourceRow:-1,editSet?sourceColumn:-1,row,column) :
-            owner->createEmptyControlSet(row,column);
-        if (!ok) {state.setText(owner->status,juce::dontSendNotification);return;}
+        const int newId=owner->createReusableControlMap(title,source);
+        if (newId==0) {
+            state.setText(owner->status,juce::dontSendNotification);return;
+        }
         auto safe=juce::Component::SafePointer<MainComponent>(owner.getComponent());
-        juce::MessageManager::callAsync([safe,row,column]{
-            if(safe) safe->editControlSet(row,column);
+        juce::MessageManager::callAsync([safe,newId] {
+            if (safe) safe->openControlPanel(false,newId);
         });
     }
     juce::TextButton connect,learn,oscLearn,add,remove,updateSelected,newPreset,assignPreset,saveTemplate,loadTemplate,
@@ -782,7 +810,7 @@ private:
             const auto* entries=currentBindings();
             createBinding(entries && selected>=0 && selected<(int)entries->size());
         }
-        if (editSet) updateEffectivePreview();
+        if (editSet && editTemplateId==0) updateEffectivePreview();
     }
     void refreshDevices() {
         if (!owner) return;
@@ -925,9 +953,10 @@ private:
             b.maximum=high.getFloatValue();
         }
         int row=-1,column=-1;
-        const bool resolved=!editSet || resolveSource(row,column);
-        const bool saved=resolved && (update ?
-            owner->updateControlBinding(row,column,b.id,b,editSet) :
+        const bool resolved=editTemplateId>0 || !editSet || resolveSource(row,column);
+        const bool saved=resolved && (editTemplateId>0 ?
+            owner->modifyReusableControlBinding(editTemplateId,b.id,b,update ? 1 : 0) :
+            update ? owner->updateControlBinding(row,column,b.id,b,editSet) :
             editSet ? owner->addControlSetBinding(row,column,b) :
                       owner->addMappingBinding(b));
         if (saved) {
@@ -1050,7 +1079,7 @@ private:
             {7,0,width-14,height},12,active?palette::text:palette::muted);
     }
 };
-void MainComponent::openControlPanel(bool editSet) {
+void MainComponent::openControlPanel(bool editSet,int templateId) {
     if (quickLearnMode!=QuickLearnMode::off) finishQuickLearn();
     if (!editSet) ensureStarterControlFunctions();
     if (controlDialog) {
@@ -1059,9 +1088,9 @@ void MainComponent::openControlPanel(bool editSet) {
         delete previous;
     }
     juce::DialogWindow::LaunchOptions options;
-    options.content.setOwned(new ControlPanel(*this,editSet));
-    options.dialogTitle=editSet ? "The Cuelist — Control Set" :
-        "The Cuelist — Control Mappings";
+    options.content.setOwned(new ControlPanel(*this,editSet,templateId));
+    options.dialogTitle=templateId>0 ? "The Cuelist — Reusable Map" :
+        editSet ? "The Cuelist — Control Set" : "The Cuelist — Control Mappings";
     options.dialogBackgroundColour=palette::panel;
     options.escapeKeyTriggersCloseButton=true;
     options.useNativeTitleBar=false;
