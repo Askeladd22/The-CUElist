@@ -140,14 +140,21 @@ struct ColumnUtilities::Strip final : juce::Component {
         gain.onGainChanged=[update](float) { update(0); }; pan.onValueChange=[update] { update(1); };
         mute.onClick=[update] { update(2); }; phase.onClick=[update] { update(3); };
     }
+    void syncAudioControls() {
+        const auto& col=owner.show.columns[index];
+        if (col.type!=ColumnType::audio) return;
+        gain.setGainDb(GainMeterFader::fromLinear(col.gain)); // no callback feedback
+        pan.setValue(col.pan,juce::dontSendNotification);
+        mute.setToggleState(col.muted,juce::dontSendNotification);
+        phase.setToggleState(col.phaseInverted,juce::dontSendNotification);
+        masterSend.setToggleState(col.masterSend,juce::dontSendNotification);
+        repaint();
+    }
     void sync() {
         const auto& col=owner.show.columns[index];
         gain.setMaximumDb(owner.audioFaderCeilingDb());
-        gain.setGainDb(GainMeterFader::fromLinear(col.gain));
-        pan.setValue(col.pan,juce::dontSendNotification); mute.setToggleState(col.muted,juce::dontSendNotification);
-        phase.setToggleState(col.phaseInverted,juce::dontSendNotification);
+        syncAudioControls();
         dataMute.setToggleState(col.muted,juce::dontSendNotification);
-        masterSend.setToggleState(col.masterSend,juce::dontSendNotification);
         directMode.setButtonText(col.directPostFader ? "POST" : "PRE");
         directMode.setEnabled(col.directOutputEnabled);
         gain.setCompact(col.collapsed);
@@ -379,6 +386,15 @@ void ColumnUtilities::refresh() {
 }
 void ColumnUtilities::refreshLearnVisuals() {
     for (auto& strip:strips) strip->refreshLearnVisuals();
+}
+void ColumnUtilities::syncAudioControls(int column) {
+    if (column<0 || column>=(int)owner.show.columns.size()) return;
+    if ((size_t)column>=strips.size() ||
+        strips[(size_t)column]->id!=owner.show.columns[(size_t)column].id) {
+        refresh(); // structural change; rebuild only if this column was replaced
+        return;
+    }
+    strips[(size_t)column]->syncAudioControls();
 }
 void ColumnUtilities::syncScroll(int x) { if (scrollX!=x) { scrollX=x; resized(); repaint(); } }
 void ColumnUtilities::refreshRouting() {

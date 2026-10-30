@@ -613,7 +613,6 @@ void MainComponent::dispatchControl(const ControlEvent& input) {
                 if (c.muted!=action->pressed) setColumnUtilities(i,c.gain,c.pan,action->pressed,c.phaseInverted);
             } else if (c.phaseInverted!=action->pressed)
                 setColumnUtilities(i,c.gain,c.pan,c.muted,action->pressed);
-            utilities.refresh();
         }
     } else if (binding.target==ControlTarget::columnGain ||
                binding.target==ControlTarget::columnPan) {
@@ -628,7 +627,6 @@ void MainComponent::dispatchControl(const ControlEvent& input) {
                         binding.target==ControlTarget::columnGain ? bounded : c.gain,
                         binding.target==ControlTarget::columnPan ? action->scaled : c.pan,
                         c.muted,c.phaseInverted);
-                    utilities.refresh();
                 }
         }
     }
