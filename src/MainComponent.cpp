@@ -32,7 +32,7 @@ MainComponent::MainComponent(bool startAudio) {
     setLookAndFeel(&theme); setWantsKeyboardFocus(true); setSize(1440,900);
     for (juce::Component* c : std::initializer_list<juce::Component*>{&openButton,&saveButton,&newButton,&addRowButton,&addColumnButton,
          &goButton,&panicButton,&deviceButton,&controlButton,&collapseAllButton,&inspectorSideTab,
-         &cuelistOverflowButton,&addCuelistButton,&cuelistMoveLeft,&cuelistMoveRight,&undoButton,&redoButton,&globalMidiLearn,&globalOscLearn,&quickControlTargets,&cancelQuickLearn,&goLearnHotspot,&panicLearnHotspot,&helpButton,&dockResize,&timelineResize,&importButton,&midiEditButton,&oscEditButton,&playCellButton,&stopCellButton,&clearButton,&tempoButton,&applyButton,
+         &cuelistOverflowButton,&addCuelistButton,&cuelistMoveLeft,&cuelistMoveRight,&undoButton,&redoButton,&globalMidiLearn,&globalOscLearn,&quickControlTargets,&quickLearnMapSelector,&cancelQuickLearn,&goLearnHotspot,&panicLearnHotspot,&helpButton,&dockResize,&timelineResize,&importButton,&midiEditButton,&oscEditButton,&playCellButton,&stopCellButton,&clearButton,&tempoButton,&applyButton,
          &cellTab,&rowTab,&rowGain,&rowBehaviour,&rowMute,&rowLoop,&rowName,&cellName,&bpm,&cueNotes,&behaviour,&follow,&loop,&cellAutoStop,&gainDb,&viewport,&timeline,&utilities,
          &clipCollapseButton,&clipCloseButton,&cueHeaders,&columnHeaders,&cueMetrics,&preflightButton,&diagnosticsButton,&preferencesButton,&projectNameLabel,&inlineNameEditor}) addAndMakeVisible(c);
     for (juce::TextButton* b : std::initializer_list<juce::TextButton*>{&openButton,&saveButton,&newButton,&addRowButton,&addColumnButton,&goButton,&panicButton,&deviceButton,&controlButton,&collapseAllButton,&inspectorSideTab,
@@ -326,6 +326,17 @@ MainComponent::MainComponent(bool startAudio) {
     undoButton.setEnabled(false);
     redoButton.setEnabled(false);
     quickControlTargets.setVisible(false);
+    quickLearnMapSelector.setVisible(false);
+    quickLearnMapSelector.setName("quickLearnMapSelector");
+    quickLearnMapSelector.setTooltip("Choose Default Map or a cue Control Column override");
+    quickLearnMapSelector.onChange=[this] {
+        const int index=quickLearnMapSelector.getSelectedId()-1;
+        if (index>=0 && index<(int)quickLearnMapLocations.size()) {
+            const auto location=quickLearnMapLocations[(size_t)index];
+            selectQuickLearnMap(location.first,location.second);
+        }
+    };
+    quickControlTargets.onRename=[this](int id){renameQuickLearnFunction(id);};
     cancelQuickLearn.setVisible(false);
     quickControlTargets.onPick=[this](int functionId) {chooseQuickLearnTarget(functionId);};
     cancelQuickLearn.onClick=[this] {finishQuickLearn();status="Quick Learn ended.";repaint();};
@@ -348,11 +359,7 @@ MainComponent::MainComponent(bool startAudio) {
     globalOscLearn.onClick=[this] {beginQuickLearn(true);};
     controlButton.setName("controlMapping");
     controlButton.setTooltip("MIDI input, MIDI Learn, and global/per-cue mappings.");
-    controlButton.onClick=[this] {
-        if (show.columns[(size_t)selectedColumn].type==ColumnType::control)
-            editControlSet(selectedRow,selectedColumn);
-        else openControlPanel(false); // legacy global/preset editor remains available
-    };
+    controlButton.onClick=[this] {openControlPanel(false);};
     importButton.onClick=[this] { importDialog(); };
     playCellButton.onClick=[this] { triggerCell(); }; stopCellButton.onClick=[this] { send(show.rows[selectedRow].cells[selectedColumn].id,false,true); };
     clearButton.onClick=[this] {
@@ -574,6 +581,7 @@ void MainComponent::paint(juce::Graphics& g) {
               {x+5,98,geometry.inspectorInnerWidth-10,25},19,learnColour,true);
         const bool midiInputMissing=quickLearnMode==QuickLearnMode::midi &&
                                     !midiInput.connected();
+        label(g,"Map to edit",{x+5,126,geometry.inspectorInnerWidth-10,16},11,palette::muted,true);
         label(g,quickLearnFunctionId>0 ?
               (midiInputMissing ? "MIDI input missing - select device" :
                "Selected target blinking - move your controller") :
@@ -912,6 +920,7 @@ void MainComponent::resized() {
     }
     const bool learnVisible=inspectorVisible && quickLearnMode!=QuickLearnMode::off;
     quickControlTargets.setVisible(learnVisible);
+    quickLearnMapSelector.setVisible(learnVisible);
     cancelQuickLearn.setVisible(learnVisible);
     if (learnVisible) {
         // Learning temporarily replaces Inspector content; no extra window.
@@ -920,11 +929,13 @@ void MainComponent::resized() {
                  &loop,&midiEditButton,&oscEditButton,&importButton,&cueNotes,
                  &cellAutoStop,&rowMute,&rowGain,&rowBehaviour,&behaviour})
             c->setVisible(false);
-        cancelQuickLearn.setBounds(x+4,126,inner-8,29);
-        const int top=231;
+        quickLearnMapSelector.setBounds(x+4,145,inner-8,27);
+        cancelQuickLearn.setBounds(x+4,179,inner-8,29);
+        const int top=235;
         quickControlTargets.setBounds(x+4,top,inner-8,
             std::max(60,geometry.inspectorPanel.getBottom()-top-20));
         quickControlTargets.toFront(false);
+        quickLearnMapSelector.toFront(false);
         cancelQuickLearn.toFront(false);
     }
     // Overlays must stay above the grid, pinned headings and Cuelist tabs.

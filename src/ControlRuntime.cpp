@@ -13,7 +13,8 @@ void MainComponent::resetActiveMapping() {
     quickLearnArmedEntryId=0;quickLearnPulseTicks=0;quickLearnPulseBright=true;
     quickLearnFeedback.clear();
     controlLearnArmed=false;oscLearnArmed=false;
-    quickControlTargets.setVisible(false);cancelQuickLearn.setVisible(false);
+    quickControlTargets.setVisible(false);quickLearnMapSelector.setVisible(false);
+    cancelQuickLearn.setVisible(false);
     activeCueId=0;
     controlMapping.setActiveCue(0,0);
 }
@@ -507,27 +508,77 @@ void MainComponent::beginQuickLearn(bool osc) {
     }
     ensureStarterControlFunctions();
     quickLearnMode=mode;quickLearnFunctionId=0;
+    quickLearnMapRowId=quickLearnMapColumnId=0;
     quickLearnArmedEntryId=0;quickLearnPulseTicks=0;quickLearnPulseBright=true;
     quickLearnFeedback.clear();
-    refreshQuickLearnTargets();
+    refreshQuickLearnTargets();refreshQuickLearnMaps();
     inspectorVisible=true;
     status=osc ? "OSC Learn: choose a GUI control or function, then send OSC." :
                  "MIDI Learn: choose a GUI control or function, then move a controller.";
     utilities.refresh();
     resized();updateQuickLearnVisuals();repaint();
 }
+void MainComponent::refreshQuickLearnMaps() {
+    quickLearnMapLocations.clear();
+    quickLearnMapSelector.clear(juce::dontSendNotification);
+    quickLearnMapLocations.push_back({0,0});
+    quickLearnMapSelector.addItem("Default Map (fallback)",1);
+    int choice=1;
+    for (int r=0;r<(int)show.rows.size();++r)
+        for (int c=0;c<(int)show.columns.size();++c) {
+            const auto& column=show.columns[(size_t)c];
+            if (column.type!=ColumnType::control || column.controlLocked) continue;
+            if (!show.rows[(size_t)r].cells[(size_t)c].controlSet) continue;
+            quickLearnMapLocations.push_back({show.rows[(size_t)r].id,column.id});
+            const int id=(int)quickLearnMapLocations.size();
+            quickLearnMapSelector.addItem("Q"+juce::String(r+1)+" / "+column.name,id);
+            if (quickLearnMapRowId==show.rows[(size_t)r].id &&
+                quickLearnMapColumnId==column.id) choice=id;
+        }
+    quickLearnMapSelector.setSelectedId(choice,juce::dontSendNotification);
+}
+void MainComponent::selectQuickLearnMap(int rowId,int columnId) {
+    quickLearnMapRowId=rowId;quickLearnMapColumnId=columnId;
+    quickLearnFunctionId=quickLearnArmedEntryId=0;
+    controlLearnArmed=oscLearnArmed=false;
+    refreshQuickLearnTargets();updateQuickLearnVisuals();
+    quickLearnFeedback=rowId==0 ? "Editing Default Map" : "Editing contextual override";
+}
+void MainComponent::renameQuickLearnFunction(int functionId) {
+    if (quickLearnMode==QuickLearnMode::off || functionId<=0) return;
+    const auto it=std::find_if(show.controls.functions.begin(),show.controls.functions.end(),
+        [functionId](const ControlFunction& f){return f.id==functionId;});
+    if (it==show.controls.functions.end()) return;
+    quickControlTargets.beginInlineRename(functionId,it->name,
+        [this,functionId](const juce::String& title) {
+            const auto fn=std::find_if(show.controls.functions.begin(),show.controls.functions.end(),
+                [functionId](const ControlFunction& f){return f.id==functionId;});
+            if (fn==show.controls.functions.end()) return;
+            if (updateAbstractControlFunction(functionId,title,fn->destination))
+                refreshQuickLearnTargets();
+        });
+}
 void MainComponent::refreshQuickLearnTargets() {
     if (quickLearnMode==QuickLearnMode::off) return;
     std::vector<QuickControlTargets::Entry> entries;
     for (const auto& function:show.controls.functions) {
         juce::String detail;
-        for (const auto& binding:show.controls.bindings)
+        const std::vector<ControlBinding>* mapping=&show.controls.bindings;
+        if (quickLearnMapRowId>0)
+            for (int r=0;r<(int)show.rows.size();++r)
+                if (show.rows[(size_t)r].id==quickLearnMapRowId)
+                    for (int c=0;c<(int)show.columns.size();++c)
+                        if (show.columns[(size_t)c].id==quickLearnMapColumnId &&
+                            show.rows[(size_t)r].cells[(size_t)c].controlSet)
+                            mapping=&show.rows[(size_t)r].cells[(size_t)c].controlSet->bindings;
+        for (const auto& binding:*mapping)
             if (binding.functionId==function.id) {
                 detail=binding.deviceId+" / "+juce::String(binding.channel)+
                     ":"+juce::String(binding.number);
                 break;
             }
-        if (detail.isEmpty()) detail="No Default Map assignment";
+        if (detail.isEmpty()) detail=quickLearnMapRowId==0 ?
+            "No Default Map assignment" : "Inherits Default Map";
         if ((function.destination.target==ControlTarget::midiCc ||
              function.destination.target==ControlTarget::oscFloat) &&
             function.destination.targetColumnId==0)
@@ -697,16 +748,26 @@ void MainComponent::completeQuickLearn(const ControlEvent& event) {
         event.kind==ControlKind::osc || input.target==ControlTarget::go ||
         input.target==ControlTarget::panic) ? ControlTakeover::jump :
         ControlTakeover::pickup;
-    // Stable function identity: Learn changes only input, never destination.
-    const auto found=std::find_if(show.controls.bindings.begin(),
-        show.controls.bindings.end(),[this](const ControlBinding& b){
-            return b.functionId==quickLearnFunctionId &&
-                b.scope==ControlScope::global;
-        });
+    int mapRow=-1,mapColumn=-1;
+    if (quickLearnMapRowId>0) {
+        for (int r=0;r<(int)show.rows.size();++r)
+            if (show.rows[(size_t)r].id==quickLearnMapRowId) mapRow=r;
+        for (int c=0;c<(int)show.columns.size();++c)
+            if (show.columns[(size_t)c].id==quickLearnMapColumnId) mapColumn=c;
+        if (mapRow<0 || mapColumn<0 ||
+            !show.rows[(size_t)mapRow].cells[(size_t)mapColumn].controlSet) {
+            quickLearnFeedback="Selected map no longer exists.";return;
+        }
+    }
+    const auto* assignments=quickLearnMapRowId==0 ? &show.controls.bindings :
+        &show.rows[(size_t)mapRow].cells[(size_t)mapColumn].controlSet->bindings;
+    const auto found=std::find_if(assignments->begin(),assignments->end(),
+        [this](const ControlBinding& b){return b.functionId==quickLearnFunctionId;});
     const auto name=fn->name;
-    const bool ok=found!=show.controls.bindings.end() ?
-        updateControlBinding(-1,-1,found->id,input,false) :
-        addMappingBinding(input);
+    const bool isOverride=quickLearnMapRowId!=0;
+    const bool ok=found!=assignments->end() ?
+        updateControlBinding(mapRow,mapColumn,found->id,input,isOverride) :
+        isOverride ? addControlSetBinding(mapRow,mapColumn,input) : addMappingBinding(input);
     if (!ok) {
         status="Learn failed: "+status+". Check for conflicting hardware bindings.";
         quickLearnFeedback="Binding failed. Select another target.";
@@ -728,7 +789,7 @@ void MainComponent::completeQuickLearn(const ControlEvent& event) {
     quickLearnFeedback="Mapped: "+name;
     refreshQuickLearnTargets(); // clear selection, refresh assignment labels
     updateQuickLearnVisuals();
-    status="Learn saved to Default Map: "+name+
+    status=(isOverride ? "Learn saved to override: " : "Learn saved to Default Map: ")+name+
         " ← "+event.deviceId+". Select the next target or Cancel Learn.";
     repaint();
 }

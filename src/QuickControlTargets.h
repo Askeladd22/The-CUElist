@@ -1,6 +1,8 @@
 #pragma once
 #include <juce_gui_basics/juce_gui_basics.h>
 #include <functional>
+#include <memory>
+#include <algorithm>
 #include <vector>
 
 namespace cuelist {
@@ -9,6 +11,28 @@ class QuickControlTargets final : public juce::ListBox, private juce::ListBoxMod
 public:
     struct Entry { int functionId=0; juce::String title,detail; };
     std::function<void(int)> onPick;
+    std::function<void(int)> onRename;
+    void beginInlineRename(int functionId,const juce::String& current,
+                           std::function<void(const juce::String&)> commit) {
+        int row=-1;
+        for (int i=0;i<(int)entries.size();++i)
+            if (entries[(size_t)i].functionId==functionId) {row=i;break;}
+        if (row<0) return;
+        renameCommit=std::move(commit);
+        if (!renameEditor) {
+            renameEditor=std::make_unique<juce::TextEditor>();
+            addAndMakeVisible(*renameEditor);
+            renameEditor->onReturnKey=[this]{finishRename(true);};
+            renameEditor->onEscapeKey=[this]{finishRename(false);};
+            renameEditor->onFocusLost=[this]{finishRename(true);};
+        }
+        renameEditor->setBounds(10,row*getRowHeight()-
+            (getViewport()?getViewport()->getViewPositionY():0)+2,
+            std::max(60,getWidth()-20),getRowHeight()-4);
+        renameEditor->setText(current,false);
+        renameEditor->setVisible(true);renameEditor->toFront(false);
+        renameEditor->grabKeyboardFocus();renameEditor->selectAll();
+    }
     QuickControlTargets():juce::ListBox("quickControlTargets",nullptr) {
         setModel(this);setRowHeight(42);
         setColour(juce::ListBox::backgroundColourId,juce::Colour(0xff19222c));
@@ -33,6 +57,11 @@ public:
         if (row>=0 && row<(int)entries.size() && onPick)
             onPick(entries[(size_t)row].functionId);
     }
+    void listBoxItemDoubleClicked(int row,const juce::MouseEvent&) override {
+        if (row>=0 && row<(int)entries.size() &&
+            entries[(size_t)row].functionId>0 && onRename)
+            onRename(entries[(size_t)row].functionId);
+    }
     void paintListBoxItem(int row,juce::Graphics& g,int width,int height,
                           bool rowSelected) override {
         if (row<0 || row>=(int)entries.size()) return;
@@ -56,6 +85,15 @@ public:
     }
 private:
     std::vector<Entry> entries;
+    std::unique_ptr<juce::TextEditor> renameEditor;
+    std::function<void(const juce::String&)> renameCommit;
+    void finishRename(bool save) {
+        if (!renameEditor || !renameEditor->isVisible()) return;
+        const auto name=renameEditor->getText().trim();
+        renameEditor->setVisible(false);
+        auto callback=std::move(renameCommit);renameCommit={};
+        if (save && name.isNotEmpty() && callback) callback(name);
+    }
     juce::Colour accent{0xfff9c76e};
     int armedFunctionId=0,armedEntryId=0;
     bool pulseBright=true;

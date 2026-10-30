@@ -8,6 +8,22 @@ void MainComponent::editControlSet(int row,int column) {
     openControlPanel(true);
 }
 
+bool MainComponent::createEmptyControlSet(int row,int column) {
+    if (row<0 || row>=(int)show.rows.size() ||
+        column<0 || column>=(int)show.columns.size() ||
+        show.columns[(size_t)column].type!=ColumnType::control) return false;
+    if (show.columns[(size_t)column].controlLocked ||
+        show.rows[(size_t)row].cells[(size_t)column].controlSet) return true;
+    auto candidate=show;
+    candidate.rows[(size_t)row].cells[(size_t)column].controlSet.emplace();
+    if (const auto result=validateShow(candidate);result.failed()) {
+        status=result.getErrorMessage();return false;
+    }
+    show=std::move(candidate);refreshControlSettings();dirty=true;
+    status="Empty override created; Default Map remains available.";
+    refresh();return true;
+}
+
 class ControlPanel final : public juce::Component, private juce::Timer,
                            private juce::ListBoxModel {
 public:

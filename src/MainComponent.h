@@ -295,6 +295,7 @@ public:
     void setSafetyLimiter(bool enabled);
     void openControlPanel(bool editSet=false);
     void editControlSet(int row,int column);
+    bool createEmptyControlSet(int row,int column);
     bool addControlSetBinding(int row,int column,ControlBinding);
     bool deleteControlSetBinding(int row,int column,int id);
     bool updateControlBinding(int row,int column,int id,ControlBinding updated,bool inControlSet);
@@ -323,6 +324,9 @@ public:
     void armControlLearn() { oscLearnArmed=false;controlLearnArmed=true; }
     void beginQuickLearn(bool osc);
     void chooseQuickLearnTarget(int functionId);
+    void refreshQuickLearnMaps();
+    void selectQuickLearnMap(int rowId,int columnId);
+    void renameQuickLearnFunction(int functionId);
     void chooseQuickLearnGuiTarget(ControlTarget target,int columnId=0);
     bool isQuickLearnActive() const noexcept {return quickLearnMode!=QuickLearnMode::off;}
     bool isQuickLearnAwaitingInput() const noexcept {return quickLearnFunctionId>0 && isQuickLearnActive();}
@@ -431,6 +435,9 @@ private:
     juce::TextButton undoButton{"Undo"},redoButton{"Redo"};
     juce::TextButton globalMidiLearn{"M Learn"},globalOscLearn{"O Learn"};
     QuickControlTargets quickControlTargets;
+    juce::ComboBox quickLearnMapSelector;
+    std::vector<std::pair<int,int>> quickLearnMapLocations;
+    int quickLearnMapRowId=0,quickLearnMapColumnId=0;
     juce::TextButton cancelQuickLearn{"Cancel Learn"};
     QuickLearnHotspot goLearnHotspot{"Go"},panicLearnHotspot{"Panic"};
     QuickLearnHotspot masterGainLearnHotspot{"Master Gain"},masterPanLearnHotspot{"Master Pan"};

@@ -496,7 +496,8 @@ void CueGrid::mouseDown(const juce::MouseEvent& e) {
     }
     if (!owner.select(row,column)) return;
     if (col.type==ColumnType::control) {
-        if (e.getNumberOfClicks()==1) owner.editControlSet(row,column);
+        const auto& cell=owner.show.rows[(size_t)row].cells[(size_t)column];
+        if (col.controlLocked || cell.controlSet) owner.editControlSet(row,column);
     } else if (owner.hasClip(row,column)) {
         dragRow=row; dragColumn=column;
     }
@@ -541,7 +542,9 @@ void CueGrid::mouseDoubleClick(const juce::MouseEvent& e) {
             const auto type=owner.show.columns[(size_t)column].type;
             if (type==ColumnType::midi) owner.editMidiClip();
             else if (type==ColumnType::osc) owner.editOscClip();
-            else if (type==ColumnType::control) owner.editControlSet(row,column);
+            else if (type==ColumnType::control) {
+                if (owner.createEmptyControlSet(row,column)) owner.editControlSet(row,column);
+            }
             else owner.triggerCell();
         }
     }
