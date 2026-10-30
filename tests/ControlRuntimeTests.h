@@ -3,6 +3,32 @@
 #include "ShowEditOperations.h"
 
 void controlRuntimeTests() {
+    test("project refresh synchronizes master controls without external GO",[] {
+        MainComponent ui(false);
+        ui.show.masterGain=0.4f;
+        ui.show.masterPan=0.25f;
+        ui.show.safetyLimiterEnabled=false;
+        ui.refresh();
+        auto findNamed=[](juce::Component& root,const juce::String& name)->juce::Component* {
+            std::vector<juce::Component*> stack{&root};
+            while (!stack.empty()) {
+                auto* component=stack.back();stack.pop_back();
+                if (component->getName()==name) return component;
+                for (auto* child:component->getChildren()) stack.push_back(child);
+            }
+            return nullptr;
+        };
+        auto* gain=dynamic_cast<GainMeterFader*>(findNamed(ui,"masterAudioDb"));
+        auto* pan=dynamic_cast<juce::Slider*>(findNamed(ui,"masterPan"));
+        auto* limiter=dynamic_cast<juce::Button*>(findNamed(ui,"safetyLimiter"));
+        check(gain && pan,"Project refresh lost Master controls");
+        check(std::abs(gain->getGainDb()-GainMeterFader::fromLinear(.4f))<.15f,
+              "Master fader did not reflect restored Show gain");
+        check(std::abs((float)pan->getValue()-.25f)<.0051f,
+              "Master pan did not reflect restored Show pan");
+        if (limiter) check(!limiter->getToggleState(),
+                           "Safety limiter GUI did not reflect restored setting");
+    });
     test("MIDI and OSC update real-time master and column controls without GO",[] {
         MainComponent ui(false);
         // Locate actual JUCE controls instead of merely asserting that the Show

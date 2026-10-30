@@ -367,6 +367,14 @@ void ColumnUtilities::refresh() {
         for (int i=0;i<(int)owner.show.columns.size();++i) { auto strip=std::make_unique<Strip>(owner,i); scrollableStrips.addAndMakeVisible(*strip); strips.push_back(std::move(strip)); }
     }
     for (auto& strip : strips) strip->sync();
+    // A project load or scene refresh must synchronize these non-child Master
+    // controls too. Neither setter notifies listeners or starts another GO.
+    owner.masterSlider.setMaximumDb(owner.audioFaderCeilingDb());
+    owner.masterSlider.setGainDb(GainMeterFader::fromLinear(owner.show.masterGain));
+    owner.masterPan.setValue(owner.show.masterPan,juce::dontSendNotification);
+    owner.masterMute.setToggleState(owner.show.masterMuted,juce::dontSendNotification);
+    owner.safetyLimiter.setToggleState(owner.show.safetyLimiterEnabled,
+                                       juce::dontSendNotification);
     // Populate the Master output menu immediately, not only on the next timer.
     refreshRouting();
     // Preserve the historical strip-child order used by the UI and tests.
