@@ -26,13 +26,17 @@ std::optional<float> mappedPickupTarget(const Show& show,
 
     std::optional<float> actual;
     if (binding.target==ControlTarget::masterGain) actual=show.masterGain;
+    else if (binding.target==ControlTarget::limiterToggle) actual=show.safetyLimiterEnabled ? 1.0f : 0.0f;
     else if (binding.target==ControlTarget::masterPan) actual=show.masterPan;
     else if (binding.target==ControlTarget::columnGain ||
-             binding.target==ControlTarget::columnPan) {
+             (binding.target==ControlTarget::columnPan || binding.target==ControlTarget::columnMute || binding.target==ControlTarget::columnPolarity || binding.target==ControlTarget::columnSend)) {
         // As before, pickup uses stable column IDs, not their visual indices.
         for (const auto& column:show.columns)
             if (column.id==binding.targetColumnId) {
-                actual=binding.target==ControlTarget::columnPan ? column.pan : column.gain;
+                actual=binding.target==ControlTarget::columnPan ? column.pan :
+                    binding.target==ControlTarget::columnMute ? (column.muted ? 1.0f : 0.0f) :
+                    binding.target==ControlTarget::columnPolarity ? (column.phaseInverted ? 1.0f : 0.0f) :
+                    binding.target==ControlTarget::columnSend ? (column.masterSend ? 1.0f : 0.0f) : column.gain;
                 break;
             }
     }

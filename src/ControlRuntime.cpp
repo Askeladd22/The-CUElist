@@ -364,6 +364,22 @@ void MainComponent::dispatchControl(const ControlEvent& input) {
     } else if (binding.target==ControlTarget::masterPan) {
         if (shouldApplyMappedValue(show.masterPan,action->scaled))
             setMasterPan(action->scaled);
+    } else if (binding.target==ControlTarget::limiterToggle) {
+        if (show.safetyLimiterEnabled!=action->pressed) setSafetyLimiter(action->pressed);
+    } else if (binding.target==ControlTarget::columnMute ||
+               binding.target==ControlTarget::columnPolarity ||
+               binding.target==ControlTarget::columnSend) {
+        const int i=mappedTargetColumn(show,binding.targetColumnId,ColumnType::audio);
+        if (i>=0) {
+            const auto c=show.columns[(size_t)i];
+            if (binding.target==ControlTarget::columnSend) {
+                if (c.masterSend!=action->pressed) setColumnMasterSend(i,action->pressed);
+            } else if (binding.target==ControlTarget::columnMute) {
+                if (c.muted!=action->pressed) setColumnUtilities(i,c.gain,c.pan,action->pressed,c.phaseInverted);
+            } else if (c.phaseInverted!=action->pressed)
+                setColumnUtilities(i,c.gain,c.pan,c.muted,action->pressed);
+            utilities.refresh();
+        }
     } else if (binding.target==ControlTarget::columnGain ||
                binding.target==ControlTarget::columnPan) {
         const int i=mappedTargetColumn(show,binding.targetColumnId,ColumnType::audio);
@@ -589,13 +605,17 @@ void MainComponent::refreshQuickLearnTargets() {
     entries.push_back({-2,"Master Pan","Internal master balance"});
     entries.push_back({-3,"GO","Transport: next cue"});
     entries.push_back({-4,"PANIC","Emergency stop"});
+    entries.push_back({-5,"Limiter On/Off","Master safety limiter"});
     // Every audio column has two direct Learn targets. Stable column IDs
     // are resolved at selection time; their position in this list is UI-only.
     for (int index=0;index<(int)show.columns.size();++index) {
         const auto& col=show.columns[(size_t)index];
         if (col.type!=ColumnType::audio) continue;
-        entries.push_back({-100-index*2,col.name+" Gain","Audio column fader"});
-        entries.push_back({-101-index*2,col.name+" Pan","Audio column balance"});
+        entries.push_back({-100-index*5,col.name+" Gain","Audio column fader"});
+        entries.push_back({-101-index*5,col.name+" Pan","Audio column balance"});
+        entries.push_back({-102-index*5,col.name+" Mute","Audio column mute"});
+        entries.push_back({-103-index*5,col.name+" Phase / Polarity","Audio polarity"});
+        entries.push_back({-104-index*5,col.name+" L/R Send","Master bus send"});
     }
     quickControlTargets.setEntries(std::move(entries));
     quickControlTargets.setLearnPresentation(quickLearnAccent(),
@@ -666,13 +686,15 @@ void MainComponent::chooseQuickLearnTarget(int functionId) {
     quickLearnFeedback.clear();
     if (functionId<=-100) {
         const int encoded=-100-functionId;
-        const int index=encoded/2;
-        const bool pan=encoded%2!=0;
+        const int index=encoded/5;
+        const int parameter=encoded%5;
         if (index<0 || index>=(int)show.columns.size() ||
             show.columns[(size_t)index].type!=ColumnType::audio) return;
         const int columnId=show.columns[(size_t)index].id;
-        const ControlTarget target=pan ? ControlTarget::columnPan :
-            ControlTarget::columnGain;
+        const ControlTarget target=parameter==1 ? ControlTarget::columnPan :
+            parameter==2 ? ControlTarget::columnMute :
+            parameter==3 ? ControlTarget::columnPolarity :
+            parameter==4 ? ControlTarget::columnSend : ControlTarget::columnGain;
         functionId=0;
         for (const auto& fn:show.controls.functions)
             if (fn.destination.target==target &&
@@ -682,17 +704,20 @@ void MainComponent::chooseQuickLearnTarget(int functionId) {
         if (functionId==0) {
             ControlBinding destination;
             destination.target=target;destination.targetColumnId=columnId;
-            if (pan) destination.minimum=-1.0f;
+            if (parameter==1) destination.minimum=-1.0f;
             const auto name=show.columns[(size_t)index].name+
-                (pan ? " Pan" : " Gain");
+                (parameter==1 ? " Pan" : parameter==2 ? " Mute" :
+                 parameter==3 ? " Phase / Polarity" : parameter==4 ? " L/R Send" : " Gain");
             functionId=createAbstractControlFunction(name,destination);
         }
     } else if (functionId<0) {
         const ControlTarget target=functionId==-1 ? ControlTarget::masterGain :
             functionId==-2 ? ControlTarget::masterPan :
-            functionId==-3 ? ControlTarget::go : ControlTarget::panic;
+            functionId==-3 ? ControlTarget::go :
+            functionId==-5 ? ControlTarget::limiterToggle : ControlTarget::panic;
         const juce::String title=functionId==-1 ? "Master Gain" :
-            functionId==-2 ? "Master Pan" : functionId==-3 ? "GO" : "PANIC";
+            functionId==-2 ? "Master Pan" : functionId==-3 ? "GO" :
+            functionId==-5 ? "Limiter On/Off" : "PANIC";
         functionId=0;
         // A renamed logical function must keep its stable destination
         // identity: GUI selection never creates a second GO/Master function.
@@ -727,7 +752,7 @@ void MainComponent::chooseQuickLearnTarget(int functionId) {
     if (quickLearnMode==QuickLearnMode::midi) armControlLearn();
     else armOscControlLearn();
     status=midiInputMissing ?
-        "MIDI target selected. Connect a MIDI input in Control Mappings to capture." :
+        "MIDI target selected. Enable a MIDI input in Settings to capture." :
         "Listening for "+juce::String(quickLearnMode==QuickLearnMode::midi ?
         "MIDI" : "OSC")+" input. The next received message creates the binding.";
     updateQuickLearnVisuals();

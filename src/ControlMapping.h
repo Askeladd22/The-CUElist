@@ -10,7 +10,7 @@
 namespace cuelist {
 enum class ControlKind { cc, note, pitchBend, osc };
 enum class ControlScope { global, column, preset, cue };
-enum class ControlTarget { go, panic, masterGain, columnGain, midiCc, oscFloat, columnPan, masterPan };
+enum class ControlTarget { go, panic, masterGain, columnGain, midiCc, oscFloat, columnPan, masterPan, columnMute, columnPolarity, columnSend, limiterToggle };
 enum class ControlTakeover { pickup, jump };
 enum class ControlCurve { linear, easeIn, easeOut };
 inline float applyControlCurve(float v,ControlCurve curve) {
@@ -283,7 +283,7 @@ inline juce::Result validateControls(const ControlSettings& s,
     for (const auto& f:s.functions) {
         if (f.id<1 || f.id>=s.nextId || !ids.insert(f.id).second ||
             f.name.trim().isEmpty() || f.name.length()>120 ||
-            (int)f.destination.target<0 || (int)f.destination.target>7 ||
+            (int)f.destination.target<0 || (int)f.destination.target>11 ||
             f.destination.outputChannel<1 || f.destination.outputChannel>16 ||
             f.destination.outputNumber<0 || f.destination.outputNumber>127 ||
             f.destination.oscPort<1 || f.destination.oscPort>65535 ||
@@ -308,7 +308,7 @@ inline juce::Result validateControls(const ControlSettings& s,
             || (b.functionId>0 && std::none_of(s.functions.begin(),s.functions.end(),
                 [&](const ControlFunction& f){return f.id==b.functionId;}))
             || (int)b.kind<0 || (int)b.kind>3 || (int)b.scope<0 || (int)b.scope>3
-            || (int)b.target<0 || (int)b.target>7 || (int)b.takeover<0 || (int)b.takeover>1
+            || (int)b.target<0 || (int)b.target>11 || (int)b.takeover<0 || (int)b.takeover>1
             || (int)b.curve<0 || (int)b.curve>2
             || b.channel<1 || b.channel>16 || b.number<0 || b.number>127
             || (b.kind==ControlKind::osc &&
@@ -327,7 +327,7 @@ inline juce::Result validateControls(const ControlSettings& s,
         if ((b.scope==ControlScope::column || (b.functionId==0 &&
              (b.target==ControlTarget::columnGain ||
              b.target==ControlTarget::midiCc || b.target==ControlTarget::oscFloat ||
-             b.target==ControlTarget::columnPan))) &&
+             (b.target==ControlTarget::columnPan || b.target==ControlTarget::columnMute || b.target==ControlTarget::columnPolarity || b.target==ControlTarget::columnSend)))) &&
             std::find(columnIds.begin(),columnIds.end(),b.targetColumnId)==columnIds.end())
             return juce::Result::fail("Mapping refers to a missing column.");
         if (b.functionId==0 &&
@@ -335,7 +335,7 @@ inline juce::Result validateControls(const ControlSettings& s,
             && (b.minimum<0 || b.maximum>4))
             return juce::Result::fail("Gain mapping out of range.");
         if (b.functionId==0 &&
-            (b.target==ControlTarget::masterPan || b.target==ControlTarget::columnPan)
+            (b.target==ControlTarget::masterPan || (b.target==ControlTarget::columnPan || b.target==ControlTarget::columnMute || b.target==ControlTarget::columnPolarity || b.target==ControlTarget::columnSend))
             && (b.minimum< -1 || b.maximum>1))
             return juce::Result::fail("Pan mapping outside [-1, 1].");
     }

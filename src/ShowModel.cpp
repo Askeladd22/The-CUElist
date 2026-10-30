@@ -186,21 +186,21 @@ juce::Result validateShow(const Show& show) {
             (route.target==ControlTarget::midiCc ||
              route.target==ControlTarget::oscFloat ||
              route.target==ControlTarget::columnGain ||
-             route.target==ControlTarget::columnPan)) {
+             (route.target==ControlTarget::columnPan || route.target==ControlTarget::columnMute || route.target==ControlTarget::columnPolarity || route.target==ControlTarget::columnSend))) {
             const auto it=std::find_if(show.columns.begin(),show.columns.end(),
                 [&](const Column& col){return col.id==route.targetColumnId;});
             if (it==show.columns.end() ||
                 (route.target==ControlTarget::midiCc && it->type!=ColumnType::midi) ||
                 (route.target==ControlTarget::oscFloat && it->type!=ColumnType::osc) ||
                 ((route.target==ControlTarget::columnGain ||
-                  route.target==ControlTarget::columnPan) && it->type!=ColumnType::audio))
+                  (route.target==ControlTarget::columnPan || route.target==ControlTarget::columnMute || route.target==ControlTarget::columnPolarity || route.target==ControlTarget::columnSend)) && it->type!=ColumnType::audio))
                 return fail("Abstract function has a missing or incompatible destination.");
         }
         if (((route.target==ControlTarget::masterGain ||
               route.target==ControlTarget::columnGain) &&
              (route.minimum<0 || route.maximum>4)) ||
             ((route.target==ControlTarget::masterPan ||
-              route.target==ControlTarget::columnPan) &&
+              (route.target==ControlTarget::columnPan || route.target==ControlTarget::columnMute || route.target==ControlTarget::columnPolarity || route.target==ControlTarget::columnSend)) &&
              (route.minimum< -1 || route.maximum>1)))
             return fail("Abstract function value range is invalid.");
     }
@@ -208,7 +208,7 @@ juce::Result validateShow(const Show& show) {
         if (binding.functionId==0 && (binding.target==ControlTarget::midiCc ||
             binding.target==ControlTarget::oscFloat ||
             binding.target==ControlTarget::columnGain ||
-            binding.target==ControlTarget::columnPan)) {
+            (binding.target==ControlTarget::columnPan || binding.target==ControlTarget::columnMute || binding.target==ControlTarget::columnPolarity || binding.target==ControlTarget::columnSend))) {
             const auto it=std::find_if(show.columns.begin(),show.columns.end(),
                 [&](const Column& col){return col.id==binding.targetColumnId;});
             if (it==show.columns.end()) return fail("Control Mapping destination does not exist.");
@@ -217,7 +217,7 @@ juce::Result validateShow(const Show& show) {
             if (binding.target==ControlTarget::oscFloat && it->type!=ColumnType::osc)
                 return fail("OSC requires an OSC column.");
             if ((binding.target==ControlTarget::columnGain ||
-                 binding.target==ControlTarget::columnPan) && it->type!=ColumnType::audio)
+                 (binding.target==ControlTarget::columnPan || binding.target==ControlTarget::columnMute || binding.target==ControlTarget::columnPolarity || binding.target==ControlTarget::columnSend)) && it->type!=ColumnType::audio)
                 return fail("Gain mapping requires an Audio column.");
         }
     }
@@ -253,12 +253,12 @@ juce::Result validateShow(const Show& show) {
                 (binding.target==ControlTarget::columnGain ||
                 binding.target==ControlTarget::midiCc ||
                 binding.target==ControlTarget::oscFloat ||
-                binding.target==ControlTarget::columnPan)) {
+                (binding.target==ControlTarget::columnPan || binding.target==ControlTarget::columnMute || binding.target==ControlTarget::columnPolarity || binding.target==ControlTarget::columnSend))) {
                 const auto destination=std::find_if(show.columns.begin(),show.columns.end(),
                     [&](const Column& col){return col.id==binding.targetColumnId;});
                 if (destination==show.columns.end() ||
                     ((binding.target==ControlTarget::columnGain ||
-                      binding.target==ControlTarget::columnPan) && destination->type!=ColumnType::audio) ||
+                      (binding.target==ControlTarget::columnPan || binding.target==ControlTarget::columnMute || binding.target==ControlTarget::columnPolarity || binding.target==ControlTarget::columnSend)) && destination->type!=ColumnType::audio) ||
                     (binding.target==ControlTarget::midiCc && destination->type!=ColumnType::midi) ||
                     (binding.target==ControlTarget::oscFloat && destination->type!=ColumnType::osc))
                     return fail("Invalid Control Set target column type.");

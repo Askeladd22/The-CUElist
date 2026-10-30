@@ -294,7 +294,8 @@ public:
         presets.setVisible(!editSet); newPreset.setVisible(!editSet);
         assignPreset.setVisible(!editSet); presetName.setVisible(!editSet);
         target.addItemList({"Master Audio","Audio column gain","GO next cue","PANIC",
-                            "MIDI CC","OSC Float","Audio column pan","Master pan"},1);
+                            "MIDI CC","OSC Float","Audio column pan","Master pan",
+                             "Audio Mute","Phase / Polarity","L/R Send","Limiter On/Off"},1);
         target.setSelectedId(1);
         target.onChange=[this] {
             refreshColumns();
@@ -531,7 +532,11 @@ private:
         scope.setEnabled(!editSet && functionChoice.getSelectedId()==1);
     }
     void showRoute(const ControlBinding& b) {
-        const int targetIndex=b.target==ControlTarget::masterGain ? 1 :
+        const int targetIndex=b.target==ControlTarget::columnMute ? 9 :
+             b.target==ControlTarget::columnPolarity ? 10 :
+             b.target==ControlTarget::columnSend ? 11 :
+             b.target==ControlTarget::limiterToggle ? 12 :
+             b.target==ControlTarget::masterGain ? 1 :
             b.target==ControlTarget::columnGain ? 2 :
             b.target==ControlTarget::go ? 3 :
             b.target==ControlTarget::panic ? 4 :
@@ -561,11 +566,14 @@ private:
             case 6: b.target=ControlTarget::oscFloat;break;
             case 7: b.target=ControlTarget::columnPan;break;
             case 8: b.target=ControlTarget::masterPan;break;
+            case 9: b.target=ControlTarget::columnMute;break;
+            case 10: b.target=ControlTarget::columnPolarity;break;
+            case 11: b.target=ControlTarget::columnSend;break;
+            case 12: b.target=ControlTarget::limiterToggle;break;
             default:return {};
         }
         if (b.target==ControlTarget::columnGain ||
-            b.target==ControlTarget::columnPan ||
-            b.target==ControlTarget::midiCc || b.target==ControlTarget::oscFloat) {
+            (b.target==ControlTarget::columnPan || b.target==ControlTarget::columnMute || b.target==ControlTarget::columnPolarity || b.target==ControlTarget::columnSend) || b.target==ControlTarget::midiCc || b.target==ControlTarget::oscFloat) {
             const int index=columns.getSelectedId()-1;
             if (index<0 || index>=(int)columnIds.size()) {
                 state.setText("Choose a valid output column.",juce::dontSendNotification);
@@ -597,7 +605,7 @@ private:
         outputCc.setEnabled(t==5 && !editSet);
         oscAddress.setEnabled(!editSet && t==6);
         columns.setEnabled(!editSet &&
-            (scope.getSelectedId()==2 || t==2 || t==5 || t==6 || t==7));
+            (scope.getSelectedId()==2 || t==2 || t==5 || t==6 || t==7 || t==9 || t==10 || t==11));
     }
     void refreshEmptyState() {
         emptyBindings.setVisible(getNumRows()==0);
@@ -657,7 +665,7 @@ private:
         columnIds.clear();
         const int targetId=target.getSelectedId();
         for (const auto& c:owner->show.columns) {
-            const bool eligible=(targetId==2 || targetId==7) ? c.type==ColumnType::audio :
+            const bool eligible=(targetId==2 || targetId==7 || targetId==9 || targetId==10 || targetId==11) ? c.type==ColumnType::audio :
                 targetId==5 ? c.type==ColumnType::midi :
                 targetId==6 ? c.type==ColumnType::osc : true;
             if (!eligible) continue;
@@ -699,6 +707,10 @@ private:
             case 6: b.target=ControlTarget::oscFloat; break;
             case 7: b.target=ControlTarget::columnPan; break;
             case 8: b.target=ControlTarget::masterPan; break;
+            case 9: b.target=ControlTarget::columnMute; break;
+            case 10: b.target=ControlTarget::columnPolarity; break;
+            case 11: b.target=ControlTarget::columnSend; break;
+            case 12: b.target=ControlTarget::limiterToggle; break;
             default: return;
         }
         b.takeover=(ControlTakeover)(takeover.getSelectedId()-1);
@@ -710,8 +722,7 @@ private:
             b.scopeId=std::max(0,presets.getSelectedId()-1);
         if (b.functionId==0 && (b.scope==ControlScope::column ||
             b.target==ControlTarget::columnGain ||
-            b.target==ControlTarget::columnPan ||
-            b.target==ControlTarget::midiCc || b.target==ControlTarget::oscFloat)) {
+            (b.target==ControlTarget::columnPan || b.target==ControlTarget::columnMute || b.target==ControlTarget::columnPolarity || b.target==ControlTarget::columnSend) || b.target==ControlTarget::midiCc || b.target==ControlTarget::oscFloat)) {
             const int i=columns.getSelectedId()-1;
             if (i<0 || i>=(int)columnIds.size()) {
                 state.setText("Select a destination column.",juce::dontSendNotification);return;
@@ -806,6 +817,10 @@ private:
                   b.target==ControlTarget::masterPan ? "MASTER PAN" :
                   b.target==ControlTarget::columnGain ? "CHANNEL GAIN" :
                   b.target==ControlTarget::columnPan ? "CHANNEL PAN" :
+                   b.target==ControlTarget::columnMute ? "MUTE" :
+                   b.target==ControlTarget::columnPolarity ? "PHASE" :
+                   b.target==ControlTarget::columnSend ? "L/R SEND" :
+                   b.target==ControlTarget::limiterToggle ? "LIMITER" :
                   b.target==ControlTarget::midiCc ?
                     "MIDI CC "+juce::String(b.outputChannel)+":"+
                       juce::String(b.outputNumber) :
@@ -859,6 +874,10 @@ private:
             b.target==ControlTarget::masterGain ? "MASTER GAIN" :
             b.target==ControlTarget::masterPan ? "MASTER PAN" :
             b.target==ControlTarget::columnPan ? "PAN" :
+            b.target==ControlTarget::columnMute ? "MUTE" :
+            b.target==ControlTarget::columnPolarity ? "PHASE" :
+            b.target==ControlTarget::columnSend ? "L/R SEND" :
+            b.target==ControlTarget::limiterToggle ? "LIMITER" :
             b.target==ControlTarget::oscFloat ? "OSC" :
             b.target==ControlTarget::midiCc ? "MIDI CC" : "GAIN";
         juce::String functionName=targetName;
