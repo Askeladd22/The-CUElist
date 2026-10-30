@@ -33,7 +33,7 @@ MainComponent::MainComponent(bool startAudio) {
          &goButton,&panicButton,&deviceButton,&controlButton,&collapseAllButton,&inspectorSideTab,
          &cuelistOverflowButton,&addCuelistButton,&undoButton,&redoButton,&globalMidiLearn,&globalOscLearn,&quickControlTargets,&cancelQuickLearn,&goLearnHotspot,&panicLearnHotspot,&helpButton,&dockResize,&timelineResize,&importButton,&midiEditButton,&oscEditButton,&playCellButton,&stopCellButton,&clearButton,&tempoButton,&applyButton,
          &cellTab,&rowTab,&rowGain,&rowBehaviour,&rowMute,&rowLoop,&rowName,&cellName,&bpm,&cueNotes,&behaviour,&follow,&loop,&cellAutoStop,&gainDb,&viewport,&timeline,&utilities,
-         &clipCollapseButton,&clipCloseButton,&cueHeaders,&columnHeaders,&cueMetrics,&preflightButton,&diagnosticsButton,&preferencesButton,&projectNameLabel}) addAndMakeVisible(c);
+         &clipCollapseButton,&clipCloseButton,&cueHeaders,&columnHeaders,&cueMetrics,&preflightButton,&diagnosticsButton,&preferencesButton,&projectNameLabel,&inlineNameEditor}) addAndMakeVisible(c);
     for (juce::TextButton* b : std::initializer_list<juce::TextButton*>{&openButton,&saveButton,&newButton,&addRowButton,&addColumnButton,&goButton,&panicButton,&deviceButton,&controlButton,&collapseAllButton,&inspectorSideTab,
                     &cuelistOverflowButton,&addCuelistButton,&undoButton,&redoButton,&globalMidiLearn,&globalOscLearn,&helpButton,
                     &importButton,&midiEditButton,&oscEditButton,&playCellButton,&stopCellButton,&clearButton,&tempoButton,&applyButton,
@@ -50,6 +50,7 @@ MainComponent::MainComponent(bool startAudio) {
         columnHeaders.repaint();
         cueMetrics.repaint();
         utilities.syncScroll(viewport.getViewPositionX());
+        positionInlineNameEditor();
     };
     goButton.setColour(juce::TextButton::buttonColourId,palette::go);
     goButton.setColour(juce::TextButton::textColourOffId,palette::text);
@@ -164,6 +165,30 @@ MainComponent::MainComponent(bool startAudio) {
         resized(); repaint();
     };
     clipCloseButton.onClick=[this] { closeMidiClip(); closeOscClip(); };
+    // Edit the displayed name directly, never through a rename dialog.
+    inlineNameEditor.setName("inlineNameEditor");
+    inlineNameEditor.setVisible(false);
+    inlineNameEditor.setMultiLine(false);
+    inlineNameEditor.setReturnKeyStartsNewLine(false);
+    inlineNameEditor.setEscapeAndReturnKeysConsumed(true);
+    inlineNameEditor.setSelectAllWhenFocused(true);
+    inlineNameEditor.setJustification(juce::Justification::centredLeft);
+    inlineNameEditor.setFont(font(13.0f));
+    inlineNameEditor.setColour(juce::TextEditor::backgroundColourId,palette::input);
+    inlineNameEditor.setColour(juce::TextEditor::textColourId,palette::text);
+    inlineNameEditor.setColour(juce::TextEditor::outlineColourId,palette::teal);
+    inlineNameEditor.setColour(juce::TextEditor::focusedOutlineColourId,palette::teal);
+    inlineNameEditor.onReturnKey=[this] {
+        if (commitInlineRename()) grabKeyboardFocus();
+    };
+    inlineNameEditor.onEscapeKey=[this] {
+        cancelInlineRename();
+        grabKeyboardFocus();
+    };
+    inlineNameEditor.onFocusLost=[this] {
+        if (inlineRenameKind!=InlineRenameKind::none && !commitInlineRename())
+            cancelInlineRename();
+    };
     projectNameLabel.setName("projectName");
     projectNameLabel.setEditable(false,true,false);
     projectNameLabel.setColour(juce::Label::textColourId,palette::text);
@@ -840,6 +865,8 @@ void MainComponent::resized() {
         quickControlTargets.toFront(false);
         cancelQuickLearn.toFront(false);
     }
+    // Overlays must stay above the grid, pinned headings and Cuelist tabs.
+    positionInlineNameEditor();
 }
 void MainComponent::refresh() {
     selectedRow=juce::jlimit(0,(int)show.rows.size()-1,selectedRow);
