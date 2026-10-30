@@ -159,7 +159,9 @@ Deleting a Cuelist is a structural operation and is not an Undo/Redo action. Sav
 
 ### 4.2 Renaming — synchronized in both directions
 
-**Double-click either the Cuelist tab or the Cuelist name in the pinned cue-grid header** to rename it. The alternative **Preferences → Rename active Cuelist** remains available. The Rename Cuelist, Rename cue, Rename column, Cue BPM and Cue tempo map windows now share a consistent dark editor: a title, short left-aligned instruction, labelled text field and Apply/Rename plus Cancel controls. Single-line editors accept Enter; Escape or Cancel closes without changing the model. Names still use the existing uniqueness/length constraints.
+**Double-click either the Cuelist tab or its name in the pinned cue-grid header** to edit the name directly on that label, without opening a dialog. The alternative **Preferences → Rename active Cuelist** uses the same inline editor. Double-clicking a cue title or a column name also edits directly where that name appears; the Workspace project name already behaves this way.
+
+The text is selected for immediate replacement: **Enter** confirms, **Escape** cancels without altering the show, and clicking elsewhere confirms a valid name. An invalid Cuelist name stays in the inline field for correction. Names still use the existing uniqueness/length constraints. If a Cuelist is hidden in the tab overflow, its inline editor appears beside the overflow control: renaming alone never activates another Cuelist or interrupts playback. Other configuration dialogs such as **Cue BPM** and **Cue tempo map** are unchanged.
 
 The tab and the grid header are two views of the **same saved Cuelist name**. Renaming either updates both immediately, and the name persists when you save the `.cuelist` file. Names must be unique, nonempty and no longer than 64 characters.
 
