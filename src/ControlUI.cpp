@@ -344,16 +344,14 @@ public:
         oscLearn.setTooltip("Listen for an OSC input address. Only the selected mapping scope is edited.");
         oscLearn.onClick=[this] {
             if (!owner) return;
-            const int port=oscInputPort.getText().getIntValue();
-            if (!owner->startOscControlInput(port)) {
-                state.setText(owner->status,juce::dontSendNotification);
-                return;
+            if (owner->oscInput.port()==0) {
+                state.setText("Enable an OSC UDP input in Settings first.",
+                              juce::dontSendNotification);return;
             }
             captured.reset();
             owner->armOscControlLearn();
-            state.setText("OSC Learn armed on UDP "+juce::String(port)+
-                ". Send a float, int or boolean OSC message.",
-                juce::dontSendNotification);
+            state.setText("Capture OSC armed on configured UDP ports. Send a supported message.",
+                          juce::dontSendNotification);
         };
         add.setButtonText("Add mapping");
         updateSelected.setButtonText("Update selected");
@@ -471,8 +469,13 @@ public:
                 owner->selectControlInput(owner->show.controls.midiInputId);
         };
         learn.onClick=[this]{
-            if (!owner || !owner->midiInput.connected()) {
-                state.setText("Connect a MIDI input.",juce::dontSendNotification); return;
+            if (!owner) return;
+            const bool connected=owner->midiInput.connected() ||
+                std::any_of(owner->additionalMidiInputs.begin(),owner->additionalMidiInputs.end(),
+                    [](const auto& entry){return entry.second->connected();});
+            if (!connected) {
+                state.setText("Enable a MIDI input in Settings first.",
+                              juce::dontSendNotification);return;
             }
             captured.reset(); owner->armControlLearn();
             state.setText(selected>=0 && currentBindings() && selected<(int)currentBindings()->size() ?
@@ -511,8 +514,14 @@ public:
                                            std::max(0,presets.getSelectedId()-1)))
                 state.setText("Preset assigned to selected cue.",juce::dontSendNotification);
         };
+        // Device enablement and UDP sockets belong to Settings; these buttons
+        // only capture a source input for the selected map/assignment.
         device.setVisible(false);connect.setVisible(false);oscInputPort.setVisible(false);
-        learn.setVisible(false);oscLearn.setVisible(false);
+        learn.setVisible(true);oscLearn.setVisible(true);
+        learn.setButtonText("Capture MIDI");
+        oscLearn.setButtonText("Capture OSC");
+        learn.setName("mappingCaptureMidi");
+        oscLearn.setName("mappingCaptureOsc");
         refreshDevices(); refreshPresets(); refreshColumns();refreshTemplates();
         refreshFunctions();
         if (!owner->show.controls.functions.empty()) {
@@ -540,8 +549,8 @@ public:
         g.setColour(palette::line);
         g.drawHorizontalLine(52,19,(float)getWidth()-19);
         label(g,"MAP SELECTION",{20,60,350,19},12,palette::teal,true);
-        label(g,"Default Map is always the fallback. Cue Control Maps override only selected functions.",
-              {20,140,getWidth()-40,28},12,palette::muted);
+        label(g,"Default Map is the fallback; Control Column maps override selected functions.",
+              {20,137,getWidth()-40,20},12,palette::muted);
 
         g.setColour(palette::line);
         g.drawHorizontalLine(191,20,(float)getWidth()-20);
@@ -584,10 +593,10 @@ public:
         cloneMap.setBounds(w-150,97,130,31);
         device.setBounds(20,105,w-177,31);
         connect.setBounds(w-143,105,123,31);
-        learn.setBounds(20,163,116,32);
-        oscLearn.setBounds(144,163,116,32);
+        learn.setBounds(20,163,148,32);
+        oscLearn.setBounds(176,163,148,32);
         oscInputPort.setBounds(269,163,68,32);
-        state.setBounds(347,162,w-367,33);
+        state.setBounds(337,162,w-357,33);
         functionChoice.setBounds(20,198,185,26);
         functionName.setBounds(213,198,228,26);
         newFunction.setBounds(449,198,140,26);
