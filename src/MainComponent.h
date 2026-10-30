@@ -361,6 +361,7 @@ public:
     void armOscControlLearn() { controlLearnArmed=false;oscLearnArmed=true; }
     std::optional<ControlEvent> consumeLearnedInput() { auto result=learnedInput; learnedInput.reset(); return result; }
     void dispatchControlForTest(const ControlEvent& event) { dispatchControl(event); }
+    void refreshForTest() { refresh(); } // Test-only bridge; refresh remains private.
     int activeCueMappingId() const noexcept { return activeCueId; }
     void setColumnOutput(int column,int output);
     void setAutoStop(int row,bool enabled);

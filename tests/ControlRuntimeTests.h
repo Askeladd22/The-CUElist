@@ -8,7 +8,7 @@ void controlRuntimeTests() {
         ui.show.masterGain=0.4f;
         ui.show.masterPan=0.25f;
         ui.show.safetyLimiterEnabled=false;
-        ui.refresh();
+        ui.refreshForTest();
         auto findNamed=[](juce::Component& root,const juce::String& name)->juce::Component* {
             std::vector<juce::Component*> stack{&root};
             while (!stack.empty()) {
