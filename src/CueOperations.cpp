@@ -181,20 +181,154 @@ bool MainComponent::setCuelistName(int index,const juce::String& proposed) {
     return true;
 }
 
+void MainComponent::beginInlineRename(InlineRenameKind kind,int index,bool pinned) {
+    if (kind==InlineRenameKind::none) return;
+    if (inlineRenameKind!=InlineRenameKind::none && !commitInlineRename())
+        cancelInlineRename();
+    juce::String initial;
+    int modelId=-1;
+    if (kind==InlineRenameKind::cuelist) {
+        if (index<0 || index>=(int)show.cuelists.size()) return;
+        initial=show.cuelists[(size_t)index].name;
+    } else if (kind==InlineRenameKind::cue) {
+        if (index<0 || index>=(int)show.rows.size()) return;
+        initial=show.rows[(size_t)index].name;
+        modelId=show.rows[(size_t)index].id;
+    } else {
+        if (index<0 || index>=(int)show.columns.size() ||
+            show.columns[(size_t)index].collapsed) return;
+        initial=show.columns[(size_t)index].name;
+        modelId=show.columns[(size_t)index].id;
+    }
+    inlineRenameKind=kind;
+    inlineRenameIndex=index;
+    inlineRenameModelId=modelId;
+    inlineRenamePinned=pinned;
+    inlineNameEditor.setText(initial,juce::dontSendNotification);
+    inlineNameEditor.setInputRestrictions(
+        kind==InlineRenameKind::cuelist ? 64 : 120);
+    inlineNameEditor.setTooltip("Rename in place: Enter to save, Esc to cancel.");
+    inlineNameEditor.setVisible(true);
+    positionInlineNameEditor();
+    inlineNameEditor.grabKeyboardFocus();
+    inlineNameEditor.selectAll();
+}
+
+void MainComponent::positionInlineNameEditor() {
+    if (inlineRenameKind==InlineRenameKind::none ||
+        !inlineNameEditor.isVisible()) return;
+    juce::Rectangle<int> rect;
+    if (inlineRenameKind==InlineRenameKind::cuelist) {
+        if (inlineRenamePinned) {
+            rect={cueHeaders.getX()+20,cueHeaders.getY()+8,
+                  CueGrid::nameWidth-132,24};
+        } else if (inlineRenameIndex>=0 &&
+                   inlineRenameIndex<(int)cuelistTabs.size() &&
+                   cuelistTabs[(size_t)inlineRenameIndex] &&
+                   cuelistTabs[(size_t)inlineRenameIndex]->isVisible()) {
+            const auto tab=cuelistTabs[(size_t)inlineRenameIndex]->getBounds();
+            rect={tab.getX()+2,tab.getY()+1,
+                  juce::jmin(176,getWidth()-tab.getX()-12),tab.getHeight()-2};
+        } else {
+            // Hidden tabs are renamed beside the overflow button rather than
+            // switching the live Cuelist (which would stop playback).
+            const auto overflow=cuelistOverflowButton.getBounds();
+            rect={overflow.getX(),overflow.getY()+1,
+                  juce::jmin(176,getWidth()-overflow.getX()-12),
+                  overflow.getHeight()-2};
+        }
+    } else if (inlineRenameKind==InlineRenameKind::cue) {
+        auto it=std::find_if(show.rows.begin(),show.rows.end(),
+            [this](const Row& row){return row.id==inlineRenameModelId;});
+        if (it==show.rows.end()) {cancelInlineRename();return;}
+        const int row=(int)std::distance(show.rows.begin(),it);
+        rect={cueHeaders.getX()+107,
+              cueHeaders.getY()+CueGrid::headerHeight+
+              row*CueGrid::rowHeight-viewport.getViewPositionY()+
+              CueGrid::rowContentInset+4,
+              CueGrid::nameWidth-224,24};
+        if (rect.getY()<cueHeaders.getY()+CueGrid::headerHeight ||
+            rect.getBottom()>cueHeaders.getBottom()) {
+            cancelInlineRename();return;
+        }
+    } else {
+        auto it=std::find_if(show.columns.begin(),show.columns.end(),
+            [this](const Column& col){return col.id==inlineRenameModelId;});
+        if (it==show.columns.end() || it->collapsed) {
+            cancelInlineRename();return;
+        }
+        const int column=(int)std::distance(show.columns.begin(),it);
+        const int localX=grid.columnX(column)-CueGrid::nameWidth-
+                         viewport.getViewPositionX();
+        rect={columnHeaders.getX()+localX+8,columnHeaders.getY()+35,
+              grid.columnWidthAt(column)-38,25};
+        if (rect.getX()<columnHeaders.getX() ||
+            rect.getRight()>columnHeaders.getRight()) {
+            cancelInlineRename();return;
+        }
+    }
+    if (rect.getWidth()<28 || rect.getHeight()<18) {
+        cancelInlineRename();return;
+    }
+    inlineNameEditor.setBounds(rect);
+    inlineNameEditor.toFront(false);
+}
+
+bool MainComponent::commitInlineRename() {
+    if (inlineRenameKind==InlineRenameKind::none) return true;
+    const auto kind=inlineRenameKind;
+    const auto index=inlineRenameIndex,modelId=inlineRenameModelId;
+    const auto name=inlineNameEditor.getText().trim();
+
+    // Preserve the existing Cuelist uniqueness/length rules; do not show a
+    // popup on errors, so the operator can correct the text right here.
+    if (kind==InlineRenameKind::cuelist) {
+        bool valid=index>=0 && index<(int)show.cuelists.size() &&
+                   name.isNotEmpty() && name.length()<=64;
+        if (valid) for (int i=0;i<(int)show.cuelists.size();++i)
+            if (i!=index && show.cuelists[(size_t)i].name.equalsIgnoreCase(name))
+                valid=false;
+        if (!valid) {
+            status="Use a unique Cuelist name of 1-64 characters.";
+            repaint();
+            return false;
+        }
+    }
+    inlineRenameKind=InlineRenameKind::none;inlineRenameIndex=-1;
+    inlineRenameModelId=-1;inlineRenamePinned=false;
+    inlineNameEditor.setVisible(false);
+    if (kind==InlineRenameKind::cuelist)
+        return setCuelistName(index,name);
+    if (kind==InlineRenameKind::cue) {
+        const auto it=std::find_if(show.rows.begin(),show.rows.end(),
+            [modelId](const Row& row){return row.id==modelId;});
+        if (it==show.rows.end()) return false;
+        if (it->name!=name) {it->name=name;changed("Cue renamed.");}
+    } else {
+        const auto it=std::find_if(show.columns.begin(),show.columns.end(),
+            [modelId](const Column& col){return col.id==modelId;});
+        if (it==show.columns.end()) return false;
+        if (it->name!=name) {it->name=name;changed("Column renamed.");}
+    }
+    repaint();
+    return true;
+}
+
+void MainComponent::cancelInlineRename() {
+    if (inlineRenameKind==InlineRenameKind::none) return;
+    inlineRenameKind=InlineRenameKind::none;
+    inlineRenameIndex=inlineRenameModelId=-1;
+    inlineRenamePinned=false;
+    inlineNameEditor.setVisible(false);
+    repaint();
+}
+
 void MainComponent::renameActiveCuelist() {
-    renameCuelist(show.activeCuelist);
+    beginInlineRename(InlineRenameKind::cuelist,show.activeCuelist,true);
 }
 
 void MainComponent::renameCuelist(int index) {
-    if (index<0 || index>=(int)show.cuelists.size()) return;
-    showOperatorTextPrompt(*this,theme,"Rename Cuelist",
-        "Update the tab and its Cue List header together.",
-        "Cuelist name",show.cuelists[(size_t)index].name,false,"Rename",
-        [safe=juce::Component::SafePointer<MainComponent>(this),index](juce::String name) {
-            if (!safe) return;
-            if (!safe->setCuelistName(index,name))
-                safe->message("Use a unique Cuelist name of 1-64 characters.");
-        });
+    beginInlineRename(InlineRenameKind::cuelist,index);
 }
 
 void MainComponent::setAllColumnsCollapsed(bool collapsed) {
@@ -280,18 +414,10 @@ void MainComponent::editTempo() {
 }
 
 void MainComponent::renameTitle(bool column,int index) {
+    if (column ? (index<0 || index>=(int)show.columns.size()) :
+                 (index<0 || index>=(int)show.rows.size())) return;
     if (!applyInspector()) return;
-    const int id=column ? show.columns[index].id : show.rows[index].id;
-    prompt(this,theme,column ? "Rename column" : "Rename cue",
-        "Give this "+juce::String(column ? "column" : "cue")+" a name (or leave it empty).",
-        column ? "Column name" : "Cue name",
-        column ? show.columns[index].name : show.rows[index].name,false,
-        [safe=juce::Component::SafePointer<MainComponent>(this),column,id](juce::String name) {
-            if (!safe) return;
-            if (column) { for (auto& c : safe->show.columns) if (c.id==id) c.name=name.trim(); }
-            else { for (auto& r : safe->show.rows) if (r.id==id) r.name=name.trim(); }
-            safe->changed("Title updated.");
-        });
+    beginInlineRename(column ? InlineRenameKind::column : InlineRenameKind::cue,index);
 }
 
 void MainComponent::reorderRow(int index,int delta) {
