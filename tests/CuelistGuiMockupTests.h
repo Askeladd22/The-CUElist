@@ -35,6 +35,73 @@ void cuelistGuiMockupTests() {
               "Cuelist names, selection or cue notes failed round-trip");
     });
 
+    test("Drag reorders Cuelist tabs without activating or stopping the active list",[] {
+        MainComponent ui(false);
+        ui.createCuelist();
+        ui.createCuelist();
+        ui.setSize(1440,900);
+        const int activeCue=ui.show.rows[0].id;
+        const auto originalOrder=juce::StringArray{
+            ui.show.cuelists[0].name,ui.show.cuelists[1].name,
+            ui.show.cuelists[2].name};
+        auto* first=dynamic_cast<CuelistTabButton*>(
+            controlsV3::named(ui,"cuelistTab0"));
+        auto* third=dynamic_cast<CuelistTabButton*>(
+            controlsV3::named(ui,"cuelistTab2"));
+        check(first && third && first->isVisible() && third->isVisible(),
+              "Reorder test requires three visible draggable tabs.");
+        const juce::Point<float> start{12.0f,13.0f};
+        const juce::Point<float> drop{
+            (float)(third->getBounds().getCentreX()-first->getX()),13.0f};
+        first->mouseDown(event(*first,start,start));
+        first->mouseDrag(event(*first,drop,start,1,true));
+        first->mouseUp(event(*first,drop,start,1,true));
+        check(ui.show.cuelists[0].name==originalOrder[1] &&
+              ui.show.cuelists[1].name==originalOrder[2] &&
+              ui.show.cuelists[2].name==originalOrder[0] &&
+              ui.show.activeCuelist==1 &&
+              ui.show.rows[0].id==activeCue,
+              "Tab drag failed to reorder or accidentally changed active Cuelist.");
+        check(validateShow(ui.show).wasOk(),
+              "Reordering tabs must retain valid independent cue lists.");
+        Show decoded;
+        check(decodeShow(encodeShow(ui.show),decoded).wasOk() &&
+              decoded.cuelists[2].name==originalOrder[0] &&
+              decoded.activeCuelist==1 && decoded.rows[0].id==activeCue,
+              "Dragged Cuelist order did not persist in project data.");
+    });
+    test("Cuelists move by dedicated arrows and keyboard shortcut",[] {
+        MainComponent ui(false);
+        ui.createCuelist();
+        ui.createCuelist();
+        auto* left=dynamic_cast<juce::TextButton*>(
+            controlsV3::named(ui,"cuelistMoveLeft"));
+        auto* right=dynamic_cast<juce::TextButton*>(
+            controlsV3::named(ui,"cuelistMoveRight"));
+        check(left && right && left->isEnabled() && !right->isEnabled(),
+              "Cuelist arrows should reflect active tab boundaries.");
+        const int cueId=ui.show.rows[0].id;
+        click(*left,10.f,10.f);
+        check(ui.show.activeCuelist==1 && ui.show.rows[0].id==cueId &&
+              ui.show.cuelists[1].name=="Cuelist 3" &&
+              left->isEnabled() && right->isEnabled(),
+              "Left arrow failed to move the active tab one place.");
+        const juce::ModifierKeys shortcut(
+            juce::ModifierKeys::ctrlModifier |
+            juce::ModifierKeys::shiftModifier);
+        check(ui.keyPressed(juce::KeyPress(juce::KeyPress::leftKey,shortcut,0)) &&
+              ui.show.activeCuelist==0 && ui.show.rows[0].id==cueId,
+              "Ctrl+Shift+Left must move the active Cuelist without changing cues.");
+        check(ui.keyPressed(juce::KeyPress(juce::KeyPress::rightKey,shortcut,0)) &&
+              ui.show.activeCuelist==1 && ui.show.rows[0].id==cueId,
+              "Ctrl+Shift+Right must restore the active Cuelist ordering.");
+        click(*right,10.f,10.f);
+        check(ui.show.activeCuelist==2 && ui.show.rows[0].id==cueId &&
+              !right->isEnabled(),"Right arrow should stop at final Cuelist.");
+        check(!ui.moveCuelist(2,3) && !ui.moveCuelist(-1,0),
+              "Invalid move indices must not change the show.");
+    });
+
     test("Cuelist names update active tab and Cue List header bidirectionally",[] {
         MainComponent ui(false);
         ui.createCuelist();

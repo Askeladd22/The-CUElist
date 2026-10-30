@@ -151,7 +151,7 @@ selectable non-float outgoing OSC argument types require another change.
 - Click **+** next to the Cuelist tabs to create a new list. A newly created list starts with an independent blank cue.
 - The application uses the first available `Cuelist N` name, including numbers freed by deletion, rather than skipping numbers.
 - Click a tab to select a list. The current transport is stopped before switching, and the Cue List, Timeline and Inspector reflect the new list.
-- Tabs continue side by side while there is space; a separate overflow menu provides access to hidden tabs and their rename/delete actions when the bar is too narrow.
+- Tabs continue side by side while there is space; **drag a tab onto another tab to reorder entire Cuelists** (the destination is highlighted). Moving a tab does not start or stop cues, change the active Cuelist, or alter its data. Click the **< / >** arrows beside the active Cuelist title to move it one place at a time, or press **Ctrl+Shift+Left / Ctrl+Shift+Right** when a text editor is not focused. The arrows disable at the first/last position. The overflow menu also provides access to hidden Cuelists' rename, delete and **Move left / Move right** actions when the bar is too narrow. Save the project to retain the new tab order.
 - Use the **×** beside a visible tab to delete a Cuelist. A confirmation dialog explains that its cues are removed from the show. Source audio files are not deleted from disk.
 - The last remaining Cuelist cannot be deleted.
 
