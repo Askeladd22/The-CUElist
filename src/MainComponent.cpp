@@ -232,6 +232,9 @@ MainComponent::MainComponent(bool startAudio) {
     appPreferences=std::make_unique<juce::PropertiesFile>(prefOptions);
     faderCeilingDb=appPreferences->getIntValue("audioFaderCeilingDb",6)==0 ? 0 : 6;
     masterSlider.setMaximumDb(faderCeilingDb);
+    for (const auto& midi:juce::MidiOutput::getAvailableDevices())
+        engine.setMidiOutputEnabled(midi.identifier,
+            appPreferences->getBoolValue("midiOutputEnabled_"+midi.identifier,true));
     preferencesButton.onClick=[this] {
         juce::PopupMenu menu;
         menu.setLookAndFeel(&theme);
@@ -254,6 +257,14 @@ MainComponent::MainComponent(bool startAudio) {
         for (int i=0;i<inputs.size() && i<100;++i)
             midiMenu.addItem(101+i,inputs[i].name,true,
                              show.controls.midiInputId==inputs[i].identifier);
+        midiMenu.addSeparator();
+        midiMenu.addSectionHeader("MIDI OUTPUT — ENABLE");
+        const auto outputs=juce::MidiOutput::getAvailableDevices();
+        for (int i=0;i<outputs.size() && i<100;++i) {
+            const bool enabled=!appPreferences ||
+                appPreferences->getBoolValue("midiOutputEnabled_"+outputs[i].identifier,true);
+            midiMenu.addItem(301+i,outputs[i].name,true,enabled);
+        }
         menu.addSubMenu("MIDI Devices",midiMenu);
         juce::PopupMenu oscMenu;
         oscMenu.addSectionHeader("Local IP: "+juce::IPAddress::getLocalAddress().toString());
@@ -266,7 +277,7 @@ MainComponent::MainComponent(bool startAudio) {
         menu.addItem(5,"Rename active Cuelist");
         auto safe=juce::Component::SafePointer<MainComponent>(this);
         menu.showMenuAsync(juce::PopupMenu::Options().withTargetComponent(&preferencesButton),
-        [safe,inputs](int choice) {
+        [safe,inputs,outputs](int choice) {
             if (!safe) return;
             if(choice==1) safe->showPreflight();
             else if(choice==2) safe->showDiagnostics();
@@ -288,6 +299,17 @@ MainComponent::MainComponent(bool startAudio) {
             else if(choice==100) safe->selectControlInput({});
             else if(choice>=101 && choice<201 && choice-101<inputs.size())
                 safe->selectControlInput(inputs[choice-101].identifier);
+            else if(choice>=301 && choice<401 && choice-301<outputs.size()) {
+                const auto device=outputs[choice-301].identifier;
+                const bool enabled=safe->appPreferences ?
+                    !safe->appPreferences->getBoolValue("midiOutputEnabled_"+device,true) : false;
+                if (safe->appPreferences)
+                    safe->appPreferences->setValue("midiOutputEnabled_"+device,enabled);
+                safe->engine.setMidiOutputEnabled(device,enabled);
+                safe->status="MIDI output "+outputs[choice-301].name+
+                             (enabled?" enabled.":" disabled.");
+                safe->repaint();
+            }
         });
     };
     newButton.onClick=[this] { withDiscardConfirmation([this] { if(projectLoader) projectLoader->cancel(); closeMidiClip(); closeOscClip(); editHistory.clearUndoHistory(); stopAll(); show=makeShow(); clips.clear(); projectFile={}; selectedRow=selectedColumn=nextCue=0;

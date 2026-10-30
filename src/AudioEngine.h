@@ -128,6 +128,7 @@ public:
     bool seekRow(int rowId, double seconds) noexcept;
     void panic() noexcept;
     juce::Result setMidiOutput(const juce::String& identifier, bool reconnect=false);
+    void setMidiOutputEnabled(const juce::String& identifier,bool enabled);
     bool sendMappedMidiCc(const juce::String& id,int channel,int number,int value);
     void refreshMidiOutputs();
     void processBlock(float* const*, int channels, int frames, double sampleRate) noexcept;

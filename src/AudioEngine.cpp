@@ -515,6 +515,9 @@ std::unique_ptr<RenderState> makeRenderState(const Show& show,const ClipMap& cli
     return state;
 }
 AudioEngine::AudioEngine() = default;
+void AudioEngine::setMidiOutputEnabled(const juce::String& id,bool enabled) {
+    midiRouter.setOutputEnabled(id,enabled);
+}
 juce::Result AudioEngine::setMidiOutput(const juce::String& identifier,bool reconnect) { return midiRouter.open(identifier,reconnect); }
 void AudioEngine::refreshMidiOutputs() { midiRouter.refresh(); }
 AudioEngine::~AudioEngine() {

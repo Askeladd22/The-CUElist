@@ -3,6 +3,7 @@
 #include <array>
 #include <atomic>
 #include <map>
+#include <set>
 #include <deque>
 #include <memory>
 #include <cstdint>
@@ -26,6 +27,7 @@ public:
     MidiOutputRouter();
     ~MidiOutputRouter() override;
     juce::Result open(const juce::String& identifier, bool reconnect=false);
+    void setOutputEnabled(const juce::String& identifier,bool enabled);
     // UI-originated MIDI controller commands use the existing device output
     // worker, never opening a second handle to the same physical port.
     bool queueMappedCc(const juce::String& identifier,int channel,int cc,int value);
@@ -48,6 +50,7 @@ private:
     struct MappedCc { int route=0,channel=1,cc=0,value=0; };
     std::deque<MappedCc> mappedCommands;
     std::map<juce::String,int> routes; // UI thread only
+    std::set<juce::String> disabledIds; // User-selected output devices
     std::vector<std::unique_ptr<juce::MidiOutput>> devices;
     std::vector<std::array<unsigned,2048>> sounding;
     std::vector<double> resetTimes;

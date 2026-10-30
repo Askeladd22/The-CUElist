@@ -16,14 +16,25 @@ void MidiOutputRouter::closeRoute(int route) {
         auto& s=*pair.second; s.workerEpoch=s.epoch.fetch_add(1)+1; s.sounding.fill(0);
     }
 }
+void MidiOutputRouter::setOutputEnabled(const juce::String& identifier,bool enabled) {
+    const juce::ScopedLock lock(deviceLock);
+    if (enabled) disabledIds.erase(identifier);
+    else {
+        disabledIds.insert(identifier);
+        const auto found=routes.find(identifier);
+        if (found!=routes.end() && devices[(size_t)found->second])
+            closeRoute(found->second);
+    }
+}
 void MidiOutputRouter::refresh() {
     const auto available=juce::MidiOutput::getAvailableDevices();
     const juce::ScopedLock lock(deviceLock);
     for (const auto& route:routes) {
         const bool found=hasExactMidiIdentifier(available,route.first);
         const int index=route.second;
-        if (!found && devices[(size_t)index]) closeRoute(index);
-        else if (found && !devices[(size_t)index]) {
+        if ((!found || disabledIds.count(route.first)>0) && devices[(size_t)index])
+            closeRoute(index);
+        else if (found && disabledIds.count(route.first)==0 && !devices[(size_t)index]) {
             // Reconnect ONLY the operator-configured device ID. Never silently
             // substitute another MIDI port. Old packets are invalidated by
             // resetTimes and stream epochs.
@@ -42,6 +53,7 @@ juce::Result MidiOutputRouter::open(const juce::String& id,bool reconnect) {
     const bool available=hasExactMidiIdentifier(juce::MidiOutput::getAvailableDevices(),id);
     const juce::ScopedLock lock(deviceLock);
     const auto found=routes.find(id);
+    if (disabledIds.count(id)>0) return juce::Result::fail("MIDI output disabled in Settings.");
     if (!available) {
         if (found!=routes.end() && devices[(size_t)found->second]) closeRoute(found->second);
         return juce::Result::fail("MIDI output disconnected or unavailable.");
