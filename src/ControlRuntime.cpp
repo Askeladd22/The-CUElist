@@ -969,7 +969,11 @@ void MainComponent::completeQuickLearn(const ControlEvent& event) {
     input.scope=ControlScope::global;input.scopeId=0;
     input.takeover=(event.kind==ControlKind::note ||
         event.kind==ControlKind::osc || input.target==ControlTarget::go ||
-        input.target==ControlTarget::panic) ? ControlTakeover::jump :
+        input.target==ControlTarget::panic ||
+        input.target==ControlTarget::limiterToggle ||
+        input.target==ControlTarget::columnMute ||
+        input.target==ControlTarget::columnPolarity ||
+        input.target==ControlTarget::columnSend) ? ControlTakeover::jump :
         ControlTakeover::pickup;
     int mapRow=-1,mapColumn=-1;
     if (quickLearnMapRowId>0) {

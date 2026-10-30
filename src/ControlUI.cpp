@@ -69,7 +69,7 @@ void MainComponent::showControlCellMenu(int row,int column,
     menu.addItem(1,present ? "Edit Control Map" : "Create empty Control Map");
     juce::PopupMenu saved;
     for (const auto& item:show.controls.templates)
-        saved.addItem(item.id,item.name);
+        saved.addItem(1000000+item.id,item.name);
     menu.addSubMenu(present?"Replace with saved map":"Load saved map",saved,
                     !show.controls.templates.empty());
     if (present) {
@@ -110,10 +110,12 @@ void MainComponent::showControlCellMenu(int row,int column,
             } else if (choice==3) {
                 safe->clearControlCellMap(r,c);
             } else {
-                const auto exists=std::any_of(safe->show.controls.templates.begin(),
+                const int chosenMap=choice-1000000;
+                const auto exists=choice>=1000000 &&
+                    std::any_of(safe->show.controls.templates.begin(),
                     safe->show.controls.templates.end(),
-                    [choice](const ControlSetTemplate& t){return t.id==choice;});
-                if (exists) safe->applyControlSetTemplate(r,c,choice);
+                    [chosenMap](const ControlSetTemplate& t){return t.id==chosenMap;});
+                if (exists) safe->applyControlSetTemplate(r,c,chosenMap);
             }
         });
 }
@@ -929,7 +931,12 @@ private:
         }
         if (b.kind==ControlKind::osc) b.takeover=ControlTakeover::jump;
         if (b.kind==ControlKind::note || b.target==ControlTarget::go ||
-            b.target==ControlTarget::panic) b.takeover=ControlTakeover::jump;
+            b.target==ControlTarget::panic ||
+            b.target==ControlTarget::columnMute ||
+            b.target==ControlTarget::columnPolarity ||
+            b.target==ControlTarget::columnSend ||
+            b.target==ControlTarget::limiterToggle)
+            b.takeover=ControlTakeover::jump;
         b.invert=invert.getToggleState();
         if (b.target==ControlTarget::midiCc && b.functionId==0) {
             // Legacy direct mappings preserve historical behavior.

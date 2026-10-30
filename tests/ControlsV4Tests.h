@@ -4,13 +4,14 @@ void controlsV4Tests() {
     test("utility routing replaces inspector output and MIDI OSC have no audio controls", [] {
         MainComponent ui(false); addColumn(ui.show,ColumnType::midi,{}); addColumn(ui.show,ColumnType::osc,{});
         auto* utilities=find<ColumnUtilities>(ui); utilities->refresh();
-        // The two temporary Master Learn targets are present but completely
-        // hidden until a Learn session begins. Retain the original five
-        // Master controls and exactly three clipped utility strips.
-        check(utilities->getNumChildComponents()==8 &&
+        // Three temporary Master Learn targets are present but completely
+        // hidden until Learn begins. Retain all five original Master
+        // controls and exactly three clipped utility strips.
+        check(utilities->getNumChildComponents()==9 &&
               utilities->getChildComponent(0)->getNumChildComponents()==3,
-              "Three clipped utility strips, five Master controls and two Learn overlays expected");
-        for (const auto* name : {"quickLearnMasterGain","quickLearnMasterPan"}) {
+              "Three clipped utility strips, five Master controls and three Learn overlays expected");
+        for (const auto* name : {"quickLearnMasterGain","quickLearnMasterPan",
+                                 "quickLearnMasterLimiter"}) {
             auto* overlay=controlsV3::named(*utilities,name);
             check(overlay!=nullptr && !overlay->isVisible(),
                   "Inactive GUI Learn overlay must not intercept Master controls");
