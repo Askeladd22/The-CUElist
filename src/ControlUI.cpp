@@ -76,7 +76,7 @@ void MainComponent::showControlCellMenu(int row,int column,
     const bool present=hasControlMapAssignment(selectedCell);
     juce::PopupMenu menu;
     menu.addItem(1,present ?
-        (selectedCell.assignedMapId>0 ? "Edit shared Control Map" : "Edit Control Map") :
+        (selectedCell.assignedMapId>0 ? "Edit Control Map (shared)" : "Edit Control Map") :
         "Create empty Control Map");
     juce::PopupMenu saved;
     for (const auto& item:show.controls.templates)
