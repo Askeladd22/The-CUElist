@@ -26,14 +26,58 @@ bool MainComponent::startOscControlInput(int port) {
         return false;
     }
     show.controls.oscInputPort=port;
+    if (appPreferences) appPreferences->setValue("oscInputPorts",juce::String(port));
     dirty=true;
     status="OSC control listener enabled on UDP "+juce::String(port)+".";
     repaint();
     return true;
 }
 
+juce::String MainComponent::configuredOscPorts() const {
+    return appPreferences ? appPreferences->getValue("oscInputPorts","") : juce::String();
+}
+bool MainComponent::configureOscInputPorts(const juce::String& value) {
+    juce::StringArray parts;parts.addTokens(value,",; ","");
+    std::vector<int> ports;
+    for (const auto& part:parts) {
+        const auto token=part.trim();
+        if (token.isEmpty()) continue;
+        if (token.retainCharacters("0123456789")!=token ||
+            token.getIntValue()<1 || token.getIntValue()>65535 ||
+            ports.size()>=16 ||
+            std::find(ports.begin(),ports.end(),token.getIntValue())!=ports.end()) {
+            status="Specify 1–16 unique UDP ports between 1 and 65535.";
+            repaint();return false;
+        }
+        ports.push_back(token.getIntValue());
+    }
+    if (ports.empty()) {
+        oscInput.stopListening();
+        if (appPreferences) appPreferences->setValue("oscInputPorts","");
+        show.controls.oscInputPort=0;dirty=true;
+        status="OSC input disabled.";repaint();return true;
+    }
+    if (!oscInput.startListeningPorts(ports)) {
+        status="One or more OSC ports are unavailable; previous listeners retained.";
+        repaint();return false;
+    }
+    juce::StringArray strings;
+    for (int port:ports) strings.add(juce::String(port));
+    if (appPreferences) appPreferences->setValue("oscInputPorts",strings.joinIntoString(","));
+    show.controls.oscInputPort=ports.front();dirty=true;
+    status="OSC input listening on: "+strings.joinIntoString(", ");
+    repaint();return true;
+}
 void MainComponent::refreshControlSettings() {
-    if (show.controls.oscInputPort==0) oscInput.stopListening();
+    const auto configured=configuredOscPorts();
+    if (configured.isNotEmpty()) {
+        juce::StringArray parts;parts.addTokens(configured,",; ","");
+        std::vector<int> requested;
+        for (auto part:parts)
+            if (part.trim().isNotEmpty()) requested.push_back(part.getIntValue());
+        if (!requested.empty() && !oscInput.startListeningPorts(requested))
+            status="Saved OSC UDP port configuration is unavailable.";
+    } else if (show.controls.oscInputPort==0) oscInput.stopListening();
     else if (oscInput.port()!=show.controls.oscInputPort &&
              !oscInput.startListening(show.controls.oscInputPort))
         status="Saved OSC input port is unavailable.";

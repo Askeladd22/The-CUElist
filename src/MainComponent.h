@@ -341,6 +341,8 @@ public:
     void finishQuickLearn();
     void ensureStarterControlFunctions();
     bool startOscControlInput(int port);
+    bool configureOscInputPorts(const juce::String& csv);
+    juce::String configuredOscPorts() const;
     void armOscControlLearn() { controlLearnArmed=false;oscLearnArmed=true; }
     std::optional<ControlEvent> consumeLearnedInput() { auto result=learnedInput; learnedInput.reset(); return result; }
     void dispatchControlForTest(const ControlEvent& event) { dispatchControl(event); }

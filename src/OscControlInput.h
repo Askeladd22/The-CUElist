@@ -6,6 +6,8 @@
 #include <cmath>
 #include <cstring>
 #include <memory>
+#include <vector>
+#include <algorithm>
 
 namespace cuelist {
 
@@ -68,25 +70,38 @@ public:
         return true;
     }
 
-    bool startListening(int port) {
-        if (port<1 || port>65535) return false;
-        if (listeningPort==port && socket) return true;
+    bool startListening(int port) {return startListeningPorts({port});}
+    bool startListeningPorts(const std::vector<int>& ports) {
+        if (ports.empty() || ports.size()>16) return false;
+        std::vector<int> unique;
+        for (int p:ports) {
+            if (p<1 || p>65535 || std::find(unique.begin(),unique.end(),p)!=unique.end())
+                return false;
+            unique.push_back(p);
+        }
+        if (unique==listeningPorts && !sockets.empty()) return true;
+        // Validate every UDP port before replacing the live listener set.
+        std::vector<std::unique_ptr<juce::DatagramSocket>> next;
+        for (int p:unique) {
+            auto socket=std::make_unique<juce::DatagramSocket>(false);
+            if (!socket->bindToPort(p)) return false;
+            next.push_back(std::move(socket));
+        }
         stopListening();
-        auto next=std::make_unique<juce::DatagramSocket>(false);
-        if (!next->bindToPort(port)) return false;
-        socket=std::move(next);
-        listeningPort=port;
+        listeningPorts=std::move(unique);
+        sockets=std::move(next);
         startThread();
         return true;
     }
     void stopListening() {
         signalThreadShouldExit();
         stopThread(1000);
-        socket.reset();
-        listeningPort=0;
+        sockets.clear();
+        listeningPorts.clear();
         readIndex.store(0);writeIndex.store(0);
     }
-    int port() const noexcept {return listeningPort;}
+    int port() const noexcept {return listeningPorts.empty()?0:listeningPorts.front();}
+    const std::vector<int>& ports() const noexcept {return listeningPorts;}
     uint64_t receivedCount() const noexcept {
         return received.load(std::memory_order_relaxed);
     }
@@ -112,8 +127,8 @@ private:
     std::atomic<unsigned> readIndex{0},writeIndex{0};
     std::atomic<uint64_t> received{0};
     std::atomic<int> dropped{0};
-    std::unique_ptr<juce::DatagramSocket> socket;
-    int listeningPort=0;
+    std::vector<std::unique_ptr<juce::DatagramSocket>> sockets;
+    std::vector<int> listeningPorts;
 
     void enqueue(const Packet& value) {
         const auto w=writeIndex.load(std::memory_order_relaxed);
@@ -127,12 +142,15 @@ private:
     void run() override {
         std::array<uint8_t,1024> buffer{};
         while (!threadShouldExit()) {
-            if (!socket || socket->waitUntilReady(true,60)!=1) continue;
-            const int size=socket->read(buffer.data(),(int)buffer.size(),false);
-            if (size<=0) continue;
-            received.fetch_add(1,std::memory_order_relaxed);
-            Packet packet;
-            if (decode(buffer.data(),size,packet)) enqueue(packet);
+            for (const auto& socket:sockets) {
+                if (threadShouldExit()) break;
+                if (!socket || socket->waitUntilReady(true,10)!=1) continue;
+                const int size=socket->read(buffer.data(),(int)buffer.size(),false);
+                if (size<=0) continue;
+                received.fetch_add(1,std::memory_order_relaxed);
+                Packet packet;
+                if (decode(buffer.data(),size,packet)) enqueue(packet);
+            }
         }
     }
 };
