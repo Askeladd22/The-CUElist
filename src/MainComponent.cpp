@@ -1239,6 +1239,9 @@ void MainComponent::setMasterAudio(float level) {
     show.masterGain=value;
     dirty=true;
     engine.publish(makeRenderState(show,clips));
+    // The engine already receives the mapped value immediately. Keep the
+    // actual JUCE fader in lockstep without invoking its onGainChanged hook.
+    masterSlider.setGainDb(GainMeterFader::fromLinear(show.masterGain));
     status="MASTER audio gain updated."; repaint();
 }
 void MainComponent::setMasterPan(float pan) {
@@ -1247,6 +1250,7 @@ void MainComponent::setMasterPan(float pan) {
     if (std::abs(show.masterPan-value)<1.0e-6f) return;
     show.masterPan=value; dirty=true;
     engine.publish(makeRenderState(show,clips));
+    masterPan.setValue(show.masterPan,juce::dontSendNotification);
     status="MASTER pan updated."; utilities.repaint(); repaint();
 }
 void MainComponent::setMasterMute(bool muted) {
@@ -1278,7 +1282,7 @@ void MainComponent::setColumnMasterSend(int column,bool enabled) {
     show.columns[(size_t)column].masterSend=enabled;
     dirty=true; engine.publish(makeRenderState(show,clips));
     status=enabled ? "L/R: column sent to stereo Master Bus." : "L/R: column removed from Master Bus.";
-    utilities.refresh(); repaint();
+    utilities.syncAudioControls(column); repaint();
 }
 void MainComponent::setColumnDirectPostFader(int column,bool post) {
     if(column<0 || column>=(int)show.columns.size() ||
@@ -1316,6 +1320,9 @@ void MainComponent::setColumnUtilities(int column,float level,float pan,bool mut
     col.gain=juce::jlimit(0.0f,4.0f,level); col.pan=juce::jlimit(-1.0f,1.0f,pan);
     col.muted=muted; col.phaseInverted=inverted;
     dirty=true; engine.publish(makeRenderState(show,clips));
+    // Mapped changes and direct GUI edits share the same one-way UI sync.
+    // A plain repaint cannot move a GainMeterFader's stored thumb position.
+    utilities.syncAudioControls(column);
     status="Column utilities updated."; repaint();
 }
 void MainComponent::setColumnOutput(int column,int outputIndex) {
@@ -1482,16 +1489,21 @@ void MainComponent::timerCallback() {
         const auto devices=juce::MidiInput::getAvailableDevices();
         for (auto& extra:additionalMidiInputs) {
             if (!hasExactMidiIdentifier(devices,extra.first)) {
-                if (extra.second->connected()) extra.second->disconnect();
+                if (extra.second->connected()) {
+                    extra.second->disconnect();
+                    physicalEdges.clear();controlMapping.clearPickup();
+                }
             } else if (!extra.second->connected()) {
-                extra.second->connect(extra.first);
+                if (extra.second->connect(extra.first).wasOk()) {
+                    physicalEdges.clear();controlMapping.clearPickup();
+                }
             }
         }
         const auto firstAction=planMidiSession(show.controls.midiInputId,
             midiInput.identifier(),midiInput.connected(),devices);
         if (firstAction==MidiSessionAction::disconnectMissing) {
             midiInput.disconnect();
-            physicalEdges.clear(); // stale NoteOn states must not survive unplug
+            physicalEdges.clear();controlMapping.clearPickup(); // stale MIDI state cannot survive unplug
             status="MIDI input disconnected. Mappings suspended.";
         }
         // Preserve the original same-tick disconnect/reconnect flow, if a
@@ -1501,7 +1513,7 @@ void MainComponent::timerCallback() {
             ++midiInputReconnectAttempts;
             const auto restored=midiInput.connect(show.controls.midiInputId);
             if (restored.wasOk()) {
-                physicalEdges.clear();
+                physicalEdges.clear();controlMapping.clearPickup();
                 status="MIDI controller reconnected (same device).";
             }
         }

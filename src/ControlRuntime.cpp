@@ -132,7 +132,7 @@ void MainComponent::toggleAdditionalMidiInput(const juce::String& id) {
     for (const auto& entry:additionalMidiInputs) saved.add(entry.first);
     if (appPreferences)
         appPreferences->setValue("additionalMidiInputIds",saved.joinIntoString("|"));
-    physicalEdges.clear();repaint();
+    physicalEdges.clear();controlMapping.clearPickup();repaint();
 }
 juce::Result MainComponent::selectControlInput(const juce::String& id) {
     auto extra=std::find_if(additionalMidiInputs.begin(),additionalMidiInputs.end(),
@@ -146,7 +146,7 @@ juce::Result MainComponent::selectControlInput(const juce::String& id) {
             appPreferences->setValue("additionalMidiInputIds",saved.joinIntoString("|"));
     }
     auto result=midiInput.connect(id);
-    physicalEdges.clear();
+    physicalEdges.clear();controlMapping.clearPickup();
     // Preserve an explicitly selected disconnected identifier, never silently
     // switch to the first available device.
     show.controls.midiInputId=id;
@@ -613,7 +613,6 @@ void MainComponent::dispatchControl(const ControlEvent& input) {
                 if (c.muted!=action->pressed) setColumnUtilities(i,c.gain,c.pan,action->pressed,c.phaseInverted);
             } else if (c.phaseInverted!=action->pressed)
                 setColumnUtilities(i,c.gain,c.pan,c.muted,action->pressed);
-            utilities.refresh();
         }
     } else if (binding.target==ControlTarget::columnGain ||
                binding.target==ControlTarget::columnPan) {
@@ -628,7 +627,6 @@ void MainComponent::dispatchControl(const ControlEvent& input) {
                         binding.target==ControlTarget::columnGain ? bounded : c.gain,
                         binding.target==ControlTarget::columnPan ? action->scaled : c.pan,
                         c.muted,c.phaseInverted);
-                    utilities.refresh();
                 }
         }
     }

@@ -235,6 +235,9 @@ public:
     void syncScroll(int);
     void refreshRouting();
     void refreshLearnVisuals();
+    // Update only audio parameters changed by a mapped control. No layout,
+    // port discovery or full editor refresh on every external CC/OSC sample.
+    void syncAudioControls(int column);
     void refreshMeters();
     void resized() override;
     void paint(juce::Graphics&) override;
