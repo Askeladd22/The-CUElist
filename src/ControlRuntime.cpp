@@ -775,7 +775,11 @@ void MainComponent::refreshQuickLearnMaps() {
         for (int c=0;c<(int)show.columns.size();++c) {
             const auto& column=show.columns[(size_t)c];
             if (column.type!=ColumnType::control || column.controlLocked) continue;
-            if (!show.rows[(size_t)r].cells[(size_t)c].controlSet) continue;
+            const auto& cell=show.rows[(size_t)r].cells[(size_t)c];
+            // A named map must only appear once, as an independent archive
+            // entry. Learning into a cue-local copy would otherwise have no
+            // effect on that cue's live shared-map reference.
+            if (!cell.controlSet || cell.assignedMapId>0) continue;
             quickLearnMapLocations.push_back({show.rows[(size_t)r].id,column.id});
             const int id=(int)quickLearnMapLocations.size();
             quickLearnMapSelector.addItem("Q"+juce::String(r+1)+" / "+column.name,id);
