@@ -6,6 +6,7 @@
 #include "ProjectSafety.h"
 #include "ProjectMediaLoader.h"
 #include "DeviceIdentity.h"
+#include "OperatorTextPrompt.h"
 #include "PianoRoll.h"
 #include "OscEditor.h"
 #include "MidiClip.h"
@@ -222,7 +223,7 @@ MainComponent::MainComponent(bool startAudio) {
             });
     };
     preferencesButton.setName("projectPreferences");
-    preferencesButton.setTooltip("Pre-flight, diagnostics and fader display range.");
+    preferencesButton.setTooltip("Settings: MIDI devices, OSC ports, audio devices and clock.");
     // Application setting, never serialized into or applied destructively to a Show.
     juce::PropertiesFile::Options prefOptions;
     prefOptions.applicationName="The Cuelist";
@@ -241,14 +242,52 @@ MainComponent::MainComponent(bool startAudio) {
         faderMenu.addItem(4,faderRangeMenuTitle(0),true,faderCeilingDb==0);
         menu.addSubMenu("Fader Range",faderMenu);
         menu.addSeparator();
+        juce::PopupMenu clockMenu;
+        const bool twelve=appPreferences && appPreferences->getBoolValue("clock12Hour",false);
+        clockMenu.addItem(60,"24-hour clock",true,!twelve);
+        clockMenu.addItem(61,"12-hour clock",true,twelve);
+        menu.addSubMenu("Clock",clockMenu);
+        juce::PopupMenu midiMenu;
+        const auto inputs=juce::MidiInput::getAvailableDevices();
+        midiMenu.addSectionHeader("MIDI INPUT — ENABLE");
+        midiMenu.addItem(100,"Disable MIDI input",true,show.controls.midiInputId.isEmpty());
+        for (int i=0;i<inputs.size() && i<100;++i)
+            midiMenu.addItem(101+i,inputs[i].name,true,
+                             show.controls.midiInputId==inputs[i].identifier);
+        menu.addSubMenu("MIDI Devices",midiMenu);
+        juce::PopupMenu oscMenu;
+        oscMenu.addSectionHeader("Local IP: "+juce::IPAddress::getLocalAddress().toString());
+        const auto ports=configuredOscPorts();
+        oscMenu.addItem(70,"Receive UDP ports: "+(ports.isEmpty()?"not configured":ports));
+        oscMenu.addItem(71,"Disable OSC input");
+        menu.addSubMenu("OSC",oscMenu);
+        menu.addItem(72,"Audio Devices...");
+        menu.addSeparator();
         menu.addItem(5,"Rename active Cuelist");
         auto safe=juce::Component::SafePointer<MainComponent>(this);
-        menu.showMenuAsync(juce::PopupMenu::Options().withTargetComponent(&preferencesButton),[safe](int choice) {
+        menu.showMenuAsync(juce::PopupMenu::Options().withTargetComponent(&preferencesButton),
+        [safe,inputs](int choice) {
             if (!safe) return;
             if(choice==1) safe->showPreflight();
             else if(choice==2) safe->showDiagnostics();
             else if(choice==3 || choice==4) safe->setAudioFaderCeilingDb(choice==3 ? 6 : 0);
             else if(choice==5) safe->renameActiveCuelist();
+            else if(choice==60 || choice==61) {
+                if(safe->appPreferences)
+                    safe->appPreferences->setValue("clock12Hour",choice==61);
+                safe->repaint();
+            } else if(choice==72) safe->showDevices();
+            else if(choice==70) {
+                showOperatorTextPrompt(*safe,safe->theme,"OSC Input Ports",
+                    "Comma-separated UDP ports, up to 16; empty disables listening.",
+                    "Receive UDP ports",safe->configuredOscPorts(),false,"Apply",
+                    [safe](juce::String value) {
+                        if(safe) safe->configureOscInputPorts(value);
+                    });
+            } else if(choice==71) safe->configureOscInputPorts("");
+            else if(choice==100) safe->selectControlInput({});
+            else if(choice>=101 && choice<201 && choice-101<inputs.size())
+                safe->selectControlInput(inputs[choice-101].identifier);
         });
     };
     newButton.onClick=[this] { withDiscardConfirmation([this] { if(projectLoader) projectLoader->cancel(); closeMidiClip(); closeOscClip(); editHistory.clearUndoHistory(); stopAll(); show=makeShow(); clips.clear(); projectFile={}; selectedRow=selectedColumn=nextCue=0;
@@ -270,7 +309,8 @@ MainComponent::MainComponent(bool startAudio) {
     addRowButton.onClick=[this] { addCue(); };
     addColumnButton.onClick=[this] { showColumnMenu(addColumnButton.getScreenBounds().getCentre()); };
     goButton.onClick=[this] { goNext(); }; panicButton.onClick=[this] { stopAll(); };
-    deviceButton.onClick=[this] { showDevices(); };
+    deviceButton.setButtonText("Settings");
+    deviceButton.onClick=[this] {preferencesButton.triggerClick();};
     // Each tab is a genuine Cuelist selector. The third tab must never
     // double as an overflow popup: the overflow appears only when needed.
     for (int i=0;i<(int)cuelistTabs.size();++i) {
@@ -476,8 +516,10 @@ void MainComponent::paint(juce::Graphics& g) {
     g.drawRoundedRectangle(telemetry.clock.toFloat(),5.0f,1.0f);
     g.drawRoundedRectangle(telemetry.usage.toFloat(),5.0f,1.0f);
     // Only the centred 24-hour time, no redundant CLOCK / 24H heading.
-    label(g,juce::Time::getCurrentTime().formatted("%H:%M:%S"),
-          telemetry.timeText,20,palette::text,true,
+    label(g,juce::Time::getCurrentTime().formatted(
+              appPreferences && appPreferences->getBoolValue("clock12Hour",false) ?
+              "%I:%M:%S %p" : "%H:%M:%S"),
+          telemetry.timeText,23,palette::text,true,
           juce::Justification::centred);
     // Two balanced CPU/RAM rows, with one decimal only for CPU.
     label(g,"CPU",telemetry.cpuLabel,11,palette::text,true);
