@@ -68,17 +68,20 @@ void MainComponent::showControlCellMenu(int row,int column,
         show.columns[(size_t)column].controlLocked) return;
     const int rowId=show.rows[(size_t)row].id;
     const int columnId=show.columns[(size_t)column].id;
-    const bool present=hasControlMapAssignment(show.rows[(size_t)row].cells[(size_t)column]);
+    const auto& selectedCell=show.rows[(size_t)row].cells[(size_t)column];
+    const bool present=hasControlMapAssignment(selectedCell);
     juce::PopupMenu menu;
-    menu.addItem(1,present ? "Edit Control Map" : "Create empty Control Map");
+    menu.addItem(1,present ?
+        (selectedCell.assignedMapId>0 ? "Edit shared Control Map" : "Edit Control Map") :
+        "Create empty Control Map");
     juce::PopupMenu saved;
     for (const auto& item:show.controls.templates)
         saved.addItem(1000000+item.id,item.name);
-    menu.addSubMenu(present?"Replace with saved map":"Load saved map",saved,
+    menu.addSubMenu(present?"Change map assignment":"Assign saved map",saved,
                     !show.controls.templates.empty());
     if (present) {
         menu.addItem(2,"Save map for reuse...");
-        menu.addItem(3,"Remove override (inherit Default Map)");
+        menu.addItem(3,"Remove map assignment (inherit Default Map)");
     }
     auto safe=juce::Component::SafePointer<MainComponent>(this);
     menu.showMenuAsync(juce::PopupMenu::Options().withTargetScreenArea(
@@ -147,25 +150,29 @@ public:
             &outputCc,&outputChannel,&oscAddress,&invert,&updateSelected,&curve,&minimum,&maximum,
              &functionChoice,&functionName,&newFunction,&saveRoute,
              &saveControllerPreset,&loadControllerPreset,&effectivePreview,&templateName,&templates,&saveTemplate,&loadTemplate,
-             &emptyBindings,&mapChooser,&newMap,&cloneMap})
+             &emptyBindings,&mapChooser,&newMap,&cloneMap,&renameMap,&deleteMap})
             addAndMakeVisible(c);
         mapChooser.setName("mappingMapSelector");
         newMap.setName("mappingNewMap");
         cloneMap.setName("mappingDuplicateMap");
         newMap.setButtonText("New Map");
         cloneMap.setButtonText("Duplicate");
+        renameMap.setName("mappingRenameMap");
+        renameMap.setButtonText("Rename Map");
+        deleteMap.setName("mappingDeleteMap");
+        deleteMap.setButtonText("Delete unused Map");
         mapChooser.addItem("Default Map (fallback)",1);
         int initial=1;
-        for (int row=0;row<(int)owner->show.rows.size();++row)
-            for (int col=0;col<(int)owner->show.columns.size();++col) {
-                const auto& column=owner->show.columns[(size_t)col];
-                if (column.type!=ColumnType::control || column.controlLocked ||
-                    !owner->show.rows[(size_t)row].cells[(size_t)col].controlSet) continue;
-                availableMaps.push_back({row,col});
-                const int id=(int)availableMaps.size()+1;
-                mapChooser.addItem("Q"+juce::String(row+1)+" / "+column.name,id);
-                if (editSet && row==sourceRow && col==sourceColumn) initial=id;
-            }
+        // The main editor is the map archive; individual cue overrides
+        // appear here only when invoked from that actual Control Column cell.
+        if (useSet && templateId==0 &&
+            sourceRow>=0 && sourceRow<(int)owner->show.rows.size() &&
+            sourceColumn>=0 && sourceColumn<(int)owner->show.columns.size()) {
+            availableMaps.push_back({sourceRow,sourceColumn});
+            mapChooser.addItem("Cue-local override: Q"+juce::String(sourceRow+1)+
+                " / "+owner->show.columns[(size_t)sourceColumn].name,2);
+            initial=2;
+        }
         for (const auto& map:owner->show.controls.templates) {
             availableTemplateIds.push_back(map.id);
             const int index=(int)availableMaps.size()+(int)availableTemplateIds.size()+1;
@@ -190,6 +197,10 @@ public:
         };
         newMap.onClick=[this]{createMap(false);};
         cloneMap.onClick=[this]{createMap(true);};
+        renameMap.onClick=[this]{renameSelectedMap();};
+        deleteMap.onClick=[this]{deleteSelectedMap();};
+        renameMap.setEnabled(editTemplateId>0);
+        deleteMap.setEnabled(editTemplateId>0);
         functionChoice.setName("mappingAbstractFunction");
         functionName.setName("mappingAbstractFunctionName");
         functionName.setTextToShowWhenEmpty("Function name (e.g. Resolume Brightness)",palette::muted);
@@ -561,8 +572,8 @@ public:
         g.setColour(palette::line);
         g.drawHorizontalLine(52,19,(float)getWidth()-19);
         label(g,"MAP SELECTION",{20,60,350,19},12,palette::teal,true);
-        label(g,"Default Map is the fallback; Control Column maps override selected functions.",
-              {20,137,getWidth()-40,20},12,palette::muted);
+        label(g,"Saved maps live here; Control Column cells assign them to cues.",
+              {320,136,getWidth()-340,24},12,palette::muted);
 
         g.setColour(palette::line);
         g.drawHorizontalLine(191,20,(float)getWidth()-20);
@@ -593,7 +604,7 @@ public:
         g.setColour(palette::line);
         g.drawHorizontalLine(getHeight()-48,20,(float)getWidth()-20);
         label(g,editTemplateId>0 ?
-            "Saved maps are reusable snapshots. Apply one from a Control Column cell." :
+            "Named maps are shared by assigned cues; edit with care. Deletion requires no assignments." :
             editSet ? "Control overrides apply after GO; removing one restores Default Map." :
             "Default Map always remains active as the lowest-priority fallback.",
             {20,getHeight()-40,getWidth()-40,23},11,palette::muted);
@@ -603,6 +614,8 @@ public:
         mapChooser.setBounds(20,97,w-314,31);
         newMap.setBounds(w-285,97,125,31);
         cloneMap.setBounds(w-150,97,130,31);
+        renameMap.setBounds(20,132,139,28);
+        deleteMap.setBounds(168,132,141,28);
         device.setBounds(20,105,w-177,31);
         connect.setBounds(w-143,105,123,31);
         learn.setBounds(20,163,148,32);
@@ -681,9 +694,53 @@ private:
         return cell.controlSet ? &cell.controlSet->bindings : nullptr;
     }
     juce::ComboBox device,presets,scope,target,takeover,columns,curve,templates,functionChoice,mapChooser;
-    juce::TextButton newMap,cloneMap;
+    juce::TextButton newMap,cloneMap,renameMap,deleteMap;
     std::vector<std::pair<int,int>> availableMaps;
     std::vector<int> availableTemplateIds;
+    void renameSelectedMap() {
+        if (!owner || editTemplateId<=0) return;
+        const int id=editTemplateId;
+        auto found=std::find_if(owner->show.controls.templates.begin(),
+            owner->show.controls.templates.end(),
+            [id](const ControlSetTemplate& m){return m.id==id;});
+        if (found==owner->show.controls.templates.end()) return;
+        auto safe=juce::Component::SafePointer<MainComponent>(owner.getComponent());
+        showOperatorTextPrompt(*owner,owner->theme,"Rename Control Map",
+            "Rename the saved map. All cue references retain the same stable ID.",
+            "Map name",found->name,false,"Rename",
+            [safe,id](juce::String value){
+                if (!safe) return;
+                if (safe->renameReusableControlMap(id,value))
+                    juce::MessageManager::callAsync([safe,id]{
+                        if (safe) safe->openControlPanel(false,id);
+                    });
+            });
+    }
+    void deleteSelectedMap() {
+        if (!owner || editTemplateId<=0) return;
+        const int id=editTemplateId;
+        const int used=owner->reusableControlMapUsage(id);
+        if (used>0) {
+            state.setText("Map assigned to "+juce::String(used)+
+                " cue(s). Unassign or replace those references first.",
+                juce::dontSendNotification);
+            return;
+        }
+        auto safe=juce::Component::SafePointer<MainComponent>(owner.getComponent());
+        juce::AlertWindow::showAsync(
+            juce::MessageBoxOptions()
+                .withIconType(juce::MessageBoxIconType::WarningIcon)
+                .withTitle("Delete saved Control Map?")
+                .withMessage("This removes the unused map from the archive. This cannot be undone.")
+                .withButton("Delete Map").withButton("Cancel"),
+            [safe,id](int result) {
+                if (!safe || result!=1) return;
+                if (safe->deleteReusableControlMap(id))
+                    juce::MessageManager::callAsync([safe] {
+                        if (safe) safe->openControlPanel(false);
+                    });
+            });
+    }
     void createMap(bool duplicate) {
         if (!owner) return;
         ControlSet source;
