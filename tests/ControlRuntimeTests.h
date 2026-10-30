@@ -3,6 +3,54 @@
 #include "ShowEditOperations.h"
 
 void controlRuntimeTests() {
+    test("reusable maps duplicate, replace and restore Default Map fallback",[] {
+        MainComponent ui(false);
+        addColumn(ui.show,ColumnType::control,"Control");
+        addRow(ui.show,"Second cue");
+        const int controlColumn=1;
+        ControlBinding destination;destination.target=ControlTarget::go;
+        const int functionId=ui.createAbstractControlFunction("Scene Trigger",destination);
+        check(functionId>0,"Function creation failed");
+        ControlBinding defaultInput;defaultInput.deviceId="desk";
+        defaultInput.kind=ControlKind::cc;defaultInput.channel=1;
+        defaultInput.number=10;defaultInput.functionId=functionId;
+        defaultInput.target=ControlTarget::go;
+        check(ui.addMappingBinding(defaultInput),"Default Map assignment failed");
+        const int templateId=ui.createReusableControlMap("Stage B",{});
+        check(templateId>0,"Empty saved map creation failed");
+        ControlBinding overrideInput=defaultInput;overrideInput.number=11;
+        check(ui.modifyReusableControlBinding(templateId,0,overrideInput,0),
+              "Saved map binding creation failed");
+        check(ui.applyControlSetTemplate(0,controlColumn,templateId),
+              "Could not assign saved map to Control Column");
+        check(validateShow(ui.show).wasOk(),"Saved map did not validate after assignment");
+        ControlMappingEngine engine;
+        engine.setSettings(ui.show.controls);
+        engine.setLayers(buildControlLayers(ui.show));
+        const ControlEvent baseline{"desk",ControlKind::cc,1,10,127,false};
+        const ControlEvent overridden{"desk",ControlKind::cc,1,11,127,false};
+        engine.setActiveCue(ui.show.rows[0].id,0);
+        check(engine.matched(overridden) && !engine.matched(baseline),
+              "Cue-local map failed to replace the same function's Default Map input");
+        engine.setActiveCue(ui.show.rows[1].id,0);
+        check(engine.matched(baseline) && !engine.matched(overridden),
+              "Default Map did not return when cue had no override");
+        overrideInput.number=12;
+        const int savedId=ui.show.controls.templates[0].set.bindings.front().id;
+        check(ui.modifyReusableControlBinding(templateId,savedId,overrideInput,1),
+              "Could not edit reusable saved map");
+        check(ui.show.rows[0].cells[controlColumn].controlSet->bindings.front().number==11,
+              "Changing a saved template must not silently rewrite an existing cue");
+        Show restored;
+        check(decodeShow(encodeShow(ui.show),restored).wasOk() &&
+              restored.controls.templates.size()==1,
+              "Saved map was not serialized in the show");
+        check(ui.clearControlCellMap(0,controlColumn),
+              "Could not clear a cue-local mapping");
+        check(!ui.show.rows[0].cells[controlColumn].controlSet &&
+              validateShow(ui.show).wasOk(),
+              "Removing an override did not restore a valid fallback");
+    });
     test("pure Control Layer builder preserves locked defaults and cue-scoped overrides",[] {
         auto show=makeShow();
         addColumn(show,ColumnType::control,"Locked default");

@@ -84,11 +84,62 @@ void quickLearnPersistenceTests() {
         check(count(ui)==0,"The normal GUI must never intercept control clicks.");
         ui.beginQuickLearn(false);
         check(ui.isQuickLearnActive(),"MIDI Learn did not remain active.");
-        check(count(ui)==6,
-            "All six supported GUI targets (GO, PANIC, master and strip gain/pan) must highlight.");
+        check(count(ui)==10,
+            "All ten GUI Learn targets must appear, including Mute, Polarity, Send and Limiter.");
         ui.finishQuickLearn();
         check(!ui.isQuickLearnActive() && count(ui)==0,
             "Leaving Learn must restore the original GUI click behavior.");
+    });
+    test("GUI Learn maps audio switches to their correct independent functions",[] {
+        MainComponent ui(false);
+        const int audioId=ui.show.columns[0].id;
+        ui.beginQuickLearn(false);
+        const std::array<ControlTarget,5> targets{{
+            ControlTarget::columnGain,ControlTarget::columnMute,
+            ControlTarget::columnPolarity,ControlTarget::columnSend,
+            ControlTarget::limiterToggle
+        }};
+        int inputNumber=20;
+        for (auto kind:targets) {
+            ui.chooseQuickLearnGuiTarget(kind,kind==ControlTarget::limiterToggle?0:audioId);
+            check(ui.isQuickLearnAwaitingInput(),"GUI target did not arm Learn");
+            ui.completeQuickLearn({"virtual-device",ControlKind::cc,1,inputNumber++,127,false});
+            check(ui.isQuickLearnActive() && !ui.isQuickLearnAwaitingInput(),
+                  "Learn must remain persistent after an audio parameter assignment");
+            const auto found=std::find_if(ui.show.controls.bindings.begin(),
+                ui.show.controls.bindings.end(),
+                [inputNumber](const ControlBinding& b){return b.number==inputNumber-1;});
+            check(found!=ui.show.controls.bindings.end() &&
+                  found->target==kind &&
+                  (kind==ControlTarget::limiterToggle ||
+                   found->targetColumnId==audioId),
+                  "GUI Learn created an incorrect audio function or column ID");
+        }
+        check(validateShow(ui.show).wasOk(),"Direct GUI Learn generated invalid mappings");
+        ui.finishQuickLearn();
+    });
+    test("saved Control Maps are selectable as persistent Learn destinations",[] {
+        MainComponent ui(false);
+        ControlBinding route;route.target=ControlTarget::go;
+        const int functionId=ui.createAbstractControlFunction("Scene Go",route);
+        check(functionId>0,"Could not create logical function");
+        const int mapId=ui.createReusableControlMap("Alt Controller",{});
+        check(mapId>0,"Could not create reusable map");
+        ui.beginQuickLearn(false);
+        ui.selectQuickLearnMap(-mapId,0);
+        ui.chooseQuickLearnTarget(functionId);
+        check(ui.isQuickLearnAwaitingInput(),"Saved map did not arm for MIDI Learn");
+        ui.completeQuickLearn({"controller-alt",ControlKind::cc,1,54,127,false});
+        check(ui.isQuickLearnActive() && !ui.isQuickLearnAwaitingInput(),
+              "Saved-map Learn must stay active between assignments");
+        check(ui.show.controls.bindings.empty(),
+              "Editing a saved map mutated Default Map");
+        check(ui.show.controls.templates.size()==1 &&
+              ui.show.controls.templates.front().set.bindings.size()==1 &&
+              ui.show.controls.templates.front().set.bindings.front().functionId==functionId,
+              "Learn did not persist to selected reusable map");
+        ui.finishQuickLearn();
+        check(validateShow(ui.show).wasOk(),"Saved Learn output failed project validation");
     });
     test("OSC Learn persists across two GUI assignments and preserves global scope",[] {
         MainComponent ui(false);
