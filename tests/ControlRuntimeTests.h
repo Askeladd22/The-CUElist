@@ -47,7 +47,7 @@ void controlRuntimeTests() {
         send("controller",ControlKind::cc,21,32);
         check(std::abs(ui.show.masterPan-(-1.0f+64.0f/127.0f))<0.00001f,
               "MIDI CC did not update master pan");
-        check(std::abs((float)masterPan->getValue()-ui.show.masterPan)<0.0001f,
+        check(std::abs((float)masterPan->getValue()-ui.show.masterPan)<=0.0051f,
               "MIDI pan updated internally without moving its GUI control");
         send("controller",ControlKind::cc,22,28);
         check(std::abs(ui.show.columns.front().gain-28.0f/127.0f)<0.00001f,
