@@ -311,6 +311,9 @@ public:
     bool setControlColumnLocked(int column,bool locked,int sourceRow);
     bool setControlColumnPriority(int column,int priority);
     juce::Result selectControlInput(const juce::String&);
+    void toggleAdditionalMidiInput(const juce::String&);
+    void restoreAdditionalMidiInputs();
+    bool isAdditionalMidiInputEnabled(const juce::String&) const;
     bool addMappingBinding(ControlBinding);
     bool deleteMappingBinding(int);
     int createAbstractControlFunction(const juce::String& name,ControlBinding destination);
@@ -509,6 +512,7 @@ private:
     bool rowSettings=false;
     int nextCue=0;
     MidiInputManager midiInput;
+    std::vector<std::pair<juce::String,std::unique_ptr<MidiInputManager>>> additionalMidiInputs;
     OscControlInput oscInput;
     ControlMappingEngine controlMapping;
     ControlOutputRouter controlOutput;

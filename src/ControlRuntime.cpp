@@ -93,7 +93,55 @@ void MainComponent::refreshControlSettings() {
     }
 }
 
+bool MainComponent::isAdditionalMidiInputEnabled(const juce::String& id) const {
+    return std::any_of(additionalMidiInputs.begin(),additionalMidiInputs.end(),
+        [&id](const auto& e) {return e.first==id;});
+}
+void MainComponent::restoreAdditionalMidiInputs() {
+    additionalMidiInputs.clear();
+    if (!appPreferences) return;
+    juce::StringArray saved;
+    saved.addTokens(appPreferences->getValue("additionalMidiInputIds"),"|","");
+    for (const auto& identifier:saved) {
+        if (identifier.isEmpty() || identifier==show.controls.midiInputId ||
+            isAdditionalMidiInputEnabled(identifier)) continue;
+        auto input=std::make_unique<MidiInputManager>();
+        input->connect(identifier);
+        additionalMidiInputs.emplace_back(identifier,std::move(input));
+    }
+}
+void MainComponent::toggleAdditionalMidiInput(const juce::String& id) {
+    if (id.isEmpty() || id==show.controls.midiInputId) return;
+    auto it=std::find_if(additionalMidiInputs.begin(),additionalMidiInputs.end(),
+        [&id](const auto& e){return e.first==id;});
+    if (it!=additionalMidiInputs.end()) {
+        it->second->disconnect();
+        additionalMidiInputs.erase(it);
+        status="MIDI input disabled: "+id;
+    } else {
+        auto input=std::make_unique<MidiInputManager>();
+        const auto result=input->connect(id);
+        if (result.failed()) {status=result.getErrorMessage();repaint();return;}
+        additionalMidiInputs.emplace_back(id,std::move(input));
+        status="Additional MIDI input enabled: "+id;
+    }
+    juce::StringArray saved;
+    for (const auto& entry:additionalMidiInputs) saved.add(entry.first);
+    if (appPreferences)
+        appPreferences->setValue("additionalMidiInputIds",saved.joinIntoString("|"));
+    physicalEdges.clear();repaint();
+}
 juce::Result MainComponent::selectControlInput(const juce::String& id) {
+    auto extra=std::find_if(additionalMidiInputs.begin(),additionalMidiInputs.end(),
+        [&id](const auto& item){return item.first==id;});
+    if (extra!=additionalMidiInputs.end()) {
+        extra->second->disconnect();
+        additionalMidiInputs.erase(extra);
+        juce::StringArray saved;
+        for (const auto& entry:additionalMidiInputs) saved.add(entry.first);
+        if (appPreferences)
+            appPreferences->setValue("additionalMidiInputIds",saved.joinIntoString("|"));
+    }
     auto result=midiInput.connect(id);
     physicalEdges.clear();
     // Preserve an explicitly selected disconnected identifier, never silently

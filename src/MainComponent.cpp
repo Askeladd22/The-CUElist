@@ -232,6 +232,7 @@ MainComponent::MainComponent(bool startAudio) {
     appPreferences=std::make_unique<juce::PropertiesFile>(prefOptions);
     faderCeilingDb=appPreferences->getIntValue("audioFaderCeilingDb",6)==0 ? 0 : 6;
     masterSlider.setMaximumDb(faderCeilingDb);
+    restoreAdditionalMidiInputs();
     for (const auto& midi:juce::MidiOutput::getAvailableDevices())
         engine.setMidiOutputEnabled(midi.identifier,
             appPreferences->getBoolValue("midiOutputEnabled_"+midi.identifier,true));
@@ -253,10 +254,11 @@ MainComponent::MainComponent(bool startAudio) {
         juce::PopupMenu midiMenu;
         const auto inputs=juce::MidiInput::getAvailableDevices();
         midiMenu.addSectionHeader("MIDI INPUT — ENABLE");
-        midiMenu.addItem(100,"Disable MIDI input",true,show.controls.midiInputId.isEmpty());
+        midiMenu.addItem(100,"Disable main MIDI input",true,show.controls.midiInputId.isEmpty());
         for (int i=0;i<inputs.size() && i<100;++i)
             midiMenu.addItem(101+i,inputs[i].name,true,
-                             show.controls.midiInputId==inputs[i].identifier);
+                             show.controls.midiInputId==inputs[i].identifier ||
+                             isAdditionalMidiInputEnabled(inputs[i].identifier));
         midiMenu.addSeparator();
         midiMenu.addSectionHeader("MIDI OUTPUT — ENABLE");
         const auto outputs=juce::MidiOutput::getAvailableDevices();
@@ -297,8 +299,15 @@ MainComponent::MainComponent(bool startAudio) {
                     });
             } else if(choice==71) safe->configureOscInputPorts("");
             else if(choice==100) safe->selectControlInput({});
-            else if(choice>=101 && choice<201 && choice-101<inputs.size())
-                safe->selectControlInput(inputs[choice-101].identifier);
+            else if(choice>=101 && choice<201 && choice-101<inputs.size()) {
+                const auto device=inputs[choice-101].identifier;
+                if (device==safe->show.controls.midiInputId)
+                    safe->selectControlInput({});
+                else if (safe->show.controls.midiInputId.isEmpty() &&
+                         !safe->isAdditionalMidiInputEnabled(device))
+                    safe->selectControlInput(device);
+                else safe->toggleAdditionalMidiInput(device);
+            }
             else if(choice>=301 && choice<401 && choice-301<outputs.size()) {
                 const auto device=outputs[choice-301].identifier;
                 const bool enabled=safe->appPreferences ?
@@ -1430,22 +1439,21 @@ void MainComponent::timerCallback() {
     }
     ControlEvent control; int processed=0;
     const bool consumeMidiTick=quickLearnMode==QuickLearnMode::midi;
-    while (processed++<256 && midiInput.poll(control)) {
-        // A quick-Learn input is consumed, never dispatched to live GO/PANIC.
+    const auto receiveMidi=[this,consumeMidiTick](const ControlEvent& control) {
         if (consumeMidiTick) {
             if (quickLearnFunctionId>0 && controlLearnArmed &&
                 !(control.kind==ControlKind::note && control.isNoteOff)) {
-                controlLearnArmed=false;
-                completeQuickLearn(control);
-            } else {
-                // Learn suppresses live actions, but must still track note
-                // releases. Otherwise a button mapped during persistent
-                // Learn can remain logically held after Cancel Learn.
-                physicalEdges.recordAndWasDown(control);
-            }
+                controlLearnArmed=false;completeQuickLearn(control);
+            } else physicalEdges.recordAndWasDown(control);
         } else if (!consumeMidiLearnEvent(controlLearnArmed,learnedInput,control))
             dispatchControl(control);
+    };
+    while (processed++<256 && midiInput.poll(control)) receiveMidi(control);
+    for (auto& extra:additionalMidiInputs) {
+        int received=0;
+        while (received++<256 && extra.second->poll(control)) receiveMidi(control);
     }
+
     int oscProcessed=0;
     const bool consumeOscTick=quickLearnMode==QuickLearnMode::osc;
     while (oscProcessed++<256 && oscInput.poll(control)) {
@@ -1463,6 +1471,13 @@ void MainComponent::timerCallback() {
         // Take one inventory snapshot per refresh. The policy checks exact
         // device identifiers and never substitutes a similarly named port.
         const auto devices=juce::MidiInput::getAvailableDevices();
+        for (auto& extra:additionalMidiInputs) {
+            if (!hasExactMidiIdentifier(devices,extra.first)) {
+                if (extra.second->connected()) extra.second->disconnect();
+            } else if (!extra.second->connected()) {
+                extra.second->connect(extra.first);
+            }
+        }
         const auto firstAction=planMidiSession(show.controls.midiInputId,
             midiInput.identifier(),midiInput.connected(),devices);
         if (firstAction==MidiSessionAction::disconnectMissing) {
