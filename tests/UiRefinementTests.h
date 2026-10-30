@@ -7,6 +7,68 @@
 #include "HeaderTelemetry.h"
 void uiRefinementTests() {
     using namespace cueViewFixtures;
+    test("Cuelist renames directly on header/tab with Enter, Escape and validation",[] {
+        MainComponent ui(false);
+        auto* editor=dynamic_cast<juce::TextEditor*>(
+            controlsV3::named(ui,"inlineNameEditor"));
+        check(editor && !editor->isVisible(),"Inline rename must start hidden.");
+        const auto original=ui.show.cuelists[(size_t)ui.show.activeCuelist].name;
+        ui.renameActiveCuelist();
+        check(editor->isVisible() && editor->getText()==original &&
+              editor->getWidth()>=100 && editor->getHeight()>=20,
+              "Double-click Cuelist header should edit directly on the title.");
+        editor->setText("",juce::dontSendNotification);
+        editor->onReturnKey();
+        check(editor->isVisible() &&
+              ui.show.cuelists[(size_t)ui.show.activeCuelist].name==original,
+              "Invalid Cuelist name should remain editable in place.");
+        editor->setText("Scene A",juce::dontSendNotification);
+        editor->onReturnKey();
+        check(!editor->isVisible() && !ui.isInlineRenaming() &&
+              ui.show.cuelists[(size_t)ui.show.activeCuelist].name=="Scene A",
+              "Enter should update the persisted Cuelist and close inline editor.");
+        ui.renameCuelist(ui.show.activeCuelist);
+        check(editor->isVisible() && editor->getY()<80,
+              "Double-click Cuelist tab should edit on top of the tab.");
+        editor->setText("Discard this",juce::dontSendNotification);
+        editor->onEscapeKey();
+        check(!editor->isVisible() &&
+              ui.show.cuelists[(size_t)ui.show.activeCuelist].name=="Scene A",
+              "Escape must cancel name editing without changing the show.");
+        // The project name already has JUCE's native in-place Label editor.
+        auto* project=dynamic_cast<juce::Label*>(
+            controlsV3::named(ui,"projectName"));
+        check(project && project->isEditableOnDoubleClick(),
+              "Workspace project naming must remain in-place.");
+    });
+    test("Cue and column renaming never creates a modal dialog",[] {
+        MainComponent ui(false);
+        auto* editor=dynamic_cast<juce::TextEditor*>(
+            controlsV3::named(ui,"inlineNameEditor"));
+        check(editor!=nullptr,"In-place editor is missing.");
+        ui.renameTitle(false,0);
+        check(editor->isVisible() && editor->getWidth()>=80 &&
+              editor->getHeight()>=20 &&
+              editor->getY()>CueGrid::headerHeight,
+              "Cue editor must appear over the cue-name label.");
+        editor->setText("Lighting cue",juce::dontSendNotification);
+        editor->onReturnKey();
+        check(ui.show.rows[0].name=="Lighting cue" &&
+              !editor->isVisible(),"Cue name was not committed inline.");
+        ui.renameTitle(true,0);
+        check(editor->isVisible() && editor->getWidth()>=80,
+              "Column editor must appear over the column name.");
+        editor->setText("Main Audio",juce::dontSendNotification);
+        editor->onFocusLost();
+        check(ui.show.columns[0].name=="Main Audio" &&
+              !editor->isVisible(),
+              "Clicking away must commit the column rename in place.");
+        ui.renameTitle(false,0);
+        editor->setText("Do not save",juce::dontSendNotification);
+        editor->onEscapeKey();
+        check(ui.show.rows[0].name=="Lighting cue" &&
+              !editor->isVisible(),"Escape must restore the original cue name.");
+    });
     test("Native Guide renders Markdown and supports section search",[] {
         GuideDocument document;
         document.setMarkdown("# The Cuelist\n\n## 1. Introduction\n"

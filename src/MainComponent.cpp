@@ -12,6 +12,7 @@
 #include "BinaryData.h"
 #include <cmath>
 #include <algorithm>
+#include <limits>
 #if JUCE_WINDOWS
 #ifndef NOMINMAX
 #define NOMINMAX
@@ -31,11 +32,11 @@ MainComponent::MainComponent(bool startAudio) {
     setLookAndFeel(&theme); setWantsKeyboardFocus(true); setSize(1440,900);
     for (juce::Component* c : std::initializer_list<juce::Component*>{&openButton,&saveButton,&newButton,&addRowButton,&addColumnButton,
          &goButton,&panicButton,&deviceButton,&controlButton,&collapseAllButton,&inspectorSideTab,
-         &cuelistOverflowButton,&addCuelistButton,&undoButton,&redoButton,&globalMidiLearn,&globalOscLearn,&quickControlTargets,&cancelQuickLearn,&goLearnHotspot,&panicLearnHotspot,&helpButton,&dockResize,&timelineResize,&importButton,&midiEditButton,&oscEditButton,&playCellButton,&stopCellButton,&clearButton,&tempoButton,&applyButton,
+         &cuelistOverflowButton,&addCuelistButton,&cuelistMoveLeft,&cuelistMoveRight,&undoButton,&redoButton,&globalMidiLearn,&globalOscLearn,&quickControlTargets,&cancelQuickLearn,&goLearnHotspot,&panicLearnHotspot,&helpButton,&dockResize,&timelineResize,&importButton,&midiEditButton,&oscEditButton,&playCellButton,&stopCellButton,&clearButton,&tempoButton,&applyButton,
          &cellTab,&rowTab,&rowGain,&rowBehaviour,&rowMute,&rowLoop,&rowName,&cellName,&bpm,&cueNotes,&behaviour,&follow,&loop,&cellAutoStop,&gainDb,&viewport,&timeline,&utilities,
-         &clipCollapseButton,&clipCloseButton,&cueHeaders,&columnHeaders,&cueMetrics,&preflightButton,&diagnosticsButton,&preferencesButton,&projectNameLabel}) addAndMakeVisible(c);
+         &clipCollapseButton,&clipCloseButton,&cueHeaders,&columnHeaders,&cueMetrics,&preflightButton,&diagnosticsButton,&preferencesButton,&projectNameLabel,&inlineNameEditor}) addAndMakeVisible(c);
     for (juce::TextButton* b : std::initializer_list<juce::TextButton*>{&openButton,&saveButton,&newButton,&addRowButton,&addColumnButton,&goButton,&panicButton,&deviceButton,&controlButton,&collapseAllButton,&inspectorSideTab,
-                    &cuelistOverflowButton,&addCuelistButton,&undoButton,&redoButton,&globalMidiLearn,&globalOscLearn,&helpButton,
+                    &cuelistOverflowButton,&addCuelistButton,&cuelistMoveLeft,&cuelistMoveRight,&undoButton,&redoButton,&globalMidiLearn,&globalOscLearn,&helpButton,
                     &importButton,&midiEditButton,&oscEditButton,&playCellButton,&stopCellButton,&clearButton,&tempoButton,&applyButton,
                     &preflightButton,&diagnosticsButton,&preferencesButton}) b->setWantsKeyboardFocus(false);
     viewport.setViewedComponent(&grid,false); viewport.setScrollBarsShown(true,true);
@@ -50,6 +51,7 @@ MainComponent::MainComponent(bool startAudio) {
         columnHeaders.repaint();
         cueMetrics.repaint();
         utilities.syncScroll(viewport.getViewPositionX());
+        positionInlineNameEditor();
     };
     goButton.setColour(juce::TextButton::buttonColourId,palette::go);
     goButton.setColour(juce::TextButton::textColourOffId,palette::text);
@@ -164,6 +166,30 @@ MainComponent::MainComponent(bool startAudio) {
         resized(); repaint();
     };
     clipCloseButton.onClick=[this] { closeMidiClip(); closeOscClip(); };
+    // Edit the displayed name directly, never through a rename dialog.
+    inlineNameEditor.setName("inlineNameEditor");
+    inlineNameEditor.setVisible(false);
+    inlineNameEditor.setMultiLine(false);
+    inlineNameEditor.setReturnKeyStartsNewLine(false);
+    inlineNameEditor.setEscapeAndReturnKeysConsumed(true);
+    inlineNameEditor.setSelectAllWhenFocused(true);
+    inlineNameEditor.setJustification(juce::Justification::centredLeft);
+    inlineNameEditor.setFont(font(13.0f));
+    inlineNameEditor.setColour(juce::TextEditor::backgroundColourId,palette::input);
+    inlineNameEditor.setColour(juce::TextEditor::textColourId,palette::text);
+    inlineNameEditor.setColour(juce::TextEditor::outlineColourId,palette::teal);
+    inlineNameEditor.setColour(juce::TextEditor::focusedOutlineColourId,palette::teal);
+    inlineNameEditor.onReturnKey=[this] {
+        if (commitInlineRename()) grabKeyboardFocus();
+    };
+    inlineNameEditor.onEscapeKey=[this] {
+        cancelInlineRename();
+        grabKeyboardFocus();
+    };
+    inlineNameEditor.onFocusLost=[this] {
+        if (inlineRenameKind!=InlineRenameKind::none && !commitInlineRename())
+            cancelInlineRename();
+    };
     projectNameLabel.setName("projectName");
     projectNameLabel.setEditable(false,true,false);
     projectNameLabel.setColour(juce::Label::textColourId,palette::text);
@@ -258,6 +284,17 @@ MainComponent::MainComponent(bool startAudio) {
         close.setWantsKeyboardFocus(false);
         tab.onClick=[this,i] {activateCuelist(i);};
         tab.onRename=[this,i] {renameCuelist(i);};
+        tab.onDragMove=[this,i](int x) {
+            cuelistDragSource=i;
+            updateCuelistDropTarget(x);
+        };
+        tab.onDropped=[this,i](int x) {
+            updateCuelistDropTarget(x);
+            const int target=cuelistDragTarget;
+            cuelistDragSource=cuelistDragTarget=-1;
+            if (target>=0) moveCuelist(i,target);
+            refreshCuelistTabs();
+        };
         close.onClick=[this,i] {requestDeleteCuelist(i);};
         tab.setVisible(false);
         close.setVisible(false);
@@ -270,6 +307,16 @@ MainComponent::MainComponent(bool startAudio) {
     addCuelistButton.setName("newCuelist");
     addCuelistButton.setTooltip("Create another Cuelist in this show.");
     addCuelistButton.onClick=[this] {createCuelist();};
+    cuelistMoveLeft.setName("cuelistMoveLeft");
+    cuelistMoveRight.setName("cuelistMoveRight");
+    cuelistMoveLeft.setTooltip("Move active Cuelist left (Ctrl+Shift+Left)");
+    cuelistMoveRight.setTooltip("Move active Cuelist right (Ctrl+Shift+Right)");
+    cuelistMoveLeft.onClick=[this] {
+        moveCuelist(show.activeCuelist,show.activeCuelist-1);
+    };
+    cuelistMoveRight.onClick=[this] {
+        moveCuelist(show.activeCuelist,show.activeCuelist+1);
+    };
     undoButton.setName("showUndo");
     redoButton.setName("showRedo");
     undoButton.setTooltip("Undo the last MIDI/OSC clip edit (Ctrl+Z).");
@@ -616,6 +663,20 @@ void MainComponent::showCuelistOverflowMenu() {
         menu.addSeparator();
         menu.addSubMenu("Delete hidden Cuelist...",deleteMenu);
     }
+    juce::PopupMenu moveLeft,moveRight;
+    moveLeft.setLookAndFeel(&theme);
+    moveRight.setLookAndFeel(&theme);
+    for (int i=0;i<(int)show.cuelists.size();++i)
+        if (!cuelistTabs[(size_t)i]->isVisible()) {
+            moveLeft.addItem(400+i,show.cuelists[(size_t)i].name,i>0);
+            moveRight.addItem(500+i,show.cuelists[(size_t)i].name,
+                              i+1<(int)show.cuelists.size());
+        }
+    if (moveLeft.getNumItems()>0) {
+        menu.addSeparator();
+        menu.addSubMenu("Move hidden Cuelist left...",moveLeft);
+        menu.addSubMenu("Move hidden Cuelist right...",moveRight);
+    }
     if (menu.getNumItems()==0) return;
     auto safe=juce::Component::SafePointer<MainComponent>(this);
     menu.showMenuAsync(
@@ -625,9 +686,24 @@ void MainComponent::showCuelistOverflowMenu() {
             if (choice>=100 && choice<112) safe->activateCuelist(choice-100);
             if (choice>=200 && choice<212) safe->requestDeleteCuelist(choice-200);
             if (choice>=300 && choice<312) safe->renameCuelist(choice-300);
+            if (choice>=400 && choice<412) safe->moveCuelist(choice-400,choice-401);
+            if (choice>=500 && choice<512) safe->moveCuelist(choice-500,choice-499);
         });
 }
 
+void MainComponent::updateCuelistDropTarget(int rootX) {
+    int candidate=-1,nearest=std::numeric_limits<int>::max();
+    for (int i=0;i<(int)show.cuelists.size();++i) {
+        auto* tab=cuelistTabs[(size_t)i].get();
+        if (!tab || !tab->isVisible()) continue;
+        const int distance=std::abs(rootX-tab->getBounds().getCentreX());
+        if (distance<nearest) {nearest=distance;candidate=i;}
+    }
+    if (cuelistDragTarget!=candidate) {
+        cuelistDragTarget=candidate;
+        refreshCuelistTabs(); // highlighted destination tab
+    }
+}
 void MainComponent::refreshCuelistTabs() {
     // setSize() can call resized() before dynamic tab allocation in the ctor.
     if (!cuelistTabs[0]) return;
@@ -657,10 +733,11 @@ void MainComponent::refreshCuelistTabs() {
 
         const int x=left+(i-first)*slot;
         const bool active=i==show.activeCuelist;
-        const auto colour=active ? palette::selectedTab : palette::panel;
+        const auto colour=i==cuelistDragTarget ? palette::teal.withAlpha(.45f) :
+                          active ? palette::selectedTab : palette::panel;
         auto name=show.cuelists[(size_t)i].name;
         tab.setButtonText(name.length()>13 ? name.substring(0,11)+"..." : name);
-        tab.setTooltip(name+" - click to select; double-click to rename.");
+        tab.setTooltip(name+" - click: select; double-click: rename; drag: move.");
         tab.setColour(juce::TextButton::buttonColourId,colour);
         tab.setBounds(x,43,count>1 ? 64 : 81,buttonHeight);
         close.setColour(juce::TextButton::buttonColourId,colour);
@@ -675,6 +752,8 @@ void MainComponent::refreshCuelistTabs() {
         cuelistOverflowButton.setBounds(trailingX,43,38,buttonHeight);
         cuelistOverflowButton.setColour(juce::TextButton::buttonColourId,palette::raised);
     }
+    cuelistMoveLeft.setEnabled(count>1 && show.activeCuelist>0);
+    cuelistMoveRight.setEnabled(count>1 && show.activeCuelist<count-1);
     addCuelistButton.setVisible(count<12);
     if (count<12) addCuelistButton.setBounds(trailingX+overflowWidth,43,28,buttonHeight);
 }
@@ -805,6 +884,12 @@ void MainComponent::resized() {
         ? viewport.getScrollBarThickness() : 0;
     cueHeaders.setBounds(geometry.cueHeaders.translated(leftScrollInset,0));
     cueHeaders.toFront(false);
+    cuelistMoveLeft.setBounds(
+        cueHeaders.getX()+CueGrid::nameWidth-146,cueHeaders.getY()+10,24,22);
+    cuelistMoveRight.setBounds(
+        cueHeaders.getX()+CueGrid::nameWidth-116,cueHeaders.getY()+10,24,22);
+    cuelistMoveLeft.toFront(false);
+    cuelistMoveRight.toFront(false);
     // Place an independent 72px-high heading over every visible column.
     // Its x is the exact right edge of the pinned cue-name lane. Column
     // content scrolls horizontally beneath it, but cannot rise through it.
@@ -818,6 +903,8 @@ void MainComponent::resized() {
     cueMetrics.setBounds(geometry.metrics);
     cueMetrics.toFront(false);
     collapseAllButton.toFront(false);
+    cuelistMoveLeft.toFront(false);
+    cuelistMoveRight.toFront(false);
     inspectorSideTab.toFront(false);
     if (learning) {
         goLearnHotspot.toFront(false);
@@ -840,6 +927,8 @@ void MainComponent::resized() {
         quickControlTargets.toFront(false);
         cancelQuickLearn.toFront(false);
     }
+    // Overlays must stay above the grid, pinned headings and Cuelist tabs.
+    positionInlineNameEditor();
 }
 void MainComponent::refresh() {
     selectedRow=juce::jlimit(0,(int)show.rows.size()-1,selectedRow);
@@ -1154,6 +1243,21 @@ void MainComponent::stopAll() {
     status="PANIC / audio, MIDI and OSC playback stopped."; repaint();
 }
 bool MainComponent::keyPressed(const juce::KeyPress& key) {
+    // Explicit modifier combination so normal Left/Right arrows and all
+    // text editing remain untouched.
+    if (!dynamic_cast<juce::TextEditor*>(
+            juce::Component::getCurrentlyFocusedComponent()) &&
+        key.getModifiers().isCommandDown() &&
+        key.getModifiers().isShiftDown()) {
+        if (key.getKeyCode()==juce::KeyPress::leftKey)
+            return moveCuelist(show.activeCuelist,show.activeCuelist-1);
+        if (key.getKeyCode()==juce::KeyPress::rightKey)
+            return moveCuelist(show.activeCuelist,show.activeCuelist+1);
+        if (key.getKeyCode()==juce::KeyPress::upKey)
+            return moveCueRow(selectedRow,selectedRow-1);
+        if (key.getKeyCode()==juce::KeyPress::downKey)
+            return moveCueRow(selectedRow,selectedRow+1);
+    }
     if (key.getModifiers().isCommandDown() && !dynamic_cast<juce::TextEditor*>(juce::Component::getCurrentlyFocusedComponent())) {
         if (key.getKeyCode()=='C' || key.getKeyCode()=='c') return copySelectedCell();
         if (key.getKeyCode()=='V' || key.getKeyCode()=='v') return pasteSelectedCell();

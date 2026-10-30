@@ -61,10 +61,43 @@ private:
 class CuelistTabButton final : public juce::TextButton {
 public:
     std::function<void()> onRename;
+    std::function<void(int)> onDragMove,onDropped;
+    // Do not delegate a completed drag to Button::mouseUp: that could
+    // also fire onClick and switch (stop) the live Cuelist.
+    void mouseDown(const juce::MouseEvent& e) override {
+        if (!e.mods.isLeftButtonDown() || e.mods.isPopupMenu()) {
+            juce::TextButton::mouseDown(e);
+            return;
+        }
+        pressing=true;wasDragged=false;
+    }
+    void mouseDrag(const juce::MouseEvent& e) override {
+        if (!pressing) return;
+        if (!wasDragged && e.getDistanceFromDragStart()>=6)
+            wasDragged=true;
+        if (wasDragged && onDragMove && getParentComponent())
+            onDragMove(e.getEventRelativeTo(getParentComponent()).x);
+    }
+    void mouseUp(const juce::MouseEvent& e) override {
+        if (!pressing) {
+            juce::TextButton::mouseUp(e);
+            return;
+        }
+        pressing=false;
+        if (wasDragged) {
+            wasDragged=false;
+            if (onDropped && getParentComponent())
+                onDropped(e.getEventRelativeTo(getParentComponent()).x);
+        } else if (e.getNumberOfClicks()==1 &&
+                   getLocalBounds().contains(e.getPosition()) && onClick)
+            onClick();
+    }
     void mouseDoubleClick(const juce::MouseEvent& e) override {
         if (e.mods.isLeftButtonDown() && onRename) onRename();
         else juce::TextButton::mouseDoubleClick(e);
     }
+private:
+    bool pressing=false,wasDragged=false;
 };
 class CueGrid final : public juce::Component, public juce::FileDragAndDropTarget {
 public:
@@ -121,10 +154,14 @@ public:
     explicit PinnedCueHeaders(MainComponent& p):owner(p) {}
     void paint(juce::Graphics&) override;
     void mouseDown(const juce::MouseEvent&) override;
+    void mouseDrag(const juce::MouseEvent&) override;
+    void mouseUp(const juce::MouseEvent&) override;
     void mouseDoubleClick(const juce::MouseEvent&) override;
     void mouseWheelMove(const juce::MouseEvent&,const juce::MouseWheelDetails&) override;
 private:
     MainComponent& owner;
+    int dragCueId=-1,dropCueRow=-1;
+    bool draggingCue=false;
 };
 // Draws the same column header as CueGrid, but stays above scrolling rows.
  // Horizontal scrolling changes its content offset, not its screen bounds.
@@ -311,6 +348,7 @@ public:
     void setAllColumnsCollapsed(bool collapsed);
     void activateCuelist(int index);
     void createCuelist();
+    bool moveCuelist(int from,int to);
     void deleteCuelist(int index);
     void requestDeleteCuelist(int index);
     void renameActiveCuelist();
@@ -318,7 +356,14 @@ public:
     bool setCuelistName(int index,const juce::String& name);
     void setCellAutoStop(int row,int column,bool enabled);
     void renameTitle(bool column,int index);
+    // Shared non-modal, in-place renaming for tabs, cues and columns.
+    bool commitInlineRename();
+    void cancelInlineRename();
+    bool isInlineRenaming() const noexcept {
+        return inlineRenameKind!=InlineRenameKind::none;
+    }
     void reorderRow(int index,int delta);
+    bool moveCueRow(int from,int to);
     void reorderColumn(int index,int delta);
     bool copyRow(int index);
     bool pasteRowAfter(int index);
@@ -364,6 +409,13 @@ private:
     juce::TextButton openButton{"Open"},saveButton{"Save"},newButton{"New"},addRowButton{"+"},addColumnButton{"+"};
     juce::TextButton preferencesButton{"Preferences"},helpButton{"Help"};
     juce::Label projectNameLabel;
+    enum class InlineRenameKind {none,cuelist,cue,column};
+    InlineRenameKind inlineRenameKind=InlineRenameKind::none;
+    int inlineRenameIndex=-1,inlineRenameModelId=-1;
+    bool inlineRenamePinned=false;
+    juce::TextEditor inlineNameEditor;
+    void beginInlineRename(InlineRenameKind kind,int index,bool pinned=false);
+    void positionInlineNameEditor();
     juce::TextButton preflightButton{"Preflight"},diagnosticsButton{"Diagnostics"};
     juce::TextButton goButton{"GO  /  SPACE"},panicButton{"PANIC  /  ESC"},deviceButton{"Audio devices"},controlButton{"Control Mapping"};
     juce::TextButton collapseAllButton{"Collapse all"};
@@ -373,6 +425,9 @@ private:
     std::array<std::unique_ptr<CuelistTabButton>,12> cuelistTabs;
     std::array<std::unique_ptr<juce::TextButton>,12> cuelistCloseButtons;
     juce::TextButton cuelistOverflowButton{"..."},addCuelistButton{"+"};
+    juce::TextButton cuelistMoveLeft{"<"},cuelistMoveRight{">"};
+    int cuelistDragSource=-1,cuelistDragTarget=-1;
+    void updateCuelistDropTarget(int rootX);
     juce::TextButton undoButton{"Undo"},redoButton{"Redo"};
     juce::TextButton globalMidiLearn{"M Learn"},globalOscLearn{"O Learn"};
     QuickControlTargets quickControlTargets;

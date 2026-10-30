@@ -10,20 +10,20 @@ juce::Component* named(juce::Component& root,const juce::String& name) {
 }
 void controlsV3Tests() {
     using namespace cueViewFixtures;
-    test("rename dialog immediately focuses and selects its text", [] {
+    test("Inline cue rename selects existing text without a popup", [] {
         MainComponent ui(false);
         auto* title=dynamic_cast<juce::TextEditor*>(controlsV3::named(ui,"cueName"));
         title->setText("Scena",false); title->onReturnKey();
         ui.renameTitle(false,0);
-        auto* modal=dynamic_cast<juce::DialogWindow*>(
-            juce::ModalComponentManager::getInstance()->getModalComponent(0));
-        auto* prompt=modal ? dynamic_cast<OperatorTextPrompt*>(modal->getContentComponent()) : nullptr;
-        check(prompt!=nullptr,"Shared rename dialog absent");
-        auto* editor=&prompt->getEditor();
-        const bool focused=editor->hasKeyboardFocus(false);
-        const bool selected=editor->getHighlightedRegion().getLength()==5;
-        delete modal;
-        check(focused,"Rename field did not receive keyboard focus"); check(selected,"Rename text not selected");
+        auto* editor=dynamic_cast<juce::TextEditor*>(
+            controlsV3::named(ui,"inlineNameEditor"));
+        check(editor && editor->isVisible(),
+              "Inline cue rename must use a visible in-place editor.");
+        check(editor->getHighlightedRegion().getLength()==5,
+              "Renaming should preselect the complete current name.");
+        check(juce::ModalComponentManager::getInstance()->getNumModalComponents()==0,
+              "Renaming must not open a modal popup.");
+        editor->onEscapeKey();
     });
     test("cell play stop and row stop hitboxes are independent and preserve sequence", [] {
         MainComponent ui(false); addRow(ui.show,{}); addColumn(ui.show,ColumnType::audio,{});

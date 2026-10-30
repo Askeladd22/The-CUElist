@@ -187,6 +187,12 @@ int main() {
         MainComponent ui(false); int editors=0;
         bool foundNotes=false;
         for (auto* child : ui.getChildren()) if (auto* edit=dynamic_cast<juce::TextEditor*>(child)) {
+            // The shared inline rename editor deliberately consumes Escape
+            // to cancel a rename, not to fire the global Panic action.
+            if (edit->getName()=="inlineNameEditor") {
+                check(!edit->isVisible(),"Inline editor must start hidden");
+                continue;
+            }
             ++editors;
             if (edit->getName()=="cueNotes") {
                 foundNotes=true;

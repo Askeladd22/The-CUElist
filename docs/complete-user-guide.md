@@ -63,6 +63,13 @@ The **Help** button in the top toolbar opens a menu with **Guide** and **About T
 
 ### 3.3 Cue grid, Inspector, mixer and Timeline
 
+Within a Cuelist, you can **drag a cue's title up or down** to change
+its position, or use **Ctrl+Shift+Up / Ctrl+Shift+Down** to move the selected
+cue by one row. The existing up/down arrows beside each cue remain available.
+As with the existing row arrows, moving a cue is a structural edit that
+**stops active playback** before changing cue order; the cue's cells, media
+references and notes move with it.
+
 The central cue grid has row controls on the left and columns for Audio/MIDI/OSC/Control. Its Cuelist title and all Audio/MIDI/OSC/Control column headings stay **fixed during vertical scrolling**. Column headings track their cells during horizontal scrolling. The **BPM** and **Auto Stop** strip remains fixed at the right, including during horizontal scrolling. During vertical scrolling, row values, toggles and action targets remain **below** their fixed headers: controls hidden behind the header are neither visible nor clickable. Row Play/Pause, Stop and the action menu are physically separated, as are the larger Play/Stop targets inside each cell. Column Utilities and the Master Audio strip occupy the lower working area; a Timeline with zoom/grid/snap controls is underneath.
 
 Small icon buttons across the workspace use a restrained shared visual style: the glyph carries the semantic colour while the border stays subtle. Hover, pressed, toggled, disabled and keyboard-focus states remain distinguishable. This affects the appearance, **not** the Play/Stop/GO/PANIC actions, selection, saved shows or clicking areas. Destructive actions still use red/pink symbols. A visible focus outline indicates keyboard focus; the critical GO and PANIC actions retain their distinct treatment.
@@ -151,7 +158,7 @@ selectable non-float outgoing OSC argument types require another change.
 - Click **+** next to the Cuelist tabs to create a new list. A newly created list starts with an independent blank cue.
 - The application uses the first available `Cuelist N` name, including numbers freed by deletion, rather than skipping numbers.
 - Click a tab to select a list. The current transport is stopped before switching, and the Cue List, Timeline and Inspector reflect the new list.
-- Tabs continue side by side while there is space; a separate overflow menu provides access to hidden tabs and their rename/delete actions when the bar is too narrow.
+- Tabs continue side by side while there is space; **drag a tab onto another tab to reorder entire Cuelists** (the destination is highlighted). Moving a tab does not start or stop cues, change the active Cuelist, or alter its data. Click the **< / >** arrows beside the active Cuelist title to move it one place at a time, or press **Ctrl+Shift+Left / Ctrl+Shift+Right** when a text editor is not focused. The arrows disable at the first/last position. The overflow menu also provides access to hidden Cuelists' rename, delete and **Move left / Move right** actions when the bar is too narrow. Save the project to retain the new tab order.
 - Use the **×** beside a visible tab to delete a Cuelist. A confirmation dialog explains that its cues are removed from the show. Source audio files are not deleted from disk.
 - The last remaining Cuelist cannot be deleted.
 
@@ -159,7 +166,9 @@ Deleting a Cuelist is a structural operation and is not an Undo/Redo action. Sav
 
 ### 4.2 Renaming — synchronized in both directions
 
-**Double-click either the Cuelist tab or the Cuelist name in the pinned cue-grid header** to rename it. The alternative **Preferences → Rename active Cuelist** remains available. The Rename Cuelist, Rename cue, Rename column, Cue BPM and Cue tempo map windows now share a consistent dark editor: a title, short left-aligned instruction, labelled text field and Apply/Rename plus Cancel controls. Single-line editors accept Enter; Escape or Cancel closes without changing the model. Names still use the existing uniqueness/length constraints.
+**Double-click either the Cuelist tab or its name in the pinned cue-grid header** to edit the name directly on that label, without opening a dialog. The alternative **Preferences → Rename active Cuelist** uses the same inline editor. Double-clicking a cue title or a column name also edits directly where that name appears; the Workspace project name already behaves this way.
+
+The text is selected for immediate replacement: **Enter** confirms, **Escape** cancels without altering the show, and clicking elsewhere confirms a valid name. An invalid Cuelist name stays in the inline field for correction. Names still use the existing uniqueness/length constraints. If a Cuelist is hidden in the tab overflow, its inline editor appears beside the overflow control: renaming alone never activates another Cuelist or interrupts playback. Other configuration dialogs such as **Cue BPM** and **Cue tempo map** are unchanged.
 
 The tab and the grid header are two views of the **same saved Cuelist name**. Renaming either updates both immediately, and the name persists when you save the `.cuelist` file. Names must be unique, nonempty and no longer than 64 characters.
 
