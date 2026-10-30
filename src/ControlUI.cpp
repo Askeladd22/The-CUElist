@@ -45,6 +45,10 @@ bool MainComponent::duplicateControlSet(int sr,int sc,int tr,int tc) {
         const auto& source=show.rows[(size_t)sr].cells[(size_t)sc].controlSet;
         if (!source) return false;
         clone=*source;
+        if (show.rows[(size_t)sr].cells[(size_t)sc].assignedMapId>0)
+            for (const auto& saved:show.controls.templates)
+                if (saved.id==show.rows[(size_t)sr].cells[(size_t)sc].assignedMapId)
+                    {clone=saved.set;break;}
     }
     auto next=show;
     for (auto& b:clone.bindings) {

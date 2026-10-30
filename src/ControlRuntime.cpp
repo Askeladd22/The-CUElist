@@ -455,9 +455,12 @@ int MainComponent::saveControlSetTemplate(int row,int column,const juce::String&
     if (label.isEmpty() || label.length()>120) return 0;
     auto candidate=show;
     auto& col=candidate.columns[(size_t)column];
+    const auto& cell=candidate.rows[(size_t)row].cells[(size_t)column];
     const ControlSet* source=col.controlLocked ? &col.controlDefaultSet :
-        (candidate.rows[(size_t)row].cells[(size_t)column].controlSet ?
-         &*candidate.rows[(size_t)row].cells[(size_t)column].controlSet : nullptr);
+        (cell.controlSet ? &*cell.controlSet : nullptr);
+    if (!col.controlLocked && cell.assignedMapId>0)
+        for (const auto& saved:candidate.controls.templates)
+            if (saved.id==cell.assignedMapId) {source=&saved.set;break;}
     if (!source || source->bindings.empty()) return 0;
     ControlSetTemplate item;
     item.id=candidate.controls.nextId++;

@@ -3,6 +3,78 @@
 #include "ShowEditOperations.h"
 
 void controlRuntimeTests() {
+    test("saved maps are independent from columns, shared by reference, and safe to delete",[] {
+        MainComponent ui(false);
+        const int mapA=ui.createReusableControlMap("Lights A",{});
+        check(mapA>0 && ui.show.columns.size()==1,
+              "A new saved Control Map must not create a Control Column");
+        check(!ui.renameReusableControlMap(mapA,""),
+              "Blank saved-map name must be rejected");
+        check(ui.renameReusableControlMap(mapA,"Lights Front"),
+              "Could not rename saved Control Map");
+        check(ui.show.controls.templates[0].id==mapA &&
+              ui.show.controls.templates[0].name=="Lights Front",
+              "Renaming a map must preserve its stable identity");
+        ControlBinding function;function.target=ControlTarget::go;
+        const int fn=ui.createAbstractControlFunction("Light GO",function);
+        check(fn>0,"Failed to create function");
+        ControlBinding input;input.functionId=fn;input.target=ControlTarget::go;
+        input.deviceId="desk";input.kind=ControlKind::cc;
+        input.channel=1;input.number=31;
+        check(ui.modifyReusableControlBinding(mapA,0,input,0),
+              "Could not populate saved map");
+        addColumn(ui.show,ColumnType::control,"Map assignment");
+        addRow(ui.show,"Next");
+        check(ui.applyControlSetTemplate(0,1,mapA) &&
+              ui.applyControlSetTemplate(1,1,mapA),
+              "Same saved map cannot be assigned to different cues in one column");
+        check(ui.show.rows[0].cells[1].assignedMapId==mapA &&
+              ui.show.rows[1].cells[1].assignedMapId==mapA &&
+              ui.reusableControlMapUsage(mapA)==2,
+              "Assigned map references were not persisted in cells");
+        check(!ui.deleteReusableControlMap(mapA),
+              "Deletion of an in-use reusable map must be blocked");
+        input.number=32;
+        const int bindingId=ui.show.controls.templates[0].set.bindings[0].id;
+        check(ui.modifyReusableControlBinding(mapA,bindingId,input,1),
+              "Could not change shared map");
+        auto layers=buildControlLayers(ui.show);
+        check(layers.size()==2 &&
+              layers[0].set.bindings[0].number==32 &&
+              layers[1].set.bindings[0].number==32,
+              "Shared map edit did not reach all referencing cues");
+        const int mapB=ui.createReusableControlMap("Lights B",{});
+        check(mapB>0 && ui.applyControlSetTemplate(1,1,mapB),
+              "Reassigning one cue to another saved map failed");
+        check(ui.show.rows[0].cells[1].assignedMapId==mapA &&
+              ui.show.rows[1].cells[1].assignedMapId==mapB &&
+              ui.reusableControlMapUsage(mapA)==1,
+              "Reassigning a cue unexpectedly altered another cue");
+        Show restored;
+        check(decodeShow(encodeShow(ui.show),restored).wasOk() &&
+              restored.rows[0].cells[1].assignedMapId==mapA &&
+              restored.rows[1].cells[1].assignedMapId==mapB,
+              "Named map references did not survive project roundtrip");
+        check(ui.clearControlCellMap(0,1) && ui.deleteReusableControlMap(mapA),
+              "Could not delete saved map after removing all references");
+        check(ui.clearControlCellMap(1,1) && ui.deleteReusableControlMap(mapB),
+              "Could not delete second unused saved map");
+        check(ui.createEmptyControlSet(0,1) &&
+              hasControlMapAssignment(ui.show.rows[0].cells[1]) &&
+              ui.show.rows[0].cells[1].controlSet->bindings.empty(),
+              "A valid empty assigned map must remain distinct from an unassigned cell");
+        check(!hasControlMapAssignment(ui.show.rows[1].cells[1]),
+              "An unassigned Control Column cell must remain empty");
+        check(validateShow(ui.show).wasOk(),"Final independent-map project invalid");
+    });
+    test("missing Control Map reference is rejected at load",[] {
+        auto project=makeShow();
+        addColumn(project,ColumnType::control,"Map");
+        project.rows[0].cells[1].assignedMapId=9999;
+        check(validateShow(project).failed(),
+              "Dangling saved-map reference must never silently fall back");
+    });
+
     test("reusable maps duplicate, replace and restore Default Map fallback",[] {
         MainComponent ui(false);
         addColumn(ui.show,ColumnType::control,"Control");

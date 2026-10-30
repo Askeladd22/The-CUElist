@@ -116,22 +116,29 @@ inherits its Default Map binding. Changing the selected Inspector row alone
 does not change the live mapping. When the next cue has no override,
 Default Map automatically resumes.
 
-**Control Mappings** opens with Default Map selected. Its selector also lists
-existing cue overrides and independently saved maps. New Map creates an
-empty named reusable map; Duplicate copies the current map with fresh
-binding IDs. Select a saved map to edit its mapping entries; use Inspector
-Learn with that same map selected to capture or replace MIDI/OSC sources.
-Saving and applying are **snapshot** operations: editing a saved reusable
-map later does not silently rewrite cells to which an earlier copy was
-applied. Export/Import Default Map remains distinct from these project maps
-and excludes project-specific function names.
+**Control Mappings** opens with Default Map selected and provides the archive
+of **independent named Control Maps**, without creating or requiring Control
+Columns. **New Map** creates an empty map, **Duplicate** copies the selected
+mapping with new binding IDs, and **Rename Map** changes its label without
+changing its stable ID. **Delete unused Map** requires that no cue in any
+Cuelist references the map; reassignment or removal must happen first.
+Select a saved map to modify its mapping entries or learn its MIDI/OSC sources.
+A map's name and rules live in the shared archive: editing a map updates
+**all cues explicitly assigned to that same map**. Changing a single cue's
+*assignment* leaves all other cue assignments intact. Existing legacy
+cue-local overrides still work independently as before. Export/Import
+Default Map remains distinct and excludes project-specific names.
 
-**Control Column cells:** double-clicking an empty cell creates an empty
-override without opening Control Mappings. Click a populated cell to open
-its contextual menu: edit, save as reusable map, replace from a saved map
-or clear the override. Clearing it restores inheritance from Default Map;
-replacing does not affect Default Map. The column's Medium/High/Maximum
-priority remains available for resolving overlapping Control Column maps.
+**Control Column cells:** double-clicking an unassigned cell creates an
+**empty cue-local override**, visually labeled **CONTROL MAP / Empty map**.
+This is different from the unassigned state (+ Control Map) even when
+there are zero bindings. The cell's appearance remains stable across cue
+selection and after a show roundtrip, including collapsed Control Columns.
+Click a populated cell to edit the local or shared map, save a new reusable
+copy, assign a saved map (including to multiple cues) or remove its
+assignment. Removing it restores inheritance from Default Map; replacing
+one cue's assignment never modifies another cue. Medium/High/Maximum
+priority still resolves overlapping Control Column maps.
 
 **Operational precautions:** physical controller Learn events cannot
 activate live playback while being captured. MIDI note releases remain
@@ -276,12 +283,14 @@ only the corresponding function IDs; all other inputs fall back to Default
 Map. Changing an inactive cue or modifying a reusable map does not silently
 change the live scene.
 
-Control Mappings opens on Default Map and lets you select an existing
-map, create one or duplicate the current map. In Control Columns, an empty
-cell's double-click creates an override without opening the editor; clicking
-a populated cell opens a contextual management menu. There you can edit,
-save, load, replace or remove a map. An explicitly removed override
-returns to Default Map.
+Control Mappings opens on Default Map and manages the saved map archive:
+create, duplicate, rename, and delete when unused. A saved map exists
+independently of any Control Column and can be referenced in multiple cues.
+Updating the shared map updates its assignments; changing a cue's selected
+map only affects that cue. In Control Columns, double-click an empty cell
+to create a **visibly assigned but empty** local map, or click a mapped
+cell for edit/assign/replace/remove actions. Clearing an assignment
+restores Default Map; its saved map remains in the archive.
 
 Controller preset export/import transfers hardware assignments and output
 routing without replacing project-specific names. Existing historical show
