@@ -108,6 +108,36 @@ void controlMappingV10Tests() {
         mapping.setActiveCue(0,0);
         check(mapping.resolve(event)->binding.id==2,"Cue controls leaked after Panic");
     });
+    test("Pickup re-arms when the GUI moves the target after physical capture",[] {
+        ControlSettings s;
+        ControlBinding b;
+        b.id=1;b.deviceId="controller";b.number=41;
+        b.target=ControlTarget::masterGain;b.takeover=ControlTakeover::pickup;
+        s.nextId=2;s.bindings.push_back(b);
+        ControlMappingEngine engine;engine.setSettings(s);
+        const auto cc=[](int v) {
+            return ControlEvent{"controller",ControlKind::cc,1,41,v,false};
+        };
+        check(!engine.resolve(cc(10),0.5f).has_value(),
+              "Pickup incorrectly jumped on the first distant event");
+        check(engine.resolve(cc(64),0.5f).has_value(),
+              "Pickup did not acquire on crossing");
+        check(engine.resolve(cc(70),70.0f/127.0f).has_value(),
+              "Captured Pickup dropped continuous changes");
+        // A manual slider move to 0.9 must invalidate the old position.
+        check(!engine.resolve(cc(71),0.9f).has_value(),
+              "Previously captured Pickup jumped after a manual GUI edit");
+        check(!engine.resolve(cc(90),0.9f).has_value(),
+              "Pickup acquired before the physical value crossed the edited target");
+        check(engine.resolve(cc(119),0.9f).has_value(),
+              "Pickup never re-acquired after crossing the new value");
+        engine.clearPickup();
+        check(!engine.resolve(cc(20),0.9f).has_value(),
+              "Disconnect/reconnect retained the stale physical pickup state");
+        b.takeover=ControlTakeover::jump;s.bindings={b};engine.setSettings(s);
+        check(engine.resolve(cc(20),0.9f).has_value(),
+              "Jump incorrectly obeyed Pickup re-arm rules");
+    });
     test("pickup only captures when physical control crosses current audio level",[] {
         ControlSettings s; ControlBinding b;
         b.id=1; b.deviceId="dev"; b.number=10; b.target=ControlTarget::masterGain;

@@ -132,7 +132,7 @@ void MainComponent::toggleAdditionalMidiInput(const juce::String& id) {
     for (const auto& entry:additionalMidiInputs) saved.add(entry.first);
     if (appPreferences)
         appPreferences->setValue("additionalMidiInputIds",saved.joinIntoString("|"));
-    physicalEdges.clear();repaint();
+    physicalEdges.clear();controlMapping.clearPickup();repaint();
 }
 juce::Result MainComponent::selectControlInput(const juce::String& id) {
     auto extra=std::find_if(additionalMidiInputs.begin(),additionalMidiInputs.end(),
@@ -146,7 +146,7 @@ juce::Result MainComponent::selectControlInput(const juce::String& id) {
             appPreferences->setValue("additionalMidiInputIds",saved.joinIntoString("|"));
     }
     auto result=midiInput.connect(id);
-    physicalEdges.clear();
+    physicalEdges.clear();controlMapping.clearPickup();
     // Preserve an explicitly selected disconnected identifier, never silently
     // switch to the first available device.
     show.controls.midiInputId=id;

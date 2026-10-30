@@ -132,6 +132,9 @@ public:
         refreshAbstractCache();
     }
     int activeCue() const noexcept { return activeCueId; }
+    // A physical device disconnect/reconnect invalidates the controller
+    // position remembered by Pickup, not the active cue or its bindings.
+    void clearPickup() noexcept { pickup.clear(); }
     // Compose the visible effective mapping for a selected cue. No live state
     // is altered: selecting a row must never activate hardware mappings.
     std::vector<EffectiveControl> effectiveForCue(int cueId,int presetId=0) const {
@@ -237,6 +240,13 @@ public:
         if (best->takeover==ControlTakeover::pickup &&
             best->kind!=ControlKind::note && currentTarget.has_value()) {
             const float desired=juce::jlimit(0.0f,1.0f,*currentTarget);
+            // A fader can be moved manually after Pickup was acquired.
+            // The next hardware message must not jump it back to an old
+            // physical position. Compare previous controller vs actual target;
+            // the accepted mapped update itself always tracks the controller.
+            if (state.captured && state.hasPrevious &&
+                std::abs(state.previous-desired)>0.025f)
+                state.captured=false;
             const float from=state.hasPrevious ? state.previous : raw;
             const bool crossed=from<=desired && raw>=desired || from>=desired && raw<=desired;
             if (!state.captured && !crossed && std::abs(raw-desired)>0.015f) {

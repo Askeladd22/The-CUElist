@@ -1489,16 +1489,21 @@ void MainComponent::timerCallback() {
         const auto devices=juce::MidiInput::getAvailableDevices();
         for (auto& extra:additionalMidiInputs) {
             if (!hasExactMidiIdentifier(devices,extra.first)) {
-                if (extra.second->connected()) extra.second->disconnect();
+                if (extra.second->connected()) {
+                    extra.second->disconnect();
+                    physicalEdges.clear();controlMapping.clearPickup();
+                }
             } else if (!extra.second->connected()) {
-                extra.second->connect(extra.first);
+                if (extra.second->connect(extra.first).wasOk()) {
+                    physicalEdges.clear();controlMapping.clearPickup();
+                }
             }
         }
         const auto firstAction=planMidiSession(show.controls.midiInputId,
             midiInput.identifier(),midiInput.connected(),devices);
         if (firstAction==MidiSessionAction::disconnectMissing) {
             midiInput.disconnect();
-            physicalEdges.clear(); // stale NoteOn states must not survive unplug
+            physicalEdges.clear();controlMapping.clearPickup(); // stale MIDI state cannot survive unplug
             status="MIDI input disconnected. Mappings suspended.";
         }
         // Preserve the original same-tick disconnect/reconnect flow, if a
@@ -1508,7 +1513,7 @@ void MainComponent::timerCallback() {
             ++midiInputReconnectAttempts;
             const auto restored=midiInput.connect(show.controls.midiInputId);
             if (restored.wasOk()) {
-                physicalEdges.clear();
+                physicalEdges.clear();controlMapping.clearPickup();
                 status="MIDI controller reconnected (same device).";
             }
         }
