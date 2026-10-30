@@ -20,13 +20,13 @@ void controlRuntimeTests() {
         };
         auto* gain=dynamic_cast<GainMeterFader*>(findNamed(ui,"masterAudioDb"));
         auto* pan=dynamic_cast<juce::Slider*>(findNamed(ui,"masterPan"));
-        auto* limiter=dynamic_cast<juce::Button*>(findNamed(ui,"safetyLimiter"));
-        check(gain && pan,"Project refresh lost Master controls");
+        auto* limiter=dynamic_cast<juce::Button*>(findNamed(ui,"masterSafetyLimiter"));
+        check(gain && pan && limiter,"Project refresh lost Master controls");
         check(std::abs(gain->getGainDb()-GainMeterFader::fromLinear(.4f))<.15f,
               "Master fader did not reflect restored Show gain");
         check(std::abs((float)pan->getValue()-.25f)<.0051f,
               "Master pan did not reflect restored Show pan");
-        if (limiter) check(!limiter->getToggleState(),
+        check(!limiter->getToggleState(),
                            "Safety limiter GUI did not reflect restored setting");
     });
     test("MIDI and OSC update real-time master and column controls without GO",[] {
