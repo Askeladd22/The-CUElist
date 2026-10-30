@@ -80,18 +80,26 @@ public:
             unique.push_back(p);
         }
         if (unique==listeningPorts && !sockets.empty()) return true;
-        // Validate every UDP port before replacing the live listener set.
-        std::vector<std::unique_ptr<juce::DatagramSocket>> next;
-        for (int p:unique) {
-            auto socket=std::make_unique<juce::DatagramSocket>(false);
-            if (!socket->bindToPort(p)) return false;
-            next.push_back(std::move(socket));
-        }
+        // Stop current sockets before rebinding any shared ports. A failure
+        // attempts to restore the previous configuration rather than leaving
+        // partially open listeners or claiming success.
+        const auto previous=listeningPorts;
         stopListening();
-        listeningPorts=std::move(unique);
-        sockets=std::move(next);
-        startThread();
-        return true;
+        auto bindPorts=[this](const std::vector<int>& requested) {
+            std::vector<std::unique_ptr<juce::DatagramSocket>> result;
+            for (int p:requested) {
+                auto socket=std::make_unique<juce::DatagramSocket>(false);
+                if (!socket->bindToPort(p)) return false;
+                result.push_back(std::move(socket));
+            }
+            listeningPorts=requested;
+            sockets=std::move(result);
+            startThread();
+            return true;
+        };
+        if (bindPorts(unique)) return true;
+        if (!previous.empty()) bindPorts(previous);
+        return false;
     }
     void stopListening() {
         signalThreadShouldExit();
