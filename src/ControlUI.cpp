@@ -618,6 +618,44 @@ public:
     }
     void paint(juce::Graphics& g) override {
         g.fillAll(palette::panel);
+        if (!editSet) {
+            const int w=getWidth();
+            label(g,"CONTROL MAPPINGS",{22,12,w-44,36},22,palette::teal,true);
+            label(g,"MAP SELECTION",{22,61,420,20},12,palette::muted,true);
+            g.setColour(palette::line);
+            g.drawHorizontalLine(119,20,(float)w-20);
+            label(g,"MAPPING LIST",{22,180,w-44,24},12,palette::teal,true);
+            const int split1=(w-44)*38/100;
+            const int split2=(w-44)*66/100;
+            label(g,"FUNCTION",{29,217,split1-10,22},11,palette::muted,true);
+            label(g,"INPUT",{29+split1,217,split2-split1-10,22},11,palette::muted,true);
+            label(g,"DESTINATION",{29+split2,217,w-split2-70,22},11,palette::muted,true);
+            g.setColour(palette::line);
+            g.drawHorizontalLine(242,22,(float)w-22);
+            if (editingMapping) {
+                g.drawHorizontalLine(477,22,(float)w-22);
+                label(g,addingMapping?"ADD MAPPING":"EDIT MAPPING",
+                      {22,483,380,26},13,palette::teal,true);
+                label(g,"Function",{22,520,195,18},11,palette::muted,true);
+                label(g,"Name",{232,520,170,18},11,palette::muted,true);
+                label(g,"INPUT",{22,577,185,18},11,palette::teal,true);
+                label(g,"Kind",{22,600,100,18},10,palette::muted,true);
+                label(g,"Channel",{156,600,70,18},10,palette::muted,true);
+                label(g,"CC / Note",{235,600,100,18},10,palette::muted,true);
+                label(g,"OSC address",{346,600,200,18},10,palette::muted,true);
+                label(g,"DESTINATION / BEHAVIOUR",{22,654,300,18},11,palette::teal,true);
+                label(g,"Target",{22,675,150,17},10,palette::muted,true);
+                label(g,"Column",{215,675,160,17},10,palette::muted,true);
+                label(g,"Takeover",{410,675,110,17},10,palette::muted,true);
+                label(g,"Curve",{531,675,110,17},10,palette::muted,true);
+                label(g,"Output",{22,726,140,17},10,palette::muted,true);
+                label(g,"Range",{415,726,140,17},10,palette::muted,true);
+            } else {
+                label(g,"Select a mapping to edit its input, function and destination.",
+                    {22,493,w-44,28},13,palette::muted);
+            }
+            return;
+        }
         label(g,editTemplateId>0 ? "SAVED CONTROL MAP" :
               editSet ? "CONTROL SET / Q"+juce::String(sourceRow+1) :
               "DEFAULT MAP / CONTROL MAPPINGS",{20,15,620,31},21,palette::teal,true);
@@ -663,6 +701,42 @@ public:
     }
     void resized() override {
         const int w=getWidth();
+        if (!editSet) {
+            mapChooser.setBounds(22,86,w-352,30);
+            newMap.setBounds(w-318,86,112,30);
+            cloneMap.setBounds(w-198,86,115,30);
+            mapMore.setBounds(w-75,86,52,30);
+            learn.setBounds(22,136,133,31);
+            oscLearn.setBounds(164,136,133,31);
+            cancelLearn.setBounds(305,136,110,31);
+            add.setBounds(423,136,151,31);
+            newFunction.setBounds(582,136,w-604,31);
+            state.setBounds(22,170,w-44,21);
+            const listHeight=editingMapping?215:440;
+            bindingList.setBounds(22,247,w-44,listHeight);
+            emptyBindings.setBounds(34,247+22,w-68,48);
+            functionChoice.setBounds(22,539,198,29);
+            functionName.setBounds(232,539,215,29);
+            saveRoute.setBounds(456,539,144,29);
+            updateSelected.setBounds(w-185,539,163,32);
+            remove.setBounds(w-185,578,163,31);
+            inputKind.setBounds(22,620,127,31);
+            inputChannel.setBounds(156,620,72,31);
+            inputNumber.setBounds(235,620,101,31);
+            inputAddress.setBounds(346,620,194,31);
+            target.setBounds(22,693,185,29);
+            columns.setBounds(215,693,187,29);
+            takeover.setBounds(410,693,114,29);
+            curve.setBounds(531,693,130,29);
+            scope.setBounds(668,693,w-690,29);
+            outputChannel.setBounds(22,743,54,28);
+            outputCc.setBounds(83,743,60,28);
+            oscAddress.setBounds(151,743,240,28);
+            minimum.setBounds(415,743,92,28);
+            maximum.setBounds(516,743,92,28);
+            invert.setBounds(620,742,110,31);
+            return;
+        }
         mapChooser.setBounds(20,97,w-314,31);
         newMap.setBounds(w-285,97,125,31);
         cloneMap.setBounds(w-150,97,130,31);
