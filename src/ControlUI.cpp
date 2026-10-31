@@ -311,6 +311,7 @@ public:
             const int id=functionChoice.getSelectedId()-1;
             scope.setSelectedId(1,juce::dontSendNotification);
             scope.setEnabled(id==0 && !editSet);
+            if (id==0 && !editSet) updateEditorVisibility();
             for (const auto& item:owner->show.controls.functions)
                 if (item.id==id) {
                     functionName.setText(item.name,false);
@@ -626,14 +627,14 @@ public:
             label(g,"MAP SELECTION",{22,61,420,20},12,palette::muted,true);
             g.setColour(palette::line);
             g.drawHorizontalLine(119,20,(float)w-20);
-            label(g,"MAPPING LIST",{22,180,w-44,24},12,palette::teal,true);
+            label(g,"MAPPING LIST",{22,200,w-44,24},12,palette::teal,true);
             const int split1=(w-44)*38/100;
             const int split2=(w-44)*66/100;
-            label(g,"FUNCTION",{29,217,split1-10,22},11,palette::muted,true);
-            label(g,"INPUT",{29+split1,217,split2-split1-10,22},11,palette::muted,true);
-            label(g,"DESTINATION",{29+split2,217,w-split2-70,22},11,palette::muted,true);
+            label(g,"FUNCTION",{29,235,split1-10,22},11,palette::muted,true);
+            label(g,"INPUT",{29+split1,235,split2-split1-10,22},11,palette::muted,true);
+            label(g,"DESTINATION",{29+split2,235,w-split2-70,22},11,palette::muted,true);
             g.setColour(palette::line);
-            g.drawHorizontalLine(242,22,(float)w-22);
+            g.drawHorizontalLine(259,22,(float)w-22);
             if (editingMapping) {
                 g.drawHorizontalLine(477,22,(float)w-22);
                 label(g,addingMapping?"ADD MAPPING":"EDIT MAPPING",
@@ -714,9 +715,9 @@ public:
             add.setBounds(423,136,151,31);
             newFunction.setBounds(582,136,w-604,31);
             state.setBounds(22,170,w-44,21);
-            const listHeight=editingMapping?215:440;
-            bindingList.setBounds(22,247,w-44,listHeight);
-            emptyBindings.setBounds(34,247+22,w-68,48);
+            const int listHeight=editingMapping?205:410;
+            bindingList.setBounds(22,264,w-44,listHeight);
+            emptyBindings.setBounds(34,286,w-68,48);
             functionChoice.setBounds(22,539,198,29);
             functionName.setBounds(232,539,215,29);
             saveRoute.setBounds(456,539,144,29);
@@ -1231,7 +1232,8 @@ private:
                 }
             } else {
                 if (b.kind==ControlKind::pitchBend) b.number=0;
-                if (b.deviceId.isEmpty()) b.deviceId=owner->show.controls.midiInputId;
+                if (b.deviceId.isEmpty() || b.deviceId.startsWithChar('/'))
+                    b.deviceId=owner->show.controls.midiInputId;
                 if (b.deviceId.isEmpty()) {
                     state.setText("Select MIDI input in Settings > MIDI Devices first.",
                                   juce::dontSendNotification);return;
