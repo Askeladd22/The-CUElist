@@ -315,6 +315,7 @@ public:
                 if (item.id==id) {
                     functionName.setText(item.name,false);
                     showRoute(item.destination);
+                    if (!editSet) updateEditorVisibility();
                     return;
                 }
         };
@@ -810,6 +811,10 @@ private:
             &invert,&curve,&minimum,&maximum,&inputKind,&inputChannel,
             &inputNumber,&inputAddress,&updateSelected,&remove})
             widget->setVisible(editingMapping);
+        functionName.setVisible(editingMapping &&
+                                functionChoice.getSelectedId()>1);
+        saveRoute.setVisible(editingMapping &&
+                             functionChoice.getSelectedId()>1);
         updateSelected.setEnabled(editingMapping &&
                                   (addingMapping || selected>=0));
         remove.setEnabled(editingMapping && !addingMapping && selected>=0);
@@ -1098,11 +1103,20 @@ private:
     }
     void refreshDestinationFields() {
         const int t=target.getSelectedId();
+        const bool needsColumn=scope.getSelectedId()==2 || t==2 || t==5 ||
+             t==6 || t==7 || t==9 || t==10 || t==11;
         outputChannel.setEnabled(t==5 && !editSet);
         outputCc.setEnabled(t==5 && !editSet);
         oscAddress.setEnabled(!editSet && t==6);
-        columns.setEnabled(!editSet &&
-            (scope.getSelectedId()==2 || t==2 || t==5 || t==6 || t==7 || t==9 || t==10 || t==11));
+        columns.setEnabled(!editSet && needsColumn);
+        if (!editSet) {
+            outputChannel.setVisible(editingMapping && t==5);
+            outputCc.setVisible(editingMapping && t==5);
+            oscAddress.setVisible(editingMapping && t==6);
+            columns.setVisible(editingMapping && needsColumn);
+            scope.setVisible(editingMapping &&
+                             functionChoice.getSelectedId()==1);
+        }
     }
     void refreshEmptyState() {
         emptyBindings.setVisible(getNumRows()==0);
@@ -1421,6 +1435,37 @@ private:
         if (!owner || row<0 || row>=getNumRows()) return;
         const auto& b=(*currentBindings())[(size_t)row];
         if (active) g.fillAll(palette::teal.withAlpha(.20f));
+        if (!editSet) {
+            juce::String function="Legacy direct";
+            for(const auto& f:owner->show.controls.functions)
+                if (f.id==b.functionId) {function=f.name;break;}
+            const auto input=b.kind==ControlKind::osc ? "OSC "+b.deviceId :
+                (b.kind==ControlKind::cc ? "MIDI CC " :
+                 b.kind==ControlKind::note ? "MIDI Note " : "Pitch Bend ")+
+                juce::String(b.kind==ControlKind::pitchBend ?
+                             b.channel:b.number);
+            const auto dest=b.target==ControlTarget::masterGain?"Master Volume" :
+                b.target==ControlTarget::masterPan?"Master Pan" :
+                b.target==ControlTarget::columnGain?"Channel Gain" :
+                b.target==ControlTarget::columnPan?"Channel Pan" :
+                b.target==ControlTarget::columnMute?"Channel Mute" :
+                b.target==ControlTarget::columnPolarity?"Phase" :
+                b.target==ControlTarget::columnSend?"L/R Send" :
+                b.target==ControlTarget::limiterToggle?"Limiter On/Off" :
+                b.target==ControlTarget::go?"GO" :
+                b.target==ControlTarget::panic?"PANIC" :
+                b.target==ControlTarget::midiCc ?
+                    "MIDI CC "+juce::String(b.outputNumber) :
+                    "OSC "+b.oscAddress;
+            const int first=width*38/100,second=width*66/100;
+            label(g,function,{8,0,first-16,height},12,
+                  active?palette::text:palette::muted);
+            label(g,input,{first+8,0,second-first-16,height},12,
+                  active?palette::text:palette::muted);
+            label(g,dest,{second+8,0,width-second-16,height},12,
+                  active?palette::text:palette::muted);
+            return;
+        }
         juce::String targetName=b.target==ControlTarget::go ? "GO" :
             b.target==ControlTarget::panic ? "PANIC" :
             b.target==ControlTarget::masterGain ? "MASTER GAIN" :
