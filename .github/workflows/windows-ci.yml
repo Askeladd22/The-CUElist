@@ -21,6 +21,22 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Validate version and changelog before CMake build
+        shell: powershell
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          python scripts/test_versioning.py
+          if ($env:BASE_SHA -and $env:HEAD_SHA) {
+            python scripts/check_versioning.py --base-sha $env:BASE_SHA --head-sha $env:HEAD_SHA
+          } else {
+            python scripts/check_versioning.py
+          }
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Windows Release and all tests
         shell: powershell
