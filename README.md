@@ -4,9 +4,26 @@
 
 The Cuelist is a desktop application for preparing and executing cue-based live productions, theatre performances, concerts and installations. It brings audio playback, MIDI sequences, OSC events and MIDI-controller mappings into one operator-focused workspace. It is not a digital audio workstation and does not include native video or timecode playback.
 
-**Current development version:** `0.9.0-beta.5` · **Platform:** Windows x64 · **Project format:** `.cuelist` JSON schema v10 · **Technology:** C++17, JUCE 8.0.12 · **License:** proprietary.
+**Current development version:** `versione indicata in [VERSION.txt](VERSION.txt)` · **Platform:** Windows x64 · **Project format:** `.cuelist` JSON schema v10 · **Technology:** C++17, JUCE 8.0.12 · **License:** proprietary.
 
 > **Beta software — not production certified.** Run Preflight, verify each actual audio/MIDI/OSC device and rehearse every transition on the intended show computer. A successful automated test suite does not establish physical-device reliability or end-to-end timing guarantees.
+
+## Versione e storico aggiornamenti
+
+La versione dell'applicazione è definita **esclusivamente**
+in [`VERSION.txt`](VERSION.txt), già utilizzato da CMake, About e
+packaging. Ogni aggiornamento — funzionalità, correzione, UI, refactor,
+test, documentazione o pulizia — incrementa la versione e aggiunge una
+sezione in testa al [`CHANGELOG.md`](CHANGELOG.md) con modifiche
+e verifiche eseguite. La CI controlla obbligatoriamente la corrispondenza
+fra i due file e il bump rispetto a `main`; vedere
+[`docs/VERSIONING.md`](docs/VERSIONING.md).
+
+Il changelog include anche una **ricostruzione retrospettiva** delle
+versioni 0.7/0.8/0.9 e delle 86 PR precedentemente integrate (con
+link alle PR), distinguendo la cronologia di sviluppo dalle release
+pubbliche. La versione del progetto salvato `.cuelist` (**schema v10**)
+è indipendente dal numero del software.
 
 ## Capabilities
 
@@ -104,7 +121,7 @@ The ZIP contains the executable, launcher, README, **one application `LICENSE`**
 
 ## Projects, backups and recovery
 
-Projects use JSON schema **v10**, independent of the application's `0.9.0-beta.5` number. The loader retains compatibility with earlier project versions. Cuelist names, per-cue notes and additional mixer/control data are saved as optional v10 fields.
+Projects use JSON schema **v10**, independent of the application's `versione indicata in [VERSION.txt](VERSION.txt)` number. The loader retains compatibility with earlier project versions. Cuelist names, per-cue notes and additional mixer/control data are saved as optional v10 fields.
 
 Save collects referenced audio into the project's sibling `<show-name>_media` directory; keep the project and media together. Overwrites preserve a backup. Project opening prepares and validates media before replacing the running show. Recovery checkpoints periodically protect applied unsaved model changes, but **are not a substitute for manual saves** and may not contain text still being edited.
 
@@ -112,7 +129,7 @@ See the [release acceptance checklist](docs/0.9-release-checklist.md) and [stabi
 
 ## Development status and known limitations
 
-- This is **0.9.0-beta.5**, not a stable release or certified live-show system.
+- This is **versione indicata in [VERSION.txt](VERSION.txt)**, not a stable release or certified live-show system.
 - MIDI/OSC dispatch counters describe local software activity, **not confirmed delivery** or end-to-end latency. OSC UDP offers no acknowledgement by default.
 - Hardware MIDI controller feedback, native video playback, LTC and MTC are not implemented.
 - File import and project save can still involve blocking work; long-duration, real-device stress tests remain necessary.
