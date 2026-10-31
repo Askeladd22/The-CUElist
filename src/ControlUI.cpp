@@ -156,7 +156,7 @@ public:
              &functionChoice,&functionName,&newFunction,&saveRoute,
              &saveControllerPreset,&loadControllerPreset,&effectivePreview,&templateName,&templates,&saveTemplate,&loadTemplate,
              &emptyBindings,&mapChooser,&newMap,&cloneMap,&renameMap,&deleteMap,
-            &mapMore,&inputKind,&inputChannel,&inputNumber,&inputAddress,&cancelLearn})
+            &mapMore,&inputKind,&inputChannel,&inputNumber,&inputAddress,&cancelLearn,&cancelEdit})
             addAndMakeVisible(c);
         mapChooser.setName("mappingMapSelector");
         newMap.setName("mappingNewMap");
@@ -190,39 +190,19 @@ public:
         renameMap.setButtonText("Rename Map");
         deleteMap.setName("mappingDeleteMap");
         deleteMap.setButtonText("Delete unused Map");
-        mapChooser.addItem("Default Map (fallback)",1);
-        int initial=1;
-        // The main editor is the map archive; individual cue overrides
-        // appear here only when invoked from that actual Control Column cell.
+        // Switch map content in this exact ControlPanel without replacing its window.
         if (useSet && templateId==0 &&
             sourceRow>=0 && sourceRow<(int)owner->show.rows.size() &&
-            sourceColumn>=0 && sourceColumn<(int)owner->show.columns.size()) {
+            sourceColumn>=0 && sourceColumn<(int)owner->show.columns.size())
             availableMaps.push_back({sourceRow,sourceColumn});
-            mapChooser.addItem("Cue-local override: Q"+juce::String(sourceRow+1)+
-                " / "+owner->show.columns[(size_t)sourceColumn].name,2);
-            initial=2;
-        }
-        for (const auto& map:owner->show.controls.templates) {
-            availableTemplateIds.push_back(map.id);
-            const int index=(int)availableMaps.size()+(int)availableTemplateIds.size()+1;
-            mapChooser.addItem("Saved: "+map.name,index);
-            if (editTemplateId==map.id) initial=index;
-        }
-        mapChooser.setSelectedId(initial,juce::dontSendNotification);
         mapChooser.onChange=[this] {
             if (!owner) return;
             const int index=mapChooser.getSelectedId()-2;
-            const auto maps=availableMaps;
-            const auto templates=availableTemplateIds;
-            auto safe=juce::Component::SafePointer<MainComponent>(owner.getComponent());
-            juce::MessageManager::callAsync([safe,maps,templates,index] {
-                if (!safe) return;
-                if (index<0) safe->openControlPanel(false);
-                else if (index<(int)maps.size())
-                    safe->editControlSet(maps[(size_t)index].first,maps[(size_t)index].second);
-                else if (index<(int)maps.size()+(int)templates.size())
-                    safe->openControlPanel(false,templates[(size_t)(index-(int)maps.size())]);
-            });
+            if (index<0) {switchMap(0,false);return;}
+            if (index<(int)availableMaps.size()) {switchMap(0,true);return;}
+            const int savedIndex=index-(int)availableMaps.size();
+            if (savedIndex>=0 && savedIndex<(int)availableTemplateIds.size())
+                switchMap(availableTemplateIds[(size_t)savedIndex],false);
         };
         newMap.onClick=[this]{createMap(false);};
         cloneMap.onClick=[this]{createMap(true);};
@@ -339,25 +319,34 @@ public:
                     auto& main=*panel.owner.getComponent();
                     const int selectedId=panel.functionChoice.getSelectedId()-1;
                     if (choice==1 || choice==2) {
-                        ControlBinding destination;
-                        destination.target=choice==1 ? ControlTarget::midiCc : ControlTarget::oscFloat;
-                        destination.maximum=choice==1 ? 127.0f : 1.0f;
-                        for (const auto& col:main.show.columns)
-                            if ((choice==1 && col.type==ColumnType::midi) ||
-                                (choice==2 && col.type==ColumnType::osc)) {
-                                destination.targetColumnId=col.id;break;
-                            }
-                        const juce::String base=choice==1 ? "MIDI Function " : "OSC Function ";
-                        // This field shows the selected function's current name.
-                        // Never accidentally copy it when creating a new slot.
-                        const auto name=base+juce::String((int)main.show.controls.functions.size()+1);
-                        const int id=main.createAbstractControlFunction(name,destination);
-                        if (id>0) {
-                            panel.refreshFunctions();
-                            panel.functionChoice.setSelectedId(id+1);
-                            panel.state.setText("Function created. Use Learn to assign an input.",
-                                juce::dontSendNotification);
-                        } else panel.state.setText(main.status,juce::dontSendNotification);
+                        // A function has one stable identity shared with MIDI/OSC
+                        // Learn. Never invent "MIDI function N" as an editor label.
+                        const auto safePanel=juce::Component::SafePointer<ControlPanel>(&panel);
+                        showOperatorTextPrompt(main,main.theme,
+                            choice==1 ? "New MIDI Function" : "New OSC Function",
+                            "Name the real destination or parameter for MIDI/OSC Learn.",
+                            "Function name",juce::String(),false,"Create",
+                            [safePanel,choice](juce::String title) {
+                                if (!safePanel || !safePanel->owner) return;
+                                auto& panel=*safePanel.getComponent();
+                                auto& main=*panel.owner.getComponent();
+                                ControlBinding destination;
+                                destination.target=choice==1 ?
+                                    ControlTarget::midiCc : ControlTarget::oscFloat;
+                                destination.maximum=choice==1 ? 127.0f : 1.0f;
+                                for (const auto& col:main.show.columns)
+                                    if ((choice==1 && col.type==ColumnType::midi) ||
+                                        (choice==2 && col.type==ColumnType::osc)) {
+                                        destination.targetColumnId=col.id;break;
+                                    }
+                                const int id=main.createAbstractControlFunction(title,destination);
+                                if (id>0) {
+                                    panel.refreshFunctions();
+                                    panel.functionChoice.setSelectedId(id+1);
+                                    panel.state.setText("Function created. Use Learn to assign an input.",
+                                        juce::dontSendNotification);
+                                } else panel.state.setText(main.status,juce::dontSendNotification);
+                            });
                     } else if (choice==3 || choice==4) {
                         if (main.moveAbstractControlFunction(selectedId,choice==3 ? -1 : 1)) {
                             panel.refreshFunctions();
@@ -427,6 +416,10 @@ public:
         emptyBindings.setInterceptsMouseClicks(false,false);
         updateSelected.setButtonText("Save Mapping");
         updateSelected.onClick=[this] { createBinding(!addingMapping); };
+        cancelEdit.setName("mappingCancelEdit");
+        cancelEdit.setButtonText("Cancel");
+        cancelEdit.onClick=[this] { cancelEditing(); };
+        cancelEdit.setVisible(false);
         curve.setName("mappingResponseCurve");
         curve.addItemList({"Linear","Ease in","Ease out"},1);
         curve.setSelectedId(1);
@@ -594,6 +587,7 @@ public:
         learn.setName("mappingCaptureMidi");
         oscLearn.setName("mappingCaptureOsc");
         refreshDevices(); refreshPresets(); refreshColumns();refreshTemplates();
+        refreshMapChooser();
         refreshFunctions();
         if (!owner->show.controls.functions.empty()) {
             const auto& f=owner->show.controls.functions.front();
@@ -601,6 +595,7 @@ public:
             showRoute(f.destination);
         }
         if (editSet) {
+            cancelEdit.setVisible(true);
             for (juce::Component* widget : std::initializer_list<juce::Component*>{
                     &target,&outputChannel,&outputCc,&oscAddress,&columns,
                     &minimum,&maximum,&functionName})
@@ -721,7 +716,8 @@ public:
             emptyBindings.setBounds(34,286,w-68,48);
             functionChoice.setBounds(22,539,198,29);
             functionName.setBounds(232,539,215,29);
-            saveRoute.setBounds(456,539,144,29);
+            saveRoute.setBounds(w-365,578,163,31);
+            cancelEdit.setBounds(w-365,539,163,32);
             updateSelected.setBounds(w-185,539,163,32);
             remove.setBounds(w-185,578,163,31);
             inputKind.setBounds(22,620,127,31);
@@ -781,13 +777,14 @@ public:
 
         saveControllerPreset.setBounds(20,403,173,29);
         loadControllerPreset.setBounds(201,403,173,29);
-        const int listY=editSet?558:449;
+        const int listY=editSet?548:449;
         const int listHeight=editSet?136:157;
         bindingList.setBounds(20,listY,w-239,listHeight);
         emptyBindings.setBounds(30,listY+19,w-259,42);
-        add.setBounds(w-209,listY,189,38);
-        updateSelected.setBounds(w-209,listY+47,189,38);
-        remove.setBounds(w-209,listY+94,189,38);
+        add.setBounds(w-209,listY,189,32);
+        updateSelected.setBounds(w-209,listY+37,189,32);
+        remove.setBounds(w-209,listY+74,189,32);
+        cancelEdit.setBounds(w-209,listY+111,189,32);
     }
 
 private:
@@ -811,7 +808,7 @@ private:
             &functionChoice,&functionName,&saveRoute,&scope,&target,
             &takeover,&columns,&outputChannel,&outputCc,&oscAddress,
             &invert,&curve,&minimum,&maximum,&inputKind,&inputChannel,
-            &inputNumber,&inputAddress,&updateSelected,&remove})
+            &inputNumber,&inputAddress,&updateSelected,&remove,&cancelEdit})
             widget->setVisible(editingMapping);
         functionName.setVisible(editingMapping &&
                                 functionChoice.getSelectedId()>1);
@@ -902,10 +899,7 @@ private:
                             main->show=std::move(candidate);
                             main->dirty=true;
                             main->refreshControlSettings();main->refresh();
-                            juce::Component::SafePointer<MainComponent> safeMain(main);
-                            juce::MessageManager::callAsync([safeMain,id] {
-                                if (safeMain) safeMain->openControlPanel(false,id);
-                            });
+                            safe->switchMap(id,false);
                         });
                 }
             });
@@ -938,12 +932,87 @@ private:
         return cell.controlSet ? &cell.controlSet->bindings : nullptr;
     }
     juce::ComboBox device,presets,scope,target,takeover,columns,curve,templates,functionChoice,mapChooser;
-    juce::TextButton newMap,cloneMap,renameMap,deleteMap,mapMore,cancelLearn;
+    juce::TextButton newMap,cloneMap,renameMap,deleteMap,mapMore,cancelLearn,cancelEdit;
     juce::ComboBox inputKind;
     juce::TextEditor inputChannel,inputNumber,inputAddress;
     bool editingMapping=false,addingMapping=false;
     std::vector<std::pair<int,int>> availableMaps;
     std::vector<int> availableTemplateIds;
+    void refreshMapChooser() {
+        if (!owner) return;
+        mapChooser.clear(juce::dontSendNotification);
+        mapChooser.addItem("Default Map (fallback)",1);
+        int item=2;
+        for (const auto& local:availableMaps) {
+            if (local.second>=0 && local.second<(int)owner->show.columns.size())
+                mapChooser.addItem("Cue-local override: Q"+juce::String(local.first+1)+
+                    " / "+owner->show.columns[(size_t)local.second].name,item++);
+        }
+        availableTemplateIds.clear();
+        for (const auto& map:owner->show.controls.templates) {
+            availableTemplateIds.push_back(map.id);
+            mapChooser.addItem("Saved: "+map.name,item++);
+        }
+        int desired=1;
+        if (editSet && !availableMaps.empty()) desired=2;
+        else if (editTemplateId>0)
+            for (int i=0;i<(int)availableTemplateIds.size();++i)
+                if (availableTemplateIds[(size_t)i]==editTemplateId)
+                    desired=2+(int)availableMaps.size()+i;
+        mapChooser.setSelectedId(desired,juce::dontSendNotification);
+    }
+    void cancelEditing() {
+        captured.reset();
+        addingMapping=false;editingMapping=false;selected=-1;
+        bindingList.deselectAllRows();
+        if (!editSet) updateEditorVisibility();
+        updateSelected.setEnabled(false);remove.setEnabled(false);
+        state.setText("Uncommitted mapping changes discarded.",
+                      juce::dontSendNotification);
+    }
+    void switchMap(int mapId,bool local) {
+        if (!owner) return;
+        if (mapId>0 && std::none_of(owner->show.controls.templates.begin(),
+                owner->show.controls.templates.end(),
+                [mapId](const ControlSetTemplate& map){return map.id==mapId;}))
+            return;
+        if (local && availableMaps.empty()) return;
+        continuousLearn=0;
+        owner->controlLearnArmed=false;owner->oscLearnArmed=false;
+        owner->learnedInput.reset();
+        captured.reset();
+        editSet=local;editTemplateId=mapId;
+        selected=-1;addingMapping=false;editingMapping=false;
+        bindingList.deselectAllRows();
+        refreshMapChooser();refreshFunctions();
+        if (editSet) {
+            for (juce::Component* widget:std::initializer_list<juce::Component*>{
+                &functionChoice,&functionName,&scope,&target,&takeover,&columns,
+                &outputChannel,&outputCc,&oscAddress,&invert,&curve,&minimum,
+                &maximum,&add,&updateSelected,&remove,&effectivePreview,
+                &saveTemplate,&loadTemplate,&templateName,&templates})
+                widget->setVisible(true);
+            functionName.setEnabled(false);
+            cancelEdit.setVisible(true);
+            newFunction.setVisible(false);saveRoute.setVisible(false);
+            effectivePreview.setVisible(true);
+            refreshTemplates();
+        } else {
+            functionName.setEnabled(true);
+            effectivePreview.setVisible(false);
+            saveTemplate.setVisible(false);loadTemplate.setVisible(false);
+            templateName.setVisible(false);templates.setVisible(false);
+            newFunction.setVisible(true);
+            updateEditorVisibility();
+        }
+        bindingList.updateContent();bindingList.repaint();
+        refreshEmptyState();updateEffectivePreview();
+        setSize(860,editSet ? 764 : 790);
+        resized();repaint();
+        state.setText(editSet?"Cue-local override selected.":
+            mapId>0?"Saved map selected.":"Default Map selected.",
+            juce::dontSendNotification);
+    }
     void renameSelectedMap() {
         if (!owner || editTemplateId<=0) return;
         const int id=editTemplateId;
@@ -951,16 +1020,15 @@ private:
             owner->show.controls.templates.end(),
             [id](const ControlSetTemplate& m){return m.id==id;});
         if (found==owner->show.controls.templates.end()) return;
-        auto safe=juce::Component::SafePointer<MainComponent>(owner.getComponent());
+        auto safe=juce::Component::SafePointer<ControlPanel>(this);
         showOperatorTextPrompt(*owner,owner->theme,"Rename Control Map",
             "Rename the saved map. All cue references retain the same stable ID.",
             "Map name",found->name,false,"Rename",
             [safe,id](juce::String value){
-                if (!safe) return;
-                if (safe->renameReusableControlMap(id,value))
-                    juce::MessageManager::callAsync([safe,id]{
-                        if (safe) safe->openControlPanel(false,id);
-                    });
+                if (!safe || !safe->owner) return;
+                if (safe->owner->renameReusableControlMap(id,value))
+                    safe->refreshMapChooser();
+                else safe->state.setText(safe->owner->status,juce::dontSendNotification);
             });
     }
     void deleteSelectedMap() {
@@ -973,7 +1041,7 @@ private:
                 juce::dontSendNotification);
             return;
         }
-        auto safe=juce::Component::SafePointer<MainComponent>(owner.getComponent());
+        auto safe=juce::Component::SafePointer<ControlPanel>(this);
         juce::AlertWindow::showAsync(
             juce::MessageBoxOptions()
                 .withIconType(juce::MessageBoxIconType::WarningIcon)
@@ -981,11 +1049,10 @@ private:
                 .withMessage("This removes the unused map from the archive. This cannot be undone.")
                 .withButton("Delete Map").withButton("Cancel"),
             [safe,id](int result) {
-                if (!safe || result!=1) return;
-                if (safe->deleteReusableControlMap(id))
-                    juce::MessageManager::callAsync([safe] {
-                        if (safe) safe->openControlPanel(false);
-                    });
+                if (!safe || !safe->owner || result!=1) return;
+                if (safe->owner->deleteReusableControlMap(id))
+                    safe->switchMap(0,false);
+                else safe->state.setText(safe->owner->status,juce::dontSendNotification);
             });
     }
     void createMap(bool duplicate) {
@@ -1018,10 +1085,7 @@ private:
         if (newId==0) {
             state.setText(owner->status,juce::dontSendNotification);return;
         }
-        auto safe=juce::Component::SafePointer<MainComponent>(owner.getComponent());
-        juce::MessageManager::callAsync([safe,newId] {
-            if (safe) safe->openControlPanel(false,newId);
-        });
+        switchMap(newId,false);
     }
     juce::TextButton connect,learn,oscLearn,add,remove,updateSelected,newPreset,assignPreset,saveTemplate,loadTemplate,
                      newFunction,saveRoute,saveControllerPreset,loadControllerPreset;
@@ -1045,6 +1109,13 @@ private:
         functionChoice.setSelectedId(old>0 && functionChoice.indexOfItemId(old)>=0 ?
             old : owner->show.controls.functions.empty() ? 1 :
                   owner->show.controls.functions.front().id+1,juce::dontSendNotification);
+        // This is the same persisted function identity displayed by Learn.
+        for (const auto& fn:owner->show.controls.functions)
+            if (fn.id+1==functionChoice.getSelectedId()) {
+                functionName.setText(fn.name,false);
+                if (selected<0) showRoute(fn.destination);
+                break;
+            }
         // Scope belongs to legacy bindings only. Named-function source
         // assignments in Default Map always inherit globally.
         scope.setEnabled(!editSet && functionChoice.getSelectedId()==1);
@@ -1094,10 +1165,15 @@ private:
             (b.target==ControlTarget::columnPan || b.target==ControlTarget::columnMute || b.target==ControlTarget::columnPolarity || b.target==ControlTarget::columnSend) || b.target==ControlTarget::midiCc || b.target==ControlTarget::oscFloat) {
             const int index=columns.getSelectedId()-1;
             if (index<0 || index>=(int)columnIds.size()) {
-                state.setText("Choose a valid output column.",juce::dontSendNotification);
-                return {};
-            }
-            b.targetColumnId=columnIds[(size_t)index];
+                // Starter functions may intentionally lack an output column.
+                // Preserve their inert destination instead of preventing Learn.
+                if (functionChoice.getSelectedId()>1 && columnIds.empty())
+                    b.targetColumnId=0;
+                else {
+                    state.setText("Choose a valid output column.",juce::dontSendNotification);
+                    return {};
+                }
+            } else b.targetColumnId=columnIds[(size_t)index];
         }
         if (b.target==ControlTarget::midiCc) {
             b.outputNumber=outputCc.getText().getIntValue();
@@ -1156,7 +1232,7 @@ private:
                 updateEditorVisibility();
             }
             const auto* entries=currentBindings();
-            createBinding(entries && selected>=0 && selected<(int)entries->size());
+            createBinding(entries && selected>=0 && selected<(int)entries->size(),true);
             if (continuousLearn==1) owner->armControlLearn();
             else if (continuousLearn==2) owner->armOscControlLearn();
         }
@@ -1210,7 +1286,7 @@ private:
         }
         if (!columnIds.empty()) columns.setSelectedId(1);
     }
-    void createBinding(bool update) {
+    void createBinding(bool update,bool fromLearn=false) {
         const auto* existing=currentBindings();
         if (!owner || (update && (!existing || selected<0 || selected>=(int)existing->size()))) {
             state.setText("Select a mapping or use + Add Mapping.",
@@ -1333,12 +1409,69 @@ private:
             b.maximum=high.getFloatValue();
         }
         int row=-1,column=-1;
-        const bool resolved=editTemplateId>0 || !editSet || resolveSource(row,column);
-        const bool saved=resolved && (editTemplateId>0 ?
-            owner->modifyReusableControlBinding(editTemplateId,b.id,b,update ? 1 : 0) :
-            update ? owner->updateControlBinding(row,column,b.id,b,editSet) :
-            editSet ? owner->addControlSetBinding(row,column,b) :
-                      owner->addMappingBinding(b));
+        bool saved=false;
+        if (!editSet) {
+            // Commit function name/route and physical input together: invalid
+            // edits cannot partially alter the active show or reusable map.
+            auto candidate=owner->show;
+            if (b.functionId>0 && !fromLearn) {
+                auto f=std::find_if(candidate.controls.functions.begin(),
+                    candidate.controls.functions.end(),
+                    [&](const ControlFunction& item){return item.id==b.functionId;});
+                if (f==candidate.controls.functions.end()) {
+                    state.setText("Selected function no longer exists.",
+                                  juce::dontSendNotification);return;
+                }
+                const auto name=functionName.getText().trim();
+                if (name.isEmpty() || name.length()>120) {
+                    state.setText("Enter a function name (1–120 characters).",
+                                  juce::dontSendNotification);return;
+                }
+                const auto route=readRoute();
+                if (!route) return;
+                f->name=name;
+                f->destination=*route;
+                f->destination.id=0;f->destination.functionId=0;
+                f->destination.deviceId={};
+                f->destination.scope=ControlScope::global;
+                f->destination.scopeId=0;
+                b=materializeFunctionBinding(b,*f);
+            }
+            std::vector<ControlBinding>* assignments=&candidate.controls.bindings;
+            if (editTemplateId>0) {
+                auto map=std::find_if(candidate.controls.templates.begin(),
+                    candidate.controls.templates.end(),
+                    [&](const ControlSetTemplate& item){return item.id==editTemplateId;});
+                if (map==candidate.controls.templates.end()) {
+                    state.setText("Selected map no longer exists.",
+                                  juce::dontSendNotification);return;
+                }
+                assignments=&map->set.bindings;
+                b.scope=ControlScope::global;b.scopeId=0;
+            }
+            if (update) {
+                auto it=std::find_if(assignments->begin(),assignments->end(),
+                    [&](const ControlBinding& item){return item.id==b.id;});
+                if (it==assignments->end()) {
+                    state.setText("Mapping no longer exists.",juce::dontSendNotification);
+                    return;
+                }
+                *it=b;
+            } else {
+                b.id=candidate.controls.nextId++;
+                assignments->push_back(b);
+            }
+            const auto result=validateShow(candidate);
+            if (result.wasOk()) {
+                owner->show=std::move(candidate);
+                owner->refreshControlSettings();owner->dirty=true;owner->refresh();
+                saved=true;
+                refreshFunctions();
+            } else state.setText(result.getErrorMessage(),juce::dontSendNotification);
+        } else if (resolveSource(row,column)) {
+            saved=update ? owner->updateControlBinding(row,column,b.id,b,true) :
+                          owner->addControlSetBinding(row,column,b);
+        }
         if (saved) {
             bindingList.updateContent();bindingList.repaint();
             selected=-1;addingMapping=false;
@@ -1433,7 +1566,12 @@ private:
         // Combo target item order differs from ControlTarget enumeration.
         const ControlBinding* route=&b;
         for (const auto& f:owner->show.controls.functions)
-            if (f.id==b.functionId) {route=&f.destination;break;}
+            if (f.id==b.functionId) {
+                route=&f.destination;
+                functionName.setText(f.name,false);
+                break;
+            }
+        if (b.functionId==0) functionName.clear();
         showRoute(*route);
         takeover.setSelectedId((int)b.takeover+1,juce::dontSendNotification);
         curve.setSelectedId((int)b.curve+1,juce::dontSendNotification);
