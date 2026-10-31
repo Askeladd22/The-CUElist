@@ -595,6 +595,7 @@ public:
             showRoute(f.destination);
         }
         if (editSet) {
+            cancelEdit.setVisible(true);
             for (juce::Component* widget : std::initializer_list<juce::Component*>{
                     &target,&outputChannel,&outputCc,&oscAddress,&columns,
                     &minimum,&maximum,&functionName})
@@ -776,14 +777,14 @@ public:
 
         saveControllerPreset.setBounds(20,403,173,29);
         loadControllerPreset.setBounds(201,403,173,29);
-        const int listY=editSet?558:449;
+        const int listY=editSet?548:449;
         const int listHeight=editSet?136:157;
         bindingList.setBounds(20,listY,w-239,listHeight);
         emptyBindings.setBounds(30,listY+19,w-259,42);
-        add.setBounds(w-209,listY,189,38);
-        updateSelected.setBounds(w-209,listY+47,189,38);
-        remove.setBounds(w-209,listY+94,189,38);
-        cancelEdit.setBounds(w-209,listY+141,189,29);
+        add.setBounds(w-209,listY,189,32);
+        updateSelected.setBounds(w-209,listY+37,189,32);
+        remove.setBounds(w-209,listY+74,189,32);
+        cancelEdit.setBounds(w-209,listY+111,189,32);
     }
 
 private:
@@ -992,7 +993,7 @@ private:
                 &saveTemplate,&loadTemplate,&templateName,&templates})
                 widget->setVisible(true);
             functionName.setEnabled(false);
-            cancelEdit.setVisible(false);
+            cancelEdit.setVisible(true);
             newFunction.setVisible(false);saveRoute.setVisible(false);
             effectivePreview.setVisible(true);
             refreshTemplates();
