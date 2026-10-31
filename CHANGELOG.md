@@ -1,0 +1,193 @@
+# CHANGELOG — The Cuelist
+
+Tutte le modifiche future devono avere **versione incrementata in
+[`VERSION.txt`](VERSION.txt)** e una nuova sezione in testa a questo file.
+La versione del progetto `.cuelist` (**schema JSON v10**) è **indipendente**
+da quella dell'applicazione. Modalità di aggiornamento:
+[`docs/VERSIONING.md`](docs/VERSIONING.md).
+
+Questo changelog è stato introdotto il **31 ottobre 2026** e ricostruito
+retrospettivamente da `VERSION.txt`, dalla cronologia Git e dalle PR
+effettivamente integrate. **Non esistono GitHub Releases o tag che
+certifichino tutte le milestone riportate**; le etichette storiche
+indicano versioni di sviluppo presenti nei commit, non distribuzioni
+pubbliche. I particolari di ogni intervento sono nell'appendice.
+
+## [0.9.0-beta.6] - 2026-10-31
+
+**Tipo:** aggiornamento di manutenzione e tracciabilità; non è una release pubblica o una certificazione per spettacoli live.
+
+### Aggiunto
+- Registro versionato `CHANGELOG.md`, con ricostruzione retrospettiva delle fasi documentate e inventario delle pull request effettivamente integrate.
+- Procedura obbligatoria per ogni modifica in `docs/VERSIONING.md`: versione, descrizione, prove e limiti.
+- Verifica CI che confronta `VERSION.txt` e la sezione più recente del changelog e richiede incremento di versione per ogni PR successiva.
+
+### Modificato
+- Versione sorgente da `0.9.0-beta.5` a `0.9.0-beta.6`, mantenendo l'unica fonte esistente `VERSION.txt`. CMake, versione in-app About, eseguibili e packaging continuano a derivarla da quel file.
+- README e checklist beta rimandano alla versione corrente in `VERSION.txt`, evitando numeri obsoleti copiati a mano.
+
+### Verifiche e limitazioni
+- Validatore SemVer e ricostruzione storica verificati sui sorgenti GitHub; i test Windows JUCE/CTest restano di competenza della CI e dell'ambiente locale.
+- Nessuna modifica a routing audio, MIDI, OSC, modello show, interfaccia operativa, API o formato progetto v10.
+- La raccolta delle PR precedenti è un **registro retrospettivo**, non implica che quelle versioni fossero pubblicate come release GitHub.
+
+## [0.9.0-beta.5] - 2026-10-28
+
+**Versione attestata:** `VERSION.txt` portato a beta.5 nel commit `3b3a9db`.
+**Evoluzione successiva sulla stessa beta:** fino al 31 ottobre sono state integrate ulteriori modifiche senza bump del file VERSION; sono tutte elencate nell'appendice PR, non retroattivamente attribuite a nuove versioni.
+
+### Aggiunto / modificato
+- Aggiornamento della documentazione beta, licenza applicativa unica, guida completa e percorsi di packaging (PR #48 e interventi correlati).
+- Redesign Midnight Slate; Cuelist multiple/tab, note e Inspector a scomparsa; rinomina inline, Undo/Redo su editor supportati e compact monitor (PR #39–#47).
+- Finestra Guide in-app, About con crediti, caratteri Hind/Exo 2 e simboli Noto espliciti, controlli per ultrawide, icone e dialoghi uniformati (PR #50–#72).
+- Funzioni astratte e Default Map, MIDI/OSC Learn, override locali per cue, feedback lampeggiante, diagnostica e correzioni di compilazione (PR #73–#80).
+- Riordino e rinomina inline di Cuelist e cue; pannello Control Mapping e archivi mappe indipendenti, sincronizzazione MIDI/OSC dei controlli fader/pan e correzioni Windows (PR #81–#88).
+- **Limite:** alcune funzioni dell'editor e del mapping sono cambiate dopo il commit che assegnava beta.5; per lo stato preciso consultare il codice e i test dell'ultimo `main`, non una fotografia congelata al 28 ottobre.
+
+### Test / rischio
+- Modifiche verificate tramite le PR e le rispettive CI; compatibilità reale con hardware e tempi MIDI/OSC resta da collaudare su postazioni di spettacolo.
+
+## [0.9.0-beta.4] - 2026-10-27
+
+**Versione attestata:** commit `f2334c3`, dichiarato beta.4.
+- Test e note di regressione per gain audio, retrigger e Inspector, con comportamento precedente preservato.
+- La numerazione del **formato show v10** è distinta dalla versione dell'applicazione.
+
+## [0.9.0-beta.3] - 2026-10-27
+
+**Versione attestata:** commit `48cfa291`, dichiarato beta.3.
+- Mixer più compatto, mute MIDI/OSC, attività LED e test del limiter condiviso, con copertura di regressione.
+
+## [0.9.0-beta.2] - 2026-10-27
+
+**Versione attestata:** commit `4efca83`, dichiarato beta.2.
+- Routing Master/Direct indipendente e checklist di accettazione hardware esplicita.
+
+## [0.9.0-beta.1] - 2026-10-27
+
+**Versione attestata:** commit `ea1d52e`, dichiarato beta.1.
+- Suite di regressione, gate di release e workflow manuale per il packaging portable separato dalla normale CI.
+- Il superamento della CI non equivale a certificazione per un utilizzo live.
+
+## [0.8.0-alpha.1] - 2026-10-27
+
+**Versione attestata:** commit `129a22a`.
+- Fase architettura/integrazioni: separazione di ciclo progetto, Inspector, operazioni su cue/celle, modello transazionale, layout e routing Control Mapping.
+- Controllo più rigoroso del dispatch MIDI e politica di riconnessione/One-shot Learn, con test (PR #25–#33).
+- Piano di accettazione hardware esplicitamente non completato.
+
+## [0.7.0-alpha.1] - 2026-10-27
+
+**Versione attestata:** commit `023bab77`.
+- Inizio della fase di stabilizzazione: checkpoint di recupero, preflight, diagnostica, caricamento progetti più sicuro e correzione di warning/build, secondo cronologia e note beta.
+- Versionamento centralizzato in `VERSION.txt`, senza confondere la versione del programma con lo schema JSON.
+
+## Cronologia precedente (0.5 → sviluppo 0.6) - 2026-10-25 / 2026-10-26
+
+**Nota:** `0.6` compare nelle denominazioni delle PR, ma non risulta un tag di release GitHub o una serie completa di versioni `VERSION.txt` da cui ricostruire patch/alpha numerici con certezza. Per questo **non vengono inventate versioni di patch**.
+
+### Funzioni ricostruite dalle PR integrate
+- Prime pipeline Windows e pacchetto portable, controlli di build e checksum (PR #1–#2); documentazione/licenza iniziale (PR #5).
+- Editor clip integrato e flottante, modifica MIDI immediata, griglia beat e snap indipendenti (PR #6, #8).
+- Editor OSC, messaggi UDP, automazioni tempo/beat, per-cella Auto Stop e mixer Master con gain/pan/meter (PR #9–#16).
+- Control Mapping v10, MIDI Learn, preset e routing; test/fix compilazione e miglioramenti della UI (PR #17–#20).
+- Le PR #4 e #7 **non furono integrate**; non si presentano come funzionalità consegnate.
+
+## Appendice A — cronologia completa delle PR fino al 31 ottobre 2026
+
+Questo indice registra **ogni PR integrata** visibile nella cronologia GitHub
+al momento del bootstrap (PR #1–#88); una riga non indica necessariamente
+una versione nuova o una release. Data = data del merge UTC, titolo = titolo
+della PR originale. Le PR non integrate sono riportate separatamente.
+
+- **2026-10-31 — [PR #88](https://github.com/Askeladd22/The-CUElist/pull/88):** Fix Control Mappings: in-place map selection, function names and Save/Cancel
+- **2026-10-31 — [PR #87](https://github.com/Askeladd22/The-CUElist/pull/87):** Control Mappings: separate map archive, compact mapping list and contextual editor
+- **2026-10-30 — [PR #86](https://github.com/Askeladd22/The-CUElist/pull/86):** Fix Windows C2248 compilation error in ControlRuntimeTests
+- **2026-10-30 — [PR #85](https://github.com/Askeladd22/The-CUElist/pull/85):** Fix MIDI/OSC real-time fader and pan UI synchronization
+- **2026-10-30 — [PR #84](https://github.com/Askeladd22/The-CUElist/pull/84):** Fix independent Control Maps and empty Control Column display
+- **2026-10-30 — [PR #83](https://github.com/Askeladd22/The-CUElist/pull/83):** Document mapping rework and validate Windows regression suite
+- **2026-10-30 — [PR #82](https://github.com/Askeladd22/The-CUElist/pull/82):** Inline rename and three-way reordering of Cuelists and cue rows
+- **2026-10-29 — [PR #81](https://github.com/Askeladd22/The-CUElist/pull/81):** Polish header clock/CPU telemetry and compact cue action buttons
+- **2026-10-29 — [PR #80](https://github.com/Askeladd22/The-CUElist/pull/80):** Fix MIDI Quick Learn yellow blinking when no MIDI input is connected
+- **2026-10-29 — [PR #79](https://github.com/Askeladd22/The-CUElist/pull/79):** Fix OSC Timeline layout and add MIDI/OSC Learn blinking feedback
+- **2026-10-29 — [PR #78](https://github.com/Askeladd22/The-CUElist/pull/78):** Fix MIDI/OSC Learn: clickable GUI parameters and persistent multi-binding mode
+- **2026-10-29 — [PR #77](https://github.com/Askeladd22/The-CUElist/pull/77):** Rework Control Mapping: direct MIDI/OSC Learn, advanced functions and cue overrides
+- **2026-10-29 — [PR #76](https://github.com/Askeladd22/The-CUElist/pull/76):** Fix Windows compilation: remove duplicate Control Mapping implementation from PR #74
+- **2026-10-29 — [PR #75](https://github.com/Askeladd22/The-CUElist/pull/75):** Fix OSC Control Learn float saturation for extreme finite values
+- **2026-10-29 — [PR #74](https://github.com/Askeladd22/The-CUElist/pull/74):** Control Mapping: stable functions and cue-local physical overrides (work in progress)
+- **2026-10-29 — [PR #73](https://github.com/Askeladd22/The-CUElist/pull/73):** Introduce abstract control functions, Default Map inheritance and cue-local input overrides
+- **2026-10-29 — [PR #72](https://github.com/Askeladd22/The-CUElist/pull/72):** Fix false blank Noto glyph failure by finalizing JUCE Graphics before pixel inspection
+- **2026-10-29 — [PR #71](https://github.com/Askeladd22/The-CUElist/pull/71):** Fix MSVC C2664 in Noto UI regression tests
+- **2026-10-29 — [PR #70](https://github.com/Askeladd22/The-CUElist/pull/70):** Fix blank Noto transport glyphs and failing 0.9 UI regression
+- **2026-10-29 — [PR #69](https://github.com/Askeladd22/The-CUElist/pull/69):** Unify and soften icon-button frames across the operator UI
+- **2026-10-29 — [PR #68](https://github.com/Askeladd22/The-CUElist/pull/68):** Correct ultrawide test for intentionally off-screen collapsed Inspector
+- **2026-10-29 — [PR #67](https://github.com/Askeladd22/The-CUElist/pull/67):** Diagnose and resolve 32:9 ultrawide workspace test regression
+- **2026-10-29 — [PR #66](https://github.com/Askeladd22/The-CUElist/pull/66):** Pin all Cue List column headers and centre Noto Mute glyphs
+- **2026-10-29 — [PR #65](https://github.com/Askeladd22/The-CUElist/pull/65):** Fix disappearing Audio/MIDI/OSC headers during cue scrolling
+- **2026-10-29 — [PR #64](https://github.com/Askeladd22/The-CUElist/pull/64):** Audit Unicode UI icons and use explicit Noto Sans Symbols 2 glyphs
+- **2026-10-29 — [PR #63](https://github.com/Askeladd22/The-CUElist/pull/63):** Eliminate the 9px Cue List / BPM gutter at its source
+- **2026-10-29 — [PR #62](https://github.com/Askeladd22/The-CUElist/pull/62):** Fix Control Mapping test race from asynchronous ComboBox notifications
+- **2026-10-29 — [PR #61](https://github.com/Askeladd22/The-CUElist/pull/61):** Fix ControlsV3 test compilation after shared editor refactor
+- **2026-10-29 — [PR #60](https://github.com/Askeladd22/The-CUElist/pull/60):** Unify cue editor dialogs and Control Mapping; polish reports and BPM seam
+- **2026-10-29 — [PR #59](https://github.com/Askeladd22/The-CUElist/pull/59):** Polish Diagnostics/About dialogs, Noto fader menu, Inspector grip and cue divider
+- **2026-10-29 — [PR #58](https://github.com/Askeladd22/The-CUElist/pull/58):** Fix Auto Stop and Play/Stop regression tests after visual polish
+- **2026-10-29 — [PR #57](https://github.com/Askeladd22/The-CUElist/pull/57):** Polish cue actions, telemetry, faders and explicit Noto font rendering
+- **2026-10-29 — [PR #56](https://github.com/Askeladd22/The-CUElist/pull/56):** Fix stale Collapse-all layout assertion after cue header resize
+- **2026-10-29 — [PR #55](https://github.com/Askeladd22/The-CUElist/pull/55):** Fix pinned cue headers, transport spacing and Expand all tooltip
+- **2026-10-29 — [PR #54](https://github.com/Askeladd22/The-CUElist/pull/54):** Fix Unicode symbols using embedded Noto font fallback
+- **2026-10-28 — [PR #53](https://github.com/Askeladd22/The-CUElist/pull/53):** feat(help): native in-app Guide viewer and consistent menu labels
+- **2026-10-28 — [PR #52](https://github.com/Askeladd22/The-CUElist/pull/52):** fix(build): restore JUCE 8 Windows compilation for Exo 2 / Hind typography
+- **2026-10-28 — [PR #51](https://github.com/Askeladd22/The-CUElist/pull/51):** design(type): Exo 2 for small text (min 10pt), Hind for headings
+- **2026-10-28 — [PR #50](https://github.com/Askeladd22/The-CUElist/pull/50):** feat(ui): Help/About, co-author credits and compact Inspector panel icons
+- **2026-10-28 — [PR #49](https://github.com/Askeladd22/The-CUElist/pull/49):** fix(tests): make Midnight Slate popup checks renderer-independent
+- **2026-10-28 — [PR #48](https://github.com/Askeladd22/The-CUElist/pull/48):** Docs/refresh beta5 and license
+- **2026-10-28 — [PR #47](https://github.com/Askeladd22/The-CUElist/pull/47):** design(ui): clean Cuelist heading and improve left sidebar spacing
+- **2026-10-28 — [PR #46](https://github.com/Askeladd22/The-CUElist/pull/46):** feat(ui): bidirectional Cuelist renaming, Undo/Redo and compact signal monitor
+- **2026-10-28 — [PR #45](https://github.com/Askeladd22/The-CUElist/pull/45):** fix(cuelists): inline responsive tabs, delete action, numbering and popup test
+- **2026-10-28 — [PR #44](https://github.com/Askeladd22/The-CUElist/pull/44):** design(ui): consistent Midnight Slate dropdown and context menus
+- **2026-10-28 — [PR #43](https://github.com/Askeladd22/The-CUElist/pull/43):** fix(inspector): Escape from cue notes reaches global Panic
+- **2026-10-28 — [PR #42](https://github.com/Askeladd22/The-CUElist/pull/42):** design(theme): balanced Midnight Slate palette between both UI references
+- **2026-10-28 — [PR #41](https://github.com/Askeladd22/The-CUElist/pull/41):** fix(windows): Inspector collapse test build and unused variable
+- **2026-10-28 — [PR #40](https://github.com/Askeladd22/The-CUElist/pull/40):** feat(ui): Inspector collapsible to the right via persistent side tab
+- **2026-10-28 — [PR #39](https://github.com/Askeladd22/The-CUElist/pull/39):** feat(gui): Cuelist tabs, cue notepad, collapsible columns and live system panels
+- **2026-10-27 — [PR #38](https://github.com/Askeladd22/The-CUElist/pull/38):** Fix stale expanded-dock regression after gap-free Timeline layout
+- **2026-10-27 — [PR #37](https://github.com/Askeladd22/The-CUElist/pull/37):** Paint collapsed MIDI OSC dock region as panel to avoid a black Timeli…
+- **2026-10-27 — [PR #36](https://github.com/Askeladd22/The-CUElist/pull/36):** Fix Timeline minimum-height clipping and remaining workspace gutters
+- **2026-10-27 — [PR #35](https://github.com/Askeladd22/The-CUElist/pull/35):** Fix layout regressions: full-width lower editors, restored columns, resizable Timeline
+- **2026-10-27 — [PR #34](https://github.com/Askeladd22/The-CUElist/pull/34):** UI density, pinned cue headers/metrics, selectable audio fader range
+- **2026-10-27 — [PR #33](https://github.com/Askeladd22/The-CUElist/pull/33):** Refactor phase 4c: deterministic MIDI reconnect and one-shot Learn session policy
+- **2026-10-27 — [PR #32](https://github.com/Askeladd22/The-CUElist/pull/32):** Refactor phase 4b: isolate physical MIDI dispatch decisions and output target lookup
+- **2026-10-27 — [PR #31](https://github.com/Askeladd22/The-CUElist/pull/31):** Refactor phase 4a: separate Control Mapping runtime from Control Panel UI
+- **2026-10-27 — [PR #30](https://github.com/Askeladd22/The-CUElist/pull/30):** Refactor phase 3b: responsive docked editors on compact windows
+- **2026-10-27 — [PR #29](https://github.com/Askeladd22/The-CUElist/pull/29):** Refactor phase 3a: centralize deterministic workspace layout geometry
+- **2026-10-27 — [PR #28](https://github.com/Askeladd22/The-CUElist/pull/28):** Refactor phase 2c: transactional cue/column deletion and mapping cleanup
+- **2026-10-27 — [PR #27](https://github.com/Askeladd22/The-CUElist/pull/27):** Refactor phase 2b: pure transactional show-model operations
+- **2026-10-27 — [PR #26](https://github.com/Askeladd22/The-CUElist/pull/26):** Refactor phase 2a: extract cue and cell editing operations
+- **2026-10-27 — [PR #25](https://github.com/Askeladd22/The-CUElist/pull/25):** Refactor phase 1: separate Inspector and project lifecycle from MainComponent
+- **2026-10-27 — [PR #24](https://github.com/Askeladd22/The-CUElist/pull/24):** Tighten cue grid margins and Inspector alignment; edit cell Gain as dB text
+- **2026-10-27 — [PR #23](https://github.com/Askeladd22/The-CUElist/pull/23):** Remove redundant Cue List heading
+- **2026-10-27 — [PR #22](https://github.com/Askeladd22/The-CUElist/pull/22):** Fix crooked Loop Playback glyph alignment
+- **2026-10-27 — [PR #21](https://github.com/Askeladd22/The-CUElist/pull/21):** UI/usability polish: project title, contextual actions, activity LEDs and lock icon
+- **2026-10-26 — [PR #20](https://github.com/Askeladd22/The-CUElist/pull/20):** Feat/master fader osc timeline 20261026
+- **2026-10-26 — [PR #19](https://github.com/Askeladd22/The-CUElist/pull/19):** Control Mapping v10 — conferma GO e icona approvata The Cuelist
+- **2026-10-26 — [PR #18](https://github.com/Askeladd22/The-CUElist/pull/18):** Fix Windows compilation: invalid break in ControlUI.cpp
+- **2026-10-26 — [PR #17](https://github.com/Askeladd22/The-CUElist/pull/17):** v0.6 — Control & Mapping v10: MIDI Learn, preset cue e routing + icona
+- **2026-10-26 — [PR #16](https://github.com/Askeladd22/The-CUElist/pull/16):** Feat/v06 osc automation editor
+- **2026-10-26 — [PR #15](https://github.com/Askeladd22/The-CUElist/pull/15):** v0.6 OSC Clip Editor v0.2 — timeline, automazioni e Stop/Restart
+- **2026-10-26 — [PR #14](https://github.com/Askeladd22/The-CUElist/pull/14):** v0.6 — GainMeterFader stereo integrato con scala dB comune
+- **2026-10-26 — [PR #13](https://github.com/Askeladd22/The-CUElist/pull/13):** v0.6 UX polish — Auto Stop compatto, azioni cue, pan e nomi automatici
+- **2026-10-26 — [PR #12](https://github.com/Askeladd22/The-CUElist/pull/12):** v0.6 Fase 6 — revisione UX: celle, Auto Stop, timeline, OSC e mixer
+- **2026-10-26 — [PR #11](https://github.com/Askeladd22/The-CUElist/pull/11):** v0.6 Fase 5 — mixer compatto, pan rotativo, meter e Master audio
+- **2026-10-26 — [PR #10](https://github.com/Askeladd22/The-CUElist/pull/10):** v0.6 Fase 4 — Auto Stop 2.0 per cella audio, MIDI e OSC
+- **2026-10-26 — [PR #9](https://github.com/Askeladd22/The-CUElist/pull/9):** v0.6 Fase 3 — OSC UDP, editor secondi/beat e formato show v6
+- **2026-10-26 — [PR #8](https://github.com/Askeladd22/The-CUElist/pull/8):** v0.6 Fase 2: griglia musicale e snap indipendenti nella timeline
+- **2026-10-26 — [PR #6](https://github.com/Askeladd22/The-CUElist/pull/6):** v0.6 — Fase 1: Clip Editor integrato, flottante e editing MIDI immediato
+- **2026-10-26 — [PR #5](https://github.com/Askeladd22/The-CUElist/pull/5):** Documentazione essenziale e licenza proprietaria perpetua
+- **2026-10-26 — [PR #3](https://github.com/Askeladd22/The-CUElist/pull/3):** Correzioni immediate: griglia BPM, snap e selezione multipla MIDI
+- **2026-10-25 — [PR #2](https://github.com/Askeladd22/The-CUElist/pull/2):** ci: stabilizzare il pacchetto portable Windows x64
+- **2026-10-25 — [PR #1](https://github.com/Askeladd22/The-CUElist/pull/1):** ci: build and verify distributable Windows portable ZIP
+
+### PR non integrate, escluse dalle funzionalità consegnate
+
+- [PR #7](https://github.com/Askeladd22/The-CUElist/pull/7) — The Cuelist 0.6 Fase 1 — Clip Editor integrato e modifiche MIDI immediate (**non integrata**)
+- [PR #4](https://github.com/Askeladd22/The-CUElist/pull/4) — Fix Windows portable CI and provide one-extraction download (**non integrata**)
