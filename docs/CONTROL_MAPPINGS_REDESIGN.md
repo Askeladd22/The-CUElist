@@ -111,3 +111,62 @@ import/export behavior must remain available for backwards compatibility.
 **Note:** headless/unit tests and compilation cannot substitute for
 actual GUI/audio/MIDI/OSC device QA; do not claim hardware behavior was
 tested when the CI only ran CTest.
+
+## Mapping editor follow-up fixes (2026-10-31)
+
+- Switching the **Map Selection** dropdown now updates the existing
+  `ControlPanel` component. It does **not** call `openControlPanel`, delete
+  its dialog or re-arm MIDI/OSC listeners in a replacement window. The
+  list selection and unsaved draft are cleared when the map changes.
+- New, Duplicate, Import, Rename and Delete refresh the same map chooser,
+  rather than closing and reopening the panel. Default Map remains the
+  first, immutable fallback entry.
+- The function-name field is populated by the **existing stable function
+  ID** used by the MIDI/OSC Learn system, including when a binding row
+  is selected or the function list is refreshed. Creating an additional
+  function requires an explicit name instead of fabricating a new
+  `MIDI Function N` or `OSC Function N` label.
+- **Save Mapping** applies the edited function name/destination and the
+  mapping's physical input in a single validated show transaction, for
+  both Default Map and reusable maps. Invalid settings leave the live
+  model unchanged. The project is marked dirty and can be persisted by
+  the normal project-save operation.
+- **Cancel** discards the current uncommitted editing draft and clears
+  the selection. Existing saved input bindings and the global function
+  identity are untouched. This control is also exposed in the cue-local
+  override editor. The separate **Save route** action, if explicitly used,
+  remains a separate immediate commit.
+- Consecutive MIDI/OSC Learn capture retains its previous auto-save
+  behavior but cannot implicitly save unsaved function rename/route drafts.
+  Unconfigured MIDI/OSC outputs remain valid, inert starter functions.
+
+### Manual UI / hardware regression checks (Windows)
+
+1. Open Control Mappings, note the dialog's actual window handle, switch
+   Default Map → saved map → Default Map. Verify the **same handle** and
+   same dialog instance throughout, with updated list rows and no stale
+   selection.
+2. Start an unsaved edit, change maps, return: the draft must be gone
+   and the previously saved binding must remain intact.
+3. Create, Duplicate, Rename, Import and Delete an unused map. Verify
+   the same Control Mappings window stays open, the dropdown selection
+   updates, and used maps still cannot be deleted.
+4. Name a function in MIDI/OSC Learn, select its mapping row, check the
+   exact same name/ID in the dropdown, Name field and row list.
+   Rename it via Save Mapping and verify Learn and Control Columns.
+5. Change MIDI input/OSC address, takeover, curve, invert, route and name
+   on a selected mapping; **Cancel** then reopen it. None of the unsaved
+   values should persist.
+6. Repeat and press **Save Mapping**. Switch maps, close and reopen the
+   dialog, then save/reload the project. Verify the input, output,
+   function name and mapping ID remain consistent.
+7. Repeat an invalid edit (e.g. invalid destination/range) and verify
+   neither the binding nor the function was partially committed.
+8. Test MIDI Learn and OSC Learn with actual hardware/network messages,
+   including consecutive captures and Stop Learn, and verify the
+   currently selected map receives them.
+9. Verify cue-local Control Column overrides, Default Map fallback and
+   older saved project files remain compatible.
+
+Windows CI compiles and runs CTest; it does **not** establish that
+hardware Learn, GUI window identity or operator flows passed manual QA.
