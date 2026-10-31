@@ -718,6 +718,107 @@ private:
     int editTemplateId=0;
     int sourceRow=0,sourceColumn=0;
     int sourceRowId=0,sourceColumnId=0;
+    int continuousLearn=0; // 0=off, 1=MIDI, 2=OSC
+    void updateInputVisibility() {
+        if (editSet) return;
+        const bool osc=inputKind.getSelectedId()==4;
+        inputAddress.setVisible(editingMapping && osc);
+        inputChannel.setVisible(editingMapping && !osc);
+        inputNumber.setVisible(editingMapping && !osc &&
+                               inputKind.getSelectedId()!=3);
+    }
+    void updateEditorVisibility() {
+        if (editSet) return; // Historical per-cue override editor is separate.
+        for (juce::Component* widget:std::initializer_list<juce::Component*>{
+            &functionChoice,&functionName,&saveRoute,&scope,&target,
+            &takeover,&columns,&outputChannel,&outputCc,&oscAddress,
+            &invert,&curve,&minimum,&maximum,&inputKind,&inputChannel,
+            &inputNumber,&inputAddress,&updateSelected,&remove})
+            widget->setVisible(editingMapping);
+        updateSelected.setEnabled(editingMapping &&
+                                  (addingMapping || selected>=0));
+        remove.setEnabled(editingMapping && !addingMapping && selected>=0);
+        updateInputVisibility();
+        if (editingMapping) refreshDestinationFields();
+        resized();
+        repaint();
+    }
+    void showMapMenu() {
+        if (!owner || editSet) return;
+        juce::PopupMenu menu;
+        const bool saved=editTemplateId>0;
+        menu.addItem(1,"Rename Map",saved);
+        menu.addItem(2,"Delete Map",saved);
+        menu.addSeparator();
+        menu.addItem(3,"Export Map...");
+        menu.addItem(4,"Import Map...");
+        auto safe=juce::Component::SafePointer<ControlPanel>(this);
+        menu.showMenuAsync(
+            juce::PopupMenu::Options().withTargetComponent(&mapMore),
+            [safe](int choice) {
+                if (!safe || !safe->owner) return;
+                auto* panel=safe.getComponent();
+                if (choice==1) {panel->renameSelectedMap();return;}
+                if (choice==2) {panel->deleteSelectedMap();return;}
+                if (choice==3) {
+                    const auto json=exportControlMap(panel->owner->show,
+                                                       panel->editTemplateId);
+                    if (json.isEmpty()) {
+                        panel->state.setText("Cannot export the selected map.",
+                                             juce::dontSendNotification);return;
+                    }
+                    panel->presetFileChooser=std::make_unique<juce::FileChooser>(
+                        "Export Control Map",
+                        juce::File::getSpecialLocation(juce::File::userDocumentsDirectory)
+                            .getChildFile("TheCuelist-ControlMap.json"),"*.json");
+                    panel->presetFileChooser->launchAsync(
+                        juce::FileBrowserComponent::saveMode |
+                        juce::FileBrowserComponent::canSelectFiles,
+                        [safe,json](const juce::FileChooser& chooser) {
+                            if (!safe) return;
+                            const auto file=chooser.getResult();
+                            if (file==juce::File()) return;
+                            safe->state.setText(file.replaceWithText(json) ?
+                                "Selected map exported." : "Map export failed.",
+                                juce::dontSendNotification);
+                        });
+                } else if (choice==4) {
+                    panel->presetFileChooser=std::make_unique<juce::FileChooser>(
+                        "Import Control Map",
+                        juce::File::getSpecialLocation(juce::File::userDocumentsDirectory),
+                        "*.json");
+                    panel->presetFileChooser->launchAsync(
+                        juce::FileBrowserComponent::openMode |
+                        juce::FileBrowserComponent::canSelectFiles,
+                        [safe](const juce::FileChooser& chooser) {
+                            if (!safe || !safe->owner) return;
+                            const auto file=chooser.getResult();
+                            if (file==juce::File()) return;
+                            if (file.getSize()>256*1024) {
+                                safe->state.setText("Map file exceeds 256KB.",
+                                    juce::dontSendNotification);return;
+                            }
+                            auto* main=safe->owner.getComponent();
+                            auto candidate=main->show;
+                            const auto result=importControlMap(file.loadFileAsString(),
+                                                               candidate);
+                            if (result.failed()) {
+                                safe->state.setText(result.getErrorMessage(),
+                                                    juce::dontSendNotification);
+                                return;
+                            }
+                            const int id=candidate.controls.templates.back().id;
+                            main->show=std::move(candidate);
+                            main->dirty=true;
+                            main->refreshControlSettings();main->refresh();
+                            juce::Component::SafePointer<MainComponent> safeMain(main);
+                            juce::MessageManager::callAsync([safeMain,id] {
+                                if (safeMain) safeMain->openControlPanel(false,id);
+                            });
+                        });
+                }
+            });
+    }
     bool resolveSource(int& row,int& column) const {
         if (!owner) return false;
         for (int i=0;i<(int)owner->show.rows.size();++i)
