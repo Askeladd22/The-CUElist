@@ -23,7 +23,7 @@ pubbliche. I particolari di ogni intervento sono nell'appendice.
 - Verifica CI che confronta `VERSION.txt` e la sezione più recente del changelog e richiede incremento di versione per ogni PR successiva.
 
 ### Modificato
-- Versione sorgente da `0.9.0-beta.5` a `0.9.0-beta.6`, mantenendo l'unica fonte esistente `VERSION.txt`. CMake, versione in-app About, eseguibili e packaging continuano a derivarla da quel file.
+- Versione sorgente da `0.9.0-beta.5` a `0.9.0-beta.6`, mantenendo l'unica fonte esistente `VERSION.txt`. CMake, versione in-app About, eseguibili e packaging continuano a derivarla da quel file. I pacchetti portable manuali includono ora sia `VERSION.txt` sia `CHANGELOG.md`, verificati dal controllo di integrità.
 - README e checklist beta rimandano alla versione corrente in `VERSION.txt`, evitando numeri obsoleti copiati a mano.
 
 ### Verifiche e limitazioni
