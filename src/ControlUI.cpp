@@ -1,5 +1,6 @@
 #include "MainComponent.h"
 #include "OperatorTextPrompt.h"
+#include "ControlMapArchive.h"
 #include <cmath>
 
 namespace cuelist {
@@ -143,7 +144,7 @@ class ControlPanel final : public juce::Component, private juce::Timer,
                            private juce::ListBoxModel {
 public:
     explicit ControlPanel(MainComponent& main,bool useSet,int templateId=0):owner(&main),
-        editSet(useSet || templateId>0),editTemplateId(templateId),
+        editSet(useSet && templateId==0),editTemplateId(templateId),
         sourceRow(main.selectedRow),sourceColumn(main.selectedColumn),
         sourceRowId(main.show.rows[(size_t)main.selectedRow].id),
         sourceColumnId(main.show.columns[(size_t)main.selectedColumn].id) {
@@ -154,13 +155,36 @@ public:
             &outputCc,&outputChannel,&oscAddress,&invert,&updateSelected,&curve,&minimum,&maximum,
              &functionChoice,&functionName,&newFunction,&saveRoute,
              &saveControllerPreset,&loadControllerPreset,&effectivePreview,&templateName,&templates,&saveTemplate,&loadTemplate,
-             &emptyBindings,&mapChooser,&newMap,&cloneMap,&renameMap,&deleteMap})
+             &emptyBindings,&mapChooser,&newMap,&cloneMap,&renameMap,&deleteMap,
+            &mapMore,&inputKind,&inputChannel,&inputNumber,&inputAddress,&cancelLearn})
             addAndMakeVisible(c);
         mapChooser.setName("mappingMapSelector");
         newMap.setName("mappingNewMap");
         cloneMap.setName("mappingDuplicateMap");
         newMap.setButtonText("New Map");
         cloneMap.setButtonText("Duplicate");
+        mapMore.setName("mappingMoreMenu");
+        mapMore.setButtonText("...");
+        mapMore.setTooltip("Rename, delete, import or export the selected map");
+        inputKind.setName("mappingInputKind");
+        inputKind.addItemList({"MIDI CC","MIDI Note","MIDI Pitch Bend","OSC"},1);
+        inputKind.setSelectedId(1);
+        inputChannel.setName("mappingInputChannel");
+        inputChannel.setText("1",false);
+        inputChannel.setInputRestrictions(2,"0123456789");
+        inputNumber.setName("mappingInputNumber");
+        inputNumber.setText("0",false);
+        inputNumber.setInputRestrictions(5,"0123456789");
+        inputAddress.setName("mappingInputAddress");
+        inputAddress.setText("/control",false);
+        cancelLearn.setName("mappingCancelLearn");
+        cancelLearn.setButtonText("Stop Learn");
+        cancelLearn.onClick=[this] { if (owner) {
+            owner->controlLearnArmed=false;owner->oscLearnArmed=false;
+            owner->learnedInput.reset();
+            state.setText("Learn stopped.",juce::dontSendNotification);
+        }};
+        inputKind.onChange=[this] {updateInputVisibility();};
         renameMap.setName("mappingRenameMap");
         renameMap.setButtonText("Rename Map");
         deleteMap.setName("mappingDeleteMap");
@@ -205,6 +229,9 @@ public:
         deleteMap.onClick=[this]{deleteSelectedMap();};
         renameMap.setEnabled(editTemplateId>0);
         deleteMap.setEnabled(editTemplateId>0);
+        renameMap.setVisible(false);
+        deleteMap.setVisible(false);
+        mapMore.onClick=[this] {showMapMenu();};
         functionChoice.setName("mappingAbstractFunction");
         functionName.setName("mappingAbstractFunctionName");
         functionName.setTextToShowWhenEmpty("Function name (e.g. Resolume Brightness)",palette::muted);
@@ -216,8 +243,8 @@ public:
         loadControllerPreset.setName("importControllerPreset");
         saveControllerPreset.setButtonText("Export Default Map");
         loadControllerPreset.setButtonText("Import Default Map");
-        saveControllerPreset.setVisible(!editSet);
-        loadControllerPreset.setVisible(!editSet);
+        saveControllerPreset.setVisible(false);
+        loadControllerPreset.setVisible(false);
         saveControllerPreset.setTooltip("Export hardware inputs and destinations without project-specific function names.");
         loadControllerPreset.setTooltip("Import routing by function order; preserve project names, other functions and cue-local overrides.");
         saveControllerPreset.onClick=[this] {
@@ -380,7 +407,7 @@ public:
             state.setText("Capture OSC armed on configured UDP ports. Send a supported message.",
                           juce::dontSendNotification);
         };
-        add.setButtonText("Add mapping");
+        add.setButtonText("+ Add Mapping");
         updateSelected.setButtonText("Update selected");
         updateSelected.setName("mappingUpdateSelected");
         updateSelected.setEnabled(false);
@@ -388,13 +415,14 @@ public:
         emptyBindings.setName("mappingEmptyState");
         emptyBindings.setText(editSet ?
              "No local overrides. Functions inherit the Default Map." :
-             "No Default Map inputs. Create a function, then use Learn.",
+             "This map has no inputs. Add a mapping or use MIDI/OSC Learn.",
              juce::dontSendNotification);
         emptyBindings.setColour(juce::Label::textColourId,palette::muted);
         emptyBindings.setFont(font(13.5f));
         emptyBindings.setJustificationType(juce::Justification::centred);
         emptyBindings.setInterceptsMouseClicks(false,false);
-        updateSelected.onClick=[this] { createBinding(true); };
+        updateSelected.setButtonText("Save Mapping");
+        updateSelected.onClick=[this] { createBinding(!addingMapping); };
         curve.setName("mappingResponseCurve");
         curve.addItemList({"Linear","Ease in","Ease out"},1);
         curve.setSelectedId(1);
@@ -456,8 +484,10 @@ public:
         scope.setSelectedId(1);
         scope.onChange=[this] { refreshDestinationFields(); };
         scope.setVisible(!editSet);
-        presets.setVisible(!editSet); newPreset.setVisible(!editSet);
-        assignPreset.setVisible(!editSet); presetName.setVisible(!editSet);
+        // Preserve legacy Cue Presets in serialized shows, but do not
+        // manage cue assignments from the map archive window.
+        presets.setVisible(false);newPreset.setVisible(false);
+        assignPreset.setVisible(false);presetName.setVisible(false);
         target.addItemList({"Master Audio","Audio column gain","GO next cue","PANIC",
                             "MIDI CC","OSC Float","Audio column pan","Master pan",
                              "Audio Mute","Phase / Polarity","L/R Send","Limiter On/Off"},1);
@@ -510,7 +540,17 @@ public:
                     " — move its hardware control, then click Update selected." :
                 "MIDI Learn for NEW mapping — move a controller control.",juce::dontSendNotification);
         };
-        add.onClick=[this]{ createBinding(false); };
+        add.onClick=[this] {
+            if (editSet) { createBinding(false);return; }
+            selected=-1;addingMapping=true;editingMapping=true;captured.reset();
+            bindingList.deselectAllRows();
+            inputKind.setSelectedId(1,juce::dontSendNotification);
+            inputChannel.setText("1",false);inputNumber.setText("0",false);
+            inputAddress.setText("/control",false);
+            updateEditorVisibility();
+            state.setText("New mapping: choose input/function, then Save Mapping or Learn.",
+                          juce::dontSendNotification);
+        };
         remove.onClick=[this]{
             const auto* bindings=currentBindings();
             if (!owner || !bindings || selected<0 || selected>=(int)bindings->size()) return;
@@ -545,8 +585,8 @@ public:
         // only capture a source input for the selected map/assignment.
         device.setVisible(false);connect.setVisible(false);oscInputPort.setVisible(false);
         learn.setVisible(true);oscLearn.setVisible(true);
-        learn.setButtonText("Capture MIDI");
-        oscLearn.setButtonText("Capture OSC");
+        learn.setButtonText("MIDI Learn");
+        oscLearn.setButtonText("OSC Learn");
         learn.setName("mappingCaptureMidi");
         oscLearn.setName("mappingCaptureOsc");
         refreshDevices(); refreshPresets(); refreshColumns();refreshTemplates();
@@ -565,9 +605,17 @@ public:
         refreshDestinationFields();
         refreshEmptyState();
         updateEffectivePreview();
-        setSize(780,editSet ? 764 : 658); startTimerHz(10);
+        if (!editSet) { editingMapping=false; updateEditorVisibility(); }
+        setSize(860,editSet ? 764 : 790); startTimerHz(10);
     }
-    ~ControlPanel() override {stopTimer();bindingList.setModel(nullptr);}
+    ~ControlPanel() override {
+        stopTimer();
+        if (owner) {
+            owner->controlLearnArmed=false;owner->oscLearnArmed=false;
+            owner->learnedInput.reset();
+        }
+        bindingList.setModel(nullptr);
+    }
     void paint(juce::Graphics& g) override {
         g.fillAll(palette::panel);
         label(g,editTemplateId>0 ? "SAVED CONTROL MAP" :
@@ -698,7 +746,10 @@ private:
         return cell.controlSet ? &cell.controlSet->bindings : nullptr;
     }
     juce::ComboBox device,presets,scope,target,takeover,columns,curve,templates,functionChoice,mapChooser;
-    juce::TextButton newMap,cloneMap,renameMap,deleteMap;
+    juce::TextButton newMap,cloneMap,renameMap,deleteMap,mapMore,cancelLearn;
+    juce::ComboBox inputKind;
+    juce::TextEditor inputChannel,inputNumber,inputAddress;
+    bool editingMapping=false,addingMapping=false;
     std::vector<std::pair<int,int>> availableMaps;
     std::vector<int> availableTemplateIds;
     void renameSelectedMap() {
