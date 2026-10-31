@@ -319,25 +319,34 @@ public:
                     auto& main=*panel.owner.getComponent();
                     const int selectedId=panel.functionChoice.getSelectedId()-1;
                     if (choice==1 || choice==2) {
-                        ControlBinding destination;
-                        destination.target=choice==1 ? ControlTarget::midiCc : ControlTarget::oscFloat;
-                        destination.maximum=choice==1 ? 127.0f : 1.0f;
-                        for (const auto& col:main.show.columns)
-                            if ((choice==1 && col.type==ColumnType::midi) ||
-                                (choice==2 && col.type==ColumnType::osc)) {
-                                destination.targetColumnId=col.id;break;
-                            }
-                        const juce::String base=choice==1 ? "MIDI Function " : "OSC Function ";
-                        // This field shows the selected function's current name.
-                        // Never accidentally copy it when creating a new slot.
-                        const auto name=base+juce::String((int)main.show.controls.functions.size()+1);
-                        const int id=main.createAbstractControlFunction(name,destination);
-                        if (id>0) {
-                            panel.refreshFunctions();
-                            panel.functionChoice.setSelectedId(id+1);
-                            panel.state.setText("Function created. Use Learn to assign an input.",
-                                juce::dontSendNotification);
-                        } else panel.state.setText(main.status,juce::dontSendNotification);
+                        // A function has one stable identity shared with MIDI/OSC
+                        // Learn. Never invent "MIDI function N" as an editor label.
+                        const auto safePanel=juce::Component::SafePointer<ControlPanel>(&panel);
+                        showOperatorTextPrompt(main,main.theme,
+                            choice==1 ? "New MIDI Function" : "New OSC Function",
+                            "Name the real destination or parameter for MIDI/OSC Learn.",
+                            "Function name",{},false,"Create",
+                            [safePanel,choice](juce::String title) {
+                                if (!safePanel || !safePanel->owner) return;
+                                auto& panel=*safePanel.getComponent();
+                                auto& main=*panel.owner.getComponent();
+                                ControlBinding destination;
+                                destination.target=choice==1 ?
+                                    ControlTarget::midiCc : ControlTarget::oscFloat;
+                                destination.maximum=choice==1 ? 127.0f : 1.0f;
+                                for (const auto& col:main.show.columns)
+                                    if ((choice==1 && col.type==ColumnType::midi) ||
+                                        (choice==2 && col.type==ColumnType::osc)) {
+                                        destination.targetColumnId=col.id;break;
+                                    }
+                                const int id=main.createAbstractControlFunction(title,destination);
+                                if (id>0) {
+                                    panel.refreshFunctions();
+                                    panel.functionChoice.setSelectedId(id+1);
+                                    panel.state.setText("Function created. Use Learn to assign an input.",
+                                        juce::dontSendNotification);
+                                } else panel.state.setText(main.status,juce::dontSendNotification);
+                            });
                     } else if (choice==3 || choice==4) {
                         if (main.moveAbstractControlFunction(selectedId,choice==3 ? -1 : 1)) {
                             panel.refreshFunctions();
@@ -1387,12 +1396,69 @@ private:
             b.maximum=high.getFloatValue();
         }
         int row=-1,column=-1;
-        const bool resolved=editTemplateId>0 || !editSet || resolveSource(row,column);
-        const bool saved=resolved && (editTemplateId>0 ?
-            owner->modifyReusableControlBinding(editTemplateId,b.id,b,update ? 1 : 0) :
-            update ? owner->updateControlBinding(row,column,b.id,b,editSet) :
-            editSet ? owner->addControlSetBinding(row,column,b) :
-                      owner->addMappingBinding(b));
+        bool saved=false;
+        if (!editSet) {
+            // Commit function name/route and physical input together: invalid
+            // edits cannot partially alter the active show or reusable map.
+            auto candidate=owner->show;
+            if (b.functionId>0) {
+                auto f=std::find_if(candidate.controls.functions.begin(),
+                    candidate.controls.functions.end(),
+                    [&](const ControlFunction& item){return item.id==b.functionId;});
+                if (f==candidate.controls.functions.end()) {
+                    state.setText("Selected function no longer exists.",
+                                  juce::dontSendNotification);return;
+                }
+                const auto name=functionName.getText().trim();
+                if (name.isEmpty() || name.length()>120) {
+                    state.setText("Enter a function name (1–120 characters).",
+                                  juce::dontSendNotification);return;
+                }
+                const auto route=readRoute();
+                if (!route) return;
+                f->name=name;
+                f->destination=*route;
+                f->destination.id=0;f->destination.functionId=0;
+                f->destination.deviceId={};
+                f->destination.scope=ControlScope::global;
+                f->destination.scopeId=0;
+                b=materializeFunctionBinding(b,*f);
+            }
+            std::vector<ControlBinding>* assignments=&candidate.controls.bindings;
+            if (editTemplateId>0) {
+                auto map=std::find_if(candidate.controls.templates.begin(),
+                    candidate.controls.templates.end(),
+                    [&](const ControlSetTemplate& item){return item.id==editTemplateId;});
+                if (map==candidate.controls.templates.end()) {
+                    state.setText("Selected map no longer exists.",
+                                  juce::dontSendNotification);return;
+                }
+                assignments=&map->set.bindings;
+                b.scope=ControlScope::global;b.scopeId=0;
+            }
+            if (update) {
+                auto it=std::find_if(assignments->begin(),assignments->end(),
+                    [&](const ControlBinding& item){return item.id==b.id;});
+                if (it==assignments->end()) {
+                    state.setText("Mapping no longer exists.",juce::dontSendNotification);
+                    return;
+                }
+                *it=b;
+            } else {
+                b.id=candidate.controls.nextId++;
+                assignments->push_back(b);
+            }
+            const auto result=validateShow(candidate);
+            if (result.wasOk()) {
+                owner->show=std::move(candidate);
+                owner->refreshControlSettings();owner->dirty=true;owner->refresh();
+                saved=true;
+                refreshFunctions();
+            } else state.setText(result.getErrorMessage(),juce::dontSendNotification);
+        } else if (resolveSource(row,column)) {
+            saved=update ? owner->updateControlBinding(row,column,b.id,b,true) :
+                          owner->addControlSetBinding(row,column,b);
+        }
         if (saved) {
             bindingList.updateContent();bindingList.repaint();
             selected=-1;addingMapping=false;
@@ -1487,7 +1553,12 @@ private:
         // Combo target item order differs from ControlTarget enumeration.
         const ControlBinding* route=&b;
         for (const auto& f:owner->show.controls.functions)
-            if (f.id==b.functionId) {route=&f.destination;break;}
+            if (f.id==b.functionId) {
+                route=&f.destination;
+                functionName.setText(f.name,false);
+                break;
+            }
+        if (b.functionId==0) functionName.clear();
         showRoute(*route);
         takeover.setSelectedId((int)b.takeover+1,juce::dontSendNotification);
         curve.setSelectedId((int)b.curve+1,juce::dontSendNotification);
