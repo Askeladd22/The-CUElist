@@ -410,6 +410,7 @@ public:
             state.setText("Capture OSC armed on configured UDP ports. Send a supported message.",
                           juce::dontSendNotification);
         };
+        add.setName("mappingAddMapping");
         add.setButtonText("+ Add Mapping");
         updateSelected.setButtonText("Update selected");
         updateSelected.setName("mappingUpdateSelected");
