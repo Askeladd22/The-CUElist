@@ -371,6 +371,49 @@ void uiRefinementTests() {
         delete dialog;
     });
 
+    test("Control Mappings archive is independent from cue assignment and opens details on demand",[] {
+        MainComponent ui(false);
+        const auto originalColumns=ui.show.columns.size();
+        const auto originalAssignments=ui.show.rows[0].cells.size();
+        ui.openControlPanel(false);
+        auto* dialog=dynamic_cast<juce::DialogWindow*>(
+            juce::ModalComponentManager::getInstance()->getModalComponent(0));
+        check(dialog!=nullptr,"Map archive window failed to open");
+        auto* chooser=dynamic_cast<juce::ComboBox*>(
+            controlsV3::named(*dialog,"mappingMapSelector"));
+        auto* newMap=controlsV3::named(*dialog,"mappingNewMap");
+        auto* duplicate=controlsV3::named(*dialog,"mappingDuplicateMap");
+        auto* menu=controlsV3::named(*dialog,"mappingMoreMenu");
+        auto* add=dynamic_cast<juce::TextButton*>(
+            controlsV3::named(*dialog,"mappingAddMapping"));
+        auto* kind=controlsV3::named(*dialog,"mappingInputKind");
+        auto* target=controlsV3::named(*dialog,"mappingTarget");
+        auto* save=controlsV3::named(*dialog,"mappingUpdateSelected");
+        auto* midi=controlsV3::named(*dialog,"mappingCaptureMidi");
+        auto* osc=controlsV3::named(*dialog,"mappingCaptureOsc");
+        check(chooser && newMap && duplicate && menu && add && kind &&
+              target && save && midi && osc,
+              "Focused mapping archive controls missing");
+        check(chooser->getSelectedId()==1 &&
+              chooser->getText()=="Default Map (fallback)",
+              "Default Map must open selected as fallback");
+        check(newMap->isVisible() && duplicate->isVisible() &&
+              menu->isVisible() && midi->isVisible() && osc->isVisible(),
+              "Map archive or Learn actions invisible");
+        check(!kind->isVisible() && !target->isVisible() &&
+              !save->isVisible(),
+              "Detailed mapping fields must be hidden until selection");
+        check(ui.show.columns.size()==originalColumns &&
+              ui.show.rows[0].cells.size()==originalAssignments &&
+              ui.show.controls.templates.empty(),
+              "Opening the archive unexpectedly created a Control Column or map");
+        add->onClick();
+        check(kind->isVisible() && target->isVisible() &&
+              save->isVisible() && save->isEnabled(),
+              "Add Mapping failed to open a dedicated editor");
+        delete dialog;
+    });
+
     test("Midnight Slate palette preserves layered dark surfaces and safety accents",[] {
         const auto brightness=[](juce::Colour colour) {
             return 0.2126f*(float)colour.getRed()+
