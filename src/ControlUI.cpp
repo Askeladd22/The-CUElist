@@ -997,7 +997,12 @@ private:
                 state.setText("No map selected to duplicate.",juce::dontSendNotification);
                 return;
             }
-            source.bindings=*bindings;
+            for (const auto& binding:*bindings)
+                if (editTemplateId>0 || binding.scope==ControlScope::global)
+                    source.bindings.push_back(binding);
+            // Default Map's legacy cue/preset-scoped assignments are not
+            // global fallback inputs and must not become globally active
+            // just because its map contents were duplicated.
         }
         // Reusable maps are independent from Control Columns until assigned.
         const auto& saved=owner->show.controls.templates;
