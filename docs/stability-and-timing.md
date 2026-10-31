@@ -1,6 +1,6 @@
 # The Cuelist — Stabilization (0.7) and transport foundations (0.8)
 
-**Current development version:** 0.9.0-beta.5, **show format:** v10. A successful build is not certification for unattended or safety-critical show operation.
+**Current development version:** versione in [VERSION.txt](../VERSION.txt), **show format:** v10. A successful build is not certification for unattended or safety-critical show operation.
 
 ## Implemented in the stabilization preview
 

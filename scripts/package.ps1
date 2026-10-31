@@ -16,6 +16,8 @@ New-Item -ItemType Directory -Path $dist -Force | Out-Null
 Copy-Item -LiteralPath $exe -Destination (Join-Path $package 'The Cuelist.exe')
 Copy-Item -LiteralPath (Join-Path $repo 'Avvia.cmd') -Destination $package
 Copy-Item -LiteralPath (Join-Path $repo 'README.md') -Destination $package
+Copy-Item -LiteralPath (Join-Path $repo 'VERSION.txt') -Destination $package
+Copy-Item -LiteralPath (Join-Path $repo 'CHANGELOG.md') -Destination $package
 New-Item -ItemType Directory -Path (Join-Path $package 'docs') -Force | Out-Null
 Copy-Item -LiteralPath (Join-Path $repo 'docs\complete-user-guide.md') -Destination (Join-Path $package 'docs\complete-user-guide.md')
 Copy-Item -LiteralPath (Join-Path $repo 'LICENSE') -Destination $package
@@ -38,6 +40,7 @@ Avvia.cmd is an alternative launcher. It does not build or install anything.
 Import a WAV or MP3 file. SPACE triggers the next cue; ESC/PANIC stops playback.
 To move a show, copy both its .cuelist file and adjacent _media folder.
 Read README.md for operating instructions and version limitations.
+Read CHANGELOG.md for the versioned history of updates and known limitations.
 MIDI: import or create notes in the piano roll; select the output in column utilities.
 OSC: configure the UDP destination in column utilities and edit timed events/ramps.
 

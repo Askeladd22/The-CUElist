@@ -9,7 +9,7 @@ $checkRoot = Join-Path $repo ('build\package-check-' + [guid]::NewGuid().ToStrin
 New-Item -ItemType Directory -Path $checkRoot | Out-Null
 Expand-Archive -LiteralPath $zip -DestinationPath $checkRoot
 $package = Join-Path $checkRoot $name
-foreach ($file in @('The Cuelist.exe', 'Avvia.cmd', 'README-WINDOWS.txt', 'README.md', 'LICENSE', 'NOTICE.md', 'JUCE-LICENSE.md', 'SHA256.txt')) {
+foreach ($file in @('The Cuelist.exe', 'Avvia.cmd', 'README-WINDOWS.txt', 'README.md', 'VERSION.txt', 'CHANGELOG.md', 'LICENSE', 'NOTICE.md', 'JUCE-LICENSE.md', 'SHA256.txt')) {
     if (!(Test-Path -LiteralPath (Join-Path $package $file))) { throw "Missing file: $file" }
 }
 foreach ($license in @('Exo2-OFL.txt','Hind-OFL.txt','NotoSansMath-OFL.txt','NotoSansSymbols2-OFL.txt')) {
@@ -23,7 +23,7 @@ if (Test-Path -LiteralPath (Join-Path $package 'Sorgenti.zip')) { throw 'Unexpec
 $guide = 'docs\complete-user-guide.md'
 if (!(Test-Path -LiteralPath (Join-Path $package $guide))) { throw "Missing offline User Guide: $guide" }
 if ((Get-FileHash -LiteralPath (Join-Path $repo $guide)).Hash -ne (Get-FileHash -LiteralPath (Join-Path $package $guide)).Hash) { throw 'Outdated bundled User Guide.' }
-foreach ($file in @('README.md','LICENSE','NOTICE.md')) {
+foreach ($file in @('README.md','VERSION.txt','CHANGELOG.md','LICENSE','NOTICE.md')) {
     if ((Get-FileHash -LiteralPath (Join-Path $repo $file)).Hash -ne (Get-FileHash -LiteralPath (Join-Path $package $file)).Hash) { throw "Outdated document: $file" }
 }
 Write-Host 'PASS: license and documentation are current; no source archive included.'

@@ -1,6 +1,6 @@
 # The Cuelist — Complete User Guide
 
-**Current prerelease:** `0.9.0-beta.5` · **Windows:** x64 · **Project schema:** v10 · **JUCE:** 8.0.12 · **License:** proprietary
+**Current prerelease:** `versione in [VERSION.txt](../VERSION.txt)` · **Windows:** x64 · **Project schema:** v10 · **JUCE:** 8.0.12 · **License:** proprietary
 
 This English guide covers the software currently implemented in this repository. It replaces the legacy 0.8-alpha instructions. For an executive overview, see the [README](../README.md).
 
@@ -319,7 +319,7 @@ The Timeline represents the selected cue's clip timing, provides zoom, grid visi
 
 ### 12.1 Saving and transferring a show
 
-The project document is `<name>.cuelist`, a versioned JSON file with **schema v10**. The application version `0.9.0-beta.5` is a separate identifier. Audio assets are collected into an adjacent `<name>_media` folder; **transfer the project file and this folder together**. MIDI/OSC clip data and Cuelist metadata are saved within the project document.
+The project document is `<name>.cuelist`, a versioned JSON file with **schema v10**. The application version `versione in [VERSION.txt](../VERSION.txt)` is a separate identifier. Audio assets are collected into an adjacent `<name>_media` folder; **transfer the project file and this folder together**. MIDI/OSC clip data and Cuelist metadata are saved within the project document.
 
 Overwriting may retain a `.cuelist.bak` backup and older media generations. Check disk usage. Previously created schema v1–v9 and compatible v10 projects can be opened by the supported migration logic; the optional multi-Cuelist and cue-note fields do not require a schema-number change. Newer feature data may not be understood by older application binaries.
 
