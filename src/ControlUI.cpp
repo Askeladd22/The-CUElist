@@ -1,5 +1,6 @@
 #include "MainComponent.h"
 #include "OperatorTextPrompt.h"
+#include "ControlMapArchive.h"
 #include <cmath>
 
 namespace cuelist {
@@ -143,7 +144,7 @@ class ControlPanel final : public juce::Component, private juce::Timer,
                            private juce::ListBoxModel {
 public:
     explicit ControlPanel(MainComponent& main,bool useSet,int templateId=0):owner(&main),
-        editSet(useSet || templateId>0),editTemplateId(templateId),
+        editSet(useSet && templateId==0),editTemplateId(templateId),
         sourceRow(main.selectedRow),sourceColumn(main.selectedColumn),
         sourceRowId(main.show.rows[(size_t)main.selectedRow].id),
         sourceColumnId(main.show.columns[(size_t)main.selectedColumn].id) {
@@ -154,13 +155,37 @@ public:
             &outputCc,&outputChannel,&oscAddress,&invert,&updateSelected,&curve,&minimum,&maximum,
              &functionChoice,&functionName,&newFunction,&saveRoute,
              &saveControllerPreset,&loadControllerPreset,&effectivePreview,&templateName,&templates,&saveTemplate,&loadTemplate,
-             &emptyBindings,&mapChooser,&newMap,&cloneMap,&renameMap,&deleteMap})
+             &emptyBindings,&mapChooser,&newMap,&cloneMap,&renameMap,&deleteMap,
+            &mapMore,&inputKind,&inputChannel,&inputNumber,&inputAddress,&cancelLearn})
             addAndMakeVisible(c);
         mapChooser.setName("mappingMapSelector");
         newMap.setName("mappingNewMap");
         cloneMap.setName("mappingDuplicateMap");
         newMap.setButtonText("New Map");
         cloneMap.setButtonText("Duplicate");
+        mapMore.setName("mappingMoreMenu");
+        mapMore.setButtonText("...");
+        mapMore.setTooltip("Rename, delete, import or export the selected map");
+        inputKind.setName("mappingInputKind");
+        inputKind.addItemList({"MIDI CC","MIDI Note","MIDI Pitch Bend","OSC"},1);
+        inputKind.setSelectedId(1);
+        inputChannel.setName("mappingInputChannel");
+        inputChannel.setText("1",false);
+        inputChannel.setInputRestrictions(2,"0123456789");
+        inputNumber.setName("mappingInputNumber");
+        inputNumber.setText("0",false);
+        inputNumber.setInputRestrictions(5,"0123456789");
+        inputAddress.setName("mappingInputAddress");
+        inputAddress.setText("/control",false);
+        cancelLearn.setName("mappingCancelLearn");
+        cancelLearn.setButtonText("Stop Learn");
+        cancelLearn.onClick=[this] { if (owner) {
+            continuousLearn=0;
+            owner->controlLearnArmed=false;owner->oscLearnArmed=false;
+            owner->learnedInput.reset();
+            state.setText("Learn stopped.",juce::dontSendNotification);
+        }};
+        inputKind.onChange=[this] {updateInputVisibility();};
         renameMap.setName("mappingRenameMap");
         renameMap.setButtonText("Rename Map");
         deleteMap.setName("mappingDeleteMap");
@@ -205,6 +230,9 @@ public:
         deleteMap.onClick=[this]{deleteSelectedMap();};
         renameMap.setEnabled(editTemplateId>0);
         deleteMap.setEnabled(editTemplateId>0);
+        renameMap.setVisible(false);
+        deleteMap.setVisible(false);
+        mapMore.onClick=[this] {showMapMenu();};
         functionChoice.setName("mappingAbstractFunction");
         functionName.setName("mappingAbstractFunctionName");
         functionName.setTextToShowWhenEmpty("Function name (e.g. Resolume Brightness)",palette::muted);
@@ -216,8 +244,8 @@ public:
         loadControllerPreset.setName("importControllerPreset");
         saveControllerPreset.setButtonText("Export Default Map");
         loadControllerPreset.setButtonText("Import Default Map");
-        saveControllerPreset.setVisible(!editSet);
-        loadControllerPreset.setVisible(!editSet);
+        saveControllerPreset.setVisible(false);
+        loadControllerPreset.setVisible(false);
         saveControllerPreset.setTooltip("Export hardware inputs and destinations without project-specific function names.");
         loadControllerPreset.setTooltip("Import routing by function order; preserve project names, other functions and cue-local overrides.");
         saveControllerPreset.onClick=[this] {
@@ -283,10 +311,12 @@ public:
             const int id=functionChoice.getSelectedId()-1;
             scope.setSelectedId(1,juce::dontSendNotification);
             scope.setEnabled(id==0 && !editSet);
+            if (id==0 && !editSet) updateEditorVisibility();
             for (const auto& item:owner->show.controls.functions)
                 if (item.id==id) {
                     functionName.setText(item.name,false);
                     showRoute(item.destination);
+                    if (!editSet) updateEditorVisibility();
                     return;
                 }
         };
@@ -375,12 +405,13 @@ public:
                 state.setText("Enable an OSC UDP input in Settings first.",
                               juce::dontSendNotification);return;
             }
-            captured.reset();
+            continuousLearn=2;captured.reset();
             owner->armOscControlLearn();
             state.setText("Capture OSC armed on configured UDP ports. Send a supported message.",
                           juce::dontSendNotification);
         };
-        add.setButtonText("Add mapping");
+        add.setName("mappingAddMapping");
+        add.setButtonText("+ Add Mapping");
         updateSelected.setButtonText("Update selected");
         updateSelected.setName("mappingUpdateSelected");
         updateSelected.setEnabled(false);
@@ -388,13 +419,14 @@ public:
         emptyBindings.setName("mappingEmptyState");
         emptyBindings.setText(editSet ?
              "No local overrides. Functions inherit the Default Map." :
-             "No Default Map inputs. Create a function, then use Learn.",
+             "This map has no inputs. Add a mapping or use MIDI/OSC Learn.",
              juce::dontSendNotification);
         emptyBindings.setColour(juce::Label::textColourId,palette::muted);
         emptyBindings.setFont(font(13.5f));
         emptyBindings.setJustificationType(juce::Justification::centred);
         emptyBindings.setInterceptsMouseClicks(false,false);
-        updateSelected.onClick=[this] { createBinding(true); };
+        updateSelected.setButtonText("Save Mapping");
+        updateSelected.onClick=[this] { createBinding(!addingMapping); };
         curve.setName("mappingResponseCurve");
         curve.addItemList({"Linear","Ease in","Ease out"},1);
         curve.setSelectedId(1);
@@ -456,8 +488,10 @@ public:
         scope.setSelectedId(1);
         scope.onChange=[this] { refreshDestinationFields(); };
         scope.setVisible(!editSet);
-        presets.setVisible(!editSet); newPreset.setVisible(!editSet);
-        assignPreset.setVisible(!editSet); presetName.setVisible(!editSet);
+        // Preserve legacy Cue Presets in serialized shows, but do not
+        // manage cue assignments from the map archive window.
+        presets.setVisible(false);newPreset.setVisible(false);
+        assignPreset.setVisible(false);presetName.setVisible(false);
         target.addItemList({"Master Audio","Audio column gain","GO next cue","PANIC",
                             "MIDI CC","OSC Float","Audio column pan","Master pan",
                              "Audio Mute","Phase / Polarity","L/R Send","Limiter On/Off"},1);
@@ -504,13 +538,23 @@ public:
                 state.setText("Enable a MIDI input in Settings first.",
                               juce::dontSendNotification);return;
             }
-            captured.reset(); owner->armControlLearn();
+            continuousLearn=1;captured.reset(); owner->armControlLearn();
             state.setText(selected>=0 && currentBindings() && selected<(int)currentBindings()->size() ?
                 "MIDI Learn for mapping #"+juce::String((*currentBindings())[(size_t)selected].id)+
                     " — move its hardware control, then click Update selected." :
                 "MIDI Learn for NEW mapping — move a controller control.",juce::dontSendNotification);
         };
-        add.onClick=[this]{ createBinding(false); };
+        add.onClick=[this] {
+            if (editSet) { createBinding(false);return; }
+            selected=-1;addingMapping=true;editingMapping=true;captured.reset();
+            bindingList.deselectAllRows();
+            inputKind.setSelectedId(1,juce::dontSendNotification);
+            inputChannel.setText("1",false);inputNumber.setText("0",false);
+            inputAddress.setText("/control",false);
+            updateEditorVisibility();
+            state.setText("New mapping: choose input/function, then Save Mapping or Learn.",
+                          juce::dontSendNotification);
+        };
         remove.onClick=[this]{
             const auto* bindings=currentBindings();
             if (!owner || !bindings || selected<0 || selected>=(int)bindings->size()) return;
@@ -545,8 +589,8 @@ public:
         // only capture a source input for the selected map/assignment.
         device.setVisible(false);connect.setVisible(false);oscInputPort.setVisible(false);
         learn.setVisible(true);oscLearn.setVisible(true);
-        learn.setButtonText("Capture MIDI");
-        oscLearn.setButtonText("Capture OSC");
+        learn.setButtonText("MIDI Learn");
+        oscLearn.setButtonText("OSC Learn");
         learn.setName("mappingCaptureMidi");
         oscLearn.setName("mappingCaptureOsc");
         refreshDevices(); refreshPresets(); refreshColumns();refreshTemplates();
@@ -565,11 +609,57 @@ public:
         refreshDestinationFields();
         refreshEmptyState();
         updateEffectivePreview();
-        setSize(780,editSet ? 764 : 658); startTimerHz(10);
+        if (!editSet) { editingMapping=false; updateEditorVisibility(); }
+        setSize(860,editSet ? 764 : 790); startTimerHz(10);
     }
-    ~ControlPanel() override {stopTimer();bindingList.setModel(nullptr);}
+    ~ControlPanel() override {
+        stopTimer();
+        if (owner) {
+            owner->controlLearnArmed=false;owner->oscLearnArmed=false;
+            owner->learnedInput.reset();
+        }
+        bindingList.setModel(nullptr);
+    }
     void paint(juce::Graphics& g) override {
         g.fillAll(palette::panel);
+        if (!editSet) {
+            const int w=getWidth();
+            label(g,"CONTROL MAPPINGS",{22,12,w-44,36},22,palette::teal,true);
+            label(g,"MAP SELECTION",{22,61,420,20},12,palette::muted,true);
+            g.setColour(palette::line);
+            g.drawHorizontalLine(119,20,(float)w-20);
+            label(g,"MAPPING LIST",{22,200,w-44,24},12,palette::teal,true);
+            const int split1=(w-44)*38/100;
+            const int split2=(w-44)*66/100;
+            label(g,"FUNCTION",{29,235,split1-10,22},11,palette::muted,true);
+            label(g,"INPUT",{29+split1,235,split2-split1-10,22},11,palette::muted,true);
+            label(g,"DESTINATION",{29+split2,235,w-split2-70,22},11,palette::muted,true);
+            g.setColour(palette::line);
+            g.drawHorizontalLine(259,22,(float)w-22);
+            if (editingMapping) {
+                g.drawHorizontalLine(477,22,(float)w-22);
+                label(g,addingMapping?"ADD MAPPING":"EDIT MAPPING",
+                      {22,483,380,26},13,palette::teal,true);
+                label(g,"Function",{22,520,195,18},11,palette::muted,true);
+                label(g,"Name",{232,520,170,18},11,palette::muted,true);
+                label(g,"INPUT",{22,577,185,18},11,palette::teal,true);
+                label(g,"Kind",{22,600,100,18},10,palette::muted,true);
+                label(g,"Channel",{156,600,70,18},10,palette::muted,true);
+                label(g,"CC / Note",{235,600,100,18},10,palette::muted,true);
+                label(g,"OSC address",{346,600,200,18},10,palette::muted,true);
+                label(g,"DESTINATION / BEHAVIOUR",{22,654,300,18},11,palette::teal,true);
+                label(g,"Target",{22,675,150,17},10,palette::muted,true);
+                label(g,"Column",{215,675,160,17},10,palette::muted,true);
+                label(g,"Takeover",{410,675,110,17},10,palette::muted,true);
+                label(g,"Curve",{531,675,110,17},10,palette::muted,true);
+                label(g,"Output",{22,726,140,17},10,palette::muted,true);
+                label(g,"Range",{415,726,140,17},10,palette::muted,true);
+            } else {
+                label(g,"Select a mapping to edit its input, function and destination.",
+                    {22,493,w-44,28},13,palette::muted);
+            }
+            return;
+        }
         label(g,editTemplateId>0 ? "SAVED CONTROL MAP" :
               editSet ? "CONTROL SET / Q"+juce::String(sourceRow+1) :
               "DEFAULT MAP / CONTROL MAPPINGS",{20,15,620,31},21,palette::teal,true);
@@ -615,6 +705,42 @@ public:
     }
     void resized() override {
         const int w=getWidth();
+        if (!editSet) {
+            mapChooser.setBounds(22,86,w-352,30);
+            newMap.setBounds(w-318,86,112,30);
+            cloneMap.setBounds(w-198,86,115,30);
+            mapMore.setBounds(w-75,86,52,30);
+            learn.setBounds(22,136,133,31);
+            oscLearn.setBounds(164,136,133,31);
+            cancelLearn.setBounds(305,136,110,31);
+            add.setBounds(423,136,151,31);
+            newFunction.setBounds(582,136,w-604,31);
+            state.setBounds(22,170,w-44,21);
+            const int listHeight=editingMapping?205:410;
+            bindingList.setBounds(22,264,w-44,listHeight);
+            emptyBindings.setBounds(34,286,w-68,48);
+            functionChoice.setBounds(22,539,198,29);
+            functionName.setBounds(232,539,215,29);
+            saveRoute.setBounds(456,539,144,29);
+            updateSelected.setBounds(w-185,539,163,32);
+            remove.setBounds(w-185,578,163,31);
+            inputKind.setBounds(22,620,127,31);
+            inputChannel.setBounds(156,620,72,31);
+            inputNumber.setBounds(235,620,101,31);
+            inputAddress.setBounds(346,620,194,31);
+            target.setBounds(22,693,185,29);
+            columns.setBounds(215,693,187,29);
+            takeover.setBounds(410,693,114,29);
+            curve.setBounds(531,693,130,29);
+            scope.setBounds(668,693,w-690,29);
+            outputChannel.setBounds(22,743,54,28);
+            outputCc.setBounds(83,743,60,28);
+            oscAddress.setBounds(151,743,240,28);
+            minimum.setBounds(415,743,92,28);
+            maximum.setBounds(516,743,92,28);
+            invert.setBounds(620,742,110,31);
+            return;
+        }
         mapChooser.setBounds(20,97,w-314,31);
         newMap.setBounds(w-285,97,125,31);
         cloneMap.setBounds(w-150,97,130,31);
@@ -670,6 +796,120 @@ private:
     int editTemplateId=0;
     int sourceRow=0,sourceColumn=0;
     int sourceRowId=0,sourceColumnId=0;
+    int continuousLearn=0; // 0=off, 1=MIDI, 2=OSC
+    void updateInputVisibility() {
+        if (editSet) return;
+        const bool osc=inputKind.getSelectedId()==4;
+        inputAddress.setVisible(editingMapping && osc);
+        inputChannel.setVisible(editingMapping && !osc);
+        inputNumber.setVisible(editingMapping && !osc &&
+                               inputKind.getSelectedId()!=3);
+    }
+    void updateEditorVisibility() {
+        if (editSet) return; // Historical per-cue override editor is separate.
+        for (juce::Component* widget:std::initializer_list<juce::Component*>{
+            &functionChoice,&functionName,&saveRoute,&scope,&target,
+            &takeover,&columns,&outputChannel,&outputCc,&oscAddress,
+            &invert,&curve,&minimum,&maximum,&inputKind,&inputChannel,
+            &inputNumber,&inputAddress,&updateSelected,&remove})
+            widget->setVisible(editingMapping);
+        functionName.setVisible(editingMapping &&
+                                functionChoice.getSelectedId()>1);
+        saveRoute.setVisible(editingMapping &&
+                             functionChoice.getSelectedId()>1);
+        updateSelected.setEnabled(editingMapping &&
+                                  (addingMapping || selected>=0));
+        remove.setEnabled(editingMapping && !addingMapping && selected>=0);
+        updateInputVisibility();
+        if (editingMapping) refreshDestinationFields();
+        resized();
+        repaint();
+    }
+    void showMapMenu() {
+        if (!owner || editSet) return;
+        juce::PopupMenu menu;
+        const bool saved=editTemplateId>0;
+        menu.addItem(1,"Rename Map",saved);
+        menu.addItem(2,"Delete Map",saved);
+        menu.addSeparator();
+        menu.addItem(3,"Export Map...");
+        menu.addItem(4,"Import Map...");
+        if (!saved) {
+            menu.addSeparator();
+            menu.addItem(5,"Export legacy controller preset...");
+            menu.addItem(6,"Import legacy controller preset...");
+        }
+        auto safe=juce::Component::SafePointer<ControlPanel>(this);
+        menu.showMenuAsync(
+            juce::PopupMenu::Options().withTargetComponent(&mapMore),
+            [safe](int choice) {
+                if (!safe || !safe->owner) return;
+                auto* panel=safe.getComponent();
+                if (choice==1) {panel->renameSelectedMap();return;}
+                if (choice==2) {panel->deleteSelectedMap();return;}
+                // Preserve the original controller preset interchange format
+                // for existing operator files, separately from map-only JSON.
+                if (choice==5) {panel->saveControllerPreset.triggerClick();return;}
+                if (choice==6) {panel->loadControllerPreset.triggerClick();return;}
+                if (choice==3) {
+                    const auto json=exportControlMap(panel->owner->show,
+                                                       panel->editTemplateId);
+                    if (json.isEmpty()) {
+                        panel->state.setText("Cannot export the selected map.",
+                                             juce::dontSendNotification);return;
+                    }
+                    panel->presetFileChooser=std::make_unique<juce::FileChooser>(
+                        "Export Control Map",
+                        juce::File::getSpecialLocation(juce::File::userDocumentsDirectory)
+                            .getChildFile("TheCuelist-ControlMap.json"),"*.json");
+                    panel->presetFileChooser->launchAsync(
+                        juce::FileBrowserComponent::saveMode |
+                        juce::FileBrowserComponent::canSelectFiles,
+                        [safe,json](const juce::FileChooser& chooser) {
+                            if (!safe) return;
+                            const auto file=chooser.getResult();
+                            if (file==juce::File()) return;
+                            safe->state.setText(file.replaceWithText(json) ?
+                                "Selected map exported." : "Map export failed.",
+                                juce::dontSendNotification);
+                        });
+                } else if (choice==4) {
+                    panel->presetFileChooser=std::make_unique<juce::FileChooser>(
+                        "Import Control Map",
+                        juce::File::getSpecialLocation(juce::File::userDocumentsDirectory),
+                        "*.json");
+                    panel->presetFileChooser->launchAsync(
+                        juce::FileBrowserComponent::openMode |
+                        juce::FileBrowserComponent::canSelectFiles,
+                        [safe](const juce::FileChooser& chooser) {
+                            if (!safe || !safe->owner) return;
+                            const auto file=chooser.getResult();
+                            if (file==juce::File()) return;
+                            if (file.getSize()>256*1024) {
+                                safe->state.setText("Map file exceeds 256KB.",
+                                    juce::dontSendNotification);return;
+                            }
+                            auto* main=safe->owner.getComponent();
+                            auto candidate=main->show;
+                            const auto result=importControlMap(file.loadFileAsString(),
+                                                               candidate);
+                            if (result.failed()) {
+                                safe->state.setText(result.getErrorMessage(),
+                                                    juce::dontSendNotification);
+                                return;
+                            }
+                            const int id=candidate.controls.templates.back().id;
+                            main->show=std::move(candidate);
+                            main->dirty=true;
+                            main->refreshControlSettings();main->refresh();
+                            juce::Component::SafePointer<MainComponent> safeMain(main);
+                            juce::MessageManager::callAsync([safeMain,id] {
+                                if (safeMain) safeMain->openControlPanel(false,id);
+                            });
+                        });
+                }
+            });
+    }
     bool resolveSource(int& row,int& column) const {
         if (!owner) return false;
         for (int i=0;i<(int)owner->show.rows.size();++i)
@@ -698,7 +938,10 @@ private:
         return cell.controlSet ? &cell.controlSet->bindings : nullptr;
     }
     juce::ComboBox device,presets,scope,target,takeover,columns,curve,templates,functionChoice,mapChooser;
-    juce::TextButton newMap,cloneMap,renameMap,deleteMap;
+    juce::TextButton newMap,cloneMap,renameMap,deleteMap,mapMore,cancelLearn;
+    juce::ComboBox inputKind;
+    juce::TextEditor inputChannel,inputNumber,inputAddress;
+    bool editingMapping=false,addingMapping=false;
     std::vector<std::pair<int,int>> availableMaps;
     std::vector<int> availableTemplateIds;
     void renameSelectedMap() {
@@ -754,7 +997,12 @@ private:
                 state.setText("No map selected to duplicate.",juce::dontSendNotification);
                 return;
             }
-            source.bindings=*bindings;
+            for (const auto& binding:*bindings)
+                if (editTemplateId>0 || binding.scope==ControlScope::global)
+                    source.bindings.push_back(binding);
+            // Default Map's legacy cue/preset-scoped assignments are not
+            // global fallback inputs and must not become globally active
+            // just because its map contents were duplicated.
         }
         // Reusable maps are independent from Control Columns until assigned.
         const auto& saved=owner->show.controls.templates;
@@ -871,11 +1119,20 @@ private:
     }
     void refreshDestinationFields() {
         const int t=target.getSelectedId();
+        const bool needsColumn=scope.getSelectedId()==2 || t==2 || t==5 ||
+             t==6 || t==7 || t==9 || t==10 || t==11;
         outputChannel.setEnabled(t==5 && !editSet);
         outputCc.setEnabled(t==5 && !editSet);
         oscAddress.setEnabled(!editSet && t==6);
-        columns.setEnabled(!editSet &&
-            (scope.getSelectedId()==2 || t==2 || t==5 || t==6 || t==7 || t==9 || t==10 || t==11));
+        columns.setEnabled(!editSet && needsColumn);
+        if (!editSet) {
+            outputChannel.setVisible(editingMapping && t==5);
+            outputCc.setVisible(editingMapping && t==5);
+            oscAddress.setVisible(editingMapping && t==6);
+            columns.setVisible(editingMapping && needsColumn);
+            scope.setVisible(editingMapping &&
+                             functionChoice.getSelectedId()==1);
+        }
     }
     void refreshEmptyState() {
         emptyBindings.setVisible(getNumRows()==0);
@@ -889,10 +1146,19 @@ private:
         oscLearn.setColour(juce::TextButton::buttonColourId,
             owner->oscLearnArmed ? palette::amber.withAlpha(.58f) : palette::raised);
         if (auto event=owner->consumeLearnedInput()) {
+            // Learn persists for consecutive assignments to the SELECTED
+            // map. Once an input is received, its mapping is saved, while
+            // the operator may choose another function without reopening
+            // the hardware input listener.
             captured=event;
-            // Commit the selected scope as soon as a hardware event arrives.
+            if (!editSet) {
+                editingMapping=true;
+                updateEditorVisibility();
+            }
             const auto* entries=currentBindings();
             createBinding(entries && selected>=0 && selected<(int)entries->size());
+            if (continuousLearn==1) owner->armControlLearn();
+            else if (continuousLearn==2) owner->armOscControlLearn();
         }
         if (editSet && editTemplateId==0) updateEffectivePreview();
     }
@@ -946,10 +1212,13 @@ private:
     }
     void createBinding(bool update) {
         const auto* existing=currentBindings();
-        if (!owner || (update && (!existing || selected<0 || selected>=(int)existing->size())) ||
-            (!update && !captured)) {
-            state.setText("Use MIDI Learn first or select a mapping to edit.",
-                juce::dontSendNotification); return;
+        if (!owner || (update && (!existing || selected<0 || selected>=(int)existing->size()))) {
+            state.setText("Select a mapping or use + Add Mapping.",
+                juce::dontSendNotification);return;
+        }
+        if (editSet && !update && !captured) {
+            state.setText("Capture MIDI/OSC input for this cue override.",
+                          juce::dontSendNotification);return;
         }
         ControlBinding b=update ? (*existing)[(size_t)selected] : ControlBinding{};
         // A Control Set overrides only which physical input invokes the
@@ -963,6 +1232,28 @@ private:
         if (captured) {
             b.deviceId=captured->deviceId;
             b.kind=captured->kind; b.channel=captured->channel; b.number=captured->number;
+        } else if (!editSet) {
+            const int k=inputKind.getSelectedId()-1;
+            if (k<0 || k>3) return;
+            b.kind=(ControlKind)k;
+            b.channel=inputChannel.getText().getIntValue();
+            b.number=inputNumber.getText().getIntValue();
+            if (b.kind==ControlKind::osc) {
+                b.deviceId=inputAddress.getText().trim();
+                b.channel=1;b.number=0;
+                if (!b.deviceId.startsWithChar('/')) {
+                    state.setText("Input OSC address must begin with /.",
+                                  juce::dontSendNotification);return;
+                }
+            } else {
+                if (b.kind==ControlKind::pitchBend) b.number=0;
+                if (b.deviceId.isEmpty() || b.deviceId.startsWithChar('/'))
+                    b.deviceId=owner->show.controls.midiInputId;
+                if (b.deviceId.isEmpty()) {
+                    state.setText("Select MIDI input in Settings > MIDI Devices first.",
+                                  juce::dontSendNotification);return;
+                }
+            }
         }
         // Named functions in the Default Map are global. Only the
         // selected cue's Control Set can override their physical inputs.
@@ -1049,12 +1340,19 @@ private:
             editSet ? owner->addControlSetBinding(row,column,b) :
                       owner->addMappingBinding(b));
         if (saved) {
-            bindingList.updateContent(); bindingList.repaint();
-            selected=-1;updateSelected.setEnabled(false);bindingList.deselectAllRows();
-            remove.setEnabled(false);
-            refreshEmptyState();
-            captured.reset();updateEffectivePreview();
-            state.setText(update ? "Mapping updated." : "Mapping saved to the show.",
+            bindingList.updateContent();bindingList.repaint();
+            selected=-1;addingMapping=false;
+            bindingList.deselectAllRows();
+            if (!editSet) {
+                editingMapping=false;
+                updateEditorVisibility();
+            } else {
+                updateSelected.setEnabled(false);remove.setEnabled(false);
+            }
+            refreshEmptyState();captured.reset();updateEffectivePreview();
+            state.setText(update ? "Mapping updated." :
+                editTemplateId>0 ? "Mapping saved to selected reusable map." :
+                    "Mapping saved to Default Map.",
                 juce::dontSendNotification);
         } else state.setText(owner->status,juce::dontSendNotification);
     }
@@ -1113,12 +1411,21 @@ private:
     }
     void selectedRowsChanged(int row) override {
         selected=row;
+        if (!editSet && row>=0) {
+            editingMapping=true;addingMapping=false;
+            updateEditorVisibility();
+        }
         const auto* entries=currentBindings();
         updateSelected.setEnabled(entries && row>=0 && row<(int)entries->size());
         remove.setEnabled(entries && row>=0 && row<(int)entries->size());
         if (!entries || row<0 || row>=(int)entries->size()) return;
         const auto& b=(*entries)[(size_t)row];
         captured.reset();
+        inputKind.setSelectedId((int)b.kind+1,juce::dontSendNotification);
+        inputChannel.setText(juce::String(b.channel),false);
+        inputNumber.setText(juce::String(b.number),false);
+        inputAddress.setText(b.kind==ControlKind::osc?b.deviceId:"/control",false);
+        updateInputVisibility();
         scope.setSelectedId((int)b.scope+1,juce::dontSendNotification);
         scope.setEnabled(!editSet && b.functionId==0);
         functionChoice.setSelectedId(b.functionId>0 ? b.functionId+1 : 1,
@@ -1145,6 +1452,37 @@ private:
         if (!owner || row<0 || row>=getNumRows()) return;
         const auto& b=(*currentBindings())[(size_t)row];
         if (active) g.fillAll(palette::teal.withAlpha(.20f));
+        if (!editSet) {
+            juce::String function="Legacy direct";
+            for(const auto& f:owner->show.controls.functions)
+                if (f.id==b.functionId) {function=f.name;break;}
+            const auto input=b.kind==ControlKind::osc ? "OSC "+b.deviceId :
+                (b.kind==ControlKind::cc ? "MIDI CC " :
+                 b.kind==ControlKind::note ? "MIDI Note " : "Pitch Bend ")+
+                juce::String(b.kind==ControlKind::pitchBend ?
+                             b.channel:b.number);
+            const auto dest=b.target==ControlTarget::masterGain?"Master Volume" :
+                b.target==ControlTarget::masterPan?"Master Pan" :
+                b.target==ControlTarget::columnGain?"Channel Gain" :
+                b.target==ControlTarget::columnPan?"Channel Pan" :
+                b.target==ControlTarget::columnMute?"Channel Mute" :
+                b.target==ControlTarget::columnPolarity?"Phase" :
+                b.target==ControlTarget::columnSend?"L/R Send" :
+                b.target==ControlTarget::limiterToggle?"Limiter On/Off" :
+                b.target==ControlTarget::go?"GO" :
+                b.target==ControlTarget::panic?"PANIC" :
+                b.target==ControlTarget::midiCc ?
+                    "MIDI CC "+juce::String(b.outputNumber) :
+                    "OSC "+b.oscAddress;
+            const int first=width*38/100,second=width*66/100;
+            label(g,function,{8,0,first-16,height},12,
+                  active?palette::text:palette::muted);
+            label(g,input,{first+8,0,second-first-16,height},12,
+                  active?palette::text:palette::muted);
+            label(g,dest,{second+8,0,width-second-16,height},12,
+                  active?palette::text:palette::muted);
+            return;
+        }
         juce::String targetName=b.target==ControlTarget::go ? "GO" :
             b.target==ControlTarget::panic ? "PANIC" :
             b.target==ControlTarget::masterGain ? "MASTER GAIN" :
