@@ -325,7 +325,7 @@ public:
                         showOperatorTextPrompt(main,main.theme,
                             choice==1 ? "New MIDI Function" : "New OSC Function",
                             "Name the real destination or parameter for MIDI/OSC Learn.",
-                            "Function name",{},false,"Create",
+                            "Function name",juce::String(),false,"Create",
                             [safePanel,choice](juce::String title) {
                                 if (!safePanel || !safePanel->owner) return;
                                 auto& panel=*safePanel.getComponent();
@@ -1108,6 +1108,13 @@ private:
         functionChoice.setSelectedId(old>0 && functionChoice.indexOfItemId(old)>=0 ?
             old : owner->show.controls.functions.empty() ? 1 :
                   owner->show.controls.functions.front().id+1,juce::dontSendNotification);
+        // This is the same persisted function identity displayed by Learn.
+        for (const auto& fn:owner->show.controls.functions)
+            if (fn.id+1==functionChoice.getSelectedId()) {
+                functionName.setText(fn.name,false);
+                if (selected<0) showRoute(fn.destination);
+                break;
+            }
         // Scope belongs to legacy bindings only. Named-function source
         // assignments in Default Map always inherit globally.
         scope.setEnabled(!editSet && functionChoice.getSelectedId()==1);
@@ -1157,10 +1164,15 @@ private:
             (b.target==ControlTarget::columnPan || b.target==ControlTarget::columnMute || b.target==ControlTarget::columnPolarity || b.target==ControlTarget::columnSend) || b.target==ControlTarget::midiCc || b.target==ControlTarget::oscFloat) {
             const int index=columns.getSelectedId()-1;
             if (index<0 || index>=(int)columnIds.size()) {
-                state.setText("Choose a valid output column.",juce::dontSendNotification);
-                return {};
-            }
-            b.targetColumnId=columnIds[(size_t)index];
+                // Starter functions may intentionally lack an output column.
+                // Preserve their inert destination instead of preventing Learn.
+                if (functionChoice.getSelectedId()>1 && columnIds.empty())
+                    b.targetColumnId=0;
+                else {
+                    state.setText("Choose a valid output column.",juce::dontSendNotification);
+                    return {};
+                }
+            } else b.targetColumnId=columnIds[(size_t)index];
         }
         if (b.target==ControlTarget::midiCc) {
             b.outputNumber=outputCc.getText().getIntValue();
@@ -1219,7 +1231,7 @@ private:
                 updateEditorVisibility();
             }
             const auto* entries=currentBindings();
-            createBinding(entries && selected>=0 && selected<(int)entries->size());
+            createBinding(entries && selected>=0 && selected<(int)entries->size(),true);
             if (continuousLearn==1) owner->armControlLearn();
             else if (continuousLearn==2) owner->armOscControlLearn();
         }
@@ -1273,7 +1285,7 @@ private:
         }
         if (!columnIds.empty()) columns.setSelectedId(1);
     }
-    void createBinding(bool update) {
+    void createBinding(bool update,bool fromLearn=false) {
         const auto* existing=currentBindings();
         if (!owner || (update && (!existing || selected<0 || selected>=(int)existing->size()))) {
             state.setText("Select a mapping or use + Add Mapping.",
@@ -1401,7 +1413,7 @@ private:
             // Commit function name/route and physical input together: invalid
             // edits cannot partially alter the active show or reusable map.
             auto candidate=owner->show;
-            if (b.functionId>0) {
+            if (b.functionId>0 && !fromLearn) {
                 auto f=std::find_if(candidate.controls.functions.begin(),
                     candidate.controls.functions.end(),
                     [&](const ControlFunction& item){return item.id==b.functionId;});
