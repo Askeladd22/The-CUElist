@@ -180,6 +180,7 @@ public:
         cancelLearn.setName("mappingCancelLearn");
         cancelLearn.setButtonText("Stop Learn");
         cancelLearn.onClick=[this] { if (owner) {
+            continuousLearn=0;
             owner->controlLearnArmed=false;owner->oscLearnArmed=false;
             owner->learnedInput.reset();
             state.setText("Learn stopped.",juce::dontSendNotification);
@@ -402,7 +403,7 @@ public:
                 state.setText("Enable an OSC UDP input in Settings first.",
                               juce::dontSendNotification);return;
             }
-            captured.reset();
+            continuousLearn=2;captured.reset();
             owner->armOscControlLearn();
             state.setText("Capture OSC armed on configured UDP ports. Send a supported message.",
                           juce::dontSendNotification);
@@ -534,7 +535,7 @@ public:
                 state.setText("Enable a MIDI input in Settings first.",
                               juce::dontSendNotification);return;
             }
-            captured.reset(); owner->armControlLearn();
+            continuousLearn=1;captured.reset(); owner->armControlLearn();
             state.setText(selected>=0 && currentBindings() && selected<(int)currentBindings()->size() ?
                 "MIDI Learn for mapping #"+juce::String((*currentBindings())[(size_t)selected].id)+
                     " — move its hardware control, then click Update selected." :
@@ -1115,10 +1116,19 @@ private:
         oscLearn.setColour(juce::TextButton::buttonColourId,
             owner->oscLearnArmed ? palette::amber.withAlpha(.58f) : palette::raised);
         if (auto event=owner->consumeLearnedInput()) {
+            // Learn persists for consecutive assignments to the SELECTED
+            // map. Once an input is received, its mapping is saved, while
+            // the operator may choose another function without reopening
+            // the hardware input listener.
             captured=event;
-            // Commit the selected scope as soon as a hardware event arrives.
+            if (!editSet) {
+                editingMapping=true;
+                updateEditorVisibility();
+            }
             const auto* entries=currentBindings();
             createBinding(entries && selected>=0 && selected<(int)entries->size());
+            if (continuousLearn==1) owner->armControlLearn();
+            else if (continuousLearn==2) owner->armOscControlLearn();
         }
         if (editSet && editTemplateId==0) updateEffectivePreview();
     }
@@ -1172,10 +1182,13 @@ private:
     }
     void createBinding(bool update) {
         const auto* existing=currentBindings();
-        if (!owner || (update && (!existing || selected<0 || selected>=(int)existing->size())) ||
-            (!update && !captured)) {
-            state.setText("Use MIDI Learn first or select a mapping to edit.",
-                juce::dontSendNotification); return;
+        if (!owner || (update && (!existing || selected<0 || selected>=(int)existing->size()))) {
+            state.setText("Select a mapping or use + Add Mapping.",
+                juce::dontSendNotification);return;
+        }
+        if (editSet && !update && !captured) {
+            state.setText("Capture MIDI/OSC input for this cue override.",
+                          juce::dontSendNotification);return;
         }
         ControlBinding b=update ? (*existing)[(size_t)selected] : ControlBinding{};
         // A Control Set overrides only which physical input invokes the
@@ -1189,6 +1202,27 @@ private:
         if (captured) {
             b.deviceId=captured->deviceId;
             b.kind=captured->kind; b.channel=captured->channel; b.number=captured->number;
+        } else if (!editSet) {
+            const int k=inputKind.getSelectedId()-1;
+            if (k<0 || k>3) return;
+            b.kind=(ControlKind)k;
+            b.channel=inputChannel.getText().getIntValue();
+            b.number=inputNumber.getText().getIntValue();
+            if (b.kind==ControlKind::osc) {
+                b.deviceId=inputAddress.getText().trim();
+                b.channel=1;b.number=0;
+                if (!b.deviceId.startsWithChar('/')) {
+                    state.setText("Input OSC address must begin with /.",
+                                  juce::dontSendNotification);return;
+                }
+            } else {
+                if (b.kind==ControlKind::pitchBend) b.number=0;
+                if (b.deviceId.isEmpty()) b.deviceId=owner->show.controls.midiInputId;
+                if (b.deviceId.isEmpty()) {
+                    state.setText("Select MIDI input in Settings > MIDI Devices first.",
+                                  juce::dontSendNotification);return;
+                }
+            }
         }
         // Named functions in the Default Map are global. Only the
         // selected cue's Control Set can override their physical inputs.
@@ -1275,12 +1309,19 @@ private:
             editSet ? owner->addControlSetBinding(row,column,b) :
                       owner->addMappingBinding(b));
         if (saved) {
-            bindingList.updateContent(); bindingList.repaint();
-            selected=-1;updateSelected.setEnabled(false);bindingList.deselectAllRows();
-            remove.setEnabled(false);
-            refreshEmptyState();
-            captured.reset();updateEffectivePreview();
-            state.setText(update ? "Mapping updated." : "Mapping saved to the show.",
+            bindingList.updateContent();bindingList.repaint();
+            selected=-1;addingMapping=false;
+            bindingList.deselectAllRows();
+            if (!editSet) {
+                editingMapping=false;
+                updateEditorVisibility();
+            } else {
+                updateSelected.setEnabled(false);remove.setEnabled(false);
+            }
+            refreshEmptyState();captured.reset();updateEffectivePreview();
+            state.setText(update ? "Mapping updated." :
+                editTemplateId>0 ? "Mapping saved to selected reusable map." :
+                    "Mapping saved to Default Map.",
                 juce::dontSendNotification);
         } else state.setText(owner->status,juce::dontSendNotification);
     }
@@ -1339,12 +1380,21 @@ private:
     }
     void selectedRowsChanged(int row) override {
         selected=row;
+        if (!editSet && row>=0) {
+            editingMapping=true;addingMapping=false;
+            updateEditorVisibility();
+        }
         const auto* entries=currentBindings();
         updateSelected.setEnabled(entries && row>=0 && row<(int)entries->size());
         remove.setEnabled(entries && row>=0 && row<(int)entries->size());
         if (!entries || row<0 || row>=(int)entries->size()) return;
         const auto& b=(*entries)[(size_t)row];
         captured.reset();
+        inputKind.setSelectedId((int)b.kind+1,juce::dontSendNotification);
+        inputChannel.setText(juce::String(b.channel),false);
+        inputNumber.setText(juce::String(b.number),false);
+        inputAddress.setText(b.kind==ControlKind::osc?b.deviceId:"/control",false);
+        updateInputVisibility();
         scope.setSelectedId((int)b.scope+1,juce::dontSendNotification);
         scope.setEnabled(!editSet && b.functionId==0);
         functionChoice.setSelectedId(b.functionId>0 ? b.functionId+1 : 1,
