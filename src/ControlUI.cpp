@@ -833,6 +833,11 @@ private:
         menu.addSeparator();
         menu.addItem(3,"Export Map...");
         menu.addItem(4,"Import Map...");
+        if (!saved) {
+            menu.addSeparator();
+            menu.addItem(5,"Export legacy controller preset...");
+            menu.addItem(6,"Import legacy controller preset...");
+        }
         auto safe=juce::Component::SafePointer<ControlPanel>(this);
         menu.showMenuAsync(
             juce::PopupMenu::Options().withTargetComponent(&mapMore),
@@ -841,6 +846,10 @@ private:
                 auto* panel=safe.getComponent();
                 if (choice==1) {panel->renameSelectedMap();return;}
                 if (choice==2) {panel->deleteSelectedMap();return;}
+                // Preserve the original controller preset interchange format
+                // for existing operator files, separately from map-only JSON.
+                if (choice==5) {panel->saveControllerPreset.triggerClick();return;}
+                if (choice==6) {panel->loadControllerPreset.triggerClick();return;}
                 if (choice==3) {
                     const auto json=exportControlMap(panel->owner->show,
                                                        panel->editTemplateId);
