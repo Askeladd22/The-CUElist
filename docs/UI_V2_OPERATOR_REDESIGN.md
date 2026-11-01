@@ -1,6 +1,6 @@
 # The CUElist — Operator Workspace V2
-**Stato:** concept V2.1 esplorativo, non ancora interfaccia di produzione.\
-**Feedback confermato:** parte superiore approvata; mixer da integrare nella stessa geometria delle colonne cue.  
+**Stato:** concept V2.1 esplorativo, non ancora interfaccia di produzione.  
+**Feedback confermato:** parte superiore approvata; mixer integrato nella stessa geometria delle colonne cue.  
 **Baseline:** `main` alla versione `0.9.0-beta.6`, screenshot operatore a 1647×895: 12 cue list, 13 cue, 11 colonne Audio/MIDI/OSC/Control, Inspector aperto.  
 **Prototipo testabile:** [`design/operator-workspace-v2.html`](../design/operator-workspace-v2.html).
 
@@ -56,8 +56,8 @@ Questi valori sono **ipotesi del prototipo**. La riduzione della riga non autori
 
 ## Piano di integrazione successivo
 
-**V2.1 · Fascia inferiore (questa PR):** dopo la verifica dello screenshot, la parte superiore rimane invariata; mixer direttamente allineato alle colonne, Master sotto cue header e BPM/Auto Stop ancora fisso. Si veda [specifica mixer integrato](UI_V2_INTEGRATED_MIXER_SPEC.md).\
-\
+**V2.1 · Fascia inferiore (questa PR):** dopo la verifica dello screenshot, la parte superiore rimane invariata; mixer direttamente allineato alle colonne, Master sotto cue header e BPM/Auto Stop ancora fisso. Si veda [specifica mixer integrato](UI_V2_INTEGRATED_MIXER_SPEC.md).
+
 **P0 · Confronto UX (questa PR).** Prototipo HTML offline autocontenuto, 12/13/11, interazioni visive reversibili per scelta cue/tab e collasso pannelli. Acquisire feedback a 1647×895, 1920×1080 e 1280×720. Nessuna modifica JUCE attiva.
 
 **P1 · Fondazioni native.** Creare `OperatorDesignTokens` e nuove funzioni pure di layout JUCE sotto flag di sviluppo esplicito. Testare cue selection, row/column hover/focus, pinned BPM/Auto Stop, scroll sincronizzato, dock e Inspector. Non migrare motori.
