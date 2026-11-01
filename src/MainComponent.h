@@ -62,6 +62,25 @@ private:
 
 class CuelistTabButton final : public juce::TextButton {
 public:
+    void setActiveVisual(bool active) {
+        if (activeVisual!=active) { activeVisual=active; repaint(); }
+    }
+    void paintButton(juce::Graphics& g,bool hovered,bool pressed) override {
+        const auto area=getLocalBounds().toFloat();
+        g.setColour(activeVisual ? palette::selectedTab.withAlpha(.76f) :
+                    hovered || pressed ? palette::raised.withAlpha(.73f) :
+                    palette::panel.withAlpha(.38f));
+        g.fillRoundedRectangle(area.reduced(.5f,0.f),5.f);
+        if (activeVisual) {
+            g.setColour(palette::teal);
+            g.fillRoundedRectangle(area.getX()+7.f,area.getBottom()-2.f,
+                                   area.getWidth()-14.f,2.f,1.f);
+        }
+        g.setColour(activeVisual?palette::text:palette::muted);
+        g.setFont(font(13.f,true));
+        g.drawFittedText(getButtonText(),getLocalBounds().reduced(4,0),
+                         juce::Justification::centred,1);
+    }
     std::function<void()> onRename;
     std::function<void(int)> onDragMove,onDropped;
     // Do not delegate a completed drag to Button::mouseUp: that could
@@ -99,7 +118,7 @@ public:
         else juce::TextButton::mouseDoubleClick(e);
     }
 private:
-    bool pressing=false,wasDragged=false;
+    bool pressing=false,wasDragged=false,activeVisual=false;
 };
 class CueGrid final : public juce::Component, public juce::FileDragAndDropTarget,
                       public juce::SettableTooltipClient {
