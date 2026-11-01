@@ -871,38 +871,42 @@ void MainComponent::refreshCuelistTabs() {
     if (count<12) addCuelistButton.setBounds(trailingX+overflowWidth,43,28,buttonHeight);
 }
 
-// Phase N1: the native menu surface is presentation-only. Every command is
-// routed to the existing production callback or its exact owner method; no
-// mock actions, synthetic transport or new show-model mutations are added.
+// N3: A single function location per operator action. The menus are
+// functional, not a reduced mirror of the former Preferences popup. All
+// existing MIDI, OSC, clock and fader-range options remain accessible.
 void MainComponent::showOperatorMenu(int index) {
     if (index<0 || index>OperatorNavigationLayout::overflowIndex) return;
     auto* target=operatorMenus[(size_t)index].get();
     if (!target || !target->isVisible()) return;
 
-    const auto populate=[this](juce::PopupMenu& m,int group) {
+    // Capture device identities *when the menu opens*, not when it closes.
+    // Enumeration order may change when a USB MIDI device is reconnected.
+    const auto inputs=juce::MidiInput::getAvailableDevices();
+    const auto outputs=juce::MidiOutput::getAvailableDevices();
+    const int faderRange=faderCeilingDb;
+    const bool twelve=appPreferences && appPreferences->getBoolValue("clock12Hour",false);
+
+    const auto populate=[this,&inputs,&outputs,faderRange,twelve]
+                        (juce::PopupMenu& m,int group) {
         const int base=(group+1)*100;
         switch (group) {
-        case 0: // File: existing discard confirmation and project lifecycle
+        case 0: // File: no duplicate Pre-flight or Diagnostics.
             m.addItem(base+1,"New show");
             m.addItem(base+2,"Open show...");
             m.addItem(base+3,"Save show");
-            m.addSeparator();
-            m.addItem(base+4,"Pre-flight...");
-            m.addItem(base+5,"Diagnostics...");
             break;
-        case 1: // Edit: preserve current Undo history and cue actions
+        case 1: // Edit actions are only here (plus direct cue affordances).
             m.addItem(base+1,"Undo",undoButton.isEnabled());
             m.addItem(base+2,"Redo",redoButton.isEnabled());
             m.addSeparator();
             m.addItem(base+3,"Add cue");
             m.addItem(base+4,"Add column...");
             break;
-        case 2: // Show settings are still owned by the original popup
-            m.addItem(base+1,"Settings...");
-            m.addItem(base+2,"Rename show...");
+        case 2: // Show: all operational checks in one place.
+            m.addItem(base+1,"Rename show...");
             m.addSeparator();
-            m.addItem(base+3,"Pre-flight...");
-            m.addItem(base+4,"Diagnostics...");
+            m.addItem(base+2,"Pre-flight...");
+            m.addItem(base+3,"Diagnostics...");
             break;
         case 3:
             m.addItem(base+1,"New Cuelist",show.cuelists.size()<12);
@@ -912,20 +916,60 @@ void MainComponent::showOperatorMenu(int index) {
                 show.activeCuelist+1<(int)show.cuelists.size());
             m.addItem(base+5,"Delete active Cuelist...",show.cuelists.size()>1);
             break;
-        case 4:
+        case 4: { // Devices: full legacy MIDI/OSC controls, not "Settings".
             m.addItem(base+1,"Audio Devices...");
-            m.addItem(base+2,"MIDI / OSC Settings...");
-            m.addItem(base+3,"Control Mapping...");
+            juce::PopupMenu midiIn;
+            midiIn.addSectionHeader("MIDI INPUT — ENABLE");
+            midiIn.addItem(10000,"Disable main MIDI input",true,
+                           show.controls.midiInputId.isEmpty());
+            for (int i=0;i<inputs.size() && i<100;++i) {
+                const auto& device=inputs.getReference(i);
+                midiIn.addItem(10001+i,device.name,true,
+                    show.controls.midiInputId==device.identifier ||
+                    isAdditionalMidiInputEnabled(device.identifier));
+            }
+            m.addSubMenu("MIDI Inputs",midiIn);
+
+            juce::PopupMenu midiOut;
+            midiOut.addSectionHeader("MIDI OUTPUT — ENABLE");
+            for (int i=0;i<outputs.size() && i<100;++i) {
+                const auto& device=outputs.getReference(i);
+                const bool enabled=!appPreferences ||
+                    appPreferences->getBoolValue(
+                        "midiOutputEnabled_"+device.identifier,true);
+                midiOut.addItem(11001+i,device.name,true,enabled);
+            }
+            m.addSubMenu("MIDI Outputs",midiOut,!outputs.isEmpty());
+
+            juce::PopupMenu osc;
+            osc.addSectionHeader("Local IP: "+
+                                 juce::IPAddress::getLocalAddress().toString());
+            const auto ports=configuredOscPorts();
+            osc.addItem(base+2,"Receive UDP ports: "+
+                         (ports.isEmpty()?"not configured":ports));
+            osc.addItem(base+3,"Disable OSC input",ports.isNotEmpty());
+            m.addSubMenu("OSC Input",osc);
             m.addSeparator();
-            m.addItem(base+4,"MIDI Learn");
-            m.addItem(base+5,"OSC Learn");
+            m.addItem(base+4,"Control Mapping...");
+            m.addItem(base+5,"MIDI Learn");
+            m.addItem(base+6,"OSC Learn");
             break;
-        case 5:
+        }
+        case 5: { // View: old Fader Range and Clock were not removed.
             m.addItem(base+1,inspectorVisible ? "Collapse Inspector" :
                                               "Expand Inspector");
             m.addItem(base+2,collapseAllButton.getButtonText());
-            m.addItem(base+3,"Diagnostics / I/O activity...");
+            m.addSeparator();
+            juce::PopupMenu faderMenu;
+            faderMenu.addItem(base+10,faderRangeMenuTitle(6),true,faderRange==6);
+            faderMenu.addItem(base+11,faderRangeMenuTitle(0),true,faderRange==0);
+            m.addSubMenu("Fader Range",faderMenu);
+            juce::PopupMenu clockMenu;
+            clockMenu.addItem(base+12,"24-hour clock",true,!twelve);
+            clockMenu.addItem(base+13,"12-hour clock",true,twelve);
+            m.addSubMenu("Clock",clockMenu);
             break;
+        }
         case 6:
             m.addItem(base+1,"User Guide");
             m.addItem(base+2,"About The CUElist");
@@ -937,7 +981,6 @@ void MainComponent::showOperatorMenu(int index) {
     juce::PopupMenu menu;
     menu.setLookAndFeel(&theme);
     if (index==OperatorNavigationLayout::overflowIndex) {
-        // Menus hidden for width remain reachable, not disabled or lost.
         const int first=OperatorNavigationLayout::atWidth(getWidth())
                             .visibleMenuCount;
         for (int i=first;i<OperatorNavigationLayout::menuCount;++i) {
@@ -950,35 +993,68 @@ void MainComponent::showOperatorMenu(int index) {
 
     auto safe=juce::Component::SafePointer<MainComponent>(this);
     menu.showMenuAsync(juce::PopupMenu::Options().withTargetComponent(target),
-        [safe](int chosen) {
-            if (safe && chosen>0)
+        [safe,inputs,outputs](int chosen) {
+            if (!safe || chosen<=0) return;
+            if (chosen>=10000) {
+                safe->dispatchOperatorDeviceChoice(chosen,inputs,outputs);
+            } else {
                 safe->dispatchOperatorMenu(chosen/100-1,chosen%100);
+            }
         });
+}
+
+void MainComponent::dispatchOperatorDeviceChoice(int choice,
+    const juce::Array<juce::MidiDeviceInfo>& inputs,
+    const juce::Array<juce::MidiDeviceInfo>& outputs) {
+    if (choice==10000) {
+        selectControlInput({});
+    } else if (choice>=10001 && choice<10101) {
+        const int index=choice-10001;
+        if (index>=inputs.size()) return;
+        const auto device=inputs.getReference(index).identifier;
+        if (device==show.controls.midiInputId)
+            selectControlInput({});
+        else if (show.controls.midiInputId.isEmpty() &&
+                 !isAdditionalMidiInputEnabled(device))
+            selectControlInput(device);
+        else toggleAdditionalMidiInput(device);
+    } else if (choice>=11001 && choice<11101) {
+        const int index=choice-11001;
+        if (index>=outputs.size()) return;
+        const auto& device=outputs.getReference(index);
+        const bool enabled=appPreferences ?
+            !appPreferences->getBoolValue(
+                "midiOutputEnabled_"+device.identifier,true) : false;
+        if (appPreferences)
+            appPreferences->setValue("midiOutputEnabled_"+device.identifier,
+                                     enabled);
+        engine.setMidiOutputEnabled(device.identifier,enabled);
+        status="MIDI output "+device.name+
+               (enabled?" enabled.":" disabled.");
+        repaint();
+    }
 }
 
 void MainComponent::dispatchOperatorMenu(int group,int command) {
     switch (group) {
-    case 0: // File
+    case 0: // File: preserve original discard confirmation and save.
         if (command==1 && newButton.onClick) newButton.onClick();
         else if (command==2 && openButton.onClick) openButton.onClick();
         else if (command==3 && saveButton.onClick) saveButton.onClick();
-        else if (command==4) showPreflight();
-        else if (command==5) showDiagnostics();
         break;
-    case 1: // Edit
+    case 1:
         if (command==1 && undoButton.isEnabled()) undoEdit();
         else if (command==2 && redoButton.isEnabled()) redoEdit();
         else if (command==3) addCue();
         else if (command==4)
             showColumnMenu(viewport.getScreenBounds().getCentre());
         break;
-    case 2: // Show
-        if (command==1 && preferencesButton.onClick) preferencesButton.onClick();
-        else if (command==2) projectNameLabel.showEditor();
-        else if (command==3) showPreflight();
-        else if (command==4) showDiagnostics();
+    case 2: // Show: checks appear only here.
+        if (command==1) projectNameLabel.showEditor();
+        else if (command==2) showPreflight();
+        else if (command==3) showDiagnostics();
         break;
-    case 3: // Cuelists
+    case 3:
         if (command==1 && show.cuelists.size()<12) createCuelist();
         else if (command==2) renameActiveCuelist();
         else if (command==3 && show.activeCuelist>0)
@@ -989,19 +1065,34 @@ void MainComponent::dispatchOperatorMenu(int group,int command) {
         else if (command==5 && show.cuelists.size()>1)
             requestDeleteCuelist(show.activeCuelist);
         break;
-    case 4: // Devices
+    case 4: // Devices: same native handlers used in the original Settings.
         if (command==1) showDevices();
-        else if (command==2 && preferencesButton.onClick) preferencesButton.onClick();
-        else if (command==3) openControlPanel(false);
-        else if (command==4) beginQuickLearn(false);
-        else if (command==5) beginQuickLearn(true);
+        else if (command==2) {
+            auto safe=juce::Component::SafePointer<MainComponent>(this);
+            showOperatorTextPrompt(*this,theme,"OSC Input Ports",
+                "Comma-separated UDP ports, up to 16; empty disables listening.",
+                "Receive UDP ports",configuredOscPorts(),false,"Apply",
+                [safe](juce::String value) {
+                    if (safe) safe->configureOscInputPorts(value);
+                });
+        }
+        else if (command==3) configureOscInputPorts("");
+        else if (command==4) openControlPanel(false);
+        else if (command==5) beginQuickLearn(false);
+        else if (command==6) beginQuickLearn(true);
         break;
-    case 5: // View
+    case 5:
         if (command==1) inspectorSideTab.triggerClick();
         else if (command==2) collapseAllButton.triggerClick();
-        else if (command==3) showDiagnostics();
+        else if (command==10 || command==11)
+            setAudioFaderCeilingDb(command==10 ? 6 : 0);
+        else if (command==12 || command==13) {
+            if (appPreferences)
+                appPreferences->setValue("clock12Hour",command==13);
+            repaint();
+        }
         break;
-    case 6: // Guide
+    case 6:
         if (command==1) openUserGuide();
         else if (command==2) showAbout();
         break;
