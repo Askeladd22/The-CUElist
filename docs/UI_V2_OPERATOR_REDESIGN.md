@@ -1,5 +1,13 @@
 # The CUElist — Operator Workspace V2
 
+> **Aggiornamento V2.3 / 0.9.0-beta.9:** affinamento
+> delle strip Audio/MIDI/OSC/Control, leggibilità e
+> sidebar. Matrice approvata, Master completo,
+> scroll sincronizzato e BPM/Auto Stop fissi
+> rimangono inalterati. [Gate di parità](UI_V2_FEATURE_PARITY.md).
+>
+
+
 > **Aggiornamento V2.2 / 0.9.0-beta.8:** Master integrale secondo
 > il codice JUCE esistente e navigazione senza duplicazioni.
 > Ogni funzione deve restare disponibile: vedere
