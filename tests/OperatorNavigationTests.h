@@ -121,4 +121,26 @@ void operatorNavigationTests() {
         }
     });
 
+    test("V2 global clock enlarged without overlapping operator telemetry",[] {
+        using namespace cuelist;
+        MainComponent ui(false);
+        for (const int width:{1280,1440,1647,1920,3840}) {
+            ui.setSize(width,900);
+            const auto t=HeaderTelemetryLayout::atWidth(width);
+            check(t.clock.contains(t.timeText) &&
+                  t.clock.contains(t.meridiemText) &&
+                  t.timeText.getWidth()>=116 &&
+                  t.timeText.getHeight()>=38 &&
+                  t.clock.getRight()<t.usage.getX() &&
+                  t.meridiemText.getY()>=t.timeText.getBottom() &&
+                  t.timeText.getBottom()<=t.clock.getBottom() &&
+                  t.meridiemText.getBottom()<=t.clock.getBottom(),
+                  "Larger clock text or 12h AM/PM lost the fixed header bounds");
+            const auto picture=ui.createComponentSnapshot(t.clock);
+            check(picture.isValid() && picture.getWidth()==t.clock.getWidth() &&
+                  picture.getHeight()==t.clock.getHeight(),
+                  "Enlarged clock is not rendered in the native JUCE header");
+        }
+    });
+
 }

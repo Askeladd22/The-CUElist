@@ -1,4 +1,5 @@
 #pragma once
+#include "MasterAudioLayout.h"
 #include "MainComponent.h"
 #include "GainMeterFader.h"
 
@@ -264,18 +265,34 @@ void utilityPolishTests() {
               "Audio Mute unexpectedly moved behind the calibrated meter region");
     });
     test("Compact Master Mute is centred below Pan and not over its label",[] {
-        MainComponent ui(false);ui.setSize(1440,900);
+        MainComponent ui(false);
         auto* util=cueViewFixtures::find<ColumnUtilities>(ui);
         auto* masterPan=controlsV3::named(*util,"masterPan");
         auto* masterMute=controlsV3::named(*util,"masterMute");
         auto* output=controlsV3::named(*util,"masterMainOutput");
-        check(masterPan && masterMute && output,"Master Audio controls missing");
-        check(std::abs(masterPan->getBounds().getCentreX()-
-                       masterMute->getBounds().getCentreX())<=2 &&
-              masterMute->getY()>=masterPan->getBottom()+55 &&
-              masterMute->getRight()<CueGrid::nameWidth &&
-              output->getRight()<masterPan->getX(),
-              "Master Audio Mute is not centered beneath Pan or overlaps output");
+        auto* limiter=controlsV3::named(*util,"masterSafetyLimiter");
+        check(util && masterPan && masterMute && output && limiter,
+              "Master Audio controls missing");
+        for (const auto size:std::initializer_list<juce::Point<int>>{
+                 {1280,768},{1440,820},{1440,900},{1920,1080}}) {
+            ui.setSize(size.x,size.y);
+            ui.resized();
+            const auto layout=MasterAudioLayout::atHeight(util->getHeight());
+            const auto pan=masterPan->getBounds();
+            const auto mute=masterMute->getBounds();
+            const auto out=output->getBounds();
+            check(std::abs(pan.getCentreX()-mute.getCentreX())<=2 &&
+                  mute.getY()>=pan.getBottom()+55 &&
+                  mute.getRight()<CueGrid::nameWidth &&
+                  out.getRight()<pan.getX() &&
+                  layout.card.contains(mute) &&
+                  layout.card.contains(limiter->getBounds()) &&
+                  layout.panCaption.getBottom()<=pan.getY() &&
+                  layout.panValue.getY()>=pan.getBottom() &&
+                  layout.panValue.getBottom()<=layout.muteCaption.getY() &&
+                  layout.muteCaption.getBottom()<=mute.getY(),
+                  "Master Mute/Pan/labels overlap or leave the pinned Cuelist lane");
+        }
     });
 
 }
