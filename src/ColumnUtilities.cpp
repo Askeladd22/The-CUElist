@@ -481,8 +481,8 @@ void ColumnUtilities::paint(juce::Graphics& g) {
     g.fillRoundedRectangle((float)layout.card.getX()+11.f,
                            (float)layout.card.getY()+1.f,96.f,2.f,1.f);
     label(g,"MASTER AUDIO",layout.title,14,palette::teal,true);
-    label(g,"L/R",{246,14,51,18},10,palette::muted,true,
-          juce::Justification::centredRight);
+    // The PAN caption now has its own clean line above the knob; a
+    // redundant L/R header badge would collide at compact panel heights.
     g.setColour(palette::line.withAlpha(.33f));
     g.fillRect(layout.headerRule);
 
