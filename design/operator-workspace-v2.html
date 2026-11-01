@@ -138,9 +138,72 @@
    metrics.appendChild(actions);body.appendChild(metrics);
    return body;
   }
+  // Keep the actual native Master feature inventory visible in preview:
+  // integrated stereo peak/gain, Pan, Mute, Main Out, safety limiter,
+  // plus Quick Learn for Gain, Pan and Limiter. No backend in this demo.
   const master=node("div","mixer-master audio");
-  const masterHeading=node("div","channel-head");masterHeading.appendChild(node("span","","MASTER AUDIO"));masterHeading.appendChild(node("span","channel-kind","OUTPUT"));
-  master.appendChild(masterHeading);master.appendChild(audioControls(true));panel.appendChild(master);
+  const masterHeading=node("div","channel-head");
+  masterHeading.appendChild(node("span","","MASTER AUDIO"));
+  masterHeading.appendChild(node("span","channel-kind","MASTER BUS"));
+  master.appendChild(masterHeading);
+  const full=node("div","master-full");
+  const level=node("div","master-level");
+  const peaks=node("div","master-peaks");
+  peaks.appendChild(node("div","master-peak left"));
+  peaks.appendChild(node("div","master-peak right"));
+  const gain=node("input","master-gain");
+  gain.id="masterGain";gain.type="range";gain.min="-60";gain.max="6";gain.step=".1";gain.value="0";
+  gain.setAttribute("aria-label","Master gain in dB — demo");
+  const gainValue=node("span","master-gain-value","0.0 dB");
+  gain.addEventListener("input",function(){gainValue.textContent=Number(this.value).toFixed(1)+" dB";demoStatus("Master Gain")});
+  level.appendChild(peaks);level.appendChild(gain);level.appendChild(gainValue);
+  const routes=node("div","master-routes");
+  const outLabel=node("label","","MAIN OUT");outLabel.setAttribute("for","masterOutput");
+  const output=node("select","master-out");output.id="masterOutput";
+  output.setAttribute("aria-label","Physical Master Bus stereo output — demo");
+  for(const pair of ["1/2","3/4","5/6","7/8"]){const opt=node("option","",pair);opt.value=pair;output.appendChild(opt)}
+  output.addEventListener("change",function(){demoStatus("Master Main Out "+this.value)});
+  routes.appendChild(outLabel);routes.appendChild(output);
+  const limiter=btn("LIMIT · -1 dBFS","master-switch",function(){
+   const enabled=this.getAttribute("aria-pressed")!=="true";
+   this.setAttribute("aria-pressed",String(enabled));demoStatus("Safety Limiter");
+  });
+  limiter.id="masterLimiter";limiter.setAttribute("aria-pressed","false");
+  limiter.title="Safety limiter -1 dBFS (Master Bus only) — demo";
+  routes.appendChild(limiter);
+  const right=node("div","master-right");
+  const panLabel=node("label","","PAN");panLabel.setAttribute("for","masterPan");
+  const pan=node("input","master-pan");pan.id="masterPan";pan.type="range";
+  pan.min="-100";pan.max="100";pan.step="1";pan.value="0";
+  const panValue=node("span","master-pan-value","C");
+  pan.addEventListener("input",function(){
+   const n=Number(this.value);panValue.textContent=n===0?"C":(n<0?"L ":"R ")+Math.abs(n);
+   demoStatus("Master Pan");
+  });
+  const mute=btn("MUTE","master-mute",function(){
+   const active=this.getAttribute("aria-pressed")!=="true";
+   this.setAttribute("aria-pressed",String(active));demoStatus("Master Mute");
+  });
+  mute.id="masterMute";mute.setAttribute("aria-pressed","false");
+  right.appendChild(panLabel);right.appendChild(pan);
+  right.appendChild(panValue);right.appendChild(mute);
+  full.appendChild(level);full.appendChild(routes);full.appendChild(right);master.appendChild(full);
+  const learn=node("div","master-learn");
+  learn.appendChild(node("span","master-learn-label","QUICK LEARN"));
+  const learnToggle=btn("Learn","",function(){
+   const show=this.getAttribute("aria-pressed")!=="true";
+   this.setAttribute("aria-pressed",String(show));
+   for(const name of ["Gain","Pan","Limiter"])learn.querySelector("#masterLearn"+name).hidden=!show;
+   demoStatus("Quick Learn");
+  });
+  learnToggle.id="masterLearnToggle";learnToggle.setAttribute("aria-pressed","false");
+  learn.appendChild(learnToggle);
+  for(const name of ["Gain","Pan","Limiter"]){
+   const target=btn(name,"",function(){demoStatus("Master Quick Learn "+name)});
+   target.id="masterLearn"+name;target.hidden=true;
+   learn.appendChild(target);
+  }
+  master.appendChild(learn);panel.appendChild(master);
   for(let i=0;i<labels.length;i++){
    const type=types[i],channel=node("div","mixer-channel "+type);
    channel.dataset.columnIndex=String(i);
@@ -163,6 +226,41 @@
    panel.appendChild(channel);
   }
  }
+ const menuDefinitions={
+  File:["New","Open","Save","Save As…","Project info"],
+  Edit:["Undo","Redo","Copy","Paste","Duplicate cue","Delete cue"],
+  Show:["Settings","Preferences","Show properties"],
+  Cuelists:["New cuelist","Rename cuelist","Duplicate cuelist","Close cuelist"],
+  Devices:["Audio devices","MIDI routing","OSC routing","Control Mapping"],
+  View:["Mixer","Timeline","Inspector","Monitor messages"],
+  Guide:["User guide","About"]
+ };
+ function demoStatus(command){
+  document.getElementById("statusText").textContent=command+" — preview only: no show or device is modified.";
+ }
+ const menuPopover=document.getElementById("menuPopover");
+ let activeMenu=null;
+ function closeMenu(){
+  menuPopover.hidden=true;menuPopover.replaceChildren();activeMenu=null;
+  for(const b of document.querySelectorAll("[data-menu]"))b.setAttribute("aria-expanded","false");
+ }
+ for(const menu of document.querySelectorAll("[data-menu]")){
+  menu.addEventListener("click",function(event){
+   event.stopPropagation();const key=this.dataset.menu;
+   if(key===activeMenu){closeMenu();return;}
+   closeMenu();activeMenu=key;
+   for(const item of menuDefinitions[key]){
+    const entry=btn(item,"",function(){demoStatus(key+" / "+item);closeMenu()});
+    entry.setAttribute("role","menuitem");menuPopover.appendChild(entry);
+   }
+   menuPopover.style.left=Math.max(12,menu.getBoundingClientRect().left)+"px";
+   menuPopover.hidden=false;this.setAttribute("aria-expanded","true");
+  });
+ }
+ document.addEventListener("click",function(event){
+  if(!menuPopover.contains(event.target)&&!event.target.closest("[data-menu]"))closeMenu()
+ });
+ document.addEventListener("keydown",function(event){if(event.key==="Escape"&&!menuPopover.hidden)closeMenu()});
  renderTabs();renderRows();renderMixer();
  document.getElementById("matrixScroll").addEventListener("scroll",function(e){const grid=e.currentTarget;document.getElementById("metricScroll").scrollTop=grid.scrollTop;document.getElementById("mixerScroll").scrollLeft=grid.scrollLeft});
  document.getElementById("closeInspector").addEventListener("click",function(){ids.inspector.classList.add("hide");document.getElementById("workspace").classList.add("hide-inspector")});
