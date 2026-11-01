@@ -198,4 +198,23 @@ void cueGridN3VisualTests() {
               "Loaded audio lost its type-colour cue");
     });
 
+    test("N3.3 empty cell has no invisible transport dead zones",[] {
+        using namespace cuelist;
+        MainComponent ui(false);
+        addRow(ui.show,"Second");
+        addColumn(ui.show,ColumnType::midi,"MIDI");
+        ui.setSize(1647,895);
+        ui.resized();
+        auto* grid=cueViewFixtures::find<CueGrid>(ui);
+        check(grid!=nullptr,"CueGrid missing");
+        ui.select(0,0);
+        const int x=grid->columnX(1)+grid->columnWidthAt(1)-20;
+        const int y=CueGridGeometry::rowTop(1)+
+                    CueGrid::rowContentInset+34;
+        cueViewFixtures::click(*grid,(float)x,(float)y);
+        check(ui.selectedRow==1 && ui.selectedColumn==1 &&
+              ui.show.rows.size()==2,
+              "Hidden disabled Stop region prevented empty cell selection");
+    });
+
 }
