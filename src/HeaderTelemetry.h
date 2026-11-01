@@ -14,7 +14,7 @@ struct HeaderTelemetryLayout final {
             {cx,8,124,56},{ux,8,132,56},
             // 24h/12h digits use almost the full clock tile. In 12h
             // mode the AM/PM suffix has its own smaller lower-right slot.
-            {cx+4,12,116,40},{cx+75,49,45,13},
+            {cx+4,10,116,38},{cx+75,49,45,13},
             {ux+10,16,28,19},{ux+39,16,48,19},
             {ux+10,39,28,19},{ux+39,39,48,19},
             {(float)ux+95,23.5f,27.0f,6.0f},
