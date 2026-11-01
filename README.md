@@ -27,6 +27,10 @@ pubbliche. La versione del progetto salvato `.cuelist` (**schema v10**)
 
 ## UI V2 — Operator workspace design study
 
+**Vincolo Master Audio:** il Master della GUI JUCE originale NON viene ridisegnato. Fader/meter stereo, pan, mute, Main Out, limiter, gain reduction, Quick Learn, geometria e aspetto originali rimangono invariati. L'immagine del Master nella preview HTML è soltanto un riferimento statico, non un nuovo controllo o una specifica estetica.
+
+
+
 **V2.3 / `0.9.0-beta.9`:** rifinito il prototipo di
 [Operator Workspace](design/operator-workspace-v2.html):
 strip Audio, MIDI, OSC e Control chiaramente differenziate,
