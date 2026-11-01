@@ -31,6 +31,7 @@ jobs:
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
           python scripts/test_versioning.py
+          python scripts/test_native_operator_menu_parity.py
           if ($env:BASE_SHA -and $env:HEAD_SHA) {
             python scripts/check_versioning.py --base-sha $env:BASE_SHA --head-sha $env:HEAD_SHA
           } else {
