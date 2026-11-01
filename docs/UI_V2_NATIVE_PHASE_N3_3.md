@@ -27,7 +27,7 @@ La Cue Grid continua ad essere la `CueGrid` JUCE esistente, senza componenti HTM
 Intervento mirato su `src/CueViews.cpp` e `src/MainComponent.h`.
 
 1. **Riga continua:** fondo Midnight Slate con alternanza minima e separatori verticali/orizzontali sottili. La selezione si estende a tutta la riga, comprese le zone senza contenuti. NEXT e playback si sovrappongono come segnali distinti anziché sostituire la selezione.
-2. **Slot vuoti:** non disegnano più pannelli scuri con bordo per ogni cella. Conservano l'indicazione testuale di import/creazione. Una piccola superficie compare solo con hover, che ridisegna la cella interessata e non muta dati, selezione o trasporto.
+2. **Slot vuoti:** non disegnano più pannelli scuri con bordo né pulsanti Play/Stop disabilitati. Conservano l'indicazione testuale di import/creazione. Una piccola superficie compare solo con hover, che ridisegna la cella interessata e non muta dati, selezione o trasporto. Anche un click dove prima c'era Stop disabilitato seleziona correttamente la cella vuota.
 3. **Contenuti veri:** clip e Control Map mantengono il nome e le informazioni esistenti; l'accento cromatico viene applicato a una piccola barra laterale e al contenuto. Progress, loop, play/stop, auto stop e indicazioni di errore sono preservati.
 4. **Stato operativo:** il pallino di attività e il testo WAITING/PAUSED provengono esclusivamente da `engine.getCellPlayback`. Il testo dell'intera cue mantiene PLAYING/PAUSED/NEXT CUE/MUTED/STANDBY. Il design non finge nuovi stati READY/STOPPED/ERROR quando il runtime non li distingue.
 5. **Focus:** la cella selezionata mostra un contorno sottile, rafforzato quando il contenitore operatore ha focus. La selezione non esegue clip/GO.
