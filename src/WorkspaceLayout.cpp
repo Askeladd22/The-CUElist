@@ -11,7 +11,9 @@ constexpr int cueLeft=182;
 constexpr int cueTop=74;
 // These panels share a real boundary with the Inspector, not a blank gutter.
 constexpr int workspaceSeparation=0;
-constexpr int cueGridTail=44;
+// Content tail is part of CueGridGeometry: row-count, viewport and scroll
+// must not calculate different content extents.
+constexpr int cueGridTail=CueGridGeometry::gridTail;
 constexpr int minimumGridHeight=310;
 constexpr int minimumTimelineHeight=75;
 constexpr int statusFooterGap=47;
