@@ -131,10 +131,18 @@ public:
     static constexpr int nameWidth=CueGridGeometry::nameWidth;
     static constexpr int columnWidth=CueGridGeometry::columnWidth;
     static constexpr int compressedWidth=CueGridGeometry::compressedWidth;
-    // Compact the cue row actions to consistent 5px gaps.
-    static juce::Rectangle<int> rowPlayBounds(int y) { return {nameWidth-114,y+11,29,26}; }
-    static juce::Rectangle<int> rowStopBounds(int y) { return {nameWidth-80,y+11,29,26}; }
-    static juce::Rectangle<int> rowMenuBounds(int y) { return {nameWidth-46,y+11,29,26}; }
+    // N3.2 follow-up: two visual tiers in the original 62px cue row.
+    // The title, GO, Play, Stop and More remain independent hit targets.
+    static juce::Rectangle<int> rowGoBounds(int y) { return {56,y+9,42,32}; }
+    static juce::Rectangle<int> rowNameBounds(int y) { return {107,y+3,nameWidth-122,25}; }
+    static juce::Rectangle<int> rowStatusBounds(int y) { return {107,y+31,94,20}; }
+    static juce::Rectangle<int> rowPlayBounds(int y) { return {nameWidth-114,y+31,29,24}; }
+    static juce::Rectangle<int> rowStopBounds(int y) { return {nameWidth-80,y+31,29,24}; }
+    static juce::Rectangle<int> rowMenuBounds(int y) { return {nameWidth-46,y+31,29,24}; }
+    static bool rowTitleHit(int x,int localY) {
+        return rowNameBounds(0).contains(x,localY) ||
+               rowStatusBounds(0).contains(x,localY);
+    }
     // Shared by the painter and input handling to prevent discrepancies.
     static juce::Rectangle<int> cellPlayBounds(int x,int width,int y) {
         return {x+width-64,y+23,24,23};
