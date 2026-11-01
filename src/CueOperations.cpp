@@ -275,11 +275,14 @@ void MainComponent::positionInlineNameEditor() {
             [this](const Row& row){return row.id==inlineRenameModelId;});
         if (it==show.rows.end()) {cancelInlineRename();return;}
         const int row=(int)std::distance(show.rows.begin(),it);
-        rect={cueHeaders.getX()+107,
-              cueHeaders.getY()+CueGrid::headerHeight+
-              row*CueGrid::rowHeight-viewport.getViewPositionY()+
-              CueGrid::rowContentInset+4,
-              CueGrid::nameWidth-224,24};
+        // Match the exact first-tier label rectangle used by CueGrid::paint.
+        // Inline rename must not cover the GO or Stop hit targets.
+        const auto title=CueGrid::rowNameBounds(0);
+        rect={cueHeaders.getX()+title.getX(),
+              cueHeaders.getY()+CueGridGeometry::overlayRowTop(
+                  row,viewport.getViewPositionY())+
+              CueGrid::rowContentInset+title.getY(),
+              title.getWidth(),title.getHeight()};
         if (rect.getY()<cueHeaders.getY()+CueGrid::headerHeight ||
             rect.getBottom()>cueHeaders.getBottom()) {
             cancelInlineRename();return;
