@@ -5,6 +5,7 @@
 #include "OperatorTextPrompt.h"
 #include "OscEditor.h"
 #include "HeaderTelemetry.h"
+#include "MasterAudioLayout.h"
 void uiRefinementTests() {
     using namespace cueViewFixtures;
     test("Cuelist renames directly on header/tab with Enter, Escape and validation",[] {
@@ -720,6 +721,73 @@ void uiRefinementTests() {
               master->getNumChildComponents()==0,
               "Master does not use the compact integrated meter/fader");
     });
+    test("N3.5 pinned Master Audio remains inside the Cuelist lane at every width",[] {
+        using namespace cuelist;
+        MainComponent ui(false);
+        for (int i=1;i<13;++i) addRow(ui.show,"Scrolled cue");
+        for (int i=1;i<12;++i)
+            addColumn(ui.show,i%2 ? ColumnType::audio : ColumnType::midi,"Column");
+        auto* utilities=cueViewFixtures::find<ColumnUtilities>(ui);
+        auto* grid=cueViewFixtures::find<CueGrid>(ui);
+        juce::Viewport* view=nullptr;
+        for (auto* child:ui.getChildren())
+            if (auto* candidate=dynamic_cast<juce::Viewport*>(child)) {
+                view=candidate;break;
+            }
+        auto* fader=controlsV3::named(*utilities,"masterAudioDb");
+        auto* output=controlsV3::named(*utilities,"masterMainOutput");
+        auto* pan=controlsV3::named(*utilities,"masterPan");
+        auto* mute=controlsV3::named(*utilities,"masterMute");
+        auto* limiter=controlsV3::named(*utilities,"masterSafetyLimiter");
+        check(utilities && grid && view && fader && output && pan && mute && limiter,
+              "Master Audio or its real five controls are missing");
+        for (const auto dimensions:std::initializer_list<juce::Point<int>>{
+            {1280,768},{1280,820},{1440,900},{1647,895},
+            {1920,1080},{3840,1080}}) {
+            ui.setSize(dimensions.x,dimensions.y);
+            ui.resized();
+            utilities->refresh();
+            const auto masterX=utilities->getX();
+            const auto expected=MasterAudioLayout::atHeight(utilities->getHeight());
+            check(utilities->getWidth()>=MasterAudioLayout::laneWidth &&
+                  fader->getParentComponent()==utilities &&
+                  output->getParentComponent()==utilities &&
+                  pan->getParentComponent()==utilities &&
+                  mute->getParentComponent()==utilities &&
+                  limiter->getParentComponent()==utilities &&
+                  fader->getBounds()==expected.fader &&
+                  pan->getBounds()==expected.panKnob &&
+                  output->getBounds()==expected.output &&
+                  mute->getBounds()==expected.muteButton &&
+                  limiter->getBounds()==expected.limiter &&
+                  expected.fader.getRight()<=CueGrid::nameWidth &&
+                  expected.panKnob.getRight()<=CueGrid::nameWidth &&
+                  expected.muteButton.getRight()<=CueGrid::nameWidth &&
+                  expected.output.getRight()<=CueGrid::nameWidth &&
+                  expected.limiter.getRight()<=CueGrid::nameWidth &&
+                  expected.card.contains(expected.fader) &&
+                  expected.card.contains(expected.output) &&
+                  expected.card.contains(expected.panKnob) &&
+                  expected.card.contains(expected.muteButton) &&
+                  expected.card.contains(expected.limiter) &&
+                  expected.fader.getBottom()<=utilities->getHeight() &&
+                  expected.muteButton.getBottom()<=utilities->getHeight(),
+                  "Master control left the pinned Cuelist lane or became clipped");
+            const auto viewportX=view->getViewPositionX();
+            view->setViewPosition(viewportX+180,115);
+            check(utilities->getX()==masterX &&
+                  fader->getBounds()==expected.fader &&
+                  output->getBounds()==expected.output &&
+                  mute->getBounds()==expected.muteButton,
+                  "Scrolling columns or cues moved pinned Master Audio");
+            // The clipped scrolling strips start at x=318; never at the
+            // fixed Cuelist's x=0, even at 32:9.
+            check(utilities->getChildComponent(0)->getX()==
+                  MasterAudioLayout::laneWidth,
+                  "Scrolling strips overlap the pinned Master panel");
+        }
+    });
+
     test("Midnight Console layout enlarges fields and meters without dropping controls",[] {
         MainComponent ui(false);
         ui.setSize(1640,900);
