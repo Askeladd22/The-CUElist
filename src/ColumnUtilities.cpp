@@ -1,5 +1,6 @@
 #include "MainComponent.h"
 #include "GainMeterFader.h"
+#include "MasterAudioLayout.h"
 
 namespace cuelist {
 struct ColumnUtilities::Strip final : juce::Component {
@@ -435,18 +436,21 @@ void ColumnUtilities::refreshMeters() {
 void ColumnUtilities::resized() {
     // A dedicated child clips scrolling strips to the centre of the mixer.
     // The Master is pinned at the left; neither area can obscure the other.
-    const int masterWidth=CueGrid::nameWidth;
+    static_assert(MasterAudioLayout::laneWidth==CueGrid::nameWidth,
+                  "Pinned Master must match the Cuelist name lane");
+    const int masterWidth=MasterAudioLayout::laneWidth;
+    const auto layout=MasterAudioLayout::atHeight(getHeight());
     scrollableStrips.setBounds(masterWidth,0,
         std::max(0,getWidth()-masterWidth),getHeight());
-    owner.masterSlider.setBounds(13,34,78,std::max(92,getHeight()-37));
-    owner.masterPan.setBounds(193,38,43,43);
+    owner.masterSlider.setBounds(layout.fader);
+    owner.masterPan.setBounds(layout.panKnob);
     owner.masterGainLearnHotspot.setBounds(owner.masterSlider.getBounds());
     owner.masterPanLearnHotspot.setBounds(owner.masterPan.getBounds());
     owner.masterGainLearnHotspot.setLearnActive(owner.isQuickLearnActive());
     owner.masterPanLearnHotspot.setLearnActive(owner.isQuickLearnActive());
-    owner.masterMute.setBounds(198,146,34,31);
-    owner.masterOutput.setBounds(104,59,85,25);
-    owner.safetyLimiter.setBounds(104,127,86,30);
+    owner.masterMute.setBounds(layout.muteButton);
+    owner.masterOutput.setBounds(layout.output);
+    owner.safetyLimiter.setBounds(layout.limiter);
     owner.masterLimiterLearnHotspot.setBounds(owner.safetyLimiter.getBounds());
     owner.masterLimiterLearnHotspot.setLearnActive(owner.isQuickLearnActive());
     if (owner.masterLimiterLearnHotspot.isVisible())
@@ -457,19 +461,50 @@ void ColumnUtilities::resized() {
 }
 void ColumnUtilities::paint(juce::Graphics& g) {
     g.fillAll(palette::panel);
-    g.setColour(palette::line); g.drawHorizontalLine(0,0,(float)getWidth());
-    const auto card=juce::Rectangle<float>(8.0f,4.0f,
-        (float)CueGrid::nameWidth-16,(float)std::max(1,getHeight()-8));
-    g.setColour(palette::raised.withAlpha(.55f)); g.fillRoundedRectangle(card,8.0f);
-    g.setColour(palette::line);g.drawRoundedRectangle(card,8.0f,1.0f);
-    g.setColour(palette::teal);g.fillRoundedRectangle(14.0f,4.0f,95.0f,3.0f,1.5f);
-    label(g,"MASTER AUDIO",{14,10,CueGrid::nameWidth-28,20},13,palette::teal,true);
-    label(g,"PAN",{187,86,55,16},11,palette::muted,true,juce::Justification::centred);
+    static_assert(MasterAudioLayout::laneWidth==CueGrid::nameWidth,
+                  "Master Audio must remain in the Cuelist fixed lane");
+    const auto layout=MasterAudioLayout::atHeight(getHeight());
+
+    // Pinned left console: only this 318px lane draws the Master.
+    // The other strips are separate children of scrollableStrips and cannot
+    // move, mask or clip the Master while the cue grid scrolls.
+    g.saveState();
+    g.reduceClipRegion(0,0,MasterAudioLayout::laneWidth,getHeight());
+    g.setColour(palette::raised.withAlpha(.50f));
+    g.fillRoundedRectangle(layout.card.toFloat(),7.f);
+    g.setColour(palette::line.withAlpha(.66f));
+    g.drawRoundedRectangle(layout.card.toFloat(),7.f,.8f);
+
+    // A restrained header rule provides continuity with the Cue/Transport
+    // lane; this card no longer resembles a floating settings dialog.
+    g.setColour(palette::teal.withAlpha(.85f));
+    g.fillRoundedRectangle((float)layout.card.getX()+11.f,
+                           (float)layout.card.getY()+1.f,96.f,2.f,1.f);
+    label(g,"MASTER AUDIO",layout.title,14,palette::teal,true);
+    label(g,"L/R",{246,14,51,18},10,palette::muted,true,
+          juce::Justification::centredRight);
+    g.setColour(palette::line.withAlpha(.33f));
+    g.fillRect(layout.headerRule);
+
+    // All captions relate to genuine interactive controls, not decorative
+    // actions; fader peaks and limiter gain reduction remain runtime driven.
+    label(g,"MAIN OUT",layout.outputCaption,11,palette::muted,true);
+    label(g,"PAN",layout.panCaption,11,palette::muted,true,
+          juce::Justification::centred);
     const auto pan=owner.show.masterPan;
-    label(g,std::abs(pan)<.005f ? juce::String("C") : juce::String(pan<0?"L ":"R ")
-        +juce::String((int)std::round(std::abs(pan)*100)),
-        {187,101,55,18},11,palette::text,false,juce::Justification::centred);
-    label(g,"MUTE",{191,126,48,17},11,palette::muted,true,juce::Justification::centred);
-    label(g,"MAIN OUT",{103,40,88,16},10,palette::muted,true);
+    label(g,std::abs(pan)<.005f ? juce::String("C") :
+          juce::String(pan<0?"L ":"R ")+
+          juce::String((int)std::round(std::abs(pan)*100)),
+          layout.panValue,11,palette::text,false,
+          juce::Justification::centred);
+    label(g,"LIMITER",layout.limiterCaption,10,palette::muted,true);
+    label(g,"MUTE",layout.muteCaption,10,palette::muted,true,
+          juce::Justification::centred);
+    if (getHeight()>=202)
+        label(g,"PCM MASTER BUS",layout.gainCaption,10,palette::muted);
+    g.restoreState();
+    g.setColour(palette::line.withAlpha(.65f));
+    g.drawVerticalLine(MasterAudioLayout::laneWidth,0.f,(float)getHeight());
 }
+
 }
