@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>The CUElist — Operator Workspace V2.2 · Full Master and Navigation</title>
+<title>The CUElist — Operator Workspace V2.3 · Functional channel hierarchy</title>
 <style>
 /* Standalone design prototype: no JUCE runtime, network, assets or actual audio transport. */
 :root{color-scheme:dark;--bg:#071521;--top:#0e2030;--surface:#102638;--raised:#183346;--line:#294559;--muted:#9eb5c4;--text:#e7f1f5;--teal:#39c4b4;--amber:#d6ac5a;--purple:#ad89dc;--blue:#79acd5;--danger:#d56b7b;--sidebar:160px;--inspector:272px;--cue:280px;--cell:109px;--metric:128px;--rowh:37px;--small:12px;font:13px/1.3 "Segoe UI",sans-serif}
@@ -71,14 +71,61 @@
 .master-learn [hidden]{display:none}.master-learn-label{font-size:10px;color:var(--muted);margin-right:2px}
 .mixer-band.collapsed .master-full,.mixer-band.collapsed .master-learn{display:none}
 @media(max-width:1280px){.master-full{grid-template-columns:43px minmax(0,1fr) 65px;gap:5px}.master-switch,.master-mute{font-size:9px}}
+/* V2.3 refinement: preserve the full Master and cue matrix, but make
+   each channel type visually legible instead of repeating audio furniture.
+   Text stays readable at the 109px design cell without erasing controls. */
+:root{--muted:#acc3d3}
+.sidebar-overview{margin-top:3px;display:grid;gap:7px;padding:8px 8px 11px;border-bottom:1px solid var(--line)}
+.sidebar-overview-title{font-size:11px;color:#9db6c9;font-weight:700;letter-spacing:.07em}
+.sidebar-overview-line{display:flex;align-items:baseline;justify-content:space-between;gap:6px;color:var(--muted);font-size:11px}
+.sidebar-overview-line strong{color:var(--text);font-size:16px;font-weight:700;font-variant-numeric:tabular-nums}
+.sidebar .selected{font-size:12px}
+.cue-name{font-size:12px}
+.cue-state{font-size:11px;color:#a6bdcd}
+.matrix-row .cell{font-size:12px;color:#b1c5d2}
+.cell.empty{color:#7f9aab}
+.column-head .small{font-size:11px}
+.channel-head{font-size:12px;letter-spacing:.01em}
+.channel-kind{font-size:10px}
+.mixer-channel{padding:8px 7px;gap:7px}
+.mixer-channel.audio{background:#112b39}
+.mixer-channel.midi,.mixer-channel.osc,.mixer-channel.control{background:#0b1d2b}
+.audio-routing{display:flex;align-items:center;justify-content:space-between;gap:3px;min-width:0;color:#b7cedc;font-size:10px}
+.audio-routing span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.audio-routing button{color:#b8d6e1;padding:2px 3px;font-size:10px;border:1px solid #34556a;border-radius:3px;flex-shrink:0}
+.audio-layout{display:flex;align-items:flex-start;gap:7px;flex:1;min-height:0}
+.audio-controls{display:grid;grid-template-columns:9px 14px;gap:5px;align-items:start;flex:0 0 auto;padding-top:4px}
+.audio-controls .meter,.audio-controls .fader-track{height:73px}
+.audio-info{display:flex;flex-direction:column;gap:7px;min-width:0;flex:1}
+.audio-info .gain-value{font-size:11px;font-weight:700;color:var(--text);white-space:nowrap}
+.audio-info .pan-readout{font-size:10px;color:#acc2d1}
+.audio-action-row{display:flex;gap:4px;flex-wrap:wrap}
+.audio-action-row button{border-radius:3px;border:1px solid #3e5d72;color:#c3d7e3;font-size:10px;min-width:22px;min-height:23px;padding:2px 3px}
+.audio-action-row button:hover{border-color:var(--teal);background:#1f4152}
+.audio-action-row button[aria-pressed="true"]{background:#255c57;color:#e2fff7;border-color:var(--teal)}
+.data-channel{min-width:0;display:flex;flex-direction:column;justify-content:space-between;gap:8px;flex:1;padding-top:2px}
+.data-channel .endpoint{font-size:11px;font-weight:700;line-height:1.25;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.data-channel .type-hint{font-size:11px;color:var(--muted);line-height:1.25}
+.data-channel .type-status{font-size:11px;display:flex;align-items:center;gap:5px;color:#b5cbd8}
+.type-status .indicator{height:6px;width:6px;border-radius:50%;background:#6b8da2;flex-shrink:0}
+.midi .type-status .indicator{background:var(--amber)}
+.osc .type-status .indicator{background:var(--purple)}
+.control .type-status .indicator{background:var(--blue)}
+.data-actions{display:flex;gap:5px;align-items:center;flex-wrap:wrap}
+.data-actions button{border:1px solid #365569;border-radius:3px;min-height:25px;padding:4px 7px;font-size:11px;color:#c8d8e2}
+.data-actions button:hover,.data-actions button:focus-visible{border-color:var(--teal);background:#224153}
+.data-actions button[aria-pressed="true"]{background:#523948;border-color:var(--danger);color:#fff}
+.data-channel.control .data-actions button{min-width:100%}
+.mixer-band.collapsed .audio-routing,.mixer-band.collapsed .audio-layout,.mixer-band.collapsed .data-channel{display:none}
+@media(max-width:1280px){.mixer-channel{padding:7px 5px}.audio-layout{gap:4px}.audio-action-row{gap:3px}.audio-action-row button{min-width:21px;padding:2px}.data-actions button{padding:3px 5px}}
 @media(max-width:1280px){:root{--sidebar:132px;--inspector:235px;--cue:254px;--cell:101px;--metric:112px}.menu{display:none}.top-status{gap:6px}.sidebar{padding:10px 6px}.top-status .status:nth-last-child(n+2){display:none}}
 </style>
 </head>
 <body>
 <div class="app">
-<header><div class="brand"><div class="brand-mark">▥</div><span>The <b>CUElist</b></span></div><nav class="menu" aria-label="Menu globale"><button data-menu="File" aria-haspopup="menu" aria-expanded="false">File</button><button data-menu="Edit" aria-haspopup="menu" aria-expanded="false">Edit</button><button data-menu="Show" aria-haspopup="menu" aria-expanded="false">Show</button><button data-menu="Cuelists" aria-haspopup="menu" aria-expanded="false">Cuelists</button><button data-menu="Devices" aria-haspopup="menu" aria-expanded="false">Devices</button><button data-menu="View" aria-haspopup="menu" aria-expanded="false">View</button><button data-menu="Guide" aria-haspopup="menu" aria-expanded="false">Guide</button></nav><div class="menu-popover" id="menuPopover" role="menu" hidden></div><div class="top-status"><span class="prototype-label">CONCEPT V2.2 — NON OPERATIVO</span><span class="clock">12:07:48</span><span>CPU 7% · RAM 35%</span><span class="status">MIDI ✓</span><span class="status">OSC ✓</span></div></header>
+<header><div class="brand"><div class="brand-mark">▥</div><span>The <b>CUElist</b></span></div><nav class="menu" aria-label="Menu globale"><button data-menu="File" aria-haspopup="menu" aria-expanded="false">File</button><button data-menu="Edit" aria-haspopup="menu" aria-expanded="false">Edit</button><button data-menu="Show" aria-haspopup="menu" aria-expanded="false">Show</button><button data-menu="Cuelists" aria-haspopup="menu" aria-expanded="false">Cuelists</button><button data-menu="Devices" aria-haspopup="menu" aria-expanded="false">Devices</button><button data-menu="View" aria-haspopup="menu" aria-expanded="false">View</button><button data-menu="Guide" aria-haspopup="menu" aria-expanded="false">Guide</button></nav><div class="menu-popover" id="menuPopover" role="menu" hidden></div><div class="top-status"><span class="prototype-label">CONCEPT V2.3 — NON OPERATIVO</span><span class="clock">12:07:48</span><span>CPU 7% · RAM 35%</span><span class="status">MIDI ✓</span><span class="status">OSC ✓</span></div></header>
 <div class="workspace" id="workspace">
-<aside class="sidebar" aria-label="Show attivo e trasporto"><div class="eyebrow">Workspace</div><nav><button class="selected">▣ &nbsp; Show 001</button></nav><div class="sidebar-context"><strong>12 cue list</strong><span>Settings, Devices e Control Mapping nei menu superiori</span></div><div class="control"><div class="on-deck"><span class="eyebrow">ON DECK</span><strong id="onDeck">NEXT / 13</strong></div><button class="go" id="go">▶ &nbsp; GO / Space</button><button class="panic" id="panic">■ &nbsp; PANIC / Esc</button></div></aside>
+<aside class="sidebar" aria-label="Show attivo e trasporto"><div class="eyebrow">Workspace</div><nav><button class="selected">▣ &nbsp; Show 001</button></nav><div class="sidebar-overview" aria-label="Riepilogo dello show"><div class="sidebar-overview-title">SESSIONE</div><div class="sidebar-overview-line"><strong>12</strong><span>Cue list</span></div><div class="sidebar-overview-line"><strong>13</strong><span>Cue nella lista</span></div><div class="sidebar-overview-line"><strong>11</strong><span>Colonne</span></div></div><div class="control"><div class="on-deck"><span class="eyebrow">ON DECK</span><strong id="onDeck">NEXT / 13</strong></div><button class="go" id="go">▶ &nbsp; GO / Space</button><button class="panic" id="panic">■ &nbsp; PANIC / Esc</button></div></aside>
 <main class="center">
 <div class="tabs" id="tabs" role="tablist" aria-label="Cue list"></div>
 <div class="tool"><div><h1 id="current-title">Cuelist 12</h1><div class="meta">13 cues / 11 colonne</div></div><div class="end"><button id="density" aria-pressed="false">Densità: standard</button><button id="dock-toggle" aria-pressed="true">Mixer ▾</button><button id="timeline-toggle" aria-pressed="true">Timeline ▾</button></div></div>
