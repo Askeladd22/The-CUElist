@@ -105,6 +105,8 @@ class CueGrid final : public juce::Component, public juce::FileDragAndDropTarget
 public:
     explicit CueGrid(MainComponent& parent) : owner(parent) {}
     void paint(juce::Graphics&) override;
+    void mouseMove(const juce::MouseEvent&) override;
+    void mouseExit(const juce::MouseEvent&) override;
     void mouseDown(const juce::MouseEvent&) override;
     void mouseDoubleClick(const juce::MouseEvent&) override;
     void mouseDrag(const juce::MouseEvent&) override;
@@ -158,6 +160,7 @@ public:
 private:
     MainComponent& owner;
     int dragRow=-1, dragColumn=-1, dropRow=-1, dropColumn=-1;
+    int hoverRow=-1, hoverColumn=-1; // visual only; never activates a cue
     std::set<int> autoStopVisibleRows;
     bool dragging=false;
 };
