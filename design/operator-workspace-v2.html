@@ -65,6 +65,7 @@
 .master-switch[aria-pressed="true"]{background:#204c47;color:#d8fff5;border-color:var(--teal)}
 .master-mute[aria-pressed="true"]{background:#65404c;color:#fff;border-color:var(--danger)}
 .master-pan{height:17px;width:100%;accent-color:var(--teal);margin:0}.master-pan-value{font-size:10px;text-align:center;color:var(--text)}
+.master-reduction{font-size:10px;color:var(--muted);font-variant-numeric:tabular-nums}
 .master-learn{display:flex;gap:4px;align-items:center;border-top:1px solid #2c4c60;padding-top:5px;min-height:25px}
 .master-learn button{height:21px;min-width:28px;padding:2px 4px;background:#173448;border:1px solid #3b5a71;border-radius:3px;font-size:10px}
 .master-learn [hidden]{display:none}.master-learn-label{font-size:10px;color:var(--muted);margin-right:2px}
@@ -149,8 +150,9 @@
   const full=node("div","master-full");
   const level=node("div","master-level");
   const peaks=node("div","master-peaks");
-  peaks.appendChild(node("div","master-peak left"));
-  peaks.appendChild(node("div","master-peak right"));
+  const peakL=node("div","master-peak left"),peakR=node("div","master-peak right");
+  peakL.title="Peak L / peak hold — demo";peakR.title="Peak R / peak hold — demo";
+  peaks.appendChild(peakL);peaks.appendChild(peakR);
   const gain=node("input","master-gain");
   gain.id="masterGain";gain.type="range";gain.min="-60";gain.max="6";gain.step=".1";gain.value="0";
   gain.setAttribute("aria-label","Master gain in dB — demo");
@@ -171,6 +173,9 @@
   limiter.id="masterLimiter";limiter.setAttribute("aria-pressed","false");
   limiter.title="Safety limiter -1 dBFS (Master Bus only) — demo";
   routes.appendChild(limiter);
+  const reduction=node("span","master-reduction","GR 0.0 dB");
+  reduction.title="Gain reduction meter del limiter — valore dimostrativo";
+  routes.appendChild(reduction);
   const right=node("div","master-right");
   const panLabel=node("label","","PAN");panLabel.setAttribute("for","masterPan");
   const pan=node("input","master-pan");pan.id="masterPan";pan.type="range";
