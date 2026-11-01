@@ -381,7 +381,9 @@ void CueGrid::paint(juce::Graphics& g) {
                     g.setColour(playback.playing?palette::teal:palette::amber);
                     g.fillEllipse((float)x+10,(float)y+31,5.f,5.f);
                 }
-                label(g,playback.waiting?"WAITING":playback.paused?"PAUSED":
+                // Preserve numeric position/duration while paused; the
+                // amber activity dot and row status already say PAUSED.
+                label(g,playback.waiting?"WAITING":
                         timeText(playback.positionSeconds)+" / "+timeText(seconds),
                      {x+(active?19:9),y+26,w-(active?84:74),16},10,
                      playback.playing?palette::teal:
