@@ -183,20 +183,36 @@ void cuelistGuiMockupTests() {
             check(ui.show.cuelists.back().name=="Cuelist "+juce::String(i),
                   "Cuelist numbering skipped a value");
         }
-        ui.setSize(1647,895);
+        // Nine tabs remain inline when there is genuine space to the
+        // left of the enlarged monitoring console.
+        ui.setSize(1920,1080);
         ui.resized();
         int previousX=-1;
         for (int i=0;i<9;++i) {
             auto* tab=controlsV3::named(ui,"cuelistTab"+juce::String(i));
             auto* close=controlsV3::named(ui,"deleteCuelist"+juce::String(i));
             check(tab && close && tab->isVisible() && close->isVisible(),
-                  "Every one of nine Cuelists must have a real tab and a close button");
-            check(tab->getX()>previousX,"Cuelist tabs did not appear side by side");
+                  "Every Cuelist must have an inline tab when space allows");
+            check(tab->getX()>previousX,"Cuelist tabs are not consecutive");
             previousX=tab->getX();
         }
         auto* overflow=controlsV3::named(ui,"cuelistOverflow");
         check(overflow && !overflow->isVisible(),
-              "Overflow menu appeared despite room for nine inline tabs");
+              "Overflow appeared despite room for nine tabs at 1920px");
+        // At 1647px telemetry has priority over the tab row. Hidden
+        // Cuelists stay reachable using the original overflow action.
+        ui.setSize(1647,895);
+        ui.resized();
+        check(overflow->isVisible() &&
+              controlsV3::named(ui,"cuelistTab8")->isVisible(),
+              "Wider telemetry obscured the active tab instead of overflowing");
+        const auto edge=HeaderTelemetryLayout::atWidth(1647).clock.getX();
+        for (int i=0;i<9;++i) {
+            auto* tab=controlsV3::named(ui,"cuelistTab"+juce::String(i));
+            if (tab->isVisible())
+                check(tab->getRight()<edge,
+                      "An inline Cuelist tab overlaps operator telemetry");
+        }
         ui.setSize(1180,820);
         ui.resized();
         check(overflow->isVisible(),"Narrow windows must retain access to hidden Cuelists");

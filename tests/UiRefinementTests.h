@@ -1166,10 +1166,13 @@ void uiRefinementTests() {
                  {1180,820},{1440,900},{1647,895},{1920,1080}}) {
             ui.setSize(size.x,size.y);
             const auto layout=HeaderTelemetryLayout::atWidth(size.x);
-            check(layout.clock.getRight()+14==layout.usage.getX() &&
+            check(layout.clock.getRight()+10==layout.usage.getX() &&
+                  layout.usage.getRight()+10==layout.activity.getX() &&
+                  layout.activity.getRight()+10==layout.audio.getX() &&
                   layout.clock.getY()==layout.usage.getY() &&
-                  layout.clock.getHeight()==layout.usage.getHeight(),
-                  "Clock and CPU/RAM panels need a consistent 14px gutter");
+                  layout.clock.getHeight()==layout.usage.getHeight() &&
+                  layout.audio.getRight()<=size.x-10,
+                  "Responsive operator console has overlapping telemetry groups");
             check(layout.usage.contains(layout.cpuValue) &&
                   layout.usage.contains(layout.ramValue) &&
                   layout.usage.contains(layout.cpuMeter.toNearestInt()) &&
@@ -1177,9 +1180,11 @@ void uiRefinementTests() {
                   "CPU/RAM labels and meters must fit inside the card");
             const auto clock=ui.createComponentSnapshot(layout.clock);
             const auto cpu=ui.createComponentSnapshot(layout.usage);
-            check(clock.isValid() && clock.getWidth()==124 &&
-                  cpu.isValid() && cpu.getWidth()==132,
-                  "Header cards must render at compact window widths");
+            check(clock.isValid() && clock.getWidth()==layout.clock.getWidth() &&
+                  cpu.isValid() && cpu.getWidth()==layout.usage.getWidth() &&
+                  layout.clock.getWidth()>=134 &&
+                  layout.usage.getWidth()>=130,
+                  "Enlarged operator telemetry must render without clipping");
             check(font(11.0f).getTypefaceName().containsIgnoreCase("Exo"),
                   "Small telemetry text lost Exo 2");
         }

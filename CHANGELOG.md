@@ -13,6 +13,21 @@ certifichino tutte le milestone riportate**; le etichette storiche
 indicano versioni di sviluppo presenti nei commit, non distribuzioni
 pubbliche. I particolari di ogni intervento sono nell'appendice.
 
+## [0.9.0-beta.24] - 2026-11-01
+
+**Tipo:** redesign nativo V2 — ingrandimento dell'intero monitor operativo nell'header globale.
+
+### Interfaccia
+- **Orologio, CPU/RAM, I/O ACTIVITY, MIDI Learn/OSC Learn e AUDIO** condividono ora una fascia Midnight Slate più ampia con separatori sottili, tipografia aumentata, indicatori e valori più leggibili. Nessun ingrandimento verticale dell'header oltre **72px**.
+- `HeaderTelemetryLayout::atWidth` definisce **tre larghezze responsive** per 1024–1180, 1250–1549 e ≥1550 px; geometrie unificate di ogni gruppo e dei veri pulsanti Learn. Orologio 30/33/35 px secondo lo spazio, sigla AM/PM separata; valori CPU/RAM 14 px e meter più lunghi; indicatori MIDI/OSC da 10px; stato audio più evidente.
+- L'orologio mantiene il formato 12/24 ore, gli indicatori utilizzano i contatori e lo stato audio reali, e le barre CPU/RAM mantengono i valori misurati. I pulsanti MIDI Learn e OSC Learn conservano gli handler esistenti e hanno un target più grande.
+- La barra delle schede Cuelist calcola ora l'overflow **rispetto all'effettivo bordo sinistro del monitor**, non a una larghezza precedente fissa: nessuna scheda o menu termina nascosta sotto la telemetria. Lo spazio utile per la Cue Grid e la posizione del Master Audio non cambiano.
+
+### Verifiche
+- Aggiornati snapshot/layout della telemetria e dei tab nelle suite JUCE; verifica di tutti e cinque i gruppi, pulsanti Learn, status dots, separatori, non-sovrapposizione, schede e menu su larghezze 1024, 1180, 1280, 1440, 1647, 1920 e 3840.
+- Invariati Master Audio fissato nella colonna Cuelist da 318px, routing, motori Audio/MIDI/OSC, Inspector, Timeline, BPM inline e schema `.cuelist` JSON v10; nessuna build portable.
+- Richiesti compilazione Windows e CTest verdi prima del merge; verifica visiva Windows/DPI necessaria per il rilascio.
+
 ## [0.9.0-beta.23] - 2026-11-01
 
 **Tipo:** hotfix compilazione Windows della topbar V2 introdotta in beta.22.

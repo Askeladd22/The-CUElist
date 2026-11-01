@@ -143,4 +143,66 @@ void operatorNavigationTests() {
         }
     });
 
+    test("V2 enlarged telemetry has readable five groups and no overlap",[] {
+        MainComponent ui(false);
+        for (const int width:{1024,1180,1280,1440,1647,1920,3840}) {
+            const auto t=HeaderTelemetryLayout::atWidth(width);
+            const auto nav=OperatorNavigationLayout::atWidth(width);
+            check(t.clock.getWidth()>=134 &&
+                  t.usage.getWidth()>=130 &&
+                  t.activity.getWidth()>=218 &&
+                  t.audio.getWidth()>=150 &&
+                  t.audio.getRight()<=width-10 &&
+                  t.clock.getRight()+10==t.usage.getX() &&
+                  t.usage.getRight()+10==t.activity.getX() &&
+                  t.activity.getRight()+10==t.audio.getX(),
+                  "Five operator-monitor groups are too narrow or overlap");
+            check(t.activity.contains(t.activityHeading) &&
+                  t.activity.contains(t.midiLearn) &&
+                  t.activity.contains(t.oscLearn) &&
+                  !t.activityHeading.intersects(t.midiLearn) &&
+                  !t.midiLearn.intersects(t.oscLearn) &&
+                  t.midiLearn.getHeight()>=22 &&
+                  t.midiLearn.getWidth()>=61,
+                  "I/O activity labels and Learn targets are compressed");
+            check(t.audio.contains(t.audioHeading) &&
+                  t.audio.contains(t.audioStatus) &&
+                  t.clock.contains(t.timeText) &&
+                  t.clock.contains(t.meridiemText) &&
+                  t.usage.contains(t.cpuMeter.toNearestInt()) &&
+                  t.usage.contains(t.ramMeter.toNearestInt()),
+                  "Clock, CPU/RAM or audio labels leave the 72px header");
+            for (int i=0;i<4;++i)
+                check(t.activity.contains(t.activityDots[(size_t)i]) &&
+                      t.activity.contains(t.activityLabels[(size_t)i]),
+                      "MIDI/OSC activity labels or dots overflow");
+            const auto more=nav.bounds[OperatorNavigationLayout::overflowIndex];
+            check(nav.visibleMenuCount>=1 &&
+                  (nav.visibleMenuCount==7 ||
+                   (more.getWidth()>0 && more.getRight()<t.clock.getX())),
+                  "Enlarged status console obscured operator menu access");
+        }
+
+        for (const int width:{1280,1440,1647,1920,3840}) {
+            ui.setSize(width,900);
+            ui.resized();
+            const auto t=HeaderTelemetryLayout::atWidth(width);
+            auto* midi=controlsV3::named(ui,"globalMidiLearn");
+            auto* osc=controlsV3::named(ui,"globalOscLearn");
+            check(midi && osc && midi->isVisible() && osc->isVisible() &&
+                  midi->getBounds()==t.midiLearn &&
+                  osc->getBounds()==t.oscLearn &&
+                  t.activity.contains(midi->getBounds()) &&
+                  t.activity.contains(osc->getBounds()),
+                  "Native MIDI/OSC Learn buttons are not aligned to I/O Activity");
+            for (const auto region:{t.clock,t.usage,t.activity,t.audio}) {
+                const auto image=ui.createComponentSnapshot(region);
+                check(image.isValid() &&
+                      image.getWidth()==region.getWidth() &&
+                      image.getHeight()==region.getHeight(),
+                      "An enlarged operator telemetry group did not render");
+            }
+        }
+    });
+
 }
