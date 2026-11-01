@@ -1,5 +1,13 @@
 # The CUElist — Operator Workspace V2
 
+> **Decisione sul Master Audio:** escluso completamente dal redesign.
+> Riutilizzare tale e quale il componente nativo in `ColumnUtilities`,
+> mantenendo le sue dimensioni, i controlli, il paint e i callback.
+> Adattare il resto del nuovo workspace attorno al Master,
+> non il Master alla nuova matrice. La preview include solo
+> un riferimento visivo statico al componente originale.
+>
+
 > **Aggiornamento V2.3 / 0.9.0-beta.9:** affinamento
 > delle strip Audio/MIDI/OSC/Control, leggibilità e
 > sidebar. Matrice approvata, Master completo,
