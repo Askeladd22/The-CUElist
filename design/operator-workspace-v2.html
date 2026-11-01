@@ -47,30 +47,38 @@
 .mixer-band.collapsed .mixer-metrics strong{font-size:10px}
 .timeline{flex:0 0 75px;background:#0f2434;border-bottom:1px solid var(--line)}.timeline.collapsed{flex-basis:29px}.timeline-top{height:29px;display:flex;gap:12px;align-items:center;padding:0 10px;font-size:11px}.timeline-top button{font-size:11px;background:#183447;border-radius:4px;padding:3px 8px}.ruler{margin:0 8px;position:relative;height:33px;background:repeating-linear-gradient(to right,#244052 0 1px,transparent 1px 54px);border-top:1px solid #314b5e}.ruler::before{content:"00:00.0                   00:02.5                   00:05.0                   00:07.5";color:#95acb9;font-size:9px;letter-spacing:1px}.timeline.collapsed .ruler{display:none}.footer{flex:0 0 22px;background:#0b1b29;color:#6f93a9;font-size:10px;padding:4px 10px}.inspector{min-width:0;display:flex;flex-direction:column;background:#0e2232;border-left:1px solid var(--line);padding:10px;gap:13px}.inspector .heading{display:flex;justify-content:space-between;align-items:center;color:var(--teal);font-weight:750;font-size:12px;border-left:3px solid var(--teal);padding-left:9px}.inspector h2{font-size:18px;margin:0}.field{display:grid;gap:6px;font-size:11px}.field span{color:var(--muted)}.field input{width:100%;height:32px;background:#0a1c2a;border:1px solid #39576a;border-radius:4px;padding:6px 9px;color:var(--text)}.property{padding-top:11px;border-top:1px solid var(--line);display:grid;gap:10px}.property b{font-size:11px;color:var(--purple);letter-spacing:.05em}.property .row{display:flex;align-items:center;justify-content:space-between;font-size:11px}.inspector .notes{margin-top:auto}.inspector .notes .field input{height:46px}.inspector .hint{font-size:11px;color:var(--muted);line-height:1.6}.inspector.hide{padding:5px}.inspector.hide>*:not(.open-rail){display:none}.open-rail{display:none}.inspector.hide .open-rail{display:block;writing-mode:vertical-rl;padding:12px 3px;color:var(--teal)}.prototype-label{font-size:10px;color:#f6cb79;border:1px solid #79633f;border-radius:4px;padding:4px 6px}
 .menu-popover{position:absolute;z-index:80;top:45px;left:180px;min-width:184px;padding:6px;background:#142c3d;border:1px solid #3f6276;border-radius:6px;box-shadow:0 12px 28px #0008}.menu-popover[hidden]{display:none}.menu-popover button{display:block;width:100%;text-align:left;border-radius:4px;padding:8px 10px;color:var(--text);font-size:12px}.menu-popover button:hover,.menu-popover button:focus-visible{background:#24485b}.sidebar-context{padding:10px 8px;display:grid;gap:7px;font-size:11px;color:var(--muted);line-height:1.5}.sidebar-context strong{font-size:12px;color:var(--text)}
-/* Master parity: these are visual-only placeholders for the REAL JUCE
-   masterSlider, masterPan, masterMute, masterOutput, safetyLimiter
-   and three individual Quick Learn targets. All must survive native V2. */
-.mixer-band{flex-basis:190px}.mixer-master{gap:6px;padding:7px 9px}
-.master-full{display:grid;grid-template-columns:49px minmax(0,1fr) 70px;gap:7px;min-height:0;flex:1;align-items:start}
-.master-level{display:flex;flex-direction:column;align-items:center;gap:4px}
-.master-peaks{display:flex;align-items:center;gap:3px;height:60px}
-.master-peak{height:56px;width:6px;border-radius:2px;display:flex;align-items:flex-end;background:#2b4657}
-.master-peak::after{content:"";height:44%;width:100%;background:var(--teal)}.master-peak.right::after{height:37%}
-.master-gain{writing-mode:vertical-lr;direction:rtl;appearance:slider-vertical;height:59px;width:15px;margin:0;accent-color:var(--teal)}
-.master-gain-value{font-size:10px;color:var(--text);font-variant-numeric:tabular-nums;white-space:nowrap}
-.master-routes,.master-right{display:flex;flex-direction:column;gap:6px;min-width:0}
-.master-routes label,.master-right label{font-size:10px;color:var(--muted)}
-.master-out{height:25px;width:100%;background:#132d3e;color:var(--text);border:1px solid #44677c;border-radius:3px;font-size:11px}
-.master-switch,.master-mute{height:24px;background:#17384b;border:1px solid #416073;border-radius:4px;font-size:10px;white-space:nowrap}
-.master-switch[aria-pressed="true"]{background:#204c47;color:#d8fff5;border-color:var(--teal)}
-.master-mute[aria-pressed="true"]{background:#65404c;color:#fff;border-color:var(--danger)}
-.master-pan{height:17px;width:100%;accent-color:var(--teal);margin:0}.master-pan-value{font-size:10px;text-align:center;color:var(--text)}
-.master-reduction{font-size:10px;color:var(--muted);font-variant-numeric:tabular-nums}
-.master-learn{display:flex;gap:4px;align-items:center;border-top:1px solid #2c4c60;padding-top:5px;min-height:25px}
-.master-learn button{height:21px;min-width:28px;padding:2px 4px;background:#173448;border:1px solid #3b5a71;border-radius:3px;font-size:10px}
-.master-learn [hidden]{display:none}.master-learn-label{font-size:10px;color:var(--muted);margin-right:2px}
-.mixer-band.collapsed .master-full,.mixer-band.collapsed .master-learn{display:none}
-@media(max-width:1280px){.master-full{grid-template-columns:43px minmax(0,1fr) 65px;gap:5px}.master-switch,.master-mute{font-size:9px}}
+/* MASTER AUDIO EXCLUDED FROM REDESIGN (user decision, V2.3).
+   Static, read-only indication of the existing native JUCE area;
+   this is NOT a design replacement or a new widget specification.
+   Native ColumnUtilities::paint/resized, Master handlers and hotspots
+   are authoritative and must be reused unmodified during migration. */
+.mixer-band{flex-basis:190px}
+.mixer-master{padding:7px 8px;gap:0}
+.master-original{height:100%;min-height:0;border:1px solid #355367;border-radius:7px;background:#1a3345;position:relative;box-shadow:inset 0 3px #37baaF;overflow:hidden}
+.master-original-head{position:absolute;top:6px;left:8px;font-size:11px;font-weight:750;color:#44d5c5;letter-spacing:.015em}
+.master-original-layout{position:absolute;inset:29px 7px 9px;display:grid;grid-template-columns:77px minmax(0,1fr) 54px;gap:7px}
+.master-original-level{display:flex;flex-direction:column;align-items:flex-start;justify-content:space-between;min-width:0}
+.master-original-rail{height:96px;position:relative;display:flex;align-items:center;gap:6px;padding-left:5px}
+.master-original-track{height:91px;width:20px;background:#213f53;border:1px solid #436479;border-radius:3px;position:relative}
+.master-original-track:before{content:"";position:absolute;left:-5px;right:-5px;top:12px;height:6px;border-radius:2px;background:#dfe9ed;box-shadow:0 0 1px #071521}
+.master-original-track:after{content:"";position:absolute;left:4px;bottom:3px;width:5px;height:39px;background:#39c4b4;border-radius:1px}
+.master-original-db{height:92px;display:flex;flex-direction:column;justify-content:space-between;font-size:9px;color:#9db5c6;font-variant-numeric:tabular-nums}
+.master-original-gain{font-size:11px;font-weight:700;color:#eef5f8;font-variant-numeric:tabular-nums}
+.master-original-middle,.master-original-right{display:flex;flex-direction:column;align-items:stretch;gap:7px;min-width:0}
+.master-original-caption{font-size:10px;font-weight:650;color:#a5bdcd;white-space:nowrap}
+.master-original-out{font-size:11px;color:#e6f4f7;background:#132d3d;border:1px solid #40667b;border-radius:3px;padding:4px 5px}
+.master-original-limiter{font-size:10px;color:#d7e6ee;display:flex;align-items:center;gap:5px;margin-top:21px;white-space:nowrap}
+.master-original-limiter:before{content:"";width:10px;height:10px;border:1px solid #d36c79;border-radius:50%;display:inline-block}
+.master-original-knob{width:35px;height:35px;border-radius:50%;border:3px solid #36586f;background:#132d40;position:relative;margin:0 auto}
+.master-original-knob:after{content:"";height:12px;width:3px;position:absolute;left:calc(50% - 1.5px);top:3px;background:#9ad0dd;border-radius:2px}
+.master-original-right{text-align:center;align-items:center;gap:4px}
+.master-original-right .master-original-caption{font-size:10px}
+.master-original-pan{font-size:10px;color:#d5e5ed}
+.master-original-speaker{font-size:17px;color:#39c4b4;line-height:1.1}
+.master-original-note{position:absolute;top:6px;right:7px;font-size:9px;color:#9fb6c6}
+.mixer-band.collapsed .master-original-layout{display:none}
+.mixer-band.collapsed .master-original{border:0;background:transparent;box-shadow:none}
+.mixer-band.collapsed .master-original-head{top:0}
 /* V2.3 refinement: preserve the full Master and cue matrix, but make
    each channel type visually legible instead of repeating audio furniture.
    Text stays readable at the 109px design cell without erasing controls. */
@@ -206,76 +214,39 @@
    layout.appendChild(levels);layout.appendChild(info);wrap.appendChild(layout);
    return wrap;
   }
-  // Keep the actual native Master feature inventory visible in preview:
-  // integrated stereo peak/gain, Pan, Mute, Main Out, safety limiter,
-  // plus Quick Learn for Gain, Pan and Limiter. No backend in this demo.
+  // Master is intentionally NOT redesigned. The production JUCE
+  // ColumnUtilities::paint/resized component is the visual and functional
+  // source of truth. This static illustration has NO independent handlers.
   const master=node("div","mixer-master audio");
-  const masterHeading=node("div","channel-head");
-  masterHeading.appendChild(node("span","","MASTER AUDIO"));
-  masterHeading.appendChild(node("span","channel-kind","MASTER BUS"));
-  master.appendChild(masterHeading);
-  const full=node("div","master-full");
-  const level=node("div","master-level");
-  const peaks=node("div","master-peaks");
-  const peakL=node("div","master-peak left"),peakR=node("div","master-peak right");
-  peakL.title="Peak L / peak hold — demo";peakR.title="Peak R / peak hold — demo";
-  peaks.appendChild(peakL);peaks.appendChild(peakR);
-  const gain=node("input","master-gain");
-  gain.id="masterGain";gain.type="range";gain.min="-60";gain.max="6";gain.step=".1";gain.value="0";
-  gain.setAttribute("aria-label","Master gain in dB — demo");
-  const gainValue=node("span","master-gain-value","0.0 dB");
-  gain.addEventListener("input",function(){gainValue.textContent=Number(this.value).toFixed(1)+" dB";demoStatus("Master Gain")});
-  level.appendChild(peaks);level.appendChild(gain);level.appendChild(gainValue);
-  const routes=node("div","master-routes");
-  const outLabel=node("label","","MAIN OUT");outLabel.setAttribute("for","masterOutput");
-  const output=node("select","master-out");output.id="masterOutput";
-  output.setAttribute("aria-label","Physical Master Bus stereo output — demo");
-  for(const pair of ["1/2","3/4","5/6","7/8"]){const opt=node("option","",pair);opt.value=pair;output.appendChild(opt)}
-  output.addEventListener("change",function(){demoStatus("Master Main Out "+this.value)});
-  routes.appendChild(outLabel);routes.appendChild(output);
-  const limiter=btn("LIMIT · -1 dBFS","master-switch",function(){
-   const enabled=this.getAttribute("aria-pressed")!=="true";
-   this.setAttribute("aria-pressed",String(enabled));demoStatus("Safety Limiter");
-  });
-  limiter.id="masterLimiter";limiter.setAttribute("aria-pressed","false");
-  limiter.title="Safety limiter -1 dBFS (Master Bus only) — demo";
-  routes.appendChild(limiter);
-  const reduction=node("span","master-reduction","GR 0.0 dB");
-  reduction.title="Gain reduction meter del limiter — valore dimostrativo";
-  routes.appendChild(reduction);
-  const right=node("div","master-right");
-  const panLabel=node("label","","PAN");panLabel.setAttribute("for","masterPan");
-  const pan=node("input","master-pan");pan.id="masterPan";pan.type="range";
-  pan.min="-100";pan.max="100";pan.step="1";pan.value="0";
-  const panValue=node("span","master-pan-value","C");
-  pan.addEventListener("input",function(){
-   const n=Number(this.value);panValue.textContent=n===0?"C":(n<0?"L ":"R ")+Math.abs(n);
-   demoStatus("Master Pan");
-  });
-  const mute=btn("MUTE","master-mute",function(){
-   const active=this.getAttribute("aria-pressed")!=="true";
-   this.setAttribute("aria-pressed",String(active));demoStatus("Master Mute");
-  });
-  mute.id="masterMute";mute.setAttribute("aria-pressed","false");
-  right.appendChild(panLabel);right.appendChild(pan);
-  right.appendChild(panValue);right.appendChild(mute);
-  full.appendChild(level);full.appendChild(routes);full.appendChild(right);master.appendChild(full);
-  const learn=node("div","master-learn");
-  learn.appendChild(node("span","master-learn-label","QUICK LEARN"));
-  const learnToggle=btn("Learn","",function(){
-   const show=this.getAttribute("aria-pressed")!=="true";
-   this.setAttribute("aria-pressed",String(show));
-   for(const name of ["Gain","Pan","Limiter"])learn.querySelector("#masterLearn"+name).hidden=!show;
-   demoStatus("Quick Learn");
-  });
-  learnToggle.id="masterLearnToggle";learnToggle.setAttribute("aria-pressed","false");
-  learn.appendChild(learnToggle);
-  for(const name of ["Gain","Pan","Limiter"]){
-   const target=btn(name,"",function(){demoStatus("Master Quick Learn "+name)});
-   target.id="masterLearn"+name;target.hidden=true;
-   learn.appendChild(target);
+  master.dataset.preserveNativeMaster="true";
+  master.title="Master Audio originale JUCE — escluso dal redesign V2.3";
+  const nativeCard=node("div","master-original");
+  const nativeHead=node("div","master-original-head","MASTER AUDIO");
+  const nativeNote=node("span","master-original-note","ORIGINALE");
+  nativeCard.appendChild(nativeHead);nativeCard.appendChild(nativeNote);
+  const nativeLayout=node("div","master-original-layout");
+  const level=node("div","master-original-level");
+  const rail=node("div","master-original-rail");
+  rail.appendChild(node("span","master-original-track"));
+  const scale=node("div","master-original-db");
+  for(const tick of ["+6","0","-6","-18","-36","-48"]){
+   scale.appendChild(node("span","",tick));
   }
-  master.appendChild(learn);panel.appendChild(master);
+  rail.appendChild(scale);level.appendChild(rail);
+  level.appendChild(node("span","master-original-gain","0.0 dB"));
+  const middle=node("div","master-original-middle");
+  middle.appendChild(node("span","master-original-caption","MAIN OUT"));
+  middle.appendChild(node("span","master-original-out","1/2  ▾"));
+  middle.appendChild(node("span","master-original-limiter","Limit"));
+  const right=node("div","master-original-right");
+  right.appendChild(node("span","master-original-knob"));
+  right.appendChild(node("span","master-original-caption","PAN"));
+  right.appendChild(node("span","master-original-pan","C"));
+  right.appendChild(node("span","master-original-caption","MUTE"));
+  right.appendChild(node("span","master-original-speaker","◖))"));
+  nativeLayout.appendChild(level);nativeLayout.appendChild(middle);
+  nativeLayout.appendChild(right);nativeCard.appendChild(nativeLayout);
+  master.appendChild(nativeCard);panel.appendChild(master);
   for(let i=0;i<labels.length;i++){
    const type=types[i],channel=node("div","mixer-channel "+type);
    channel.dataset.columnIndex=String(i);
