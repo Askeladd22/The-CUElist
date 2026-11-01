@@ -33,6 +33,9 @@ pubbliche. I particolari di ogni intervento sono nell'appendice.
   collocazione dei menu, sostituita con un breve riepilogo
   di show (12 cue list, 13 cue, 11 colonne).
   GO/Panic e on-deck rimangono immediatamente visibili.
+- I menu superiori non scompaiono più nei layout stretti
+  (fino a 1280px), evitando che funzioni spostate
+  dalla sidebar diventino irraggiungibili.
 - **Master V2.2 invariato:** conservati gain/meter stereo,
   Main Out, limiter e gain reduction, pan/mute e Quick Learn;
   nessuna riduzione funzionale del prototipo.
