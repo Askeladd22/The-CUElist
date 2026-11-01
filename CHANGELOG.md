@@ -13,6 +13,24 @@ certifichino tutte le milestone riportate**; le etichette storiche
 indicano versioni di sviluppo presenti nei commit, non distribuzioni
 pubbliche. I particolari di ogni intervento sono nell'appendice.
 
+## [0.9.0-beta.18] - 2026-11-01
+
+**Tipo:** N3.4B — semplificazione Auto Stop approvata: eliminare `CELLS` e mostrare solo le eccezioni.
+
+### Interfaccia e funzionamento
+- Rimosso completamente il pulsante **CELLS** dalla fascia BPM/Auto Stop e lo stato temporaneo legacy `autoStopVisibleRows` da `CueGrid`: nessuna nuova modalità di espansione o pulsante sostitutivo.
+- Il controllo **Auto Stop della cue** resta fisso nella colonna da 184 px, con identici hitbox BPM e toggle e senza azioni nascoste nell'area precedentemente occupata da CELLS.
+- Le singole celle seguono l'Auto Stop della cue per impostazione predefinita. Solo quelle con `cell.stopOnNext=false` mostrano un badge discreto **CONT.** (continuazione), con spiegazione al passaggio del mouse. Nelle colonne compresse il badge si riduce a una tacca ambra con lo stesso tooltip.
+- Il menu contestuale della cella offre **Includi nell'Auto Stop** con spunta; la voce è presente anche nei menu Control Map, mentre il controllo preesistente dell'Inspector continua a funzionare.
+- Nessuna perdita di informazioni: le esclusioni vengono conservate nel campo esistente `cell.stopOnNext` del progetto `.cuelist` e continuano a usare `MainComponent::setCellAutoStop`.
+- Nome file/clip, loop, progressione e Auto Stop rimangono leggibili senza sovrapporsi al badge; il badge non attiva clip, trasporti o cue.
+
+### Test e limiti
+- Aggiornati i test N3.4: due soli target cliccabili nella fascia BPM/Auto Stop, nessun click residuo nella vecchia area CELLS, scroll X/Y.
+- Aggiunti test native JUCE per comparsa/scomparsa di CONT., tooltip, indipendenza e persistenza di eccezioni Audio/Control, tacca nelle colonne compresse.
+- Nessuna modifica a motori Audio/MIDI/OSC, routing, mapping, Master Audio/strip/mixer, Timeline, Inspector, dati JSON v10 o pacchetti portable.
+- Merge subordinato alla CI Windows + CTest e alla validazione visiva/operativa.
+
 ## [0.9.0-beta.17] - 2026-11-01
 
 **Tipo:** redesign nativo V2 / N3.4 — BPM e Auto Stop fissi, allineati alle righe N3.3.
