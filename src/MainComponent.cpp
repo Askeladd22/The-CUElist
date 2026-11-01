@@ -854,6 +854,144 @@ void MainComponent::refreshCuelistTabs() {
     if (count<12) addCuelistButton.setBounds(trailingX+overflowWidth,43,28,buttonHeight);
 }
 
+// Phase N1: the native menu surface is presentation-only. Every command is
+// routed to the existing production callback or its exact owner method; no
+// mock actions, synthetic transport or new show-model mutations are added.
+void MainComponent::showOperatorMenu(int index) {
+    if (index<0 || index>OperatorNavigationLayout::overflowIndex) return;
+    auto* target=operatorMenus[(size_t)index].get();
+    if (!target || !target->isVisible()) return;
+
+    const auto populate=[this](juce::PopupMenu& m,int group) {
+        const int base=(group+1)*100;
+        switch (group) {
+        case 0: // File: existing discard confirmation and project lifecycle
+            m.addItem(base+1,"New show");
+            m.addItem(base+2,"Open show...");
+            m.addItem(base+3,"Save show");
+            m.addSeparator();
+            m.addItem(base+4,"Pre-flight...");
+            m.addItem(base+5,"Diagnostics...");
+            break;
+        case 1: // Edit: preserve current Undo history and cue actions
+            m.addItem(base+1,"Undo",undoButton.isEnabled());
+            m.addItem(base+2,"Redo",redoButton.isEnabled());
+            m.addSeparator();
+            m.addItem(base+3,"Add cue");
+            m.addItem(base+4,"Add column...");
+            break;
+        case 2: // Show settings are still owned by the original popup
+            m.addItem(base+1,"Settings...");
+            m.addItem(base+2,"Rename show...");
+            m.addSeparator();
+            m.addItem(base+3,"Pre-flight...");
+            m.addItem(base+4,"Diagnostics...");
+            break;
+        case 3:
+            m.addItem(base+1,"New Cuelist",show.cuelists.size()<12);
+            m.addItem(base+2,"Rename active Cuelist");
+            m.addItem(base+3,"Move active Cuelist left",show.activeCuelist>0);
+            m.addItem(base+4,"Move active Cuelist right",
+                show.activeCuelist+1<(int)show.cuelists.size());
+            m.addItem(base+5,"Delete active Cuelist...",show.cuelists.size()>1);
+            break;
+        case 4:
+            m.addItem(base+1,"Audio Devices...");
+            m.addItem(base+2,"MIDI / OSC Settings...");
+            m.addItem(base+3,"Control Mapping...");
+            m.addSeparator();
+            m.addItem(base+4,"MIDI Learn");
+            m.addItem(base+5,"OSC Learn");
+            break;
+        case 5:
+            m.addItem(base+1,inspectorVisible ? "Collapse Inspector" :
+                                              "Expand Inspector");
+            m.addItem(base+2,collapseAllButton.getButtonText());
+            m.addItem(base+3,"Diagnostics / I/O activity...");
+            break;
+        case 6:
+            m.addItem(base+1,"User Guide");
+            m.addItem(base+2,"About The CUElist");
+            break;
+        default: break;
+        }
+    };
+
+    juce::PopupMenu menu;
+    menu.setLookAndFeel(&theme);
+    if (index==OperatorNavigationLayout::overflowIndex) {
+        // Menus hidden for width remain reachable, not disabled or lost.
+        const int first=OperatorNavigationLayout::atWidth(getWidth())
+                            .visibleMenuCount;
+        for (int i=first;i<OperatorNavigationLayout::menuCount;++i) {
+            juce::PopupMenu sub;
+            sub.setLookAndFeel(&theme);
+            populate(sub,i);
+            menu.addSubMenu(OperatorNavigationLayout::title(i),sub);
+        }
+    } else populate(menu,index);
+
+    auto safe=juce::Component::SafePointer<MainComponent>(this);
+    menu.showMenuAsync(juce::PopupMenu::Options().withTargetComponent(target),
+        [safe](int chosen) {
+            if (safe && chosen>0)
+                safe->dispatchOperatorMenu(chosen/100-1,chosen%100);
+        });
+}
+
+void MainComponent::dispatchOperatorMenu(int group,int command) {
+    switch (group) {
+    case 0: // File
+        if (command==1) newButton.triggerClick();
+        else if (command==2) openButton.triggerClick();
+        else if (command==3) saveButton.triggerClick();
+        else if (command==4) showPreflight();
+        else if (command==5) showDiagnostics();
+        break;
+    case 1: // Edit
+        if (command==1 && undoButton.isEnabled()) undoEdit();
+        else if (command==2 && redoButton.isEnabled()) redoEdit();
+        else if (command==3) addCue();
+        else if (command==4)
+            showColumnMenu(viewport.getScreenBounds().getCentre());
+        break;
+    case 2: // Show
+        if (command==1) preferencesButton.triggerClick();
+        else if (command==2) projectNameLabel.showEditor();
+        else if (command==3) showPreflight();
+        else if (command==4) showDiagnostics();
+        break;
+    case 3: // Cuelists
+        if (command==1 && show.cuelists.size()<12) createCuelist();
+        else if (command==2) renameActiveCuelist();
+        else if (command==3 && show.activeCuelist>0)
+            moveCuelist(show.activeCuelist,show.activeCuelist-1);
+        else if (command==4 &&
+                 show.activeCuelist+1<(int)show.cuelists.size())
+            moveCuelist(show.activeCuelist,show.activeCuelist+1);
+        else if (command==5 && show.cuelists.size()>1)
+            requestDeleteCuelist(show.activeCuelist);
+        break;
+    case 4: // Devices
+        if (command==1) showDevices();
+        else if (command==2) preferencesButton.triggerClick();
+        else if (command==3) openControlPanel(false);
+        else if (command==4) beginQuickLearn(false);
+        else if (command==5) beginQuickLearn(true);
+        break;
+    case 5: // View
+        if (command==1) inspectorSideTab.triggerClick();
+        else if (command==2) collapseAllButton.triggerClick();
+        else if (command==3) showDiagnostics();
+        break;
+    case 6: // Guide
+        if (command==1) openUserGuide();
+        else if (command==2) showAbout();
+        break;
+    default: break;
+    }
+}
+
 void MainComponent::resized() {
     const int h=getHeight();
     const auto geometry=workspaceLayout();
