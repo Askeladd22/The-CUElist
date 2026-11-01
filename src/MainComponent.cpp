@@ -294,7 +294,10 @@ MainComponent::MainComponent(bool startAudio) {
         // operator Show menu after removing the duplicate sidebar button.
         auto* anchor=preferencesButton.isVisible()
             ? static_cast<juce::Component*>(&preferencesButton)
-            : static_cast<juce::Component*>(operatorMenus[2].get());
+            : static_cast<juce::Component*>(
+                  operatorMenus[2]->isVisible()
+                      ? operatorMenus[2].get()
+                      : operatorMenus[OperatorNavigationLayout::overflowIndex].get());
         menu.showMenuAsync(juce::PopupMenu::Options().withTargetComponent(anchor),
         [safe,inputs,outputs](int choice) {
             if (!safe) return;
