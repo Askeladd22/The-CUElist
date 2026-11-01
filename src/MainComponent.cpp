@@ -950,15 +950,16 @@ void MainComponent::showOperatorMenu(int index) {
             osc.addItem(base+3,"Disable OSC input",ports.isNotEmpty());
             m.addSubMenu("OSC Input",osc);
             m.addSeparator();
+            // MIDI/OSC Learn already have dedicated always-visible status
+            // buttons in the live header. Do not duplicate them here.
             m.addItem(base+4,"Control Mapping...");
-            m.addItem(base+5,"MIDI Learn");
-            m.addItem(base+6,"OSC Learn");
             break;
         }
         case 5: { // View: old Fader Range and Clock were not removed.
             m.addItem(base+1,inspectorVisible ? "Collapse Inspector" :
                                               "Expand Inspector");
-            m.addItem(base+2,collapseAllButton.getButtonText());
+            // Collapse all remains directly on the cue header; a second
+            // identical menu command only adds operator noise.
             m.addSeparator();
             juce::PopupMenu faderMenu;
             faderMenu.addItem(base+10,faderRangeMenuTitle(6),true,faderRange==6);
@@ -1078,12 +1079,9 @@ void MainComponent::dispatchOperatorMenu(int group,int command) {
         }
         else if (command==3) configureOscInputPorts("");
         else if (command==4) openControlPanel(false);
-        else if (command==5) beginQuickLearn(false);
-        else if (command==6) beginQuickLearn(true);
         break;
     case 5:
         if (command==1) inspectorSideTab.triggerClick();
-        else if (command==2) collapseAllButton.triggerClick();
         else if (command==10 || command==11)
             setAudioFaderCeilingDb(command==10 ? 6 : 0);
         else if (command==12 || command==13) {
