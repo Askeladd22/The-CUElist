@@ -13,6 +13,22 @@ certifichino tutte le milestone riportate**; le etichette storiche
 indicano versioni di sviluppo presenti nei commit, non distribuzioni
 pubbliche. I particolari di ogni intervento sono nell'appendice.
 
+## [0.9.0-beta.15] - 2026-11-01
+
+**Tipo:** complemento incrementale della N3.2 — layout su due fasce della colonna Cue Name/Transport.
+
+### Modificato
+- Titolo della cue ampliato da 94 a **196 px**, preservando la larghezza complessiva di 318 px della lane Cue/Master e la riga da 62 px.
+- Play, Stop e menu operativo disposti sulla seconda fascia accanto al numero/stato; GO resta separato e non viene attivato dalla semplice selezione.
+- Stessa geometria per paint, hit testing, drag della cue, doppio click e posizione dell'editor inline. Gli offset dello scroll verticale continuano a essere condivisi con la lane fissa.
+- Tooltip della lane Cue mostrato soltanto se il testo eccede la larghezza visibile, mantenendo i tooltip delle colonne e lo stile delle intestazioni già integrati nella beta.14.
+
+### Regressioni e limiti
+- Test JUCE aggiornati per le nuove hitbox e l'assenza di intersezioni, incluso click sulla zona aggiuntiva del titolo e rinomina inline.
+- Invariati mixer, strip, **Master Audio**, Inspector, Timeline, sidebar, motori, formati `.cuelist` JSON v10, gestione delle celle e sincronizzazione BPM/Auto Stop.
+- Mantiene N3.1 e N3.2 originali. Non include ancora le nuove superfici delle celle e gli stati della N3.3 né la compattazione definitiva 36–40 px.
+- Verifiche Windows Actions/CTest e screenshot su Windows sono gate prima del merge. Nessuna build portable.
+
 ## [0.9.0-beta.14] - 2026-11-01
 
 **Tipo:** fase N3.2 del redesign nativo Cue Grid: intestazioni e Cue/Transport.
