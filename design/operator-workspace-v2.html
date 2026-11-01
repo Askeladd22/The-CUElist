@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>The CUElist — Operator Workspace V2.1 · Integrated Mixer Concept</title>
+<title>The CUElist — Operator Workspace V2.2 · Full Master and Navigation</title>
 <style>
 /* Standalone design prototype: no JUCE runtime, network, assets or actual audio transport. */
 :root{color-scheme:dark;--bg:#071521;--top:#0e2030;--surface:#102638;--raised:#183346;--line:#294559;--muted:#9eb5c4;--text:#e7f1f5;--teal:#39c4b4;--amber:#d6ac5a;--purple:#ad89dc;--blue:#79acd5;--danger:#d56b7b;--sidebar:160px;--inspector:272px;--cue:280px;--cell:109px;--metric:128px;--rowh:37px;--small:12px;font:13px/1.3 "Segoe UI",sans-serif}
@@ -46,14 +46,38 @@
 .mixer-band.collapsed .mixer-metrics{padding:6px 8px}
 .mixer-band.collapsed .mixer-metrics strong{font-size:10px}
 .timeline{flex:0 0 75px;background:#0f2434;border-bottom:1px solid var(--line)}.timeline.collapsed{flex-basis:29px}.timeline-top{height:29px;display:flex;gap:12px;align-items:center;padding:0 10px;font-size:11px}.timeline-top button{font-size:11px;background:#183447;border-radius:4px;padding:3px 8px}.ruler{margin:0 8px;position:relative;height:33px;background:repeating-linear-gradient(to right,#244052 0 1px,transparent 1px 54px);border-top:1px solid #314b5e}.ruler::before{content:"00:00.0                   00:02.5                   00:05.0                   00:07.5";color:#95acb9;font-size:9px;letter-spacing:1px}.timeline.collapsed .ruler{display:none}.footer{flex:0 0 22px;background:#0b1b29;color:#6f93a9;font-size:10px;padding:4px 10px}.inspector{min-width:0;display:flex;flex-direction:column;background:#0e2232;border-left:1px solid var(--line);padding:10px;gap:13px}.inspector .heading{display:flex;justify-content:space-between;align-items:center;color:var(--teal);font-weight:750;font-size:12px;border-left:3px solid var(--teal);padding-left:9px}.inspector h2{font-size:18px;margin:0}.field{display:grid;gap:6px;font-size:11px}.field span{color:var(--muted)}.field input{width:100%;height:32px;background:#0a1c2a;border:1px solid #39576a;border-radius:4px;padding:6px 9px;color:var(--text)}.property{padding-top:11px;border-top:1px solid var(--line);display:grid;gap:10px}.property b{font-size:11px;color:var(--purple);letter-spacing:.05em}.property .row{display:flex;align-items:center;justify-content:space-between;font-size:11px}.inspector .notes{margin-top:auto}.inspector .notes .field input{height:46px}.inspector .hint{font-size:11px;color:var(--muted);line-height:1.6}.inspector.hide{padding:5px}.inspector.hide>*:not(.open-rail){display:none}.open-rail{display:none}.inspector.hide .open-rail{display:block;writing-mode:vertical-rl;padding:12px 3px;color:var(--teal)}.prototype-label{font-size:10px;color:#f6cb79;border:1px solid #79633f;border-radius:4px;padding:4px 6px}
+.menu-popover{position:absolute;z-index:80;top:45px;left:180px;min-width:184px;padding:6px;background:#142c3d;border:1px solid #3f6276;border-radius:6px;box-shadow:0 12px 28px #0008}.menu-popover[hidden]{display:none}.menu-popover button{display:block;width:100%;text-align:left;border-radius:4px;padding:8px 10px;color:var(--text);font-size:12px}.menu-popover button:hover,.menu-popover button:focus-visible{background:#24485b}.sidebar-context{padding:10px 8px;display:grid;gap:7px;font-size:11px;color:var(--muted);line-height:1.5}.sidebar-context strong{font-size:12px;color:var(--text)}
+/* Master parity: these are visual-only placeholders for the REAL JUCE
+   masterSlider, masterPan, masterMute, masterOutput, safetyLimiter
+   and three individual Quick Learn targets. All must survive native V2. */
+.mixer-band{flex-basis:190px}.mixer-master{gap:6px;padding:7px 9px}
+.master-full{display:grid;grid-template-columns:49px minmax(0,1fr) 70px;gap:7px;min-height:0;flex:1;align-items:start}
+.master-level{display:flex;flex-direction:column;align-items:center;gap:4px}
+.master-peaks{display:flex;align-items:center;gap:3px;height:60px}
+.master-peak{height:56px;width:6px;border-radius:2px;display:flex;align-items:flex-end;background:#2b4657}
+.master-peak::after{content:"";height:44%;width:100%;background:var(--teal)}.master-peak.right::after{height:37%}
+.master-gain{writing-mode:vertical-lr;direction:rtl;appearance:slider-vertical;height:59px;width:15px;margin:0;accent-color:var(--teal)}
+.master-gain-value{font-size:10px;color:var(--text);font-variant-numeric:tabular-nums;white-space:nowrap}
+.master-routes,.master-right{display:flex;flex-direction:column;gap:6px;min-width:0}
+.master-routes label,.master-right label{font-size:10px;color:var(--muted)}
+.master-out{height:25px;width:100%;background:#132d3e;color:var(--text);border:1px solid #44677c;border-radius:3px;font-size:11px}
+.master-switch,.master-mute{height:24px;background:#17384b;border:1px solid #416073;border-radius:4px;font-size:10px;white-space:nowrap}
+.master-switch[aria-pressed="true"]{background:#204c47;color:#d8fff5;border-color:var(--teal)}
+.master-mute[aria-pressed="true"]{background:#65404c;color:#fff;border-color:var(--danger)}
+.master-pan{height:17px;width:100%;accent-color:var(--teal);margin:0}.master-pan-value{font-size:10px;text-align:center;color:var(--text)}
+.master-learn{display:flex;gap:4px;align-items:center;border-top:1px solid #2c4c60;padding-top:5px;min-height:25px}
+.master-learn button{height:21px;min-width:28px;padding:2px 4px;background:#173448;border:1px solid #3b5a71;border-radius:3px;font-size:10px}
+.master-learn [hidden]{display:none}.master-learn-label{font-size:10px;color:var(--muted);margin-right:2px}
+.mixer-band.collapsed .master-full,.mixer-band.collapsed .master-learn{display:none}
+@media(max-width:1280px){.master-full{grid-template-columns:43px minmax(0,1fr) 65px;gap:5px}.master-switch,.master-mute{font-size:9px}}
 @media(max-width:1280px){:root{--sidebar:132px;--inspector:235px;--cue:254px;--cell:101px;--metric:112px}.menu{display:none}.top-status{gap:6px}.sidebar{padding:10px 6px}.top-status .status:nth-last-child(n+2){display:none}}
 </style>
 </head>
 <body>
 <div class="app">
-<header><div class="brand"><div class="brand-mark">▥</div><span>The <b>CUElist</b></span></div><nav class="menu" aria-label="Menu globale"><button>File</button><button>Edit</button><button>Show</button><button>Cuelists</button><button>Devices</button><button>View</button><button>Guide</button></nav><div class="top-status"><span class="prototype-label">CONCEPT V2.1 — NON OPERATIVO</span><span class="clock">12:07:48</span><span>CPU 7% · RAM 35%</span><span class="status">MIDI ✓</span><span class="status">OSC ✓</span></div></header>
+<header><div class="brand"><div class="brand-mark">▥</div><span>The <b>CUElist</b></span></div><nav class="menu" aria-label="Menu globale"><button data-menu="File" aria-haspopup="menu" aria-expanded="false">File</button><button data-menu="Edit" aria-haspopup="menu" aria-expanded="false">Edit</button><button data-menu="Show" aria-haspopup="menu" aria-expanded="false">Show</button><button data-menu="Cuelists" aria-haspopup="menu" aria-expanded="false">Cuelists</button><button data-menu="Devices" aria-haspopup="menu" aria-expanded="false">Devices</button><button data-menu="View" aria-haspopup="menu" aria-expanded="false">View</button><button data-menu="Guide" aria-haspopup="menu" aria-expanded="false">Guide</button></nav><div class="menu-popover" id="menuPopover" role="menu" hidden></div><div class="top-status"><span class="prototype-label">CONCEPT V2.2 — NON OPERATIVO</span><span class="clock">12:07:48</span><span>CPU 7% · RAM 35%</span><span class="status">MIDI ✓</span><span class="status">OSC ✓</span></div></header>
 <div class="workspace" id="workspace">
-<aside class="sidebar" aria-label="Navigazione e trasporto"><div class="eyebrow">Workspace</div><nav><button class="selected">▣ &nbsp; Show 001</button><button>▤ &nbsp; Cuelists</button><button>◧ &nbsp; Devices</button><button>⊞ &nbsp; Control Mapping</button></nav><div class="eyebrow">Show</div><button>Settings</button><button>Project info</button><div class="control"><div class="on-deck"><span class="eyebrow">ON DECK</span><strong id="onDeck">NEXT / 13</strong></div><button class="go" id="go">▶ &nbsp; GO / Space</button><button class="panic" id="panic">■ &nbsp; PANIC / Esc</button></div></aside>
+<aside class="sidebar" aria-label="Show attivo e trasporto"><div class="eyebrow">Workspace</div><nav><button class="selected">▣ &nbsp; Show 001</button></nav><div class="sidebar-context"><strong>12 cue list</strong><span>Settings, Devices e Control Mapping nei menu superiori</span></div><div class="control"><div class="on-deck"><span class="eyebrow">ON DECK</span><strong id="onDeck">NEXT / 13</strong></div><button class="go" id="go">▶ &nbsp; GO / Space</button><button class="panic" id="panic">■ &nbsp; PANIC / Esc</button></div></aside>
 <main class="center">
 <div class="tabs" id="tabs" role="tablist" aria-label="Cue list"></div>
 <div class="tool"><div><h1 id="current-title">Cuelist 12</h1><div class="meta">13 cues / 11 colonne</div></div><div class="end"><button id="density" aria-pressed="false">Densità: standard</button><button id="dock-toggle" aria-pressed="true">Mixer ▾</button><button id="timeline-toggle" aria-pressed="true">Timeline ▾</button></div></div>
