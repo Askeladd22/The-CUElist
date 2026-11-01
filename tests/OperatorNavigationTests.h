@@ -33,6 +33,40 @@ void operatorNavigationTests() {
                   "Guide or overflow identity changed");
         }
     });
+    test("Native N2 sidebar removes File/Settings/Mapping duplicates",[] {
+        MainComponent ui(false);
+        for (const auto bounds:std::initializer_list<juce::Point<int>>{
+                 {1180,820},{1440,900},{1647,895},{1920,1080}}) {
+            ui.setSize(bounds.x,bounds.y);
+            ui.resized();
+            for (int i=0;i<ui.getNumChildComponents();++i) {
+                auto* child=ui.getChildComponent(i);
+                auto* button=dynamic_cast<juce::TextButton*>(child);
+                if (!button) continue;
+                const auto text=button->getButtonText();
+                if (text=="New" || text=="Open" || text=="Save" ||
+                    text=="Settings" || text=="Preferences" ||
+                    text=="Control Mapping")
+                    check(!button->isVisible(),
+                          "Duplicated operator action still occupies sidebar");
+            }
+            auto* show=dynamic_cast<juce::Label*>(
+                controlsV3::named(ui,"projectName"));
+            check(show && show->isVisible() && show->isEditableOnDoubleClick() &&
+                  show->getY()==122,
+                  "One native editable Show identity must remain visible");
+            auto* file=controlsV3::named(ui,"operatorMenuFile");
+            auto* devices=controlsV3::named(ui,"operatorMenuDevices");
+            auto* more=controlsV3::named(ui,"operatorMenuMore");
+            check(file && devices && more &&
+                  (file->isVisible() || more->isVisible()) &&
+                  (devices->isVisible() || more->isVisible()),
+                  "File/Mapping actions must stay accessible through menus");
+            auto* master=controlsV3::named(ui,"masterAudioDb");
+            check(master && master->isVisible(),
+                  "Original Master Audio must not be modified by sidebar work");
+        }
+    });
     test("Actual JUCE operator menus are buttons with preserved native commands",[] {
         MainComponent ui(false);
         ui.setSize(1647,900);
