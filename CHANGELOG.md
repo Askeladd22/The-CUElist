@@ -13,6 +13,14 @@ certifichino tutte le milestone riportate**; le etichette storiche
 indicano versioni di sviluppo presenti nei commit, non distribuzioni
 pubbliche. I particolari di ogni intervento sono nell'appendice.
 
+## [0.9.0-beta.23] - 2026-11-01
+
+**Tipo:** hotfix compilazione Windows della topbar V2 introdotta in beta.22.
+
+- In `src/MainComponent.cpp` l'orologio nativo ingrandito ora usa la variabile `clockTime` di tipo `juce::Time`, distinta dal precedente contatore numerico `now` di attività MIDI/OSC nello stesso metodo.
+- Risolti `C2371` (ridefinizione con tipi differenti) e i conseguenti quattro `C2446` (confronto fra `juce::Time` e `double`) per **TheCuelist** e **CuelistTests**.
+- Nessuna modifica a orario reale, formato 12/24 ore, refresh, monitor MIDI/OSC, CPU/RAM, layout da 72 px, Master Audio bloccato nella colonna Cuelist o motori audio. La build Windows e CTest devono essere verificati prima dell'integrazione.
+
 ## [0.9.0-beta.22] - 2026-11-01
 
 **Tipo:** redesign nativo V2 — rifinitura Cuelist/Transport e Master Audio fisso, con correzione della regressione Windows beta.21.
