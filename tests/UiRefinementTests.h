@@ -1034,11 +1034,20 @@ void uiRefinementTests() {
         check(play.getWidth()>=28 && stop.getWidth()>=28 && menu.getWidth()>=28 &&
               play.getHeight()>=24 && stop.getHeight()>=24 && menu.getHeight()>=24,
               "Cue transport buttons are too small");
+        const auto title=CueGrid::rowNameBounds(0);
+        const auto status=CueGrid::rowStatusBounds(0);
+        const auto go=CueGrid::rowGoBounds(0);
         check(play.getRight()+5<=stop.getX() &&
               stop.getRight()+5<=menu.getX() &&
               menu.getRight()<=CueGrid::nameWidth-7 &&
-              107+CueGrid::nameWidth-224<play.getX(),
-              "Cue Play, Stop, menu or title overlap");
+              !title.intersects(go) && !title.intersects(play) &&
+              !title.intersects(stop) && !title.intersects(menu) &&
+              !status.intersects(go) && !status.intersects(play) &&
+              !status.intersects(stop) && !status.intersects(menu) &&
+              CueGrid::rowContentInset+play.getBottom()<=CueGrid::rowHeight &&
+              CueGrid::rowContentInset+stop.getBottom()<=CueGrid::rowHeight &&
+              CueGrid::rowContentInset+menu.getBottom()<=CueGrid::rowHeight,
+              "Cue title, state or independent transport hitboxes overlap");
         MainComponent ui(false);
         auto* collapse=dynamic_cast<juce::TextButton*>(
             controlsV3::named(ui,"toggleAllColumns"));
