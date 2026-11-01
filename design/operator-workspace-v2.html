@@ -174,17 +174,36 @@
   const panel=document.getElementById("strips");panel.replaceChildren();
   // Master shares the frozen cue-name column; all remaining strips follow
   // the exact live order, type and width of the 11 matrix columns.
-  function audioControls(master){
-   const body=node("div",master?"master-body":"channel-body");
-   body.appendChild(node("div","meter"));body.appendChild(node("div","fader-track"));
-   const metrics=node("div","channel-metrics");
-   metrics.appendChild(node("strong","","0.0 dB"));
-   metrics.appendChild(node("span","",master?"MAIN OUT":"PAN · L/R"));
-   const actions=node("div","mixer-actions");
-   actions.appendChild(btn("M","",function(){document.getElementById("statusText").textContent="Anteprima: Mute non operativo."}));
-   if(!master)actions.appendChild(btn("S","",function(){document.getElementById("statusText").textContent="Anteprima: Solo non operativo."}));
-   metrics.appendChild(actions);body.appendChild(metrics);
-   return body;
+  // Compact AUDIO strip only: physical meter/fader plus existing routing,
+  // pan, mute, polarity, Master L/R send and PRE/POST affordances. JUCE
+  // remains the authoritative implementation of each real control.
+  function audioControls(){
+   const wrap=node("div","data-channel audio-data");
+   const routing=node("div","audio-routing");
+   routing.appendChild(node("span","","Direct out"));
+   const post=btn("POST","",function(){demoStatus("Audio Pre/Post")});
+   post.title="PRE/POST: output routing mode (demo)";
+   routing.appendChild(post);wrap.appendChild(routing);
+   const layout=node("div","audio-layout");
+   const levels=node("div","audio-controls");
+   levels.appendChild(node("div","meter"));
+   levels.appendChild(node("div","fader-track"));
+   const info=node("div","audio-info");
+   info.appendChild(node("strong","gain-value","0.0 dB"));
+   info.appendChild(node("span","pan-readout","Pan · C"));
+   const actions=node("div","audio-action-row");
+   const controls=[["M","Mute Audio"],["Ø","Invert phase"],["L/R","Master L/R send"]];
+   for(const pair of controls){
+    const action=btn(pair[0],"",function(){
+     const active=this.getAttribute("aria-pressed")!=="true";
+     this.setAttribute("aria-pressed",String(active));demoStatus("Audio "+pair[1]);
+    });
+    action.title=pair[1]+" — demo";action.setAttribute("aria-label",pair[1]+" — demo");
+    action.setAttribute("aria-pressed","false");actions.appendChild(action);
+   }
+   info.appendChild(actions);levels.title="Gain e meter · mockup, non operativo";
+   layout.appendChild(levels);layout.appendChild(info);wrap.appendChild(layout);
+   return wrap;
   }
   // Keep the actual native Master feature inventory visible in preview:
   // integrated stereo peak/gain, Pan, Mute, Main Out, safety limiter,
@@ -264,16 +283,45 @@
    heading.appendChild(node("span","channel-kind",type.toUpperCase()));
    channel.appendChild(heading);
    if(type==="audio"){
-    channel.appendChild(audioControls(false));
+    channel.appendChild(audioControls());
+   }else if(type==="midi" || type==="osc"){
+    // Data-output strips communicate port/endpoint and transmission state,
+    // not an imaginary gain/fader/pan control.
+    const body=node("div","data-channel "+type+"-data");
+    const endpoint=type==="midi"?"MIDI OUT":"127.0.0.1:9000";
+    const title=node("div","endpoint",endpoint);
+    title.title=type==="midi"?"Routing device MIDI — demo":"OSC UDP host / port — demo";
+    body.appendChild(title);
+    body.appendChild(node("span","type-hint",type==="midi"?"Porta di uscita":"Destinazione UDP"));
+    const state=node("div","type-status");
+    state.appendChild(node("span","indicator"));
+    state.appendChild(node("span","",type==="midi"?"TX · In attesa":"TX · Idle"));
+    body.appendChild(state);
+    const actions=node("div","data-actions");
+    const mute=btn("Mute TX","",function(){
+     const on=this.getAttribute("aria-pressed")!=="true";
+     this.setAttribute("aria-pressed",String(on));demoStatus(type.toUpperCase()+" output mute");
+    });
+    mute.setAttribute("aria-pressed","false");
+    mute.title="Mute della trasmissione dati, senza arrestare il cue — demo";
+    actions.appendChild(mute);body.appendChild(actions);channel.appendChild(body);
    }else{
-    const body=node("div","channel-body");
-    const status=node("div","control-readout");
-    const destination=type==="midi"?"MIDI OUT":type==="osc"?"127.0.0.1:9000":"CONTROL SET";
-    status.appendChild(node("strong","",destination));
-    status.appendChild(node("span","",type==="control"?"Mapping · Medium":"● TX · Standby"));
-    const actions=node("div","mixer-actions");
-    actions.appendChild(btn("M","",function(){document.getElementById("statusText").textContent="Anteprima: stato canale non operativo."}));
-    status.appendChild(actions);body.appendChild(status);channel.appendChild(body);
+    // Control column is its own workflow: priority and Control Set editor.
+    const body=node("div","data-channel control-data");
+    body.appendChild(node("div","endpoint","CONTROL SET"));
+    const priority=btn("Priorità · Medium","",function(){
+     demoStatus("Control priority (Low / Medium / High)");
+    });
+    priority.className="type-hint";priority.title="Priorità del Control Set — demo";
+    body.appendChild(priority);
+    const status=node("div","type-status");
+    status.appendChild(node("span","indicator"));
+    status.appendChild(node("span","","Mapping configurato"));
+    body.appendChild(status);
+    const actions=node("div","data-actions");
+    const edit=btn("Edit set","",function(){demoStatus("Control Set editor")});
+    edit.title="Editor del Control Set — demo";
+    actions.appendChild(edit);body.appendChild(actions);channel.appendChild(body);
    }
    panel.appendChild(channel);
   }
