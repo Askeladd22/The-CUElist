@@ -167,19 +167,23 @@ void CueGrid::paint(juce::Graphics& g) {
     g.drawHorizontalLine(headerHeight-1,0,(float)getWidth());
     g.setColour(palette::teal);
     g.fillRect(0,0,nameWidth-1,3);
-    g.setColour(palette::teal.withAlpha(.76f));
-    g.fillRect(10,12,2,44);
+    // Light vertical identity marker; the real Cuelist tab already
+    // indicates which list is active and is never duplicated as a button.
+    g.setColour(palette::teal.withAlpha(.70f));
+    g.fillRoundedRectangle(12.f,13.f,2.f,40.f,1.f);
     const auto& show=owner.show;
     const auto activeName=show.cuelists.empty()
         ? juce::String("Cuelist 1")
         : show.cuelists[(size_t)show.activeCuelist].name;
-    label(g,activeName,{22,8,nameWidth-170,23},
-          14,palette::text,true);
+    label(g,activeName,{24,9,nameWidth-173,24},
+          15,palette::text,true);
+    // Count is useful operator telemetry, unlike the duplicate
+    // "CUE / TRANSPORT" section label which consumed a third text row.
     label(g,juce::String((int)show.rows.size())+" cues  /  "+
           juce::String(owner.visibleClipCount)+" clips",
-          {22,35,nameWidth-40,20},11,palette::muted,true);
-    label(g,"CUE / TRANSPORT",{22,56,nameWidth-40,14},
-          10,palette::teal.withAlpha(.85f),true);
+          {24,36,nameWidth-48,20},11,palette::muted,true);
+    g.setColour(palette::line.withAlpha(.28f));
+    g.fillRoundedRectangle(24.f,63.f,(float)nameWidth-48.f,1.f,.5f);
     for (int c=0;c<(int)show.columns.size();++c) {
         const auto& col=show.columns[(size_t)c];
         const int x=columnX(c),w=columnWidthAt(c);
