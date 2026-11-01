@@ -2,6 +2,7 @@
 #include "OperatorTextPrompt.h"
 #include "ShowEditOperations.h"
 #include <algorithm>
+#include <cmath>
 #include <sstream>
 #include <set>
 
@@ -577,28 +578,44 @@ void MainComponent::deleteColumn(int index) {
 }
 
 void MainComponent::editRowBpm(int index) {
+    // Inline on the fixed lane: never open the legacy modal BPM prompt.
     if (index<0 || index>=(int)show.rows.size() || !applyInspector()) return;
-    const int id=show.rows[(size_t)index].id;
-    prompt(this,theme,"Cue BPM","Set the initial BPM (20–400). Later tempo changes stay unchanged.",
-        "Initial BPM",juce::String(show.rows[(size_t)index].tempo.front().bpm,1),false,
-        [safe=juce::Component::SafePointer<MainComponent>(this),id](juce::String text) {
-            if (!safe) return;
-            const auto value=text.trim();
-            if (value.isEmpty() || value.retainCharacters("0123456789.")!=value) {
-                safe->message("Invalid BPM."); return;
-            }
-            auto candidate=safe->show;
-            bool changed=false;
-            for (auto& row:candidate.rows) if (row.id==id) {
-                row.tempo.front().bpm=value.getDoubleValue(); changed=true; break;
-            }
-            if (!changed) return;
-            if (auto result=validateShow(candidate); result.failed()) {
-                safe->message(result.getErrorMessage()); return;
-            }
-            safe->show=std::move(candidate);
-            safe->changed("Cue initial BPM updated.",true);
-        });
+    cueMetrics.beginBpmEdit(index);
+}
+
+bool MainComponent::commitRowBpm(int rowId,const juce::String& text) {
+    // Strict decimal parser, identical 20–400 range and full model
+    // validation. Reject empty values, ambiguous separators, NaN and inf.
+    const auto value=text.trim();
+    int dots=0,digits=0;
+    for (auto c:value) {
+        if (c=='.') ++dots;
+        else if (c>='0' && c<='9') ++digits;
+        else { message("Invalid BPM. Enter a number from 20 to 400."); return false; }
+    }
+    if (digits==0 || dots>1) {
+        message("Invalid BPM. Enter a number from 20 to 400."); return false;
+    }
+    const double bpmValue=value.getDoubleValue();
+    if (!std::isfinite(bpmValue) || bpmValue<20.0 || bpmValue>400.0) {
+        message("BPM must be between 20 and 400."); return false;
+    }
+    auto candidate=show;
+    bool found=false;
+    for (auto& row:candidate.rows) if (row.id==rowId) {
+        if (row.tempo.empty()) return false;
+        if (std::abs(row.tempo.front().bpm-bpmValue)<0.00001) return true;
+        row.tempo.front().bpm=bpmValue;
+        found=true;
+        break;
+    }
+    if (!found) return false;
+    if (auto result=validateShow(candidate); result.failed()) {
+        message(result.getErrorMessage()); return false;
+    }
+    show=std::move(candidate);
+    changed("Cue initial BPM updated.",true);
+    return true;
 }
 
 } // namespace cuelist

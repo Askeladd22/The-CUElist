@@ -898,6 +898,81 @@ void PinnedColumnHeaders::mouseWheelMove(
     else
         owner.viewport.setViewPosition(x,y-(int)(wheel.deltaY*100));
 }
+CueMetricsOverlay::CueMetricsOverlay(MainComponent& parent):owner(parent) {
+    // Native child editor, not an AlertWindow, popup, or floating modal.
+    bpmEditor.setName("inlineBpmEditor");
+    bpmEditor.setMultiLine(false);
+    bpmEditor.setReturnKeyStartsNewLine(false);
+    bpmEditor.setEscapeAndReturnKeysConsumed(true);
+    bpmEditor.setSelectAllWhenFocused(true);
+    bpmEditor.setInputRestrictions(7,"0123456789.");
+    bpmEditor.setJustification(juce::Justification::centredLeft);
+    bpmEditor.setFont(font(15.f,true));
+    bpmEditor.setColour(juce::TextEditor::backgroundColourId,palette::input);
+    bpmEditor.setColour(juce::TextEditor::textColourId,palette::text);
+    bpmEditor.setColour(juce::TextEditor::outlineColourId,palette::teal);
+    bpmEditor.setColour(juce::TextEditor::focusedOutlineColourId,palette::teal);
+    bpmEditor.setTooltip("Enter confirms the BPM (20–400); Esc cancels.");
+    addAndMakeVisible(bpmEditor);
+    bpmEditor.setVisible(false);
+    bpmEditor.onReturnKey=[this] { finishBpmEdit(true); };
+    bpmEditor.onEscapeKey=[this] { finishBpmEdit(false); };
+    bpmEditor.onFocusLost=[this] {
+        if (editingRowId>0 && !closingBpmEditor) finishBpmEdit(true);
+    };
+}
+void CueMetricsOverlay::beginBpmEdit(int row) {
+    if (row<0 || row>=(int)owner.show.rows.size()) return;
+    if (editingRowId>0) {
+        if (!bpmEditor.isVisible()) editingRowId=0;
+        else if (editingRowId==owner.show.rows[(size_t)row].id) {
+            bpmEditor.grabKeyboardFocus();
+            return;
+        } else finishBpmEdit(true);
+    }
+    editingRowId=owner.show.rows[(size_t)row].id;
+    bpmEditor.setText(juce::String(owner.show.rows[(size_t)row].tempo.front().bpm,1),
+                      juce::dontSendNotification);
+    bpmEditor.setVisible(true);
+    syncBpmEditor();
+    if (!bpmEditor.isVisible()) return;
+    bpmEditor.toFront(false);
+    bpmEditor.grabKeyboardFocus();
+    bpmEditor.selectAll();
+}
+void CueMetricsOverlay::syncBpmEditor() {
+    if (editingRowId<=0 || !bpmEditor.isVisible()) return;
+    int index=-1;
+    for (int r=0;r<(int)owner.show.rows.size();++r)
+        if (owner.show.rows[(size_t)r].id==editingRowId) { index=r;break; }
+    if (index<0) { finishBpmEdit(false); return; }
+    const int y=CueGridGeometry::overlayRowTop(index,
+        owner.viewport.getViewPositionY());
+    const auto bounds=juce::Rectangle<int>(16,y+15,73,32);
+    if (bounds.getY()<CueGrid::headerHeight ||
+        bounds.getBottom()>getHeight()) {
+        // Never leave an interactive editor underneath the pinned heading
+        // or bind it to a different row after scrolling.
+        finishBpmEdit(true);
+        return;
+    }
+    bpmEditor.setBounds(bounds);
+}
+void CueMetricsOverlay::finishBpmEdit(bool accept) {
+    if (editingRowId<=0 || closingBpmEditor) return;
+    closingBpmEditor=true;
+    const int rowId=editingRowId;
+    const auto entered=bpmEditor.getText();
+    const bool valid=!accept || owner.commitRowBpm(rowId,entered);
+    if (valid || !bpmEditor.hasKeyboardFocus(true)) {
+        editingRowId=0;
+        bpmEditor.setVisible(false);
+        repaint();
+    } else {
+        bpmEditor.selectAll();
+    }
+    closingBpmEditor=false;
+}
 void CueMetricsOverlay::paint(juce::Graphics& g) {
     // The metrics lane is fixed: only row contents use the viewport's Y,
     // while the 72px heading, 3px rail and controls keep local coordinates.
@@ -959,17 +1034,14 @@ void CueMetricsOverlay::paint(juce::Graphics& g) {
         const bool bpmHover=hoverRow==r && hoverTarget==HoverTarget::bpm;
         const bool toggleHover=hoverRow==r && hoverTarget==HoverTarget::autoStop;
         if (bpmHover) {
-            g.setColour(palette::raised.withAlpha(.32f));
-            g.fillRoundedRectangle(juce::Rectangle<float>(13.f,(float)y+6.f,77.f,49.f),4.f);
+            g.setColour(palette::raised.withAlpha(.26f));
+            g.fillRoundedRectangle(juce::Rectangle<float>(14.f,(float)y+13.f,75.f,36.f),4.f);
         }
-        // Tempo remains a direct-edit field with its original full-lane
-        // hit target, not a decorative value or a secondary inspector field.
-        label(g,juce::String(row.tempo.front().bpm,1),
-              {22,y+11,66,25},14,palette::text,true);
-        const auto tempoState=next?"NEXT":playing?"LIVE":paused?"PAUSED":"EDIT BPM";
-        label(g,tempoState,{22,y+39,66,16},10,
-              next?palette::amber:playing?palette::teal:
-              paused?palette::amber:palette::muted,true);
+        // One readable BPM number. No NEXT/LIVE/PAUSED/EDIT decorative
+        // caption: all cue states remain available in the cue-name lane.
+        if (editingRowId!=row.id)
+            label(g,juce::String(row.tempo.front().bpm,1),
+                  {22,y+16,66,29},17,palette::text,true);
 
         const auto toggle=autoStopToggleBounds(y);
         if (toggleHover) {
@@ -1000,13 +1072,13 @@ void CueMetricsOverlay::paint(juce::Graphics& g) {
     // can never bleed through it; match the native N3.2 header's palette.
     g.setColour(palette::panel);
     g.fillRect(0,0,getWidth(),CueGrid::headerHeight);
-    g.setColour(palette::teal.withAlpha(.76f));
-    g.fillRect(3,0,getWidth()-3,3);
-    label(g,"CUE METRICS",{17,10,154,19},10,palette::muted,true);
-    label(g,"BPM",{22,37,66,22},12,palette::text,true);
-    label(g,"AUTO STOP",{102,37,77,22},11,palette::text,true);
-    g.setColour(palette::line.withAlpha(.38f));
-    g.drawVerticalLine(94,3.f,(float)CueGrid::headerHeight-1);
+    // Lean two-column strip: no redundant "Cue Metrics" caption.
+    g.setColour(palette::teal.withAlpha(.65f));
+    g.fillRect(3,0,getWidth()-3,2);
+    label(g,"BPM",{22,23,66,26},13,palette::text,true);
+    label(g,"AUTO STOP",{103,23,77,26},13,palette::text,true);
+    g.setColour(palette::line.withAlpha(.26f));
+    g.drawVerticalLine(94,8.f,(float)CueGrid::headerHeight-9);
     g.setColour(palette::line.withAlpha(.72f));
     g.drawHorizontalLine(CueGrid::headerHeight-1,4.f,(float)getWidth());
 

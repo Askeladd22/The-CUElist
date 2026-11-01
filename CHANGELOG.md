@@ -13,6 +13,28 @@ certifichino tutte le milestone riportate**; le etichette storiche
 indicano versioni di sviluppo presenti nei commit, non distribuzioni
 pubbliche. I particolari di ogni intervento sono nell'appendice.
 
+## [0.9.0-beta.19] - 2026-11-01
+
+**Tipo:** redesign nativo delle due intestazioni — topbar globale e fascia fissa BPM/Auto Stop.
+
+### BPM / Auto Stop
+- Rimosse le etichette di stato ridondanti NEXT/LIVE/PAUSED/EDIT BPM sotto i BPM e la testata **CUE METRICS**; restano un valore BPM ben leggibile e le sole intestazioni BPM / AUTO STOP.
+- Il clic sul BPM apre un **TextEditor JUCE inline** direttamente nella cella, non una finestra popup. **Enter** conferma, **Esc** annulla, perdita di focus conferma un dato valido o annulla quello errato.
+- Validation numerica rigorosa per **20–400 BPM** e `validateShow` prima di modificare il modello; modificato solo il BPM iniziale della cue identificata tramite ID stabile. I tempi successivi, l'Inspector e il comportamento preesistente `changed(...,true)` restano invariati.
+- L'editor segue la geometria condivisa del viewport ed evita di comparire sopra la testata fissa quando si scorre; resta invariata la logica del toggle Auto Stop di riga.
+- Resta integralmente valida la rimozione di **CELLS** della beta.18: le eccezioni delle singole celle sono accessibili dai menu/Inspector, con marker CONT.
+
+### Header globale
+- La barra principale resta alta **72 px** con due piani visivi: navigazione operatore e schede Cuelist; separatori più leggeri e tipografia Exo 2 più leggibile.
+- Scheda Cuelist attiva con linea teal sottile e background meno marcato; rinomina inline, drag & drop e pulsanti di gestione mantengono gli handler nativi.
+- CPU/RAM, orologio, I/O MIDI/OSC e disponibilità AUDIO mantengono **coordinate e dati reali** ma condividono un'unica fascia compatta con separatori discreti invece di tre riquadri autonomi.
+- Le funzioni File/Edit/Show/Cuelists/Devices/View/Guide e overflow restano accessibili, con hover minimale.
+
+### Verifica e compatibilità
+- Test JUCE: Enter/Esc e valori invalidi; editing senza `DialogWindow`; scroll e ID stabile; geometrie e marker delle schede; menu e indicatori ai diversi formati.
+- Master Audio, mixer/strip, Inspector, Timeline, motori Audio/MIDI/OSC, routing, mapping e struttura JSON v10 invariati. Nessuna build portable.
+- PR subordinata a Windows CI + CTest e verifica visiva/operativa DPI prima del merge.
+
 ## [0.9.0-beta.18] - 2026-11-01
 
 **Tipo:** N3.4B — semplificazione Auto Stop approvata: eliminare `CELLS` e mostrare solo le eccezioni.

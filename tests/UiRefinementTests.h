@@ -635,17 +635,21 @@ void uiRefinementTests() {
         check(ui.show.rows[1].cells[2].osc->events[0].address=="/scene",
               "OSC clipboard pasted mutable shared message data");
     });
-    test("BPM row label opens direct edit dialog without metric control", [] {
+    test("BPM row label starts in-place native editing without a modal", [] {
         MainComponent ui(false);
         auto* metrics=find<CueMetricsOverlay>(ui);
         check(metrics!=nullptr,"Fixed BPM / Auto Stop overlay missing");
-        click(*metrics,22.0f,(float)CueGrid::headerHeight+17);
-        auto* modal=dynamic_cast<juce::DialogWindow*>(
-            juce::ModalComponentManager::getInstance()->getModalComponent(0));
-        auto* editor=modal ? dynamic_cast<OperatorTextPrompt*>(modal->getContentComponent()) : nullptr;
-        check(editor!=nullptr,"BPM row label did not open shared editor");
-        check(editor->getEditor().getText().contains("120"),"BPM dialog initial value incorrect");
-        delete modal;
+        click(*metrics,22.0f,(float)CueGrid::headerHeight+28);
+        auto& editor=metrics->bpmEditorForTests();
+        check(metrics->isBpmEditing() && editor.isVisible() &&
+              editor.getText().contains("120") &&
+              editor.getX()>=0 && editor.getRight()<=CueMetricsOverlay::width,
+              "BPM did not open a native inline field inside the fixed strip");
+        check(juce::ModalComponentManager::getInstance()->getNumModalComponents()==0,
+              "Inline BPM editing unexpectedly opened a modal dialog");
+        editor.onEscapeKey();
+        check(!metrics->isBpmEditing() && !editor.isVisible(),
+              "Esc did not cancel the inline BPM edit");
     });
     test("MIDI and OSC timeline edges resize durations without moving clip start", [] {
         MainComponent ui(false);

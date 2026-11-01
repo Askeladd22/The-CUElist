@@ -62,6 +62,7 @@ MainComponent::MainComponent(bool startAudio) {
         cueHeaders.repaint();
         columnHeaders.repaint();
         cueMetrics.repaint();
+        cueMetrics.syncBpmEditor();
         utilities.syncScroll(viewport.getViewPositionX());
         positionInlineNameEditor();
     };
@@ -534,7 +535,11 @@ void MainComponent::paint(juce::Graphics& g) {
     const int w=getWidth(),h=getHeight();
     const auto geometry=workspaceLayout();
     g.fillAll(palette::background);
-    g.setColour(palette::toolbar); g.fillRect(0,0,w,72);
+    // Two quiet header tiers: 38px operator navigation and 34px Cuelists.
+    // No change to the 72px workspace boundary or any child hitbox.
+    g.setColour(palette::toolbar); g.fillRect(0,0,w,38);
+    g.setColour(palette::toolbar.interpolatedWith(palette::panel,.43f));
+    g.fillRect(0,38,w,35);
     g.setColour(palette::panel); g.fillRect(0,73,180,h-73);
     // A collapsed MIDI/OSC editor retains a 36px docking region while
     // its editor component is hidden. Paint the reserved panel background
@@ -543,8 +548,9 @@ void MainComponent::paint(juce::Graphics& g) {
         g.setColour(palette::panel);
         g.fillRect(geometry.dockEditor);
     }
-    g.setColour(palette::line);
-    g.drawHorizontalLine(38,0,(float)std::min(w,HeaderTelemetryLayout::atWidth(w).clock.getX()-10));
+    g.setColour(palette::line.withAlpha(.38f));
+    g.drawHorizontalLine(37,0,(float)std::min(w,HeaderTelemetryLayout::atWidth(w).clock.getX()-10));
+    g.setColour(palette::line.withAlpha(.62f));
     g.drawHorizontalLine(72,0,(float)w);
     g.drawVerticalLine(180,73,(float)h);
     // Keep the project card, but remove the redundant static ENGINES panel.
@@ -563,16 +569,19 @@ void MainComponent::paint(juce::Graphics& g) {
     // accent from the approved reference (no font or icon replacement).
     label(g,"The",{53,7,38,32},19,palette::text,true);
     label(g,"CUElist",{91,7,105,32},19,palette::teal,true);
-    // Keep the left half free for cue-list tabs. Telemetry panels are
-    // fixed to the right and never cover the source/utility workspace.
-    g.setColour(palette::teal); g.fillRect(190,70,122,2);
+    // One coherent monitoring surface instead of three heavy cards. The
+    // clock, CPU/RAM, I/O and audio values still use their tested positions.
     const auto telemetry=HeaderTelemetryLayout::atWidth(w);
-    g.setColour(palette::panel);
-    g.fillRoundedRectangle(telemetry.clock.toFloat(),5.0f);
-    g.fillRoundedRectangle(telemetry.usage.toFloat(),5.0f);
-    g.setColour(palette::line.withAlpha(.85f));
-    g.drawRoundedRectangle(telemetry.clock.toFloat(),5.0f,1.0f);
-    g.drawRoundedRectangle(telemetry.usage.toFloat(),5.0f,1.0f);
+    const auto monitorStrip=juce::Rectangle<float>(
+        (float)telemetry.clock.getX(),7.f,
+        (float)(w-telemetry.clock.getX()-10),58.f);
+    g.setColour(palette::panel.withAlpha(.93f));
+    g.fillRoundedRectangle(monitorStrip,5.f);
+    g.setColour(palette::line.withAlpha(.45f));
+    g.drawRoundedRectangle(monitorStrip,5.f,.8f);
+    g.setColour(palette::line.withAlpha(.55f));
+    g.drawVerticalLine(telemetry.usage.getX()-7,13.f,58.f);
+    g.drawVerticalLine(w-375,13.f,58.f);
     // Only the centred 24-hour time, no redundant CLOCK / 24H heading.
     label(g,juce::Time::getCurrentTime().formatted(
               appPreferences && appPreferences->getBoolValue("clock12Hour",false) ?
@@ -606,12 +615,8 @@ void MainComponent::paint(juce::Graphics& g) {
     // indicators and independent audio availability, all inside one card.
     // The values are real counters (OSC RX stays inactive: no listener).
     const int statusX=w-365;
-    const auto monitor=juce::Rectangle<float>((float)statusX,8.0f,354.0f,56.0f);
-    g.setColour(palette::panel);
-    g.fillRoundedRectangle(monitor,5.0f);
-    g.setColour(palette::line.withAlpha(.85f));
-    g.drawRoundedRectangle(monitor,5.0f,1.0f);
-    g.drawVerticalLine(w-153,13.0f,59.0f);
+    g.setColour(palette::line.withAlpha(.55f));
+    g.drawVerticalLine(w-153,13.f,58.f);
     label(g,"I/O ACTIVITY",{statusX+10,11,82,14},
           10,palette::muted,true);
     const double now=juce::Time::getMillisecondCounterHiRes();
@@ -846,6 +851,7 @@ void MainComponent::refreshCuelistTabs() {
 
         const int x=left+(i-first)*slot;
         const bool active=i==show.activeCuelist;
+        tab.setActiveVisual(active);
         const auto colour=i==cuelistDragTarget ? palette::teal.withAlpha(.45f) :
                           active ? palette::selectedTab : palette::panel;
         auto name=show.cuelists[(size_t)i].name;
@@ -1255,6 +1261,7 @@ void MainComponent::resized() {
     collapseAllButton.setBounds(cueHeaders.getX()+CueGrid::nameWidth-84,
                                 cueHeaders.getY()+9,77,24);
     cueMetrics.setBounds(geometry.metrics);
+    cueMetrics.syncBpmEditor();
     cueMetrics.toFront(false);
     collapseAllButton.toFront(false);
     cuelistMoveLeft.toFront(false);

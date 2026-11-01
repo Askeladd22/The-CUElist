@@ -379,4 +379,68 @@ void cueGridN3VisualTests() {
               "Collapsed cell exception is unexplained");
     });
 
+    test("N3.4C inline BPM Enter commits, Esc cancels, and model is validated",[] {
+        using namespace cuelist;
+        MainComponent ui(false);
+        addRow(ui.show,"Second cue");
+        ui.setSize(1440,900);
+        auto* metrics=cueViewFixtures::find<CueMetricsOverlay>(ui);
+        check(metrics!=nullptr,"Fixed metrics missing");
+        auto& editor=metrics->bpmEditorForTests();
+        const int y=CueGridGeometry::rowTop(0);
+        cueViewFixtures::click(*metrics,24.f,(float)y+29.f);
+        check(editor.isVisible() && metrics->isBpmEditing(),
+              "Clicking the displayed BPM failed to open inline editor");
+        const double original=ui.show.rows[0].tempo.front().bpm;
+        editor.setText("137.5",juce::dontSendNotification);
+        editor.onReturnKey();
+        check(!editor.isVisible() && !metrics->isBpmEditing() &&
+              std::abs(ui.show.rows[0].tempo.front().bpm-137.5)<.001,
+              "Enter failed to save inline BPM");
+        cueViewFixtures::click(*metrics,24.f,(float)y+29.f);
+        editor.setText("200",juce::dontSendNotification);
+        editor.onEscapeKey();
+        check(!editor.isVisible() &&
+              std::abs(ui.show.rows[0].tempo.front().bpm-137.5)<.001,
+              "Esc must cancel BPM without modifying the persisted value");
+        check(!ui.commitRowBpm(ui.show.rows[0].id,"19") &&
+              !ui.commitRowBpm(ui.show.rows[0].id,"401") &&
+              !ui.commitRowBpm(ui.show.rows[0].id,"120..0") &&
+              !ui.commitRowBpm(ui.show.rows[0].id,"abc") &&
+              !ui.commitRowBpm(ui.show.rows[0].id,"") &&
+              std::abs(ui.show.rows[0].tempo.front().bpm-137.5)<.001,
+              "Malformed/out-of-range inline BPM changed the show");
+        check(original>0 && validateShow(ui.show).wasOk(),
+              "Inline BPM commit damaged the show model");
+    });
+
+    test("N3.4C inline BPM edits stable row ID and follows vertical scroll",[] {
+        using namespace cuelist;
+        MainComponent ui(false);
+        for (int i=1;i<13;++i) addRow(ui.show,"Cue");
+        ui.setSize(1280,820);
+        auto* metrics=cueViewFixtures::find<CueMetricsOverlay>(ui);
+        juce::Viewport* view=nullptr;
+        for (auto* child:ui.getChildren())
+            if (auto* candidate=dynamic_cast<juce::Viewport*>(child)) {
+                view=candidate;break;
+            }
+        check(metrics && view,"Scroll fixtures are missing");
+        view->setViewPosition(0,115);
+        const int row=4,rowId=ui.show.rows[(size_t)row].id;
+        const int y=CueGridGeometry::overlayRowTop(row,115)+26;
+        cueViewFixtures::click(*metrics,24.f,(float)y);
+        auto& editor=metrics->bpmEditorForTests();
+        check(editor.isVisible() && editor.getBounds().getCentreY()==
+              CueGridGeometry::overlayRowTop(row,115)+31,
+              "BPM inline editor is not centred on the scrolled row");
+        editor.setText("156.5",juce::dontSendNotification);
+        view->setViewPosition(0,250);
+        check(!metrics->isBpmEditing() &&
+              std::abs(ui.show.rows[(size_t)row].tempo.front().bpm-156.5)<.001,
+              "Editing a scrolled row lost its value or remained under the heading");
+        check(ui.show.rows[(size_t)row].id==rowId,
+              "BPM edit retargeted a different cue during scrolling");
+    });
+
 }
