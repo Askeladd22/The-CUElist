@@ -25,6 +25,18 @@ link alle PR), distinguendo la cronologia di sviluppo dalle release
 pubbliche. La versione del progetto salvato `.cuelist` (**schema v10**)
 è indipendente dal numero del software.
 
+## UI V2 — Operator workspace design study
+
+La `0.9.0-beta.7` avvia uno studio di redesign **solo visuale** della
+cue matrix, prendendo a riferimento un uso ricco (12 Cuelist, 13 cue,
+11 colonne). La [specifica UI V2](docs/UI_V2_OPERATOR_REDESIGN.md)
+descrive i vincoli del futuro intervento JUCE e l'[anteprima HTML
+offline](design/operator-workspace-v2.html) permette di valutare
+gerarchia, densità e collasso dei pannelli. La GUI di produzione,
+l'esecuzione di cue e il formato show v10 sono **invariati**.
+La preview non invia comandi audio, MIDI o OSC e non costituisce
+una nuova build del programma.
+
 ## Capabilities
 
 | Area | Current functionality |
