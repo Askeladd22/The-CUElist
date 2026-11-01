@@ -40,6 +40,17 @@ MainComponent::MainComponent(bool startAudio) {
                     &cuelistOverflowButton,&addCuelistButton,&cuelistMoveLeft,&cuelistMoveRight,&undoButton,&redoButton,&globalMidiLearn,&globalOscLearn,&helpButton,
                     &importButton,&midiEditButton,&oscEditButton,&playCellButton,&stopCellButton,&clearButton,&tempoButton,&applyButton,
                     &preflightButton,&diagnosticsButton,&preferencesButton}) b->setWantsKeyboardFocus(false);
+    // Native V2 menus reuse the original operator handlers and shortcuts.
+    for (int i=0;i<=OperatorNavigationLayout::overflowIndex;++i) {
+        operatorMenus[(size_t)i]=std::make_unique<OperatorNavigationButton>(
+            OperatorNavigationLayout::title(i));
+        auto& button=*operatorMenus[(size_t)i];
+        button.setName("operatorMenu"+juce::String(
+            OperatorNavigationLayout::title(i)));
+        button.setTooltip("Show "+button.getButtonText()+" actions");
+        button.onClick=[this,i] { showOperatorMenu(i); };
+        addAndMakeVisible(button);
+    }
     viewport.setViewedComponent(&grid,false); viewport.setScrollBarsShown(true,true);
     // Keep drag scrolling available, but place the vertical bar at the far
     // left edge. The right edge must meet BPM/Auto Stop without a dark gutter.
@@ -523,8 +534,9 @@ void MainComponent::paint(juce::Graphics& g) {
         g.setColour(palette::panel);
         g.fillRect(geometry.dockEditor);
     }
-    g.setColour(palette::teal); g.fillRect(0,0,w,3);
-    g.setColour(palette::line); g.drawHorizontalLine(72,0,(float)w);
+    g.setColour(palette::line);
+    g.drawHorizontalLine(38,0,(float)std::min(w,HeaderTelemetryLayout::atWidth(w).clock.getX()-10));
+    g.drawHorizontalLine(72,0,(float)w);
     g.drawVerticalLine(180,73,(float)h);
     // Keep the project card, but remove the redundant static ENGINES panel.
     // Engine controls, routing and the live audio-status indicator are unchanged.
@@ -533,13 +545,12 @@ void MainComponent::paint(juce::Graphics& g) {
     static const auto appIcon=juce::ImageFileFormat::loadFrom(
         BinaryData::thecuelist_icon_png,BinaryData::thecuelist_icon_pngSize);
     if (appIcon.isValid())
-        g.drawImageWithin(appIcon,19,16,38,39,juce::RectanglePlacement::centred);
+        g.drawImageWithin(appIcon,15,7,31,31,juce::RectanglePlacement::centred);
     else for (int i=0;i<3;++i) {
         g.setColour(i==1 ? palette::teal : palette::text);
-        g.fillRoundedRectangle(23.0f,23.0f+i*9,23.0f-i*4,4,2);
+        g.fillRoundedRectangle(17.0f,12.0f+i*7,23.0f-i*4,3,1.5f);
     }
-    label(g,"The Cuelist",{60,14,165,32},24,palette::text,true);
-    label(g,"SHOW CONTROL",{61,45,130,16},11,palette::muted,true);
+    label(g,"The CUElist",{53,7,142,32},19,palette::text,true);
     // Keep the left half free for cue-list tabs. Telemetry panels are
     // fixed to the right and never cover the source/utility workspace.
     g.setColour(palette::teal); g.fillRect(190,70,122,2);
@@ -853,11 +864,20 @@ void MainComponent::resized() {
     preferencesButton.setBounds(20,267,140,34);
     controlButton.setBounds(20,316,140,34);
     refreshCuelistTabs();
-    // Undo/Redo live in the unused upper-right band before the clock,
-    // separate from the 43px-high Cuelist tab row.
-    helpButton.setBounds(getWidth()-831,10,61,25);
-    undoButton.setBounds(getWidth()-764,10,51,25);
-    redoButton.setBounds(getWidth()-709,10,51,25);
+    const auto nav=OperatorNavigationLayout::atWidth(getWidth());
+    for (int i=0;i<=OperatorNavigationLayout::overflowIndex;++i)
+        if (auto* button=operatorMenus[(size_t)i].get()) {
+            const bool visible=i<nav.visibleMenuCount ||
+                (i==OperatorNavigationLayout::overflowIndex &&
+                 nav.visibleMenuCount<OperatorNavigationLayout::menuCount);
+            button->setVisible(visible);
+            if (visible) button->setBounds(nav.bounds[(size_t)i]);
+        }
+    // Keep existing Undo/Redo and Guide callbacks/shortcuts. Their
+    // former direct header controls now live in real popup menus.
+    helpButton.setVisible(false);
+    undoButton.setVisible(false);
+    redoButton.setVisible(false);
     const int activityX=getWidth()-365;
     // Leave separation from the I/O ACTIVITY caption and the audio card.
     globalMidiLearn.setBounds(activityX+95,10,58,20);
