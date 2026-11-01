@@ -15,6 +15,15 @@ pubbliche. I particolari di ogni intervento sono nell'appendice.
 
 ## [0.9.0-beta.9] - 2026-11-01
 
+**Decisione di design aggiuntiva:** MASTER AUDIO ESCLUSO DAL REDESIGN.
+Il componente JUCE originale, il suo disegno e la sua geometria, tutti
+i controlli e i callback devono essere preservati senza modifiche:
+fader/meter stereo, Pan, Mute, Main Out, limiter/gain reduction e Quick Learn.
+La preview HTML sostituisce il Master sperimentale con una semplice
+rappresentazione statica indicativa del componente originale; non è un
+nuovo Master né una specifica da implementare in JUCE. Le altre
+strip Audio/MIDI/OSC/Control possono essere rifinite.
+
 **Tipo:** rifinitura mirata del concept Operator Workspace V2.3; nessun cambiamento ai sorgenti e ai motori JUCE di produzione.
 
 ### Migliorato
