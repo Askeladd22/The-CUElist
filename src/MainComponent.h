@@ -155,7 +155,8 @@ private:
 };
 // Stays outside the horizontally scrolled content, but follows its vertical
 // offset and reuses CueGrid rendering and row hit targets.
-class PinnedCueHeaders final : public juce::Component {
+class PinnedCueHeaders final : public juce::Component,
+                               public juce::SettableTooltipClient {
 public:
     explicit PinnedCueHeaders(MainComponent& p):owner(p) {}
     void paint(juce::Graphics&) override;
@@ -163,6 +164,7 @@ public:
     void mouseDrag(const juce::MouseEvent&) override;
     void mouseUp(const juce::MouseEvent&) override;
     void mouseDoubleClick(const juce::MouseEvent&) override;
+    void mouseMove(const juce::MouseEvent&) override;
     void mouseWheelMove(const juce::MouseEvent&,const juce::MouseWheelDetails&) override;
 private:
     MainComponent& owner;
@@ -171,12 +173,14 @@ private:
 };
 // Draws the same column header as CueGrid, but stays above scrolling rows.
  // Horizontal scrolling changes its content offset, not its screen bounds.
-class PinnedColumnHeaders final : public juce::Component {
+class PinnedColumnHeaders final : public juce::Component,
+                                  public juce::SettableTooltipClient {
 public:
     explicit PinnedColumnHeaders(MainComponent& parent):owner(parent) {}
     void paint(juce::Graphics&) override;
     void mouseDown(const juce::MouseEvent&) override;
     void mouseDoubleClick(const juce::MouseEvent&) override;
+    void mouseMove(const juce::MouseEvent&) override;
     void mouseWheelMove(const juce::MouseEvent&,const juce::MouseWheelDetails&) override;
     int gridXAt(int localX) const;
 private:
