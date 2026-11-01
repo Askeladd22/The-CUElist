@@ -436,6 +436,9 @@ private:
     std::array<std::unique_ptr<OperatorNavigationButton>,8> operatorMenus;
     void showOperatorMenu(int index);
     void dispatchOperatorMenu(int index,int command);
+    void dispatchOperatorDeviceChoice(int choice,
+        const juce::Array<juce::MidiDeviceInfo>& inputs,
+        const juce::Array<juce::MidiDeviceInfo>& outputs);
     juce::Label projectNameLabel;
     enum class InlineRenameKind {none,cuelist,cue,column};
     InlineRenameKind inlineRenameKind=InlineRenameKind::none;

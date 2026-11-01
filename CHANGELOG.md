@@ -13,6 +13,40 @@ certifichino tutte le milestone riportate**; le etichette storiche
 indicano versioni di sviluppo presenti nei commit, non distribuzioni
 pubbliche. I particolari di ogni intervento sono nell'appendice.
 
+## [0.9.0-beta.12] - 2026-11-01
+
+**Tipo:** correzione dell'architettura dei menu JUCE N2.1; parità funzionale con le opzioni del vecchio Settings.
+
+### Corretti
+- Rimossi i duplicati **Pre-flight** e **Diagnostics** da File/View:
+  compaiono ora **una sola volta**, nel menu Show.
+- Nessun generico "Settings" o "MIDI / OSC Settings" che ripresenti
+  il vecchio menu in un altro punto: Devices include ora
+  direttamente **Audio Devices**, **MIDI Inputs**,
+  **MIDI Outputs**, **OSC Input** e **Control Mapping**.
+- Ripristinate e rese visibili le impostazioni del menu originale:
+  input MIDI principale e aggiuntivi, attivazione/disattivazione
+  delle uscite MIDI, configurazione/ascolto UDP OSC e IP locale,
+  intervallo fader 0/+6 dB (**View → Fader Range**),
+  formato orario 24/12 h (**View → Clock**).
+- Le scorciatoie MIDI/OSC Learn rimangono nella telemetria
+  superiore; eliminati i doppioni nel menu Devices. Collapse all
+  rimane nel cue header anziché apparire anche in View.
+- I menu MIDI usano i device ID rilevati all'apertura, evitando
+  associazioni errate se l'enumerazione cambia durante il popup.
+- Il menu Cuelists mostra spostamento/eliminazione soltanto
+  quando l'operazione è effettivamente possibile, evitando
+  voci disabilitate inutili con un solo elenco.
+
+### Verifiche e garanzie
+- Nuovo test `test_native_operator_menu_parity.py` eseguito
+  nelle CI di versione e Windows; documentato l'inventario
+  originale nel
+  [menu audit N2.1](docs/UI_V2_NATIVE_MENU_AUDIT.md).
+- **Master Audio immutato**; nessuna modifica a
+  `ColumnUtilities.cpp`, codec, motori, progetto JSON v10,
+  GO/Panic, cue grid e strip.
+
 ## [0.9.0-beta.11] - 2026-11-01
 
 **Tipo:** fase N2 del redesign JUCE — rimozione delle duplicazioni dalla sidebar; continuazione del branch `feat/native-operator-header-beta10`.
