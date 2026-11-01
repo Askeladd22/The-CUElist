@@ -13,6 +13,20 @@ certifichino tutte le milestone riportate**; le etichette storiche
 indicano versioni di sviluppo presenti nei commit, non distribuzioni
 pubbliche. I particolari di ogni intervento sono nell'appendice.
 
+## [0.9.0-beta.7] - 2026-11-01
+
+**Tipo:** fase P0 del redesign strutturale UI V2 — studio e prototipo autonomo, senza cambiamenti alla GUI operativa.
+
+### Aggiunto
+- `design/operator-workspace-v2.html`: prototipo offline ad alta densità, con 12 Cuelist, 13 cue, 11 colonne miste Audio/MIDI/OSC/Control, cue fissi, banda BPM/Auto Stop fissa, selezione evidente, stato on-deck, Inspector, mixer dock e Timeline. Supporta solo interazioni visive reversibili: cambio tab, selezione cue, densità e collasso pannelli.
+- `docs/UI_V2_OPERATOR_REDESIGN.md`: audit JUCE, specifica di product design, geometrie candidate e piano di migrazione graduale senza toccare il runtime.
+- `scripts/test_operator_workspace_v2.py`: test standard library su densità, regioni fisse, interazioni accessibili e isolamento hardware del prototipo.
+
+### Verifiche e limitazioni
+- La nuova preview non usa AudioEngine, MIDI, OSC o il modello show e non può eseguire GO/Panic: i comandi sono dimostrativi.
+- Nessuna modifica a `src/`, routing, persistenza v10 o build portable. Il mockup impiega un font browser surrogato; la futura UI nativa conserva Hind/Exo 2.
+- La direzione grafica è proposta, non approvata: servono feedback su 1647×895, 720p, 1080p e l'applicazione successiva con test CTest e hardware.
+
 ## [0.9.0-beta.6] - 2026-10-31
 
 **Tipo:** aggiornamento di manutenzione e tracciabilità; non è una release pubblica o una certificazione per spettacoli live.
