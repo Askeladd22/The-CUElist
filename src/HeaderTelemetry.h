@@ -55,8 +55,8 @@ struct HeaderTelemetryLayout final {
                         juce::Rectangle<int>{rightX,53,10,10}};
         t.activityLabels={juce::Rectangle<int>{leftX+15,30,iw/2-25,20},
                           juce::Rectangle<int>{rightX+15,30,iw/2-23,20},
-                          juce::Rectangle<int>{leftX+15,47,iw/2-25,20},
-                          juce::Rectangle<int>{rightX+15,47,iw/2-23,20}};
+                          juce::Rectangle<int>{leftX+15,46,iw/2-25,18},
+                          juce::Rectangle<int>{rightX+15,46,iw/2-23,18}};
         t.audioHeading={t.audio.getX()+12,11,aw-22,20};
         t.audioStatus={t.audio.getX()+30,31,aw-40,26};
         return t;
