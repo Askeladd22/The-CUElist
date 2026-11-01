@@ -1,5 +1,15 @@
 # The CUElist — V2.1: mixer integrato nella matrice
 
+> **Eccezione al mixer ridisegnato: il Master Audio rimane originale.**
+> Il Master non è una strip da allineare o semplificare:
+> preservare la geometria, il disegno e tutti i callback
+> del componente JUCE attuale, senza cambiare fader/meter,
+> pan, mute, Main Out, limiter e Quick Learn. Il mixer nuovo
+> deve adattarsi intorno al Master esistente, anche se
+> ciò richiede un raccordo geometrico fra i due sistemi.
+> Il segnaposto nella demo HTML non è un design definitivo.
+>
+
 > **V2.2:** il Master deve conservare gain/meter L/R, pan,
 > mute audio, Main Out, limiter con gain reduction e Quick Learn
 > gain/pan/limiter. Nessuna funzione dell'attuale mixer deve
@@ -17,11 +27,11 @@
 | Cue header a sinistra | `--cue: 280px` | Fissa a sinistra | Nome/numero cue, selezione, trasporto per riga |
 | 11 colonne | `--cell: 109px` ciascuna | Un solo scroll orizzontale sincronizzato | Audio/MIDI/OSC/Control; editor cue sopra, strumenti di colonna direttamente sotto |
 | Banda BPM / Auto Stop | `--metric: 128px` | Fissa a destra | Stato per riga e continuità visiva nel tratto inferiore |
-| Mixer integrato aperto | 150px di altezza | Stesse x delle colonne | Master nel blocco cue, una strip per ciascuna delle 11 colonne |
+| Mixer integrato aperto | 150px di concept (adattivo in produzione) | Stesse x delle colonne | Master **nativo invariato**, accanto a una strip per ciascuna delle 11 colonne |
 | Mixer richiuso | 30px di altezza | Stesse x delle colonne | Solo identificativi colonna; preserva lo spazio della matrice |
 | Timeline | 75px, opzionale | Componente distinta, ma trattata come fascia tecnica | Riga di tempo con controlli; non trasforma il mixer in una card |
 
-Le misure sono **di concept**, non target obbligatori JUCE. A 1647×895, 1280×720 e 1920×1080 occorre confrontare con i controlli reali e l'altezza operativa. Il master segue esattamente la larghezza del cue-header; non si inserisce una tredicesima strip sganciata dalle colonne.
+Le misure sono **di concept**, non target obbligatori JUCE. A 1647×895, 1280×720 e 1920×1080 occorre confrontare con i controlli reali e l'altezza operativa. Il Master mantiene **le misure native originali** indipendentemente dalla larghezza proposta del cue-header (280 px nel concept, 318 px nella GUI attuale). Le nuove colonne devono raccordarsi alla regione Master senza ridimensionarlo.
 
 ### Regola principale di allineamento
 
@@ -47,7 +57,7 @@ Il mockup utilizza le stesse variabili CSS per matrice e fascia mixer e aggiorna
 
 **Control.** Priorità e Control Set con i comandi esistenti (`Edit set`, ecc.); non rappresentare come canale audio. La preview usa il testo del mapping quale placeholder.
 
-**Master.** Fader/meter master e routing, dentro la stessa fascia visuale, allineati sotto la zona cue. Non esistono più un header “MIXER” sopra una collezione di card e uno spazio orizzontale indipendente dalle colonne.
+**Master.** Componente originale JUCE da mantenere immutato in ogni sua parte, inclusi stile, dimensioni, routing, fader/meter, controlli e Quick Learn. Solo le strip **non Master** sono oggetto del nuovo design; il bordo del layout deve rispettare la regione Master nativa.
 
 ## Continuità visiva
 

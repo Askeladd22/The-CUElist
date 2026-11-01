@@ -13,6 +13,53 @@ certifichino tutte le milestone riportate**; le etichette storiche
 indicano versioni di sviluppo presenti nei commit, non distribuzioni
 pubbliche. I particolari di ogni intervento sono nell'appendice.
 
+## [0.9.0-beta.9] - 2026-11-01
+
+**Decisione di design aggiuntiva:** MASTER AUDIO ESCLUSO DAL REDESIGN.
+Il componente JUCE originale, il suo disegno e la sua geometria, tutti
+i controlli e i callback devono essere preservati senza modifiche:
+fader/meter stereo, Pan, Mute, Main Out, limiter/gain reduction e Quick Learn.
+La preview HTML sostituisce il Master sperimentale con una semplice
+rappresentazione statica indicativa del componente originale; non è un
+nuovo Master né una specifica da implementare in JUCE. Le altre
+strip Audio/MIDI/OSC/Control possono essere rifinite.
+
+**Tipo:** rifinitura mirata del concept Operator Workspace V2.3; nessun cambiamento ai sorgenti e ai motori JUCE di produzione.
+
+### Migliorato
+- **Mixer integrato più leggibile:** mantenuta la continuità geometrica
+  delle 11 colonne con la matrice e lo stesso scroll orizzontale.
+  Audio conserva fader, meter e segnali visivi di routing, pan,
+  mute, inversione di fase, invio Master L/R e PRE/POST;
+  MIDI mostra porta, stato TX e mute della trasmissione;
+  OSC mostra endpoint UDP, TX e mute della trasmissione;
+  Control mostra priorità, stato del mapping e accesso a Edit set.
+- **Gerarchia tipografica:** valori di gain, cue name, legenda
+  colonne e stati delle strip più leggibili, con contrasto dei
+  testi secondari leggermente incrementato senza introdurre
+  nuove cornici o cambiare l'identità Midnight Slate.
+- **Sidebar ripulita:** eliminata la nota temporanea sulla
+  collocazione dei menu, sostituita con un breve riepilogo
+  di show (12 cue list, 13 cue, 11 colonne).
+  GO/Panic e on-deck rimangono immediatamente visibili.
+- I menu superiori non scompaiono più nei layout stretti
+  (fino a 1280px), evitando che funzioni spostate
+  dalla sidebar diventino irraggiungibili.
+- **Master V2.2 invariato:** conservati gain/meter stereo,
+  Main Out, limiter e gain reduction, pan/mute e Quick Learn;
+  nessuna riduzione funzionale del prototipo.
+
+### Verifica e limitazioni
+- Test esteso di parità del concept a confronto con i nomi
+  dei controlli JUCE realmente esistenti in
+  `src/ColumnUtilities.cpp`, più test per la sidebar.
+- La preview HTML non attiva transport, dispositivi,
+  fader, mute, routing o mapping: i dati sono dimostrativi.
+  Nessun file `src/` modificato, nessun intervento a
+  AudioEngine, MIDI, OSC, Control o schema dello show.
+- Misure e leggibilità native su Windows ancora da
+  validare prima del trasferimento in JUCE.
+
 ## [0.9.0-beta.8] - 2026-11-01
 
 **Tipo:** concept UI V2.2 e gate di parità funzionale — soltanto design, documentazione e test, nessuna modifica ai sorgenti JUCE.

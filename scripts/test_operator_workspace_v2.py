@@ -83,7 +83,7 @@ class OperatorWorkspacePrototypeTests(unittest.TestCase):
 
     def test_no_production_or_external_execution(self):
         src = self.source
-        self.assertIn("CONCEPT V2.2 — NON OPERATIVO", src)
+        self.assertIn("CONCEPT V2.3 — NON OPERATIVO", src)
         self.assertIn("GO disabilitato", src)
         self.assertIn("PANIC non operativo", src)
         for forbidden in (
@@ -114,8 +114,9 @@ class OperatorWorkspacePrototypeTests(unittest.TestCase):
         self.assertIn('panel.appendChild(master)', js)
         self.assertIn('for(let i=0;i<labels.length;i++)', js)
         self.assertIn('channel.dataset.columnIndex=String(i)', js)
-        self.assertIn('channel.appendChild(audioControls(false))', js)
-        self.assertIn('type==="control"?"Mapping · Medium"', js)
+        self.assertIn('channel.appendChild(audioControls())', js)
+        self.assertIn('type==="midi" || type==="osc"', js)
+        self.assertIn('Priorità · Medium', js)
         self.assertIn('position:sticky;left:0;z-index:4', source,
                       "Master must stay beneath the pinned cue-label column")
         self.assertIn('class="mixer-metrics"', source,
@@ -130,39 +131,91 @@ class OperatorWorkspacePrototypeTests(unittest.TestCase):
         )
         self.assertIn('top:calc(52px + 13 * var(--rowh))', source)
 
-    def test_full_native_master_control_inventory_is_present_in_preview(self):
-        src = self.parsed.script
-        html = self.source
-        # These map one-to-one to JUCE's actual MainComponent/ColumnUtilities.
-        for control in (
-            'masterGain', 'masterPan', 'masterMute', 'masterOutput',
-            'masterLimiter', 'masterLearnToggle',
+    def test_v2_3_type_specific_strips_without_feature_loss(self):
+        js, source = self.parsed.script, self.source
+        # Audio has real type-appropriate controls (demo only), not generic
+        # MIDI/OSC faders or extra fake hardware operations.
+        for token in (
+            'function audioControls()', 'Direct out', 'POST', '0.0 dB',
+            'Pan · C', 'Invert phase', 'Master L/R send', 'Mute Audio',
+            '127.0.0.1:9000', 'MIDI OUT', 'Porta di uscita',
+            'Destinazione UDP', 'TX · In attesa', 'TX · Idle', 'Mute TX',
+            'CONTROL SET', 'Priorità · Medium', 'Edit set',
         ):
-            self.assertIn(control, src, "Missing native feature: " + control)
-        # JS creates the three learn IDs at runtime from a grounded list;
-        # do not require the assembled names to appear as static strings.
-        self.assertIn('for(const name of ["Gain","Pan","Limiter"])', src)
-        self.assertIn('target.id="masterLearn"+name', src)
-        self.assertIn('master-peak left', src)
-        self.assertIn('master-peak right', src)
-        self.assertIn('Gain, Pan and Limiter', html)
-        self.assertIn('Master Bus only', src)
-        self.assertIn('LIMIT · -1 dBFS', src)
-        self.assertIn('GR 0.0 dB', src)
-        native_main = (ROOT / "src" / "MainComponent.cpp").read_text(encoding="utf-8")
-        native_strips = (ROOT / "src" / "ColumnUtilities.cpp").read_text(encoding="utf-8")
+            self.assertIn(token, js)
+        self.assertIn('else if(type==="midi" || type==="osc")', js)
+        self.assertIn('const edit=btn("Edit set"', js)
+        self.assertIn('mute.setAttribute("aria-pressed","false")', js)
+        self.assertIn('type-status', source)
+        self.assertIn('.data-channel', source)
+        self.assertIn('.audio-action-row button:hover', source)
+        self.assertIn('button:focus-visible', source)
+        # Concrete native JUCE controls remain the authority on parity.
+        native = (ROOT / "src" / "ColumnUtilities.cpp").read_text(
+            encoding="utf-8"
+        )
+        for symbol in (
+            'columnDataOutputMute', 'columnOscDestination',
+            'controlColumnPriority', 'controlColumnEditSet',
+            'masterSend', 'gainLearnHotspot', 'panLearnHotspot',
+            'phaseLearnHotspot',
+        ):
+            self.assertIn(symbol, native,
+                          'Existing native functionality was lost: ' + symbol)
+
+    def test_sidebar_has_operator_context_not_temporary_guidance(self):
+        source = self.source
+        self.assertIn('class="sidebar-overview"', source)
+        for label in ('SESSIONE', 'Cue list', 'Cue nella lista', 'Colonne'):
+            self.assertIn(label, source)
+        self.assertNotIn('Settings, Devices e Control Mapping nei menu superiori',
+                         source)
+        self.assertIn('id="go"', source)
+        self.assertIn('id="panic"', source)
+
+    def test_native_master_excluded_from_redesign_and_preserved(self):
+        src, html = self.parsed.script, self.source
+        # Do not build an alternative interactive Master: keep the native
+        # ColumnUtilities component untouched and show only a static guide.
+        self.assertIn('master.dataset.preserveNativeMaster="true"', src)
+        self.assertIn('master-original-layout', src)
+        self.assertIn('MASTER AUDIO', src)
+        self.assertIn('MAIN OUT', src)
+        self.assertIn('Limit', src)
+        self.assertIn('PAN', src)
+        self.assertIn('MUTE', src)
+        self.assertIn('0.0 dB', src)
+        self.assertIn('master.appendChild(nativeCard);panel.appendChild(master)', src)
+        self.assertNotIn('gain.id="masterGain"', src)
+        self.assertNotIn('pan.id="masterPan"', src)
+        self.assertNotIn('limiter.id="masterLimiter"', src)
+        self.assertNotIn('const learn=node("div","master-learn")', src)
+        self.assertIn('static illustration has NO independent handlers', html)
+        self.assertIn('Native ColumnUtilities::paint/resized', html)
+        self.assertIn('mixer-master', html)
+
+        # The real production controls must exist and remain the authority:
+        native_main = (ROOT / "src" / "MainComponent.cpp").read_text(
+            encoding="utf-8"
+        )
+        native_strips = (ROOT / "src" / "ColumnUtilities.cpp").read_text(
+            encoding="utf-8"
+        )
         for native_name in (
             "masterSlider", "masterPan", "masterMute", "masterOutput",
             "safetyLimiter", "masterGainLearnHotspot",
             "masterPanLearnHotspot", "masterLimiterLearnHotspot",
         ):
             self.assertIn(native_name, native_main,
-                          "Native feature inventory changed: " + native_name)
-        self.assertIn("setStereoPeaks", native_strips)
-        self.assertIn("setGainReduction", native_strips)
-        self.assertIn('gain.min="-60"', src)
-        self.assertNotIn('master.appendChild(audioControls(true))', src,
-                         "Master cannot be reduced to a generic audio strip")
+                          "A native Master feature must not be removed: " + native_name)
+        for native_paint in (
+            "void ColumnUtilities::paint", "void ColumnUtilities::resized",
+            "owner.masterSlider.setBounds", "owner.masterPan.setBounds",
+            "owner.masterMute.setBounds", "owner.masterOutput.setBounds",
+            "owner.safetyLimiter.setBounds", "setStereoPeaks",
+            "setGainReduction"
+        ):
+            self.assertIn(native_paint, native_strips)
 
     def test_no_duplicate_sidebar_routes_and_no_lost_navigation(self):
         html, js = self.source, self.parsed.script
@@ -183,6 +236,10 @@ class OperatorWorkspacePrototypeTests(unittest.TestCase):
         self.assertNotIn('>⊞ &nbsp; Control Mapping</button>', html)
         self.assertIn('aria-expanded', html)
         self.assertIn('menuPopover.hidden=false', js)
+        self.assertNotIn('.menu{display:none}', html,
+                         'Top menus cannot disappear at 1280px')
+        self.assertIn('@media(max-width:1280px)', html)
+        self.assertIn('.menu{display:flex;gap:0}', html)
 
     def test_top_workspace_and_reversible_panel_controls(self):
         src = self.parsed.script
@@ -190,7 +247,7 @@ class OperatorWorkspacePrototypeTests(unittest.TestCase):
         self.assertIn('classList.toggle("collapsed")', src)
         self.assertIn('--rowh",active?"31px":"37px"', src)
         self.assertIn('aria-pressed', src)
-        self.assertIn("CONCEPT V2.2 — NON OPERATIVO", self.source)
+        self.assertIn("CONCEPT V2.3 — NON OPERATIVO", self.source)
         self.assertNotIn("setInterval(", src)
 
 

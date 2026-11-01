@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>The CUElist — Operator Workspace V2.2 · Full Master and Navigation</title>
+<title>The CUElist — Operator Workspace V2.3 · Functional channel hierarchy</title>
 <style>
 /* Standalone design prototype: no JUCE runtime, network, assets or actual audio transport. */
 :root{color-scheme:dark;--bg:#071521;--top:#0e2030;--surface:#102638;--raised:#183346;--line:#294559;--muted:#9eb5c4;--text:#e7f1f5;--teal:#39c4b4;--amber:#d6ac5a;--purple:#ad89dc;--blue:#79acd5;--danger:#d56b7b;--sidebar:160px;--inspector:272px;--cue:280px;--cell:109px;--metric:128px;--rowh:37px;--small:12px;font:13px/1.3 "Segoe UI",sans-serif}
@@ -47,38 +47,94 @@
 .mixer-band.collapsed .mixer-metrics strong{font-size:10px}
 .timeline{flex:0 0 75px;background:#0f2434;border-bottom:1px solid var(--line)}.timeline.collapsed{flex-basis:29px}.timeline-top{height:29px;display:flex;gap:12px;align-items:center;padding:0 10px;font-size:11px}.timeline-top button{font-size:11px;background:#183447;border-radius:4px;padding:3px 8px}.ruler{margin:0 8px;position:relative;height:33px;background:repeating-linear-gradient(to right,#244052 0 1px,transparent 1px 54px);border-top:1px solid #314b5e}.ruler::before{content:"00:00.0                   00:02.5                   00:05.0                   00:07.5";color:#95acb9;font-size:9px;letter-spacing:1px}.timeline.collapsed .ruler{display:none}.footer{flex:0 0 22px;background:#0b1b29;color:#6f93a9;font-size:10px;padding:4px 10px}.inspector{min-width:0;display:flex;flex-direction:column;background:#0e2232;border-left:1px solid var(--line);padding:10px;gap:13px}.inspector .heading{display:flex;justify-content:space-between;align-items:center;color:var(--teal);font-weight:750;font-size:12px;border-left:3px solid var(--teal);padding-left:9px}.inspector h2{font-size:18px;margin:0}.field{display:grid;gap:6px;font-size:11px}.field span{color:var(--muted)}.field input{width:100%;height:32px;background:#0a1c2a;border:1px solid #39576a;border-radius:4px;padding:6px 9px;color:var(--text)}.property{padding-top:11px;border-top:1px solid var(--line);display:grid;gap:10px}.property b{font-size:11px;color:var(--purple);letter-spacing:.05em}.property .row{display:flex;align-items:center;justify-content:space-between;font-size:11px}.inspector .notes{margin-top:auto}.inspector .notes .field input{height:46px}.inspector .hint{font-size:11px;color:var(--muted);line-height:1.6}.inspector.hide{padding:5px}.inspector.hide>*:not(.open-rail){display:none}.open-rail{display:none}.inspector.hide .open-rail{display:block;writing-mode:vertical-rl;padding:12px 3px;color:var(--teal)}.prototype-label{font-size:10px;color:#f6cb79;border:1px solid #79633f;border-radius:4px;padding:4px 6px}
 .menu-popover{position:absolute;z-index:80;top:45px;left:180px;min-width:184px;padding:6px;background:#142c3d;border:1px solid #3f6276;border-radius:6px;box-shadow:0 12px 28px #0008}.menu-popover[hidden]{display:none}.menu-popover button{display:block;width:100%;text-align:left;border-radius:4px;padding:8px 10px;color:var(--text);font-size:12px}.menu-popover button:hover,.menu-popover button:focus-visible{background:#24485b}.sidebar-context{padding:10px 8px;display:grid;gap:7px;font-size:11px;color:var(--muted);line-height:1.5}.sidebar-context strong{font-size:12px;color:var(--text)}
-/* Master parity: these are visual-only placeholders for the REAL JUCE
-   masterSlider, masterPan, masterMute, masterOutput, safetyLimiter
-   and three individual Quick Learn targets. All must survive native V2. */
-.mixer-band{flex-basis:190px}.mixer-master{gap:6px;padding:7px 9px}
-.master-full{display:grid;grid-template-columns:49px minmax(0,1fr) 70px;gap:7px;min-height:0;flex:1;align-items:start}
-.master-level{display:flex;flex-direction:column;align-items:center;gap:4px}
-.master-peaks{display:flex;align-items:center;gap:3px;height:60px}
-.master-peak{height:56px;width:6px;border-radius:2px;display:flex;align-items:flex-end;background:#2b4657}
-.master-peak::after{content:"";height:44%;width:100%;background:var(--teal)}.master-peak.right::after{height:37%}
-.master-gain{writing-mode:vertical-lr;direction:rtl;appearance:slider-vertical;height:59px;width:15px;margin:0;accent-color:var(--teal)}
-.master-gain-value{font-size:10px;color:var(--text);font-variant-numeric:tabular-nums;white-space:nowrap}
-.master-routes,.master-right{display:flex;flex-direction:column;gap:6px;min-width:0}
-.master-routes label,.master-right label{font-size:10px;color:var(--muted)}
-.master-out{height:25px;width:100%;background:#132d3e;color:var(--text);border:1px solid #44677c;border-radius:3px;font-size:11px}
-.master-switch,.master-mute{height:24px;background:#17384b;border:1px solid #416073;border-radius:4px;font-size:10px;white-space:nowrap}
-.master-switch[aria-pressed="true"]{background:#204c47;color:#d8fff5;border-color:var(--teal)}
-.master-mute[aria-pressed="true"]{background:#65404c;color:#fff;border-color:var(--danger)}
-.master-pan{height:17px;width:100%;accent-color:var(--teal);margin:0}.master-pan-value{font-size:10px;text-align:center;color:var(--text)}
-.master-reduction{font-size:10px;color:var(--muted);font-variant-numeric:tabular-nums}
-.master-learn{display:flex;gap:4px;align-items:center;border-top:1px solid #2c4c60;padding-top:5px;min-height:25px}
-.master-learn button{height:21px;min-width:28px;padding:2px 4px;background:#173448;border:1px solid #3b5a71;border-radius:3px;font-size:10px}
-.master-learn [hidden]{display:none}.master-learn-label{font-size:10px;color:var(--muted);margin-right:2px}
-.mixer-band.collapsed .master-full,.mixer-band.collapsed .master-learn{display:none}
-@media(max-width:1280px){.master-full{grid-template-columns:43px minmax(0,1fr) 65px;gap:5px}.master-switch,.master-mute{font-size:9px}}
-@media(max-width:1280px){:root{--sidebar:132px;--inspector:235px;--cue:254px;--cell:101px;--metric:112px}.menu{display:none}.top-status{gap:6px}.sidebar{padding:10px 6px}.top-status .status:nth-last-child(n+2){display:none}}
+/* MASTER AUDIO EXCLUDED FROM REDESIGN (user decision, V2.3).
+   Static, read-only indication of the existing native JUCE area;
+   this is NOT a design replacement or a new widget specification.
+   Native ColumnUtilities::paint/resized, Master handlers and hotspots
+   are authoritative and must be reused unmodified during migration. */
+.mixer-band{flex-basis:190px}
+.mixer-master{padding:7px 8px;gap:0}
+.master-original{height:100%;min-height:0;border:1px solid #355367;border-radius:7px;background:#1a3345;position:relative;box-shadow:inset 0 3px #37baaF;overflow:hidden}
+.master-original-head{position:absolute;top:6px;left:8px;font-size:11px;font-weight:750;color:#44d5c5;letter-spacing:.015em}
+.master-original-layout{position:absolute;inset:29px 7px 9px;display:grid;grid-template-columns:77px minmax(0,1fr) 54px;gap:7px}
+.master-original-level{display:flex;flex-direction:column;align-items:flex-start;justify-content:space-between;min-width:0}
+.master-original-rail{height:96px;position:relative;display:flex;align-items:center;gap:6px;padding-left:5px}
+.master-original-track{height:91px;width:20px;background:#213f53;border:1px solid #436479;border-radius:3px;position:relative}
+.master-original-track:before{content:"";position:absolute;left:-5px;right:-5px;top:12px;height:6px;border-radius:2px;background:#dfe9ed;box-shadow:0 0 1px #071521}
+.master-original-track:after{content:"";position:absolute;left:4px;bottom:3px;width:5px;height:39px;background:#39c4b4;border-radius:1px}
+.master-original-db{height:92px;display:flex;flex-direction:column;justify-content:space-between;font-size:9px;color:#9db5c6;font-variant-numeric:tabular-nums}
+.master-original-gain{font-size:11px;font-weight:700;color:#eef5f8;font-variant-numeric:tabular-nums}
+.master-original-middle,.master-original-right{display:flex;flex-direction:column;align-items:stretch;gap:7px;min-width:0}
+.master-original-caption{font-size:10px;font-weight:650;color:#a5bdcd;white-space:nowrap}
+.master-original-out{font-size:11px;color:#e6f4f7;background:#132d3d;border:1px solid #40667b;border-radius:3px;padding:4px 5px}
+.master-original-limiter{font-size:10px;color:#d7e6ee;display:flex;align-items:center;gap:5px;margin-top:21px;white-space:nowrap}
+.master-original-limiter:before{content:"";width:10px;height:10px;border:1px solid #d36c79;border-radius:50%;display:inline-block}
+.master-original-knob{width:35px;height:35px;border-radius:50%;border:3px solid #36586f;background:#132d40;position:relative;margin:0 auto}
+.master-original-knob:after{content:"";height:12px;width:3px;position:absolute;left:calc(50% - 1.5px);top:3px;background:#9ad0dd;border-radius:2px}
+.master-original-right{text-align:center;align-items:center;gap:4px}
+.master-original-right .master-original-caption{font-size:10px}
+.master-original-pan{font-size:10px;color:#d5e5ed}
+.master-original-speaker{font-size:17px;color:#39c4b4;line-height:1.1}
+.master-original-note{position:absolute;top:6px;right:7px;font-size:9px;color:#9fb6c6}
+.mixer-band.collapsed .master-original-layout{display:none}
+.mixer-band.collapsed .master-original{border:0;background:transparent;box-shadow:none}
+.mixer-band.collapsed .master-original-head{top:0}
+/* V2.3 refinement: preserve the full Master and cue matrix, but make
+   each channel type visually legible instead of repeating audio furniture.
+   Text stays readable at the 109px design cell without erasing controls. */
+:root{--muted:#acc3d3}
+.sidebar-overview{margin-top:3px;display:grid;gap:7px;padding:8px 8px 11px;border-bottom:1px solid var(--line)}
+.sidebar-overview-title{font-size:11px;color:#9db6c9;font-weight:700;letter-spacing:.07em}
+.sidebar-overview-line{display:flex;align-items:baseline;justify-content:space-between;gap:6px;color:var(--muted);font-size:11px}
+.sidebar-overview-line strong{color:var(--text);font-size:16px;font-weight:700;font-variant-numeric:tabular-nums}
+.sidebar .selected{font-size:12px}
+.cue-name{font-size:12px}
+.cue-state{font-size:11px;color:#a6bdcd}
+.matrix-row .cell{font-size:12px;color:#b1c5d2}
+.cell.empty{color:#7f9aab}
+.column-head .small{font-size:11px}
+.channel-head{font-size:12px;letter-spacing:.01em}
+.channel-kind{font-size:10px}
+.mixer-channel{padding:8px 7px;gap:7px}
+.mixer-channel.audio{background:#112b39}
+.mixer-channel.midi,.mixer-channel.osc,.mixer-channel.control{background:#0b1d2b}
+.audio-routing{display:flex;align-items:center;justify-content:space-between;gap:3px;min-width:0;color:#b7cedc;font-size:10px}
+.audio-routing span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.audio-routing button{color:#b8d6e1;padding:2px 3px;font-size:10px;border:1px solid #34556a;border-radius:3px;flex-shrink:0}
+.audio-layout{display:flex;align-items:flex-start;gap:7px;flex:1;min-height:0}
+.audio-controls{display:grid;grid-template-columns:9px 14px;gap:5px;align-items:start;flex:0 0 auto;padding-top:4px}
+.audio-controls .meter,.audio-controls .fader-track{height:73px}
+.audio-info{display:flex;flex-direction:column;gap:7px;min-width:0;flex:1}
+.audio-info .gain-value{font-size:11px;font-weight:700;color:var(--text);white-space:nowrap}
+.audio-info .pan-readout{font-size:10px;color:#acc2d1}
+.audio-action-row{display:flex;gap:4px;flex-wrap:wrap}
+.audio-action-row button{border-radius:3px;border:1px solid #3e5d72;color:#c3d7e3;font-size:10px;min-width:22px;min-height:23px;padding:2px 3px}
+.audio-action-row button:hover{border-color:var(--teal);background:#1f4152}
+.audio-action-row button[aria-pressed="true"]{background:#255c57;color:#e2fff7;border-color:var(--teal)}
+.data-channel{min-width:0;display:flex;flex-direction:column;justify-content:space-between;gap:8px;flex:1;padding-top:2px}
+.data-channel .endpoint{font-size:11px;font-weight:700;line-height:1.25;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.data-channel .type-hint{font-size:11px;color:var(--muted);line-height:1.25}
+.data-channel .type-status{font-size:11px;display:flex;align-items:center;gap:5px;color:#b5cbd8}
+.type-status .indicator{height:6px;width:6px;border-radius:50%;background:#6b8da2;flex-shrink:0}
+.midi .type-status .indicator{background:var(--amber)}
+.osc .type-status .indicator{background:var(--purple)}
+.control .type-status .indicator{background:var(--blue)}
+.data-actions{display:flex;gap:5px;align-items:center;flex-wrap:wrap}
+.data-actions button{border:1px solid #365569;border-radius:3px;min-height:25px;padding:4px 7px;font-size:11px;color:#c8d8e2}
+.data-actions button:hover,.data-actions button:focus-visible{border-color:var(--teal);background:#224153}
+.data-actions button[aria-pressed="true"]{background:#523948;border-color:var(--danger);color:#fff}
+.data-channel.control .data-actions button{min-width:100%}
+.mixer-band.collapsed .audio-routing,.mixer-band.collapsed .audio-layout,.mixer-band.collapsed .data-channel{display:none}
+@media(max-width:1280px){.mixer-channel{padding:7px 5px}.audio-layout{gap:4px}.audio-action-row{gap:3px}.audio-action-row button{min-width:21px;padding:2px}.data-actions button{padding:3px 5px}}
+@media(max-width:1280px){:root{--sidebar:132px;--inspector:235px;--cue:254px;--cell:101px;--metric:112px}.menu{display:flex;gap:0}.menu button{padding:7px 6px;font-size:12px}.brand{min-width:142px;font-size:17px}.top-status{gap:6px}.sidebar{padding:10px 6px}.top-status .status:nth-last-child(n+2){display:none}}
+@media(max-width:980px){.top-status .prototype-label,.top-status .status,.top-status>span:nth-child(3){display:none}.brand{min-width:112px;font-size:15px}.menu button{padding:6px 4px;font-size:11px}}
 </style>
 </head>
 <body>
 <div class="app">
-<header><div class="brand"><div class="brand-mark">▥</div><span>The <b>CUElist</b></span></div><nav class="menu" aria-label="Menu globale"><button data-menu="File" aria-haspopup="menu" aria-expanded="false">File</button><button data-menu="Edit" aria-haspopup="menu" aria-expanded="false">Edit</button><button data-menu="Show" aria-haspopup="menu" aria-expanded="false">Show</button><button data-menu="Cuelists" aria-haspopup="menu" aria-expanded="false">Cuelists</button><button data-menu="Devices" aria-haspopup="menu" aria-expanded="false">Devices</button><button data-menu="View" aria-haspopup="menu" aria-expanded="false">View</button><button data-menu="Guide" aria-haspopup="menu" aria-expanded="false">Guide</button></nav><div class="menu-popover" id="menuPopover" role="menu" hidden></div><div class="top-status"><span class="prototype-label">CONCEPT V2.2 — NON OPERATIVO</span><span class="clock">12:07:48</span><span>CPU 7% · RAM 35%</span><span class="status">MIDI ✓</span><span class="status">OSC ✓</span></div></header>
+<header><div class="brand"><div class="brand-mark">▥</div><span>The <b>CUElist</b></span></div><nav class="menu" aria-label="Menu globale"><button data-menu="File" aria-haspopup="menu" aria-expanded="false">File</button><button data-menu="Edit" aria-haspopup="menu" aria-expanded="false">Edit</button><button data-menu="Show" aria-haspopup="menu" aria-expanded="false">Show</button><button data-menu="Cuelists" aria-haspopup="menu" aria-expanded="false">Cuelists</button><button data-menu="Devices" aria-haspopup="menu" aria-expanded="false">Devices</button><button data-menu="View" aria-haspopup="menu" aria-expanded="false">View</button><button data-menu="Guide" aria-haspopup="menu" aria-expanded="false">Guide</button></nav><div class="menu-popover" id="menuPopover" role="menu" hidden></div><div class="top-status"><span class="prototype-label">CONCEPT V2.3 — NON OPERATIVO</span><span class="clock">12:07:48</span><span>CPU 7% · RAM 35%</span><span class="status">MIDI ✓</span><span class="status">OSC ✓</span></div></header>
 <div class="workspace" id="workspace">
-<aside class="sidebar" aria-label="Show attivo e trasporto"><div class="eyebrow">Workspace</div><nav><button class="selected">▣ &nbsp; Show 001</button></nav><div class="sidebar-context"><strong>12 cue list</strong><span>Settings, Devices e Control Mapping nei menu superiori</span></div><div class="control"><div class="on-deck"><span class="eyebrow">ON DECK</span><strong id="onDeck">NEXT / 13</strong></div><button class="go" id="go">▶ &nbsp; GO / Space</button><button class="panic" id="panic">■ &nbsp; PANIC / Esc</button></div></aside>
+<aside class="sidebar" aria-label="Show attivo e trasporto"><div class="eyebrow">Workspace</div><nav><button class="selected">▣ &nbsp; Show 001</button></nav><div class="sidebar-overview" aria-label="Riepilogo dello show"><div class="sidebar-overview-title">SESSIONE</div><div class="sidebar-overview-line"><strong>12</strong><span>Cue list</span></div><div class="sidebar-overview-line"><strong>13</strong><span>Cue nella lista</span></div><div class="sidebar-overview-line"><strong>11</strong><span>Colonne</span></div></div><div class="control"><div class="on-deck"><span class="eyebrow">ON DECK</span><strong id="onDeck">NEXT / 13</strong></div><button class="go" id="go">▶ &nbsp; GO / Space</button><button class="panic" id="panic">■ &nbsp; PANIC / Esc</button></div></aside>
 <main class="center">
 <div class="tabs" id="tabs" role="tablist" aria-label="Cue list"></div>
 <div class="tool"><div><h1 id="current-title">Cuelist 12</h1><div class="meta">13 cues / 11 colonne</div></div><div class="end"><button id="density" aria-pressed="false">Densità: standard</button><button id="dock-toggle" aria-pressed="true">Mixer ▾</button><button id="timeline-toggle" aria-pressed="true">Timeline ▾</button></div></div>
@@ -127,88 +183,70 @@
   const panel=document.getElementById("strips");panel.replaceChildren();
   // Master shares the frozen cue-name column; all remaining strips follow
   // the exact live order, type and width of the 11 matrix columns.
-  function audioControls(master){
-   const body=node("div",master?"master-body":"channel-body");
-   body.appendChild(node("div","meter"));body.appendChild(node("div","fader-track"));
-   const metrics=node("div","channel-metrics");
-   metrics.appendChild(node("strong","","0.0 dB"));
-   metrics.appendChild(node("span","",master?"MAIN OUT":"PAN · L/R"));
-   const actions=node("div","mixer-actions");
-   actions.appendChild(btn("M","",function(){document.getElementById("statusText").textContent="Anteprima: Mute non operativo."}));
-   if(!master)actions.appendChild(btn("S","",function(){document.getElementById("statusText").textContent="Anteprima: Solo non operativo."}));
-   metrics.appendChild(actions);body.appendChild(metrics);
-   return body;
+  // Compact AUDIO strip only: physical meter/fader plus existing routing,
+  // pan, mute, polarity, Master L/R send and PRE/POST affordances. JUCE
+  // remains the authoritative implementation of each real control.
+  function audioControls(){
+   const wrap=node("div","data-channel audio-data");
+   const routing=node("div","audio-routing");
+   routing.appendChild(node("span","","Direct out"));
+   const post=btn("POST","",function(){demoStatus("Audio Pre/Post")});
+   post.title="PRE/POST: output routing mode (demo)";
+   routing.appendChild(post);wrap.appendChild(routing);
+   const layout=node("div","audio-layout");
+   const levels=node("div","audio-controls");
+   levels.appendChild(node("div","meter"));
+   levels.appendChild(node("div","fader-track"));
+   const info=node("div","audio-info");
+   info.appendChild(node("strong","gain-value","0.0 dB"));
+   info.appendChild(node("span","pan-readout","Pan · C"));
+   const actions=node("div","audio-action-row");
+   const controls=[["M","Mute Audio"],["Ø","Invert phase"],["L/R","Master L/R send"]];
+   for(const pair of controls){
+    const action=btn(pair[0],"",function(){
+     const active=this.getAttribute("aria-pressed")!=="true";
+     this.setAttribute("aria-pressed",String(active));demoStatus("Audio "+pair[1]);
+    });
+    action.title=pair[1]+" — demo";action.setAttribute("aria-label",pair[1]+" — demo");
+    action.setAttribute("aria-pressed","false");actions.appendChild(action);
+   }
+   info.appendChild(actions);levels.title="Gain e meter · mockup, non operativo";
+   layout.appendChild(levels);layout.appendChild(info);wrap.appendChild(layout);
+   return wrap;
   }
-  // Keep the actual native Master feature inventory visible in preview:
-  // integrated stereo peak/gain, Pan, Mute, Main Out, safety limiter,
-  // plus Quick Learn for Gain, Pan and Limiter. No backend in this demo.
+  // Master is intentionally NOT redesigned. The production JUCE
+  // ColumnUtilities::paint/resized component is the visual and functional
+  // source of truth. This static illustration has NO independent handlers.
   const master=node("div","mixer-master audio");
-  const masterHeading=node("div","channel-head");
-  masterHeading.appendChild(node("span","","MASTER AUDIO"));
-  masterHeading.appendChild(node("span","channel-kind","MASTER BUS"));
-  master.appendChild(masterHeading);
-  const full=node("div","master-full");
-  const level=node("div","master-level");
-  const peaks=node("div","master-peaks");
-  const peakL=node("div","master-peak left"),peakR=node("div","master-peak right");
-  peakL.title="Peak L / peak hold — demo";peakR.title="Peak R / peak hold — demo";
-  peaks.appendChild(peakL);peaks.appendChild(peakR);
-  const gain=node("input","master-gain");
-  gain.id="masterGain";gain.type="range";gain.min="-60";gain.max="6";gain.step=".1";gain.value="0";
-  gain.setAttribute("aria-label","Master gain in dB — demo");
-  const gainValue=node("span","master-gain-value","0.0 dB");
-  gain.addEventListener("input",function(){gainValue.textContent=Number(this.value).toFixed(1)+" dB";demoStatus("Master Gain")});
-  level.appendChild(peaks);level.appendChild(gain);level.appendChild(gainValue);
-  const routes=node("div","master-routes");
-  const outLabel=node("label","","MAIN OUT");outLabel.setAttribute("for","masterOutput");
-  const output=node("select","master-out");output.id="masterOutput";
-  output.setAttribute("aria-label","Physical Master Bus stereo output — demo");
-  for(const pair of ["1/2","3/4","5/6","7/8"]){const opt=node("option","",pair);opt.value=pair;output.appendChild(opt)}
-  output.addEventListener("change",function(){demoStatus("Master Main Out "+this.value)});
-  routes.appendChild(outLabel);routes.appendChild(output);
-  const limiter=btn("LIMIT · -1 dBFS","master-switch",function(){
-   const enabled=this.getAttribute("aria-pressed")!=="true";
-   this.setAttribute("aria-pressed",String(enabled));demoStatus("Safety Limiter");
-  });
-  limiter.id="masterLimiter";limiter.setAttribute("aria-pressed","false");
-  limiter.title="Safety limiter -1 dBFS (Master Bus only) — demo";
-  routes.appendChild(limiter);
-  const reduction=node("span","master-reduction","GR 0.0 dB");
-  reduction.title="Gain reduction meter del limiter — valore dimostrativo";
-  routes.appendChild(reduction);
-  const right=node("div","master-right");
-  const panLabel=node("label","","PAN");panLabel.setAttribute("for","masterPan");
-  const pan=node("input","master-pan");pan.id="masterPan";pan.type="range";
-  pan.min="-100";pan.max="100";pan.step="1";pan.value="0";
-  const panValue=node("span","master-pan-value","C");
-  pan.addEventListener("input",function(){
-   const n=Number(this.value);panValue.textContent=n===0?"C":(n<0?"L ":"R ")+Math.abs(n);
-   demoStatus("Master Pan");
-  });
-  const mute=btn("MUTE","master-mute",function(){
-   const active=this.getAttribute("aria-pressed")!=="true";
-   this.setAttribute("aria-pressed",String(active));demoStatus("Master Mute");
-  });
-  mute.id="masterMute";mute.setAttribute("aria-pressed","false");
-  right.appendChild(panLabel);right.appendChild(pan);
-  right.appendChild(panValue);right.appendChild(mute);
-  full.appendChild(level);full.appendChild(routes);full.appendChild(right);master.appendChild(full);
-  const learn=node("div","master-learn");
-  learn.appendChild(node("span","master-learn-label","QUICK LEARN"));
-  const learnToggle=btn("Learn","",function(){
-   const show=this.getAttribute("aria-pressed")!=="true";
-   this.setAttribute("aria-pressed",String(show));
-   for(const name of ["Gain","Pan","Limiter"])learn.querySelector("#masterLearn"+name).hidden=!show;
-   demoStatus("Quick Learn");
-  });
-  learnToggle.id="masterLearnToggle";learnToggle.setAttribute("aria-pressed","false");
-  learn.appendChild(learnToggle);
-  for(const name of ["Gain","Pan","Limiter"]){
-   const target=btn(name,"",function(){demoStatus("Master Quick Learn "+name)});
-   target.id="masterLearn"+name;target.hidden=true;
-   learn.appendChild(target);
+  master.dataset.preserveNativeMaster="true";
+  master.title="Master Audio originale JUCE — escluso dal redesign V2.3";
+  const nativeCard=node("div","master-original");
+  const nativeHead=node("div","master-original-head","MASTER AUDIO");
+  const nativeNote=node("span","master-original-note","ORIGINALE");
+  nativeCard.appendChild(nativeHead);nativeCard.appendChild(nativeNote);
+  const nativeLayout=node("div","master-original-layout");
+  const level=node("div","master-original-level");
+  const rail=node("div","master-original-rail");
+  rail.appendChild(node("span","master-original-track"));
+  const scale=node("div","master-original-db");
+  for(const tick of ["+6","0","-6","-18","-36","-48"]){
+   scale.appendChild(node("span","",tick));
   }
-  master.appendChild(learn);panel.appendChild(master);
+  rail.appendChild(scale);level.appendChild(rail);
+  level.appendChild(node("span","master-original-gain","0.0 dB"));
+  const middle=node("div","master-original-middle");
+  middle.appendChild(node("span","master-original-caption","MAIN OUT"));
+  middle.appendChild(node("span","master-original-out","1/2  ▾"));
+  middle.appendChild(node("span","master-original-limiter","Limit"));
+  const right=node("div","master-original-right");
+  right.appendChild(node("span","master-original-knob"));
+  right.appendChild(node("span","master-original-caption","PAN"));
+  right.appendChild(node("span","master-original-pan","C"));
+  right.appendChild(node("span","master-original-caption","MUTE"));
+  right.appendChild(node("span","master-original-speaker","◖))"));
+  nativeLayout.appendChild(level);nativeLayout.appendChild(middle);
+  nativeLayout.appendChild(right);nativeCard.appendChild(nativeLayout);
+  master.appendChild(nativeCard);panel.appendChild(master);
   for(let i=0;i<labels.length;i++){
    const type=types[i],channel=node("div","mixer-channel "+type);
    channel.dataset.columnIndex=String(i);
@@ -217,16 +255,45 @@
    heading.appendChild(node("span","channel-kind",type.toUpperCase()));
    channel.appendChild(heading);
    if(type==="audio"){
-    channel.appendChild(audioControls(false));
+    channel.appendChild(audioControls());
+   }else if(type==="midi" || type==="osc"){
+    // Data-output strips communicate port/endpoint and transmission state,
+    // not an imaginary gain/fader/pan control.
+    const body=node("div","data-channel "+type+"-data");
+    const endpoint=type==="midi"?"MIDI OUT":"127.0.0.1:9000";
+    const title=node("div","endpoint",endpoint);
+    title.title=type==="midi"?"Routing device MIDI — demo":"OSC UDP host / port — demo";
+    body.appendChild(title);
+    body.appendChild(node("span","type-hint",type==="midi"?"Porta di uscita":"Destinazione UDP"));
+    const state=node("div","type-status");
+    state.appendChild(node("span","indicator"));
+    state.appendChild(node("span","",type==="midi"?"TX · In attesa":"TX · Idle"));
+    body.appendChild(state);
+    const actions=node("div","data-actions");
+    const mute=btn("Mute TX","",function(){
+     const on=this.getAttribute("aria-pressed")!=="true";
+     this.setAttribute("aria-pressed",String(on));demoStatus(type.toUpperCase()+" output mute");
+    });
+    mute.setAttribute("aria-pressed","false");
+    mute.title="Mute della trasmissione dati, senza arrestare il cue — demo";
+    actions.appendChild(mute);body.appendChild(actions);channel.appendChild(body);
    }else{
-    const body=node("div","channel-body");
-    const status=node("div","control-readout");
-    const destination=type==="midi"?"MIDI OUT":type==="osc"?"127.0.0.1:9000":"CONTROL SET";
-    status.appendChild(node("strong","",destination));
-    status.appendChild(node("span","",type==="control"?"Mapping · Medium":"● TX · Standby"));
-    const actions=node("div","mixer-actions");
-    actions.appendChild(btn("M","",function(){document.getElementById("statusText").textContent="Anteprima: stato canale non operativo."}));
-    status.appendChild(actions);body.appendChild(status);channel.appendChild(body);
+    // Control column is its own workflow: priority and Control Set editor.
+    const body=node("div","data-channel control-data");
+    body.appendChild(node("div","endpoint","CONTROL SET"));
+    const priority=btn("Priorità · Medium","",function(){
+     demoStatus("Control priority (Low / Medium / High)");
+    });
+    priority.className="type-hint";priority.title="Priorità del Control Set — demo";
+    body.appendChild(priority);
+    const status=node("div","type-status");
+    status.appendChild(node("span","indicator"));
+    status.appendChild(node("span","","Mapping configurato"));
+    body.appendChild(status);
+    const actions=node("div","data-actions");
+    const edit=btn("Edit set","",function(){demoStatus("Control Set editor")});
+    edit.title="Editor del Control Set — demo";
+    actions.appendChild(edit);body.appendChild(actions);channel.appendChild(body);
    }
    panel.appendChild(channel);
   }
