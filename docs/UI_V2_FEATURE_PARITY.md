@@ -1,5 +1,14 @@
 # The CUElist — Redesign V2.3: parità funzionale obbligatoria
 
+> **Eccezione vincolante: il Master Audio non va ridisegnato.**
+> Conservare il componente JUCE originale di `ColumnUtilities` con
+> aspetto, posizione, dimensioni, disegno e tutti i controlli/callback
+> attuali. Nessun componente HTML alternativo deve essere tradotto
+> nel Master nativo. La preview mostra solo un'indicazione statica
+> del Master originale; Quick Learn conserva i propri hotspot
+> solo nella modalità esistente dell'applicazione.
+>
+
 > **Rifinitura beta.9:** i canali MIDI/OSC/Control nella
 > preview sono rappresentati con dati pertinenti
 > (porta, host/porta, mute TX, priorità, Edit set)
