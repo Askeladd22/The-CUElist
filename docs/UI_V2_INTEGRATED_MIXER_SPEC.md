@@ -1,5 +1,15 @@
 # The CUElist — V2.1: mixer integrato nella matrice
 
+> **Eccezione al mixer ridisegnato: il Master Audio rimane originale.**
+> Il Master non è una strip da allineare o semplificare:
+> preservare la geometria, il disegno e tutti i callback
+> del componente JUCE attuale, senza cambiare fader/meter,
+> pan, mute, Main Out, limiter e Quick Learn. Il mixer nuovo
+> deve adattarsi intorno al Master esistente, anche se
+> ciò richiede un raccordo geometrico fra i due sistemi.
+> Il segnaposto nella demo HTML non è un design definitivo.
+>
+
 > **V2.2:** il Master deve conservare gain/meter L/R, pan,
 > mute audio, Main Out, limiter con gain reduction e Quick Learn
 > gain/pan/limiter. Nessuna funzione dell'attuale mixer deve
