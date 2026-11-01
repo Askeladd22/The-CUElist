@@ -15,7 +15,7 @@ struct WorkspaceLayoutInput {
     int rowHeaderHeight=CueGridGeometry::headerHeight;
     int rowHeight=CueGridGeometry::rowHeight;
     int pinnedMetricsWidth=CueGridGeometry::pinnedMetricsWidth;
-    int pinnedHeaderWidth=290;
+    int pinnedHeaderWidth=CueGridGeometry::nameWidth;
     int timelineHeightAdjustment=0; // user drag, positive enlarges Timeline
     bool inspectorVisible=true; // collapsed Inspector leaves a 26px reopen rail
 };
