@@ -13,6 +13,24 @@ certifichino tutte le milestone riportate**; le etichette storiche
 indicano versioni di sviluppo presenti nei commit, non distribuzioni
 pubbliche. I particolari di ogni intervento sono nell'appendice.
 
+## [0.9.0-beta.16] - 2026-11-01
+
+**Tipo:** redesign nativo V2 / N3.3 — righe, celle e stati della Cue Grid, senza riscrivere la logica operativa.
+
+### Interfaccia JUCE
+- Le righe cue formano una matrice continua con separatori molto sottili, lieve alternanza Midnight Slate e selezione estesa all'intera larghezza, anche oltre l'ultima colonna.
+- Selezione, NEXT e playback reale hanno indicatori indipendenti anche quando coesistono; i testi operativi PLAYING, PAUSED, NEXT CUE, MUTED e STANDBY restano presenti. Non sono introdotti stati READY/ERROR/STOPPED artificiosi nel runtime.
+- Celle vuote senza riempimenti e bordi ripetuti; hover discreto senza alcun effetto sullo show o sul trasporto. Focus/selezione della cella delineati separatamente.
+- Clip e mappe caricate mantengono accenti per tipo, nome, durata, progress bar, play/stop, loop e Auto Stop per cella. Indicazione puntuale di attività soltanto da `getCellPlayback`; attese/pausa e media missing restano segnalate con testo.
+- Le colonne collassate distinguono il contenuto reale da una cella vuota; gli indicatori Auto Stop per cella sono portati a 10pt.
+
+### Regressioni e vincoli
+- Test JUCE di snapshot della selezione a tutta larghezza, hover reversibile senza mutazione del modello, media mancante e clip caricata; rimangono i test di N3.1/N3.2 e i test dell'esecuzione.
+- Invariati gli hitbox di GO, Play/Stop, import, menu, duplicazione, cancellazione, drag/drop ed editing Audio/MIDI/OSC/Control.
+- Conservate le metriche originarie (62px riga, 72px header, 318px lane cue, 152/48px colonne, 184px BPM) e la sincronizzazione mixer/scroll.
+- **Master Audio intatto**: nessuna modifica a `ColumnUtilities.cpp`, Inspector, Timeline, barre di menu, motori/routing/mapping o formato `.cuelist` JSON v10. Nessuna build portable.
+- CI Windows/CTest e revisione visiva su PC con DPI differenziati restano criteri necessari prima del merge. N3.4/N3.5 rimangono incrementi separati.
+
 ## [0.9.0-beta.15] - 2026-11-01
 
 **Tipo:** complemento incrementale della N3.2 — layout su due fasce della colonna Cue Name/Transport.
