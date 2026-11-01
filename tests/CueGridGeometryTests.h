@@ -79,9 +79,10 @@ void cueGridGeometryTests() {
     });
 
     test("N3.1 fixed BPM band and viewport match dense window contracts",[] {
-        std::vector<Column> columns(11);
+        struct Entry { bool collapsed=false; };
+        std::vector<Entry> columns(11);
         for (int i=0;i<11;++i)
-            columns[(size_t)i].collapsed=(i==2 || i==8);
+            columns[(std::size_t)i].collapsed=(i==2 || i==8);
         for (const auto size:std::initializer_list<juce::Point<int>>{
              {1280,720},{1647,895},{1920,1080},{3840,1080}}) {
             WorkspaceLayoutInput input;
