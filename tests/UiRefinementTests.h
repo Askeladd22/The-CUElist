@@ -1137,7 +1137,7 @@ void uiRefinementTests() {
               view->getY()==74 && ui.getWidth()-288-overlay->getRight()==0,
               "Compact cue-list positioning broke at smaller window size");
     });
-    test("Sidebar navigation has breathing room without overlapping On Deck",[] {
+    test("N2 Sidebar has one Show name and no duplicated operator actions",[] {
         MainComponent ui(false);
         for (const auto dimension:std::initializer_list<juce::Point<int>>{
                 {1180,820},{1440,900},{1647,895},{1920,1080}}) {
@@ -1146,15 +1146,25 @@ void uiRefinementTests() {
             auto* title=controlsV3::named(ui,"projectName");
             auto* preferences=controlsV3::named(ui,"projectPreferences");
             auto* mapping=controlsV3::named(ui,"controlMapping");
-            check(title && preferences && mapping,
-                  "Sidebar title, Settings or Control Mapping is missing");
-            check(title->getBottom()+22<=preferences->getY() &&
-                  preferences->getBottom()+14<=mapping->getY() &&
-                  mapping->getBottom()<=373 &&
-                  mapping->getBottom()+20<=dimension.y-339-12,
-                  "Sidebar spacing overlaps navigation or the emergency controls");
-            check(mapping->getRight()<=180 && mapping->getHeight()>=33,
-                  "Expanded spacing reduced the clickable Control Mapping target");
+            auto* file=controlsV3::named(ui,"operatorMenuFile");
+            auto* show=controlsV3::named(ui,"operatorMenuShow");
+            auto* devices=controlsV3::named(ui,"operatorMenuDevices");
+            auto* more=controlsV3::named(ui,"operatorMenuMore");
+            check(title && title->isVisible() &&
+                  title->getY()==122 && title->getBottom()<175,
+                  "Single editable Show name is missing from workspace");
+            check(preferences && mapping && !preferences->isVisible() &&
+                  !mapping->isVisible(),
+                  "Settings/Mapping are still duplicated in sidebar");
+            check(file && show && devices && more &&
+                  (file->isVisible() || more->isVisible()) &&
+                  (show->isVisible() || more->isVisible()) &&
+                  (devices->isVisible() || more->isVisible()),
+                  "Hidden sidebar actions must remain accessible in native menus");
+            const auto name=title->getBounds();
+            check(name.getX()>12 && name.getRight()<180 &&
+                  name.getBottom()<dimension.y-339-12,
+                  "Single Show card overlaps emergency operator transport");
         }
     });
     test("Project title is editable and survives v10 serialization",[] {
@@ -1169,9 +1179,12 @@ void uiRefinementTests() {
               loaded.name=="Teatro - Autunno","Renamed title was not serialized");
         auto* preferences=controlsV3::named(ui,"projectPreferences");
         auto* diagnostics=controlsV3::named(ui,"showDiagnostics");
-        check(preferences && preferences->isVisible() &&
-              preferences->getX()<180 && diagnostics && !diagnostics->isVisible(),
-              "Preferences menu did not replace toolbar diagnostics");
+        auto* showMenu=controlsV3::named(ui,"operatorMenuShow");
+        check(preferences && !preferences->isVisible() && showMenu &&
+              (showMenu->isVisible() ||
+               controlsV3::named(ui,"operatorMenuMore")->isVisible()) &&
+              diagnostics && !diagnostics->isVisible(),
+              "Settings must use the native Show/More menu without a sidebar duplicate");
     });
     test("Contextual plus adds a cue below the existing sequence",[] {
         MainComponent ui(false);

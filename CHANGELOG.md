@@ -13,6 +13,33 @@ certifichino tutte le milestone riportate**; le etichette storiche
 indicano versioni di sviluppo presenti nei commit, non distribuzioni
 pubbliche. I particolari di ogni intervento sono nell'appendice.
 
+## [0.9.0-beta.11] - 2026-11-01
+
+**Tipo:** fase N2 del redesign JUCE — rimozione delle duplicazioni dalla sidebar; continuazione del branch `feat/native-operator-header-beta10`.
+
+### Modificato
+- Nascosti i pulsanti duplicati **New, Open, Save, Settings,
+  Preferences e Control Mapping** nella sidebar, poiché sono ora
+  richiamabili dai menu nativi File, Show e Devices della fase N1.
+- Gli stessi callback JUCE originali sono conservati; File
+  continua a gestire apertura/salvataggio e conferme di abbandono.
+- Settings conserva ogni voce e impostazione esistente:
+  il popup è ora ancorato al menu Show visibile, anziché
+  al vecchio pulsante Preferences nascosto.
+- Eliminato il riquadro PROJECT con numero cue/colonne duplicato.
+  Rimane un solo nome show editabile, spostato nella zona
+  WORKSPACE; l'indicatore modifiche non salvate appare
+  soltanto quando serve.
+- **ON DECK, GO/PANIC, shortcut, cue grid, inspector,
+  mixer, Master Audio e diagnostica restano invariati.**
+- Aggiornati i test nativi per verificare sidebar pulita,
+  show editabile, accessibilità File/Show/Devices/More
+  e il formato show v10 senza regressioni.
+
+### Documentazione
+- [UI V2 N2 — Sidebar](docs/UI_V2_NATIVE_PHASE_N2.md).
+- Nessuna nuova dipendenza, nessuna build portable.
+
 ## [0.9.0-beta.10] - 2026-11-01
 
 **Tipo:** prima integrazione reale JUCE del redesign V2 (fase N1: navigazione superiore); nessun intervento sul Master Audio.

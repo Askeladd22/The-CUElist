@@ -289,7 +289,16 @@ MainComponent::MainComponent(bool startAudio) {
         menu.addSeparator();
         menu.addItem(5,"Rename active Cuelist");
         auto safe=juce::Component::SafePointer<MainComponent>(this);
-        menu.showMenuAsync(juce::PopupMenu::Options().withTargetComponent(&preferencesButton),
+        // The original Settings button is retained only as an action source.
+        // Anchor its unchanged native settings popup to the visible
+        // operator Show menu after removing the duplicate sidebar button.
+        auto* anchor=preferencesButton.isVisible()
+            ? static_cast<juce::Component*>(&preferencesButton)
+            : static_cast<juce::Component*>(
+                  operatorMenus[2]->isVisible()
+                      ? operatorMenus[2].get()
+                      : operatorMenus[OperatorNavigationLayout::overflowIndex].get());
+        menu.showMenuAsync(juce::PopupMenu::Options().withTargetComponent(anchor),
         [safe,inputs,outputs](int choice) {
             if (!safe) return;
             if(choice==1) safe->showPreflight();
@@ -623,15 +632,20 @@ void MainComponent::paint(juce::Graphics& g) {
     label(g,audioConnected ? "AVAILABLE" : "UNAVAILABLE",
           {w-125,30,108,24},11,
           audioConnected ? palette::teal : palette::red,true);
-    label(g,"WORKSPACE",{20,130,140,17},11,palette::muted,true);
-    g.setColour(palette::teal.withAlpha(0.19f)); g.fillRoundedRectangle(12,148,156,54,8);
-    g.setColour(palette::teal); g.fillRoundedRectangle(12,155,4,40,2);
-    // The editable project title is a JUCE Label over this card.
-    label(g,"PROJECT",{20,382,140,18},11,palette::muted,true);
-    label(g,juce::String((int)show.rows.size())+" cues / "+juce::String((int)show.columns.size())+" columns",
-          {20,412,150,22},13,palette::muted);
-    label(g,hasUnsavedChanges() ? "Unsaved changes" : "No changes",
-          {20,441,153,22},11,hasUnsavedChanges() ? palette::amber : palette::muted);
+    // N2: one editable Show identity instead of two redundant Show/Project
+    // cards. File, Settings and Control Mapping are in genuine JUCE menus.
+    label(g,"WORKSPACE",{20,91,140,17},11,palette::muted,true);
+    g.setColour(palette::teal.withAlpha(0.19f));
+    g.fillRoundedRectangle(12,112,156,54,8);
+    g.setColour(palette::teal);
+    g.fillRoundedRectangle(12,119,4,40,2);
+    // The project title remains the original editable JUCE Label.
+    // Do not repeat cue/column counts from the Cuelist header.
+    if (hasUnsavedChanges()) {
+        g.setColour(palette::amber);
+        g.fillEllipse(20.0f,181.0f,7.0f,7.0f);
+        label(g,"UNSAVED CHANGES",{34,174,130,21},10,palette::amber,true);
+    }
     g.setColour(palette::amber.withAlpha(.11f));
     g.fillRoundedRectangle(12.0f,(float)h-339,156.0f,51.0f,8.0f);
     label(g,"ON DECK",{20,h-333,145,16},11,palette::amber,true);
@@ -945,9 +959,9 @@ void MainComponent::showOperatorMenu(int index) {
 void MainComponent::dispatchOperatorMenu(int group,int command) {
     switch (group) {
     case 0: // File
-        if (command==1) newButton.triggerClick();
-        else if (command==2) openButton.triggerClick();
-        else if (command==3) saveButton.triggerClick();
+        if (command==1 && newButton.onClick) newButton.onClick();
+        else if (command==2 && openButton.onClick) openButton.onClick();
+        else if (command==3 && saveButton.onClick) saveButton.onClick();
         else if (command==4) showPreflight();
         else if (command==5) showDiagnostics();
         break;
@@ -959,7 +973,7 @@ void MainComponent::dispatchOperatorMenu(int group,int command) {
             showColumnMenu(viewport.getScreenBounds().getCentre());
         break;
     case 2: // Show
-        if (command==1) preferencesButton.triggerClick();
+        if (command==1 && preferencesButton.onClick) preferencesButton.onClick();
         else if (command==2) projectNameLabel.showEditor();
         else if (command==3) showPreflight();
         else if (command==4) showDiagnostics();
@@ -977,7 +991,7 @@ void MainComponent::dispatchOperatorMenu(int group,int command) {
         break;
     case 4: // Devices
         if (command==1) showDevices();
-        else if (command==2) preferencesButton.triggerClick();
+        else if (command==2 && preferencesButton.onClick) preferencesButton.onClick();
         else if (command==3) openControlPanel(false);
         else if (command==4) beginQuickLearn(false);
         else if (command==5) beginQuickLearn(true);
@@ -999,11 +1013,12 @@ void MainComponent::resized() {
     const int h=getHeight();
     const auto geometry=workspaceLayout();
     editorX=geometry.editorX;
-    newButton.setBounds(13,86,49,29); openButton.setBounds(67,86,49,29); saveButton.setBounds(121,86,49,29);
-    projectNameLabel.setBounds(28,158,132,34);
-    deviceButton.setBounds(20,218,140,34);
-    preferencesButton.setBounds(20,267,140,34);
-    controlButton.setBounds(20,316,140,34);
+    // Reuse the existing command callbacks from the menus, but hide their
+    // duplicated sidebar hitboxes. No action or shortcut is deleted.
+    for (auto* control:{&newButton,&openButton,&saveButton,
+                        &deviceButton,&preferencesButton,&controlButton})
+        control->setVisible(false);
+    projectNameLabel.setBounds(28,122,132,34);
     refreshCuelistTabs();
     const auto nav=OperatorNavigationLayout::atWidth(getWidth());
     for (int i=0;i<=OperatorNavigationLayout::overflowIndex;++i)

@@ -27,6 +27,19 @@ pubbliche. La versione del progetto salvato `.cuelist` (**schema v10**)
 
 ## UI V2 — Implementazione JUCE progressiva
 
+La **0.9.0-beta.11 (fase N2)** elimina dalla sidebar
+i comandi duplicati New/Open/Save, Settings/Preferences
+e Control Mapping, già disponibili tramite i menu JUCE
+dell'header N1. Rimane un solo nome show editabile e
+l'avviso di modifiche non salvate quando necessario.
+Nessuna funzione viene rimossa: i callback sono gli
+originali, con Settings ancorato al menu Show visibile.
+Master Audio, GO/PANIC, cue list, mixer, audio/MIDI/OSC
+e formato `.cuelist` restano invariati.
+[Specifiche e test N2](docs/UI_V2_NATIVE_PHASE_N2.md).
+
+## UI V2 — Implementazione JUCE progressiva
+
 La **0.9.0-beta.10** inizia l'integrazione reale del redesign
 con una barra di navigazione superiore JUCE (File, Edit,
 Show, Cuelists, Devices, View, Guide) completamente collegata
