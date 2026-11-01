@@ -467,51 +467,58 @@ void uiRefinementTests() {
         check(width>=140 && height>=30,
               "Popup row dimensions are too small for clear stage use");
     });
-    test("Undo and Redo controls fit before Clock without covering Cuelist tabs",[] {
+    test("Native Edit menu preserves Undo and Redo without obscuring tabs",[] {
         MainComponent ui(false);
         auto* undo=dynamic_cast<juce::TextButton*>(
             controlsV3::named(ui,"showUndo"));
         auto* redo=dynamic_cast<juce::TextButton*>(
             controlsV3::named(ui,"showRedo"));
-        check(undo && redo,"Global Undo/Redo controls missing");
+        auto* edit=dynamic_cast<juce::TextButton*>(
+            controlsV3::named(ui,"operatorMenuEdit"));
+        auto* more=dynamic_cast<juce::TextButton*>(
+            controlsV3::named(ui,"operatorMenuMore"));
+        check(undo && redo && edit && more,
+              "Native Edit, overflow or original Undo/Redo callbacks missing");
         check(!undo->isEnabled() && !redo->isEnabled(),
-              "Undo/Redo must be disabled when the edit history is empty");
+              "Empty history must still disable Undo/Redo");
         for (const auto dimensions:std::initializer_list<juce::Point<int>>{
                  {1180,820},{1440,900},{1647,895},{1920,1080}}) {
             ui.setSize(dimensions.x,dimensions.y);
             ui.resized();
-            check(undo->isVisible() && redo->isVisible() &&
-                  undo->getX()>=190 && redo->getX()>undo->getRight() &&
-                  redo->getRight()<=dimensions.x-650 &&
-                  undo->getY()<40 && redo->getBottom()<43,
-                  "Undo/Redo obscured the tabs or the fixed Clock");
-            const auto image=ui.createComponentSnapshot({dimensions.x-365,8,354,56});
+            check(!undo->isVisible() && !redo->isVisible() &&
+                  (edit->isVisible() || more->isVisible()),
+                  "Undo/Redo are not reachable through native Edit/More");
+            const auto image=ui.createComponentSnapshot(
+                {dimensions.x-365,8,354,56});
             check(image.isValid() && image.getHeight()==56,
-                  "The compact MIDI/OSC/Audio monitor failed to render");
+                  "Live MIDI/OSC/audio monitor stopped rendering");
         }
     });
 
-    test("Help menu and versioned About stay accessible at minimum window width",[] {
+    test("Native Guide and About stay reachable at every supported width",[] {
         MainComponent ui(false);
-        auto* help=dynamic_cast<juce::TextButton*>(
+        auto* oldHelp=dynamic_cast<juce::TextButton*>(
             controlsV3::named(ui,"showHelpMenu"));
-        auto* undo=dynamic_cast<juce::TextButton*>(
-            controlsV3::named(ui,"showUndo"));
+        auto* guide=dynamic_cast<juce::TextButton*>(
+            controlsV3::named(ui,"operatorMenuGuide"));
+        auto* more=dynamic_cast<juce::TextButton*>(
+            controlsV3::named(ui,"operatorMenuMore"));
         auto* tab=dynamic_cast<juce::TextButton*>(
             controlsV3::named(ui,"inspectorSideToggle"));
-        check(help && undo && tab,"Help, Undo or Inspector grip missing");
+        check(oldHelp && guide && more && tab,
+              "Guide, More or Inspector grip missing");
         check(juce::String(THE_CUELIST_VERSION).startsWith("0.9.0-beta."),
-              "About version is not bound to VERSION.txt in the build");
+              "About version is not bound to VERSION.txt");
         for (const auto size:std::initializer_list<juce::Point<int>>{
                  {1180,820},{1440,900},{1647,895},{1920,1080}}) {
             ui.setSize(size.x,size.y);
             ui.resized();
-            check(help->isVisible() && help->getRight()+5<=undo->getX() &&
-                  help->getY()>=0 && help->getBottom()<43,
-                  "Help overlaps Undo or Cuelist tab strip");
+            check(!oldHelp->isVisible() &&
+                  (guide->isVisible() || more->isVisible()),
+                  "Guide/About must remain in a native menu at every width");
             check(tab->getButtonText().isEmpty() &&
                   tab->getWidth()==20 && tab->getHeight()==46,
-                  "Inspector grip must use directional vector symbols");
+                  "Inspector grip must preserve directional vector symbols");
             auto icon=tab->createComponentSnapshot(tab->getLocalBounds());
             check(icon.isValid() && icon.getWidth()==20 && icon.getHeight()==46,
                   "Inspector vector symbol failed to render");

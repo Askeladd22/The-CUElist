@@ -40,6 +40,17 @@ MainComponent::MainComponent(bool startAudio) {
                     &cuelistOverflowButton,&addCuelistButton,&cuelistMoveLeft,&cuelistMoveRight,&undoButton,&redoButton,&globalMidiLearn,&globalOscLearn,&helpButton,
                     &importButton,&midiEditButton,&oscEditButton,&playCellButton,&stopCellButton,&clearButton,&tempoButton,&applyButton,
                     &preflightButton,&diagnosticsButton,&preferencesButton}) b->setWantsKeyboardFocus(false);
+    // Native V2 menus reuse the original operator handlers and shortcuts.
+    for (int i=0;i<=OperatorNavigationLayout::overflowIndex;++i) {
+        operatorMenus[(size_t)i]=std::make_unique<OperatorNavigationButton>(
+            OperatorNavigationLayout::title(i));
+        auto& button=*operatorMenus[(size_t)i];
+        button.setName("operatorMenu"+juce::String(
+            OperatorNavigationLayout::title(i)));
+        button.setTooltip("Show "+button.getButtonText()+" actions");
+        button.onClick=[this,i] { showOperatorMenu(i); };
+        addAndMakeVisible(button);
+    }
     viewport.setViewedComponent(&grid,false); viewport.setScrollBarsShown(true,true);
     // Keep drag scrolling available, but place the vertical bar at the far
     // left edge. The right edge must meet BPM/Auto Stop without a dark gutter.
@@ -523,8 +534,9 @@ void MainComponent::paint(juce::Graphics& g) {
         g.setColour(palette::panel);
         g.fillRect(geometry.dockEditor);
     }
-    g.setColour(palette::teal); g.fillRect(0,0,w,3);
-    g.setColour(palette::line); g.drawHorizontalLine(72,0,(float)w);
+    g.setColour(palette::line);
+    g.drawHorizontalLine(38,0,(float)std::min(w,HeaderTelemetryLayout::atWidth(w).clock.getX()-10));
+    g.drawHorizontalLine(72,0,(float)w);
     g.drawVerticalLine(180,73,(float)h);
     // Keep the project card, but remove the redundant static ENGINES panel.
     // Engine controls, routing and the live audio-status indicator are unchanged.
@@ -533,13 +545,15 @@ void MainComponent::paint(juce::Graphics& g) {
     static const auto appIcon=juce::ImageFileFormat::loadFrom(
         BinaryData::thecuelist_icon_png,BinaryData::thecuelist_icon_pngSize);
     if (appIcon.isValid())
-        g.drawImageWithin(appIcon,19,16,38,39,juce::RectanglePlacement::centred);
+        g.drawImageWithin(appIcon,15,7,31,31,juce::RectanglePlacement::centred);
     else for (int i=0;i<3;++i) {
         g.setColour(i==1 ? palette::teal : palette::text);
-        g.fillRoundedRectangle(23.0f,23.0f+i*9,23.0f-i*4,4,2);
+        g.fillRoundedRectangle(17.0f,12.0f+i*7,23.0f-i*4,3,1.5f);
     }
-    label(g,"The Cuelist",{60,14,165,32},24,palette::text,true);
-    label(g,"SHOW CONTROL",{61,45,130,16},11,palette::muted,true);
+    // Product wordmark: neutral "The" plus the restrained teal CUElist
+    // accent from the approved reference (no font or icon replacement).
+    label(g,"The",{53,7,38,32},19,palette::text,true);
+    label(g,"CUElist",{91,7,105,32},19,palette::teal,true);
     // Keep the left half free for cue-list tabs. Telemetry panels are
     // fixed to the right and never cover the source/utility workspace.
     g.setColour(palette::teal); g.fillRect(190,70,122,2);
@@ -843,6 +857,144 @@ void MainComponent::refreshCuelistTabs() {
     if (count<12) addCuelistButton.setBounds(trailingX+overflowWidth,43,28,buttonHeight);
 }
 
+// Phase N1: the native menu surface is presentation-only. Every command is
+// routed to the existing production callback or its exact owner method; no
+// mock actions, synthetic transport or new show-model mutations are added.
+void MainComponent::showOperatorMenu(int index) {
+    if (index<0 || index>OperatorNavigationLayout::overflowIndex) return;
+    auto* target=operatorMenus[(size_t)index].get();
+    if (!target || !target->isVisible()) return;
+
+    const auto populate=[this](juce::PopupMenu& m,int group) {
+        const int base=(group+1)*100;
+        switch (group) {
+        case 0: // File: existing discard confirmation and project lifecycle
+            m.addItem(base+1,"New show");
+            m.addItem(base+2,"Open show...");
+            m.addItem(base+3,"Save show");
+            m.addSeparator();
+            m.addItem(base+4,"Pre-flight...");
+            m.addItem(base+5,"Diagnostics...");
+            break;
+        case 1: // Edit: preserve current Undo history and cue actions
+            m.addItem(base+1,"Undo",undoButton.isEnabled());
+            m.addItem(base+2,"Redo",redoButton.isEnabled());
+            m.addSeparator();
+            m.addItem(base+3,"Add cue");
+            m.addItem(base+4,"Add column...");
+            break;
+        case 2: // Show settings are still owned by the original popup
+            m.addItem(base+1,"Settings...");
+            m.addItem(base+2,"Rename show...");
+            m.addSeparator();
+            m.addItem(base+3,"Pre-flight...");
+            m.addItem(base+4,"Diagnostics...");
+            break;
+        case 3:
+            m.addItem(base+1,"New Cuelist",show.cuelists.size()<12);
+            m.addItem(base+2,"Rename active Cuelist");
+            m.addItem(base+3,"Move active Cuelist left",show.activeCuelist>0);
+            m.addItem(base+4,"Move active Cuelist right",
+                show.activeCuelist+1<(int)show.cuelists.size());
+            m.addItem(base+5,"Delete active Cuelist...",show.cuelists.size()>1);
+            break;
+        case 4:
+            m.addItem(base+1,"Audio Devices...");
+            m.addItem(base+2,"MIDI / OSC Settings...");
+            m.addItem(base+3,"Control Mapping...");
+            m.addSeparator();
+            m.addItem(base+4,"MIDI Learn");
+            m.addItem(base+5,"OSC Learn");
+            break;
+        case 5:
+            m.addItem(base+1,inspectorVisible ? "Collapse Inspector" :
+                                              "Expand Inspector");
+            m.addItem(base+2,collapseAllButton.getButtonText());
+            m.addItem(base+3,"Diagnostics / I/O activity...");
+            break;
+        case 6:
+            m.addItem(base+1,"User Guide");
+            m.addItem(base+2,"About The CUElist");
+            break;
+        default: break;
+        }
+    };
+
+    juce::PopupMenu menu;
+    menu.setLookAndFeel(&theme);
+    if (index==OperatorNavigationLayout::overflowIndex) {
+        // Menus hidden for width remain reachable, not disabled or lost.
+        const int first=OperatorNavigationLayout::atWidth(getWidth())
+                            .visibleMenuCount;
+        for (int i=first;i<OperatorNavigationLayout::menuCount;++i) {
+            juce::PopupMenu sub;
+            sub.setLookAndFeel(&theme);
+            populate(sub,i);
+            menu.addSubMenu(OperatorNavigationLayout::title(i),sub);
+        }
+    } else populate(menu,index);
+
+    auto safe=juce::Component::SafePointer<MainComponent>(this);
+    menu.showMenuAsync(juce::PopupMenu::Options().withTargetComponent(target),
+        [safe](int chosen) {
+            if (safe && chosen>0)
+                safe->dispatchOperatorMenu(chosen/100-1,chosen%100);
+        });
+}
+
+void MainComponent::dispatchOperatorMenu(int group,int command) {
+    switch (group) {
+    case 0: // File
+        if (command==1) newButton.triggerClick();
+        else if (command==2) openButton.triggerClick();
+        else if (command==3) saveButton.triggerClick();
+        else if (command==4) showPreflight();
+        else if (command==5) showDiagnostics();
+        break;
+    case 1: // Edit
+        if (command==1 && undoButton.isEnabled()) undoEdit();
+        else if (command==2 && redoButton.isEnabled()) redoEdit();
+        else if (command==3) addCue();
+        else if (command==4)
+            showColumnMenu(viewport.getScreenBounds().getCentre());
+        break;
+    case 2: // Show
+        if (command==1) preferencesButton.triggerClick();
+        else if (command==2) projectNameLabel.showEditor();
+        else if (command==3) showPreflight();
+        else if (command==4) showDiagnostics();
+        break;
+    case 3: // Cuelists
+        if (command==1 && show.cuelists.size()<12) createCuelist();
+        else if (command==2) renameActiveCuelist();
+        else if (command==3 && show.activeCuelist>0)
+            moveCuelist(show.activeCuelist,show.activeCuelist-1);
+        else if (command==4 &&
+                 show.activeCuelist+1<(int)show.cuelists.size())
+            moveCuelist(show.activeCuelist,show.activeCuelist+1);
+        else if (command==5 && show.cuelists.size()>1)
+            requestDeleteCuelist(show.activeCuelist);
+        break;
+    case 4: // Devices
+        if (command==1) showDevices();
+        else if (command==2) preferencesButton.triggerClick();
+        else if (command==3) openControlPanel(false);
+        else if (command==4) beginQuickLearn(false);
+        else if (command==5) beginQuickLearn(true);
+        break;
+    case 5: // View
+        if (command==1) inspectorSideTab.triggerClick();
+        else if (command==2) collapseAllButton.triggerClick();
+        else if (command==3) showDiagnostics();
+        break;
+    case 6: // Guide
+        if (command==1) openUserGuide();
+        else if (command==2) showAbout();
+        break;
+    default: break;
+    }
+}
+
 void MainComponent::resized() {
     const int h=getHeight();
     const auto geometry=workspaceLayout();
@@ -853,11 +1005,20 @@ void MainComponent::resized() {
     preferencesButton.setBounds(20,267,140,34);
     controlButton.setBounds(20,316,140,34);
     refreshCuelistTabs();
-    // Undo/Redo live in the unused upper-right band before the clock,
-    // separate from the 43px-high Cuelist tab row.
-    helpButton.setBounds(getWidth()-831,10,61,25);
-    undoButton.setBounds(getWidth()-764,10,51,25);
-    redoButton.setBounds(getWidth()-709,10,51,25);
+    const auto nav=OperatorNavigationLayout::atWidth(getWidth());
+    for (int i=0;i<=OperatorNavigationLayout::overflowIndex;++i)
+        if (auto* button=operatorMenus[(size_t)i].get()) {
+            const bool visible=i<nav.visibleMenuCount ||
+                (i==OperatorNavigationLayout::overflowIndex &&
+                 nav.visibleMenuCount<OperatorNavigationLayout::menuCount);
+            button->setVisible(visible);
+            if (visible) button->setBounds(nav.bounds[(size_t)i]);
+        }
+    // Keep existing Undo/Redo and Guide callbacks/shortcuts. Their
+    // former direct header controls now live in real popup menus.
+    helpButton.setVisible(false);
+    undoButton.setVisible(false);
+    redoButton.setVisible(false);
     const int activityX=getWidth()-365;
     // Leave separation from the I/O ACTIVITY caption and the audio card.
     globalMidiLearn.setBounds(activityX+95,10,58,20);

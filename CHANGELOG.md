@@ -13,6 +13,40 @@ certifichino tutte le milestone riportate**; le etichette storiche
 indicano versioni di sviluppo presenti nei commit, non distribuzioni
 pubbliche. I particolari di ogni intervento sono nell'appendice.
 
+## [0.9.0-beta.10] - 2026-11-01
+
+**Tipo:** prima integrazione reale JUCE del redesign V2 (fase N1: navigazione superiore); nessun intervento sul Master Audio.
+
+### Implementato
+- Barra superiore nativa con icona compatta, identità The CUElist e
+  menu **File, Edit, Show, Cuelists, Devices, View, Guide**.
+- Popup JUCE funzionali collegati ai metodi già esistenti
+  dell'applicazione: Nuovo/Apri/Salva, Undo/Redo,
+  cue e colonne, Settings, Cuelist, dispositivi,
+  Control Mapping, MIDI/OSC Learn, Inspector, Guide/About.
+- Overflow **More** a larghezze ridotte, che raggruppa
+  le categorie non visibili senza perdere i comandi
+  (1024/1180/1280 px testati).
+- Sostituiti nella vecchia barra superiore i pulsanti diretti
+  Help, Undo e Redo con i nuovi menu; mantenuti i callback
+  e le scorciatoie originali.
+- Conservati temporaneamente i comandi di sidebar
+  per evitare regressioni prima della sua fase nativa separata.
+- Inseriti test CTest JUCE in `OperatorNavigationTests.h`
+  su geometria, overflow, presenza pulsanti veri, collegamenti
+  originali e permanenza del Master.
+
+### Vincoli
+- **Master Audio originale intoccato**: nessuna modifica a
+  `ColumnUtilities.cpp`, routing, fader/meter stereo,
+  pan, mute, Main Out, limiter e Quick Learn.
+- Nessuna modifica a motori, modello Show v10, cue,
+  timeline, Inspector, MIDI/OSC/Control, mixer o
+  comportamenti di salvataggio.
+- Fase N1 documentata in
+  [UI_V2_NATIVE_PHASE_N1.md](docs/UI_V2_NATIVE_PHASE_N1.md).
+  L'integrazione del resto della GUI è successiva.
+
 ## [0.9.0-beta.9] - 2026-11-01
 
 **Decisione di design aggiuntiva:** MASTER AUDIO ESCLUSO DAL REDESIGN.

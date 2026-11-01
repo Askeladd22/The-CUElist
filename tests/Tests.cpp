@@ -37,6 +37,7 @@ void test(const char* name, const std::function<void()>& body) {
 #include "CueTransportUXTests.h"
 #include "GainMeterFaderTests.h"
 #include "UiRefinementTests.h"
+#include "OperatorNavigationTests.h"
 #include "RowActionsUiTests.h"
 #include "ShowEditOperationsTests.h"
 #include "WorkspaceLayoutTests.h"
@@ -62,6 +63,7 @@ int main() {
     cueTransportUXTests();
     gainMeterFaderTests();
     uiRefinementTests();
+    operatorNavigationTests();
     rowActionsUiTests();
     showEditOperationsTests();
     workspaceLayoutTests();
