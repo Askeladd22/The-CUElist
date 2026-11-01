@@ -202,8 +202,12 @@ private:
 };
 class CueMetricsOverlay final : public juce::Component {
 public:
-    explicit CueMetricsOverlay(MainComponent& parent):owner(parent) {}
+    explicit CueMetricsOverlay(MainComponent& parent);
     void paint(juce::Graphics&) override;
+    void beginBpmEdit(int row);
+    void syncBpmEditor();
+    bool isBpmEditing() const { return editingRowId>0; }
+    juce::TextEditor& bpmEditorForTests() { return bpmEditor; }
     void mouseDown(const juce::MouseEvent&) override;
     void mouseMove(const juce::MouseEvent&) override;
     void mouseExit(const juce::MouseEvent&) override;
@@ -219,6 +223,10 @@ public:
         return {102,rowTop+8,78,26};
     }
 private:
+    void finishBpmEdit(bool accept);
+    juce::TextEditor bpmEditor;
+    int editingRowId=0;
+    bool closingBpmEditor=false;
     enum class HoverTarget { none, bpm, autoStop };
     int hoverRow=-1;
     HoverTarget hoverTarget=HoverTarget::none;
@@ -435,6 +443,7 @@ public:
     void setCellLoop(int row,int column,bool enabled);
     void setCellFollowsRow(int row,int column,bool enabled);
     void editRowBpm(int row);
+    bool commitRowBpm(int rowId,const juce::String& value);
     void seekTimeline(double seconds);
     void goNext();
     int nextCueIndex() const { return nextCue; }
