@@ -430,7 +430,7 @@ void CueGrid::paint(juce::Graphics& g) {
         // Thin dividers use the same collapsed-column positions as hit tests.
         g.setColour(palette::line.withAlpha(.25f));
         for (int c=0;c<(int)show.columns.size();++c)
-            g.drawVerticalLine(columnX(c),y,(float)(y+rowHeight));
+            g.drawVerticalLine(columnX(c),(float)y,(float)(y+rowHeight));
         g.setColour(palette::line.withAlpha(.43f));
         g.drawHorizontalLine(y+rowHeight-1,0,(float)getWidth());
     }
@@ -701,7 +701,7 @@ void CueGrid::mouseDoubleClick(const juce::MouseEvent& e) {
     if (e.x<nameWidth && rowTitleHit(e.x,localY))
         owner.renameTitle(false,row);
     else if (column>=0 && !owner.show.columns[(size_t)column].collapsed) {
-        const int localX=e.x-columnX(column),localY=(e.y-headerHeight)%rowHeight-rowContentInset;
+        const int localX=e.x-columnX(column);
         if (cellPlayBounds(0,columnWidthAt(column),0).contains(localX,localY) ||
             cellStopBounds(0,columnWidthAt(column),0).contains(localX,localY))
             return;
@@ -928,8 +928,11 @@ void CueMetricsOverlay::beginBpmEdit(int row) {
         else if (editingRowId==owner.show.rows[(size_t)row].id) {
             bpmEditor.grabKeyboardFocus();
             return;
-        } else finishBpmEdit(true);
+        } else finishBpmEdit(true,true);
     }
+    // A focus-lost callback may run while closing the previous edit.
+    // Never carry its editor text to the newly selected cue.
+    if (closingBpmEditor || editingRowId>0) return;
     editingRowId=owner.show.rows[(size_t)row].id;
     bpmEditor.setText(juce::String(owner.show.rows[(size_t)row].tempo.front().bpm,1),
                       juce::dontSendNotification);
@@ -953,18 +956,18 @@ void CueMetricsOverlay::syncBpmEditor() {
         bounds.getBottom()>getHeight()) {
         // Never leave an interactive editor underneath the pinned heading
         // or bind it to a different row after scrolling.
-        finishBpmEdit(true);
+        finishBpmEdit(true,true);
         return;
     }
     bpmEditor.setBounds(bounds);
 }
-void CueMetricsOverlay::finishBpmEdit(bool accept) {
+void CueMetricsOverlay::finishBpmEdit(bool accept,bool forceClose) {
     if (editingRowId<=0 || closingBpmEditor) return;
     closingBpmEditor=true;
     const int rowId=editingRowId;
     const auto entered=bpmEditor.getText();
     const bool valid=!accept || owner.commitRowBpm(rowId,entered);
-    if (valid || !bpmEditor.hasKeyboardFocus(true)) {
+    if (valid || forceClose || !bpmEditor.hasKeyboardFocus(true)) {
         editingRowId=0;
         bpmEditor.setVisible(false);
         repaint();
