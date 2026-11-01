@@ -21,19 +21,22 @@ struct MasterAudioLayout final {
 
     static MasterAudioLayout atHeight(int panelHeight) {
         const int height=std::max(180,panelHeight);
+        // At compact heights the lower action row moves up rather than
+        // escaping the card. The fader scales continuously with the panel.
+        const int actionTop=std::min(147,height-44);
         return {
             {8,5,laneWidth-16,height-10},
             {17,37,82,std::max(92,height-45)},
             {244,58,43,43},
-            {248,147,34,31},
+            {248,actionTop,34,31},
             {110,65,100,25},
-            {109,147,105,31},
+            {109,actionTop,105,31},
             {19,12,280,21},
             {112,45,97,17},
             {238,44,57,16},
             {242,106,52,17},
-            {241,126,59,17},
-            {110,126,105,17},
+            {241,actionTop-21,59,17},
+            {110,actionTop-21,105,17},
             {110,height-25,174,16},
             {19,36,laneWidth-38,1}
         };
