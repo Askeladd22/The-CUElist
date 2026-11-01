@@ -23,7 +23,7 @@ struct CueGridGeometry final {
     template<class Columns>
     static int widthAt(const Columns& columns,int index) noexcept {
         if (index<0 || index>=(int)columns.size()) return 0;
-        return columns[(size_t)index].collapsed ? compressedWidth : columnWidth;
+        return columns[(std::size_t)index].collapsed ? compressedWidth : columnWidth;
     }
     template<class Columns>
     static int xAt(const Columns& columns,int index) noexcept {
