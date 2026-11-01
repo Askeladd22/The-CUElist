@@ -25,6 +25,17 @@ link alle PR), distinguendo la cronologia di sviluppo dalle release
 pubbliche. La versione del progetto salvato `.cuelist` (**schema v10**)
 è indipendente dal numero del software.
 
+## UI V2 — Implementazione JUCE progressiva
+
+La **0.9.0-beta.10** inizia l'integrazione reale del redesign
+con una barra di navigazione superiore JUCE (File, Edit,
+Show, Cuelists, Devices, View, Guide) completamente collegata
+ai callback già esistenti e con overflow accessibile a
+finestre strette. La matrice, la sidebar operativa, il mixer
+e il Master Audio rimangono quelli originali in questa fase.
+Il Master è escluso definitivamente dal redesign.
+[Specifiche e gate N1](docs/UI_V2_NATIVE_PHASE_N1.md).
+
 ## UI V2 — Operator workspace design study
 
 **Vincolo Master Audio:** il Master della GUI JUCE originale NON viene ridisegnato. Fader/meter stereo, pan, mute, Main Out, limiter, gain reduction, Quick Learn, geometria e aspetto originali rimangono invariati. L'immagine del Master nella preview HTML è soltanto un riferimento statico, non un nuovo controllo o una specifica estetica.
