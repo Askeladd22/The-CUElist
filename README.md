@@ -27,6 +27,18 @@ pubbliche. La versione del progetto salvato `.cuelist` (**schema v10**)
 
 ## UI V2 — Operator workspace design study
 
+**V2.2 / `0.9.0-beta.8`:** il Master nel prototipo di
+[Operator Workspace](design/operator-workspace-v2.html)
+rappresenta tutte le funzioni che il programma ha già in
+JUCE (gain/meter stereo, pan, mute, Main Out, limiter,
+gain reduction, Quick Learn); i comandi di configurazione
+duplicati nella sidebar sono stati raccolti in un
+unico menu superiore. **Nessuna funzionalità nativa viene
+rimossa nel redesign**: vedi il
+[gate di parità funzionale](docs/UI_V2_FEATURE_PARITY.md).
+La preview è dimostrativa, non invia audio, MIDI o OSC.
+
+
 La `0.9.0-beta.7` avvia uno studio di redesign **solo visuale** della
 cue matrix, prendendo a riferimento un uso ricco (12 Cuelist, 13 cue,
 11 colonne). La [specifica UI V2](docs/UI_V2_OPERATOR_REDESIGN.md)
