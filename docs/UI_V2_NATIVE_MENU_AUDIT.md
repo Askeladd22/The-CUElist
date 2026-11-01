@@ -11,7 +11,7 @@
 | Rinomina show | **Show** | `projectNameLabel.showEditor` |
 | Pre-flight | **Show** e nessun altro menu | `showPreflight` |
 | Diagnostics | **Show** e nessun altro menu | `showDiagnostics` |
-| Crea / rinomina / sposta / elimina Cuelist | **Cuelists** e tabs reali | Metodi `createCuelist`, `renameActiveCuelist`, `moveCuelist`, `requestDeleteCuelist` |
+| Crea / rinomina / sposta / elimina Cuelist | **Cuelists** e tabs reali; spostamento/eliminazione appaiono solo quando validi | Metodi `createCuelist`, `renameActiveCuelist`, `moveCuelist`, `requestDeleteCuelist` |
 | Scelta dispositivo Audio | **Devices → Audio Devices** | `showDevices` |
 | Input MIDI principale / input aggiuntivi, selezione e disattivazione | **Devices → MIDI Inputs** | `selectControlInput`, `toggleAdditionalMidiInput` |
 | Abilitazione e disabilitazione uscite MIDI | **Devices → MIDI Outputs** | `engine.setMidiOutputEnabled` e `appPreferences` |
