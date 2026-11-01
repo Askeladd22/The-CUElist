@@ -41,7 +41,8 @@ struct MasterAudioLayout final {
             {241,actionTop-21,59,17},
             {110,actionTop-21,105,17},
             {110,height-25,174,16},
-            {19,36,laneWidth-38,1}
+            // Stop the header rule before the high PAN caption.
+            {19,36,198,1}
         };
     }
 };
