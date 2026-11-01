@@ -13,6 +13,24 @@ certifichino tutte le milestone riportate**; le etichette storiche
 indicano versioni di sviluppo presenti nei commit, non distribuzioni
 pubbliche. I particolari di ogni intervento sono nell'appendice.
 
+## [0.9.0-beta.22] - 2026-11-01
+
+**Tipo:** redesign nativo V2 — rifinitura Cuelist/Transport e Master Audio fisso, con correzione della regressione Windows beta.21.
+
+### Colonna Cuelist
+- L'intestazione fissa della Cue Grid conserva l'altezza da **72 px**, l'identità della Cuelist attiva e il conteggio di cue/clip ma elimina la scritta ridondante **CUE / TRANSPORT**. Il titolo è leggermente più leggibile, con separatori e accento teal più discreti.
+- Layout, hitbox di rinomina inline, riordino e trasporto GO/Play/Stop/More non modificati. Il Master rimane sotto, allineato alla stessa colonna da **318 px**.
+
+### Master Audio
+- Risolta la **regressione CTest Windows beta.21** (`Compact Master Mute is centred below Pan and not over its label`): il Pan torna sopra il Mute con almeno 55 px di separazione e gli indicatori numerici/etichette sono ora in righe non sovrapposte anche a 768 px di altezza.
+- La superficie fissa mantiene tutti i controlli nativi e realmente attivi: fader e meter L/R, Main Out, Pan, limiter, mute, Quick Learn, output routing e stato runtime. Eliminata la ridondante etichetta **L/R** in alto che interferiva con il titolo PAN.
+- `MasterAudioLayout::atHeight` continua ad alimentare sia paint sia bounds e test, compresi i 180/208 px del pannello. `scrollableStrips` inizia sempre a X=318; il Master non scorre né con il viewport X né con le cue Y.
+
+### Verifiche
+- Espanso il test regressione Pan/Mute di `UtilityPolishTests.h`: finestra 1280×768, 1440×820, 1440×900, 1920×1080; controllo puntuale di allineamento, padding, caption e card containment.
+- Restano i test Master Bus/routing/limiter e tutte le verifiche di beta.21, cue, BPM inline, Auto Stop/CONT., Inspector e formati 32:9.
+- Nessuna modifica alla logica Audio/MIDI/OSC/Control, routing, mapping, JSON v10 o build portable. Windows CI/CTest verde e revisione visiva su PC sono gate di integrazione.
+
 ## [0.9.0-beta.21] - 2026-11-01
 
 **Tipo:** redesign nativo V2 — Master Audio fisso nella colonna Cuelist e stabilizzazione CONT.
