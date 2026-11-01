@@ -92,4 +92,33 @@ void operatorNavigationTests() {
         check(more && more->isVisible() && more->getWidth()>=55,
               "Operator navigation lost narrow-width More menu");
     });
+    test("N3.4C global header retains 72px tiers and active Cuelist tab",[] {
+        MainComponent ui(false);
+        ui.setSize(1920,1080);
+        auto* tab=controlsV3::named(ui,"cuelistTab0");
+        auto* file=controlsV3::named(ui,"operatorMenuFile");
+        auto* newTab=controlsV3::named(ui,"newCuelist");
+        check(tab && file && newTab && tab->isVisible() &&
+              tab->getY()>=38 && tab->getBottom()<=72 &&
+              file->getBottom()<=38 && newTab->getBottom()<=72,
+              "Top navigation and second-tier Cuelist tabs overlap");
+        const auto image=tab->createComponentSnapshot(tab->getLocalBounds());
+        check(image.isValid(),"Native Cuelist tab snapshot unavailable");
+        const auto underline=image.getPixelAt(15,tab->getHeight()-2);
+        check(underline.getGreen()>underline.getRed(),
+              "Active Cuelist lost its visible teal underline");
+        for (const int width:{1280,1440,1647,1920,3840}) {
+            ui.setSize(width,900);
+            const auto nav=OperatorNavigationLayout::atWidth(width);
+            const auto telemetry=HeaderTelemetryLayout::atWidth(width);
+            check(telemetry.clock.getX()>200 &&
+                  telemetry.usage.getRight()<width-365 &&
+                  telemetry.clock.getRight()<telemetry.usage.getX() &&
+                  telemetry.clock.getY()==8 &&
+                  telemetry.usage.getY()==8 &&
+                  nav.bounds[0].getRight()<telemetry.clock.getX(),
+                  "Unified monitoring strip overlaps the native operator menu");
+        }
+    });
+
 }
