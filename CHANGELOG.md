@@ -13,6 +13,21 @@ certifichino tutte le milestone riportate**; le etichette storiche
 indicano versioni di sviluppo presenti nei commit, non distribuzioni
 pubbliche. I particolari di ogni intervento sono nell'appendice.
 
+## [0.9.0-beta.20] - 2026-11-01
+
+**Tipo:** Native V2 / N3.5 — stabilizzazione regressioni e rendering finale dell'header e della Cue Grid.
+
+### Correzioni
+- Risolta la **compilazione Windows fallita della beta.19**: gli ultimi test `AutoStopV7Tests.h` non fanno più riferimento a `CueMetricsOverlay::cellDetailsBounds` e `CueGrid::autoStopDetailsVisible`, eliminati nella beta.18. I test ora verificano l'area CELLS effettivamente inerte, il metodo esistente `setCellAutoStop`, il marker `CONT.` e la sincronizzazione Inspector.
+- L'editor BPM inline segue una cue mediante ID stabile e **si chiude necessariamente** quando quella cue esce dall'area visibile, anche se il valore è invalido: un valore valido viene salvato, uno invalido scartato, senza lasciare un campo attivo nascosto sotto la testata fissa.
+- Il passaggio tra due editor BPM di cue differenti termina prima l'editing precedente e non riutilizza il vecchio testo sulla cue successiva.
+- Corretti due warning MSVC in `CueViews.cpp` (conversione implicita Y del separatore e shadowing di `localY`) senza modifiche alle interazioni.
+
+### Verifiche
+- Estesi test nativi JUCE: hover/scroll dei BPM, riposizionamento nell'area visibile, chiusura con inserimento valido/invalido, identità della cue, persistenza/Inspector dell'Auto Stop senza CELLS.
+- **Master Audio intoccato**; invariati tutte le geometrie e gli handler della topbar beta.19, cue grid, mixer, motori, routing e progetto `.cuelist` JSON v10. Nessuna distribuzione portable.
+- La CI Windows/CTest e la revisione visiva sul PC restano gate per la PR.
+
 ## [0.9.0-beta.19] - 2026-11-01
 
 **Tipo:** redesign nativo delle due intestazioni — topbar globale e fascia fissa BPM/Auto Stop.

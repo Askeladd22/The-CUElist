@@ -435,10 +435,24 @@ void cueGridN3VisualTests() {
               CueGridGeometry::overlayRowTop(row,115)+31,
               "BPM inline editor is not centred on the scrolled row");
         editor.setText("156.5",juce::dontSendNotification);
-        view->setViewPosition(0,250);
+        view->setViewPosition(0,150);
+        check(metrics->isBpmEditing() &&
+              editor.getBounds().getCentreY()==
+              CueGridGeometry::overlayRowTop(row,150)+31,
+              "Visible BPM editor failed to track its row while scrolling");
+        view->setViewPosition(0,300);
         check(!metrics->isBpmEditing() &&
               std::abs(ui.show.rows[(size_t)row].tempo.front().bpm-156.5)<.001,
-              "Editing a scrolled row lost its value or remained under the heading");
+              "Offscreen BPM edit failed to commit or stayed under pinned heading");
+        // Invalid offscreen edits must close without corrupting the model.
+        view->setViewPosition(0,115);
+        cueViewFixtures::click(*metrics,24.f,(float)y);
+        check(editor.isVisible(),"Could not reopen inline BPM after scrolling");
+        editor.setText("999",juce::dontSendNotification);
+        view->setViewPosition(0,300);
+        check(!metrics->isBpmEditing() && !editor.isVisible() &&
+              std::abs(ui.show.rows[(size_t)row].tempo.front().bpm-156.5)<.001,
+              "Invalid BPM editor remained under header or mutated the cue");
         check(ui.show.rows[(size_t)row].id==rowId,
               "BPM edit retargeted a different cue during scrolling");
     });

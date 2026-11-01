@@ -110,21 +110,30 @@ void autoStopV7Tests() {
         check(control->getToggleState(),"New cell checkbox should default to ON");
         const int x=CueGrid::nameWidth + CueGrid::columnWidth*2 + CueGrid::columnWidth-22;
         const int y=CueGrid::headerHeight+CueGrid::rowContentInset+12;
-        // Badge toggles stay hidden until the row disclosure is expanded.
+        // N3.4B deliberately removed CELLS expansion and inline toggles:
+        // a click on the cell is selection only, not a hidden Auto Stop.
         click(*grid,(float)x,(float)y);
-        check(ui.show.rows[0].cells[2].stopOnNext,"Hidden Auto Stop badge was clickable");
+        check(ui.show.rows[0].cells[2].stopOnNext,
+              "Selecting a cell unexpectedly changed its Auto Stop");
         auto* fixed=find<CueMetricsOverlay>(ui);
         check(fixed!=nullptr,"Fixed Auto Stop strip missing");
-        // The old x=96 click was outside the new 108..176 CELLS
-        // disclosure. Use the shared painted/hit-tested bounds instead.
-        const auto disclosure=CueMetricsOverlay::cellDetailsBounds(CueGrid::headerHeight);
-        click(*fixed,(float)disclosure.getCentreX(),(float)disclosure.getCentreY());
-        check(grid->autoStopDetailsVisible(ui.show.rows[0].id),
-              "CELLS disclosure did not expand when clicked at its centre");
-        click(*grid,(float)x,(float)y);
-        check(!ui.show.rows[0].cells[2].stopOnNext,"OSC cell badge did not turn OFF");
-        check(ui.show.rows[0].cells[0].stopOnNext && ui.show.rows[0].cells[1].stopOnNext,
-              "OSC badge incorrectly changed other cells");
+        const auto before=encodeShow(ui.show);
+        // The former disclosure region is inert, including after scroll.
+        click(*fixed,121.f,(float)CueGrid::headerHeight+46.f);
+        check(encodeShow(ui.show)==before,
+              "A removed CELLS disclosure still mutated the show");
+        ui.setCellAutoStop(0,2,false);
+        check(!ui.show.rows[0].cells[2].stopOnNext,
+              "OSC cell Auto Stop exception was not applied");
+        check(ui.show.rows[0].cells[0].stopOnNext &&
+              ui.show.rows[0].cells[1].stopOnNext,
+              "OSC exception changed another cell");
+        const auto badge=CueGrid::cellContinueBadgeBounds(
+            grid->columnX(2),grid->columnWidthAt(2),
+            CueGridGeometry::rowTop(0)+CueGrid::rowContentInset);
+        const auto marker=grid->createComponentSnapshot(
+            {badge.getX()+1,badge.getY()+8,1,1});
+        check(marker.isValid(),"Excluded cell CONT. marker is missing");
         ui.select(0,2);
         check(!control->getToggleState(),"Inspector did not mirror selected cell");
         control->setToggleState(true,juce::dontSendNotification);
