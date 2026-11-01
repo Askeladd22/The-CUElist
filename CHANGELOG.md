@@ -13,6 +13,22 @@ certifichino tutte le milestone riportate**; le etichette storiche
 indicano versioni di sviluppo presenti nei commit, non distribuzioni
 pubbliche. I particolari di ogni intervento sono nell'appendice.
 
+## [0.9.0-beta.21] - 2026-11-01
+
+**Tipo:** redesign nativo V2 — Master Audio fisso nella colonna Cuelist e stabilizzazione CONT.
+
+### Master Audio
+- Il Master Audio resta **ancorato in basso a sinistra, dentro la fascia Cuelist da 318px**, fuori dal contenitore che scorre le strip audio/MIDI/OSC. La geometria di fader, output, pan, limiter, mute e caption è ora centralizzata in `src/MasterAudioLayout.h`.
+- Pulizia visiva in JUCE: superficie Midnight Slate uniforme, un accento teal sottile, header leggibile `MASTER AUDIO`, contrassegno `L/R`, divisori discreti e gruppi `MAIN OUT`, `PAN`, `LIMITER`, `MUTE`. Nessun control button fittizio.
+- I cinque controlli sono sempre nativi e realmente collegati ai modelli e ai callback esistenti. Meter L/R, Quick Learn, output routing, gain, limiter reduction, pan e mute non vengono sostituiti né semplificati.
+- La striscia Cuelist mantiene dimensione fissa in tutte le risoluzioni; la `scrollableStrips` inizia a X=318 e non può sovrapporsi alla superficie Master. Nessuna alterazione di `WorkspaceLayout`, dei viewport o della geometria globale.
+
+### Regressioni
+- Risolto il test JUCE `N3.4B CONT.` fallito durante CI beta.20: la comparazione di pixel ora rimuove l'hover dalla cella prima di verificare l'identità visiva del badge ripristinato. La modifica è del **test**, non della persistenza di Auto Stop.
+- Aggiunto test di Master Audio pinned per larghezze 1280, 1440, 1647, 1920 e 3840, inclusi scrollbar X/Y: controlli interni alla fascia da 318px, associazione alla utility nativa, strip separatamente scrollabili.
+- Nessuna modifica ai motori, alle funzioni GO/Stop, all'Inspector, al mapping/routing, al formato JSON v10 o alla build portable.
+- Merge solo con Windows CI/CTest verde e successivo controllo visuale Windows/DPI.
+
 ## [0.9.0-beta.20] - 2026-11-01
 
 **Tipo:** Native V2 / N3.5 — stabilizzazione regressioni e rendering finale dell'header e della Cue Grid.
