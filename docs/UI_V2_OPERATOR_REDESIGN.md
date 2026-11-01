@@ -1,5 +1,6 @@
 # The CUElist — Operator Workspace V2
-**Stato:** concept esplorativo, non ancora interfaccia di produzione.  
+**Stato:** concept V2.1 esplorativo, non ancora interfaccia di produzione.\
+**Feedback confermato:** parte superiore approvata; mixer da integrare nella stessa geometria delle colonne cue.  
 **Baseline:** `main` alla versione `0.9.0-beta.6`, screenshot operatore a 1647×895: 12 cue list, 13 cue, 11 colonne Audio/MIDI/OSC/Control, Inspector aperto.  
 **Prototipo testabile:** [`design/operator-workspace-v2.html`](../design/operator-workspace-v2.html).
 
@@ -48,20 +49,22 @@ La prima schermata vuota nascondeva il vero problema. Con 11 colonne, le cornici
 | Colonna espansa | 152 px | 109 px |
 | Banda BPM/Auto Stop fissa | 184 px | 128 px |
 | Inspector | 288 px | 272 px |
-| Mixer dock | variabile e nel layout | 178 px, richiudibile a 35 px |
+| Mixer integrato sotto le stesse colonne | variabile e nel layout | 150 px, richiudibile a 30 px; stesso scroll della matrice, nessuna card separata |
 | Timeline | ridimensionabile, minimo 75 px | 75 px, richiudibile a 29 px |
 
 Questi valori sono **ipotesi del prototipo**. La riduzione della riga non autorizza a ridurre i target cliccabili sotto dimensioni sicure, né a comprimere campi di clip complessi in produzione. Le colonne JUCE dovranno offrire almeno un'espansione contestuale, e differenziare dati persistenti da comandi.
 
 ## Piano di integrazione successivo
 
+**V2.1 · Fascia inferiore (questa PR):** dopo la verifica dello screenshot, la parte superiore rimane invariata; mixer direttamente allineato alle colonne, Master sotto cue header e BPM/Auto Stop ancora fisso. Si veda [specifica mixer integrato](UI_V2_INTEGRATED_MIXER_SPEC.md).\
+\
 **P0 · Confronto UX (questa PR).** Prototipo HTML offline autocontenuto, 12/13/11, interazioni visive reversibili per scelta cue/tab e collasso pannelli. Acquisire feedback a 1647×895, 1920×1080 e 1280×720. Nessuna modifica JUCE attiva.
 
 **P1 · Fondazioni native.** Creare `OperatorDesignTokens` e nuove funzioni pure di layout JUCE sotto flag di sviluppo esplicito. Testare cue selection, row/column hover/focus, pinned BPM/Auto Stop, scroll sincronizzato, dock e Inspector. Non migrare motori.
 
 **P2 · Matrice operativa.** Migrarvi prima la cue list con input invariati, header pinning, celle clip e controllo GO/STOP. Verificare 11 colonne, DnD tab/row, click destro e controlli MIDI/OSC con test automatici e screenshot Windows.
 
-**P3 · Contesto e strumenti.** Inspector, mixer e timeline in componenti ridimensionabili, quindi menu/toolbar e settings unificati. Test regressione legati a dispositivi; nessun cambiamento ai modelli o al routing.
+**P3 · Contesto e strumenti.** Inspector e timeline in componenti adattivi; mixer nativo come prosecuzione delle stesse colonne della cue matrix (senza secondo sistema di geometria/scroll), quindi menu/toolbar e settings unificati. Test regressione legati a dispositivi; nessun cambiamento ai modelli o al routing.
 
 **P4 · Accettazione.** CI Windows/CTest, prove DPI 100–200%, 16:9 e ultrawide, cue grid 12/13/11, operator keyboard, hardware check Audio/MIDI/OSC e controllo FPS/CPU. Non certificare uso live dalla sola CI.
 
