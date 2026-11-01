@@ -83,7 +83,7 @@ class OperatorWorkspacePrototypeTests(unittest.TestCase):
 
     def test_no_production_or_external_execution(self):
         src = self.source
-        self.assertIn("CONCEPT V2.2 — NON OPERATIVO", src)
+        self.assertIn("CONCEPT V2.3 — NON OPERATIVO", src)
         self.assertIn("GO disabilitato", src)
         self.assertIn("PANIC non operativo", src)
         for forbidden in (
@@ -114,8 +114,9 @@ class OperatorWorkspacePrototypeTests(unittest.TestCase):
         self.assertIn('panel.appendChild(master)', js)
         self.assertIn('for(let i=0;i<labels.length;i++)', js)
         self.assertIn('channel.dataset.columnIndex=String(i)', js)
-        self.assertIn('channel.appendChild(audioControls(false))', js)
-        self.assertIn('type==="control"?"Mapping · Medium"', js)
+        self.assertIn('channel.appendChild(audioControls())', js)
+        self.assertIn('type==="midi" || type==="osc"', js)
+        self.assertIn('Priorità · Medium', js)
         self.assertIn('position:sticky;left:0;z-index:4', source,
                       "Master must stay beneath the pinned cue-label column")
         self.assertIn('class="mixer-metrics"', source,
@@ -129,6 +130,48 @@ class OperatorWorkspacePrototypeTests(unittest.TestCase):
             "The empty workspace must visually continue the same channel lanes"
         )
         self.assertIn('top:calc(52px + 13 * var(--rowh))', source)
+
+    def test_v2_3_type_specific_strips_without_feature_loss(self):
+        js, source = self.parsed.script, self.source
+        # Audio has real type-appropriate controls (demo only), not generic
+        # MIDI/OSC faders or extra fake hardware operations.
+        for token in (
+            'function audioControls()', 'Direct out', 'POST', '0.0 dB',
+            'Pan · C', 'Invert phase', 'Master L/R send', 'Mute Audio',
+            '127.0.0.1:9000', 'MIDI OUT', 'Porta di uscita',
+            'Destinazione UDP', 'TX · In attesa', 'TX · Idle', 'Mute TX',
+            'CONTROL SET', 'Priorità · Medium', 'Edit set',
+        ):
+            self.assertIn(token, js)
+        self.assertIn('else if(type==="midi" || type==="osc")', js)
+        self.assertIn('const edit=btn("Edit set"', js)
+        self.assertIn('mute.setAttribute("aria-pressed","false")', js)
+        self.assertIn('type-status', source)
+        self.assertIn('.data-channel', source)
+        self.assertIn('.audio-action-row button:hover', source)
+        self.assertIn('button:focus-visible', source)
+        # Concrete native JUCE controls remain the authority on parity.
+        native = (ROOT / "src" / "ColumnUtilities.cpp").read_text(
+            encoding="utf-8"
+        )
+        for symbol in (
+            'columnDataOutputMute', 'columnOscDestination',
+            'controlColumnPriority', 'controlColumnEditSet',
+            'masterSend', 'gainLearnHotspot', 'panLearnHotspot',
+            'phaseLearnHotspot',
+        ):
+            self.assertIn(symbol, native,
+                          'Existing native functionality was lost: ' + symbol)
+
+    def test_sidebar_has_operator_context_not_temporary_guidance(self):
+        source = self.source
+        self.assertIn('class="sidebar-overview"', source)
+        for label in ('SESSIONE', 'Cue list', 'Cue nella lista', 'Colonne'):
+            self.assertIn(label, source)
+        self.assertNotIn('Settings, Devices e Control Mapping nei menu superiori',
+                         source)
+        self.assertIn('id="go"', source)
+        self.assertIn('id="panic"', source)
 
     def test_full_native_master_control_inventory_is_present_in_preview(self):
         src = self.parsed.script
@@ -190,7 +233,7 @@ class OperatorWorkspacePrototypeTests(unittest.TestCase):
         self.assertIn('classList.toggle("collapsed")', src)
         self.assertIn('--rowh",active?"31px":"37px"', src)
         self.assertIn('aria-pressed', src)
-        self.assertIn("CONCEPT V2.2 — NON OPERATIVO", self.source)
+        self.assertIn("CONCEPT V2.3 — NON OPERATIVO", self.source)
         self.assertNotIn("setInterval(", src)
 
 
