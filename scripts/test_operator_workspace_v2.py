@@ -145,6 +145,18 @@ class OperatorWorkspacePrototypeTests(unittest.TestCase):
         self.assertIn('Gain, Pan and Limiter', html)
         self.assertIn('Master Bus only', src)
         self.assertIn('LIMIT · -1 dBFS', src)
+        self.assertIn('GR 0.0 dB', src)
+        native_main = (ROOT / "src" / "MainComponent.cpp").read_text(encoding="utf-8")
+        native_strips = (ROOT / "src" / "ColumnUtilities.cpp").read_text(encoding="utf-8")
+        for native_name in (
+            "masterSlider", "masterPan", "masterMute", "masterOutput",
+            "safetyLimiter", "masterGainLearnHotspot",
+            "masterPanLearnHotspot", "masterLimiterLearnHotspot",
+        ):
+            self.assertIn(native_name, native_main,
+                          "Native feature inventory changed: " + native_name)
+        self.assertIn("setStereoPeaks", native_strips)
+        self.assertIn("setGainReduction", native_strips)
         self.assertIn('gain.min="-60"', src)
         self.assertNotIn('master.appendChild(audioControls(true))', src,
                          "Master cannot be reduced to a generic audio strip")
