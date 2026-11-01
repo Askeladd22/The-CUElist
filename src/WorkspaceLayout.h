@@ -1,5 +1,6 @@
 #pragma once
 #include <juce_gui_basics/juce_gui_basics.h>
+#include "CueGridGeometry.h"
 
 namespace cuelist {
 
@@ -11,10 +12,10 @@ struct WorkspaceLayoutInput {
     int activeDockHeight=0;
     int columnEndX=467;   // grid.columnX(number of columns)
     int rowCount=1;
-    int rowHeaderHeight=72;
-    int rowHeight=62;
-    int pinnedMetricsWidth=184;
-    int pinnedHeaderWidth=290;
+    int rowHeaderHeight=CueGridGeometry::headerHeight;
+    int rowHeight=CueGridGeometry::rowHeight;
+    int pinnedMetricsWidth=CueGridGeometry::pinnedMetricsWidth;
+    int pinnedHeaderWidth=CueGridGeometry::nameWidth;
     int timelineHeightAdjustment=0; // user drag, positive enlarges Timeline
     bool inspectorVisible=true; // collapsed Inspector leaves a 26px reopen rail
 };

@@ -41,6 +41,7 @@ void test(const char* name, const std::function<void()>& body) {
 #include "RowActionsUiTests.h"
 #include "ShowEditOperationsTests.h"
 #include "WorkspaceLayoutTests.h"
+#include "CueGridGeometryTests.h"
 #include "ControlMappingV10Tests.h"
 #include "ControlMapArchiveTests.h"
 #include "ControlRuntimeTests.h"
@@ -67,6 +68,7 @@ int main() {
     rowActionsUiTests();
     showEditOperationsTests();
     workspaceLayoutTests();
+    cueGridGeometryTests();
     controlMappingV10Tests();
     controlMapArchiveTests();
     controlRuntimeTests();

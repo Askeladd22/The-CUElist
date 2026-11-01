@@ -13,6 +13,27 @@ certifichino tutte le milestone riportate**; le etichette storiche
 indicano versioni di sviluppo presenti nei commit, non distribuzioni
 pubbliche. I particolari di ogni intervento sono nell'appendice.
 
+## [0.9.0-beta.13] - 2026-11-01
+
+**Tipo:** prima implementazione JUCE della fase N3 (N3.1 — fondazioni geometriche della Cue Grid), senza ancora cambiare la grafica.
+
+### Modifiche native
+- Nuovo contratto puro `src/CueGridGeometry.h` con le **dimensioni originali**, larghezze di colonne espanse/collassate, coordinate e hit test delle celle, conversioni per le righe e gli overlay fissi, scroll e banda BPM/Auto Stop.
+- `CueGrid` ora delega alla stessa fonte le posizioni e larghezze delle colonne e il relativo hit testing; anche `PinnedCueHeaders`, `PinnedColumnHeaders` e `CueMetricsOverlay` usano le conversioni comuni.
+- Default `WorkspaceLayoutInput` e margine di scorrimento derivati dalla medesima sorgente.
+- Nessuna diminuzione prematura della riga da 62 px o delle hitbox: la compattezza 36–40 px richiederà la fase N3.2/N3.3 con test dedicati.
+
+### Verifiche
+- `tests/CueGridGeometryTests.h`: 13 cue, 11 colonne, collasso misto, scroll X/Y, limiti dei click e geometria a 1280×720, 1647×895, 1920×1080 e 3840×1080.
+- Inventario dei componenti, responsabilità e limiti della fase:
+  [`docs/UI_V2_NATIVE_PHASE_N3_1.md`](docs/UI_V2_NATIVE_PHASE_N3_1.md).
+
+### Funzionalità preservate
+- Il mixer continua a sincronizzarsi con l'unico viewport esistente.
+- Banda BPM/Auto Stop, GO/Stop, riga/cella, editor, DnD, mapping, tema, Inspector e Timeline invariati.
+- **Master Audio rigorosamente intatto**: nessuna modifica al paint, dimensioni o callback.
+- Nessuna modifica al formato dei salvataggi `.cuelist` JSON v10, audio/MIDI/OSC o al motore. Nessuna build portable.
+
 ## [0.9.0-beta.12] - 2026-11-01
 
 **Tipo:** correzione dell'architettura dei menu JUCE N2.1; parità funzionale con le opzioni del vecchio Settings.
