@@ -1,5 +1,11 @@
 # The CUElist — V2.1: mixer integrato nella matrice
 
+> **V2.2:** il Master deve conservare gain/meter L/R, pan,
+> mute audio, Main Out, limiter con gain reduction e Quick Learn
+> gain/pan/limiter. Nessuna funzione dell'attuale mixer deve
+> sparire nel redesign. Vedi [parità funzionale](UI_V2_FEATURE_PARITY.md).
+
+
 **Decisione di progetto (1 novembre 2026):** approvata la direzione della parte superiore della UI V2, da non alterare in questa iterazione. Il mixer **non deve costituire un pannello autonomo**. Deve essere il prolungamento inferiore delle stesse colonne Audio/MIDI/OSC/Control della cue matrix, senza un secondo scroller orizzontale visibile e senza singole card.
 
 **Anteprima aggiornata:** [`design/operator-workspace-v2.html`](../design/operator-workspace-v2.html) sul branch di studio; i suoi controlli sono dimostrativi e non inviano comandi.
