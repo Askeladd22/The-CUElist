@@ -26,6 +26,11 @@ pubbliche. I particolari di ogni intervento sono nell'appendice.
 - La superficie fissa mantiene tutti i controlli nativi e realmente attivi: fader e meter L/R, Main Out, Pan, limiter, mute, Quick Learn, output routing e stato runtime. Eliminata la ridondante etichetta **L/R** in alto che interferiva con il titolo PAN.
 - `MasterAudioLayout::atHeight` continua ad alimentare sia paint sia bounds e test, compresi i 180/208 px del pannello. `scrollableStrips` inizia sempre a X=318; il Master non scorre né con il viewport X né con le cue Y.
 
+### Orologio dell'header globale
+- Ingrandito il clock nativo da **23 a 30 px**, mantenendo la sua posizione nella fascia di telemetria e il refresh dell'orario reale.
+- Le modalità 24 ore e 12 ore restano disponibili. In modalità 12 ore la sigla AM/PM viene renderizzata separatamente in piccolo, per non ridurre l'ora principale o sovrapporsi a CPU/RAM.
+- Test del layout e del rendering alle larghezze 1280, 1440, 1647, 1920 e 3840 px; nessuna modifica alle dimensioni generali dell'header (72 px).
+
 ### Verifiche
 - Espanso il test regressione Pan/Mute di `UtilityPolishTests.h`: finestra 1280×768, 1440×820, 1440×900, 1920×1080; controllo puntuale di allineamento, padding, caption e card containment.
 - Restano i test Master Bus/routing/limiter e tutte le verifiche di beta.21, cue, BPM inline, Auto Stop/CONT., Inspector e formati 32:9.
