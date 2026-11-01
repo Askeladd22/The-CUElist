@@ -10,7 +10,7 @@
 
 > **Aggiornamento V2.3 / 0.9.0-beta.9:** affinamento
 > delle strip Audio/MIDI/OSC/Control, leggibilità e
-> sidebar. Matrice approvata, Master completo,
+> sidebar. Matrice approvata, Master originale invariato,
 > scroll sincronizzato e BPM/Auto Stop fissi
 > rimangono inalterati. [Gate di parità](UI_V2_FEATURE_PARITY.md).
 >
@@ -80,7 +80,7 @@ Questi valori sono **ipotesi del prototipo**. La riduzione della riga non autori
 
 ## Piano di integrazione successivo
 
-**V2.1 · Fascia inferiore (questa PR):** dopo la verifica dello screenshot, la parte superiore rimane invariata; mixer direttamente allineato alle colonne, Master sotto cue header e BPM/Auto Stop ancora fisso. Si veda [specifica mixer integrato](UI_V2_INTEGRATED_MIXER_SPEC.md).
+**V2.1 · Fascia inferiore (studio storico):** dopo la verifica dello screenshot, la parte superiore rimane invariata; mixer direttamente allineato alle colonne, Master originale ancorato a sinistra senza redesign e BPM/Auto Stop ancora fisso. Si veda [specifica mixer integrato](UI_V2_INTEGRATED_MIXER_SPEC.md).
 
 **P0 · Confronto UX (questa PR).** Prototipo HTML offline autocontenuto, 12/13/11, interazioni visive reversibili per scelta cue/tab e collasso pannelli. Acquisire feedback a 1647×895, 1920×1080 e 1280×720. Nessuna modifica JUCE attiva.
 
