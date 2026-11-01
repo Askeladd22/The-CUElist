@@ -60,12 +60,17 @@ public:
         : juce::TextButton(name) {}
     void paintButton(juce::Graphics& g,bool over,bool down) override {
         const auto area=getLocalBounds().toFloat();
+        // Flush navigation, legible without seven separate raised cards.
         if (over || down) {
-            g.setColour(palette::raised.withAlpha(down ? .95f : .74f));
-            g.fillRoundedRectangle(area.reduced(1.0f,2.0f),4.0f);
+            g.setColour(palette::raised.withAlpha(down?.92f:.55f));
+            g.fillRoundedRectangle(area.reduced(1.f,2.f),4.f);
+            g.setColour(palette::teal.withAlpha(down?.94f:.69f));
+            g.fillRoundedRectangle(area.getX()+8.f,area.getBottom()-3.f,
+                                   area.getWidth()-16.f,2.f,1.f);
         }
-        g.setColour(isEnabled() ? palette::text : palette::muted);
-        g.setFont(font(13.0f));
+        g.setColour(isEnabled() ? (over||down ? palette::text :
+                    palette::muted.withAlpha(.95f)) : palette::muted.withAlpha(.45f));
+        g.setFont(font(14.5f,true));
         g.drawFittedText(getButtonText(),getLocalBounds(),
                          juce::Justification::centred,1);
     }
