@@ -6,6 +6,7 @@
 #include "GainMeterFader.h"
 #include "MixerControls.h"
 #include "WorkspaceLayout.h"
+#include "OperatorNavigation.h"
 #include "MidiInputManager.h"
 #include "OscControlInput.h"
 #include "ControlOutputRouter.h"
@@ -430,6 +431,11 @@ private:
     ColumnUtilities utilities{*this};
     juce::TextButton openButton{"Open"},saveButton{"Save"},newButton{"New"},addRowButton{"+"},addColumnButton{"+"};
     juce::TextButton preferencesButton{"Preferences"},helpButton{"Help"};
+    // V2 operator navigation. Existing command handlers are reused; the
+    // original mixer and Master Audio are deliberately outside this phase.
+    std::array<std::unique_ptr<OperatorNavigationButton>,8> operatorMenus;
+    void showOperatorMenu(int index);
+    void dispatchOperatorMenu(int index,int command);
     juce::Label projectNameLabel;
     enum class InlineRenameKind {none,cuelist,cue,column};
     InlineRenameKind inlineRenameKind=InlineRenameKind::none;
