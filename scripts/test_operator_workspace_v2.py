@@ -136,10 +136,13 @@ class OperatorWorkspacePrototypeTests(unittest.TestCase):
         # These map one-to-one to JUCE's actual MainComponent/ColumnUtilities.
         for control in (
             'masterGain', 'masterPan', 'masterMute', 'masterOutput',
-            'masterLimiter', 'masterLearnToggle', 'masterLearnGain',
-            'masterLearnPan', 'masterLearnLimiter',
+            'masterLimiter', 'masterLearnToggle',
         ):
             self.assertIn(control, src, "Missing native feature: " + control)
+        # JS creates the three learn IDs at runtime from a grounded list;
+        # do not require the assembled names to appear as static strings.
+        self.assertIn('for(const name of ["Gain","Pan","Limiter"])', src)
+        self.assertIn('target.id="masterLearn"+name', src)
         self.assertIn('master-peak left', src)
         self.assertIn('master-peak right', src)
         self.assertIn('Gain, Pan and Limiter', html)
