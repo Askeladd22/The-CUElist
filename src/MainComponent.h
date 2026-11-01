@@ -202,14 +202,26 @@ public:
     explicit CueMetricsOverlay(MainComponent& parent):owner(parent) {}
     void paint(juce::Graphics&) override;
     void mouseDown(const juce::MouseEvent&) override;
+    void mouseMove(const juce::MouseEvent&) override;
+    void mouseExit(const juce::MouseEvent&) override;
     void mouseWheelMove(const juce::MouseEvent&,const juce::MouseWheelDetails&) override;
     static constexpr int width=CueGridGeometry::pinnedMetricsWidth;
-    // Single geometry source for both drawing and hit-testing the cell
-    // Auto Stop disclosure within the fixed BPM/AUTO STOP strip.
+    // N3.4: the same rectangles own drawing, hover and click hit-testing.
+    // Keep the original 91px BPM editing target and the 78x26 Auto Stop
+    // target; no Master Audio/inspector/layout dimensions change.
+    static juce::Rectangle<int> bpmEditBounds(int rowTop) {
+        return {0,rowTop,91,CueGridGeometry::rowHeight};
+    }
+    static juce::Rectangle<int> autoStopToggleBounds(int rowTop) {
+        return {102,rowTop+8,78,26};
+    }
     static juce::Rectangle<int> cellDetailsBounds(int rowTop) {
         return {108,rowTop+36,68,20};
     }
 private:
+    enum class HoverTarget { none, bpm, autoStop, cellDetails };
+    int hoverRow=-1;
+    HoverTarget hoverTarget=HoverTarget::none;
     MainComponent& owner;
 };
 class Timeline final : public juce::Component, private juce::ScrollBar::Listener {
