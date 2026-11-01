@@ -316,7 +316,7 @@ void CueGrid::paint(juce::Graphics& g) {
                 // marker preserves visibility of the Auto Stop exception.
                 if (!cell.stopOnNext) {
                     g.setColour(palette::amber);
-                    g.fillRoundedRectangle((float)x+w-8,(float)y+5,3.f,16.f,1.5f);
+                    g.fillRoundedRectangle((float)x+w-8,(float)y+29,3.f,15.f,1.5f);
                 }
                 continue;
             }
@@ -584,7 +584,7 @@ void CueGrid::mouseMove(const juce::MouseEvent& e) {
         const int x=columnX(column),w=columnWidthAt(column);
         const int y=CueGridGeometry::rowTop(row)+rowContentInset;
         const bool overMarker=collapsed ?
-            juce::Rectangle<int>(x+w-12,y+1,12,22).contains(e.getPosition()) :
+            juce::Rectangle<int>(x+w-12,y+26,12,21).contains(e.getPosition()) :
             cellContinueBadgeBounds(x,w,y).contains(e.getPosition());
         if (overMarker)
             tooltip="Esclusa dall'Auto Stop: continua dopo il prossimo GO quando l'Auto Stop della cue è attivo. Tasto destro per includerla.";
