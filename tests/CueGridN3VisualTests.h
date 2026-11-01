@@ -362,7 +362,7 @@ void cueGridN3VisualTests() {
         check(grid && grid->columnWidthAt(0)==48,
               "Collapsed cue lane contract changed");
         const int x=grid->columnX(0)+grid->columnWidthAt(0)-7;
-        const int y=CueGridGeometry::rowTop(0)+CueGrid::rowContentInset+11;
+        const int y=CueGridGeometry::rowTop(0)+CueGrid::rowContentInset+36;
         const auto sample=[&] {
             const auto image=grid->createComponentSnapshot({x,y,1,1});
             check(image.isValid(),"Collapsed exception snapshot invalid");
