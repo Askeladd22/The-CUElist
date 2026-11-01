@@ -69,6 +69,7 @@ class OperatorWorkspacePrototypeTests(unittest.TestCase):
         ids = self.parsed.ids
         self.assertTrue({
             "tabs", "matrixScroll", "matrix", "metricScroll", "metricRows",
+            "mixerScroll", "strips",
             "inspector", "openInspector", "closeInspector", "dock",
             "dock-toggle", "timeline", "timeline-toggle", "density",
             "go", "panic", "statusText", "current-title", "cueName",
@@ -82,7 +83,7 @@ class OperatorWorkspacePrototypeTests(unittest.TestCase):
 
     def test_no_production_or_external_execution(self):
         src = self.source
-        self.assertIn("CONCEPT UI — NON OPERATIVO", src)
+        self.assertIn("CONCEPT V2.1 — NON OPERATIVO", src)
         self.assertIn("GO disabilitato", src)
         self.assertIn("PANIC non operativo", src)
         for forbidden in (
@@ -93,12 +94,43 @@ class OperatorWorkspacePrototypeTests(unittest.TestCase):
             self.assertNotIn(forbidden, src,
                              "Prototype must be self-contained and inert: " + forbidden)
 
-    def test_separation_of_mixer_inspector_and_timeline(self):
+    def test_mixer_is_one_continuous_column_grid(self):
+        source = self.source
+        js = self.parsed.script
+        self.assertIn(
+            ".mixer-grid{display:grid;grid-template-columns:"
+            "var(--cue) repeat(11,var(--cell))", source
+        )
+        self.assertIn(
+            ".matrix-row{display:grid;grid-template-columns:"
+            "var(--cue) repeat(11,var(--cell))", source
+        )
+        self.assertIn(
+            'id="mixerScroll"><div class="mixer-grid" id="strips"',
+            source,
+        )
+        self.assertIn("scrollLeft=grid.scrollLeft", js,
+                      "Mixer must follow the exact column scroll offset")
+        self.assertIn('panel.appendChild(master)', js)
+        self.assertIn('for(let i=0;i<labels.length;i++)', js)
+        self.assertIn('channel.dataset.columnIndex=String(i)', js)
+        self.assertIn('channel.appendChild(audioControls(false))', js)
+        self.assertIn('type==="control"?"Mapping · Medium"', js)
+        self.assertIn('position:sticky;left:0;z-index:4', source,
+                      "Master must stay beneath the pinned cue-label column")
+        self.assertIn('class="mixer-metrics"', source,
+                      "The fixed BPM/Auto Stop band continues beside mixer")
+        self.assertNotIn('class="dock-content"', source)
+        self.assertNotIn('class="strip"', source)
+        self.assertNotIn('dock-top', source)
+
+    def test_top_workspace_and_reversible_panel_controls(self):
         src = self.parsed.script
         self.assertIn('classList.add("hide")', src)
         self.assertIn('classList.toggle("collapsed")', src)
         self.assertIn('--rowh",active?"31px":"37px"', src)
         self.assertIn('aria-pressed', src)
+        self.assertIn("CONCEPT V2.1 — NON OPERATIVO", self.source)
         self.assertNotIn("setInterval(", src)
 
 
