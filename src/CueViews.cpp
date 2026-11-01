@@ -410,13 +410,13 @@ void CueGrid::paint(juce::Graphics& g) {
                 label(g,cell.stopOnNext?"AS":"OFF",{x+w-41,y+4,34,16},10,
                       active?palette::teal:palette::amber,true,juce::Justification::centred);
             }
-            if (column.type!=ColumnType::control) {
-                // Visual transport buttons are smaller, but their original
-                // 24x23 hit targets and 8px separation are unchanged.
+            if (column.type!=ColumnType::control && loaded) {
+                // Transport remains identical for usable clips. Disabled
+                // buttons are not painted over empty or missing-media slots.
                 transportButton(g,cellButtonVisualBounds(cellPlayBounds(x,w,y)),
-                                false,loaded,15.0f);
+                                false,true,15.0f);
                 transportButton(g,cellButtonVisualBounds(cellStopBounds(x,w,y)),
-                                true,loaded,15.0f);
+                                true,true,15.0f);
             }
         }
         g.restoreState();
@@ -627,13 +627,15 @@ void CueGrid::mouseDown(const juce::MouseEvent& e) {
             owner.setCellAutoStop(row,column,!owner.show.rows[(size_t)row].cells[(size_t)column].stopOnNext);
         return;
     }
-    if (col.type!=ColumnType::control) {
+    if (col.type!=ColumnType::control && owner.hasClip(row,column)) {
+        // Invisible disabled transport targets must not block selection of
+        // an empty cell. Loaded clips retain their exact safe hitboxes.
         if (cellPlayBounds(0,w,0).contains(localX,localY)) {
-            if (e.getNumberOfClicks()==1 && owner.hasClip(row,column)) owner.triggerCellAt(row,column);
+            if (e.getNumberOfClicks()==1) owner.triggerCellAt(row,column);
             return;
         }
         if (cellStopBounds(0,w,0).contains(localX,localY)) {
-            if (e.getNumberOfClicks()==1 && owner.hasClip(row,column)) owner.stopCellAt(row,column);
+            if (e.getNumberOfClicks()==1) owner.stopCellAt(row,column);
             return;
         }
     }
