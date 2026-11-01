@@ -20,7 +20,7 @@ pubbliche. I particolari di ogni intervento sono nell'appendice.
 ### Interfaccia JUCE
 - Le righe cue formano una matrice continua con separatori molto sottili, lieve alternanza Midnight Slate e selezione estesa all'intera larghezza, anche oltre l'ultima colonna.
 - Selezione, NEXT e playback reale hanno indicatori indipendenti anche quando coesistono; i testi operativi PLAYING, PAUSED, NEXT CUE, MUTED e STANDBY restano presenti. Non sono introdotti stati READY/ERROR/STOPPED artificiosi nel runtime.
-- Celle vuote senza riempimenti e bordi ripetuti; hover discreto senza alcun effetto sullo show o sul trasporto. Focus/selezione della cella delineati separatamente.
+- Celle vuote senza riempimenti, bordi o trasporti disabilitati ripetuti; hover discreto senza effetti sullo show. Le aree dei vecchi pulsanti disabilitati non bloccano la selezione della cella; focus/selezione restano separati dall'attivazione.
 - Clip e mappe caricate mantengono accenti per tipo, nome, durata, progress bar, play/stop, loop e Auto Stop per cella. Indicazione puntuale di attività soltanto da `getCellPlayback`; attese/pausa e media missing restano segnalate con testo.
 - Le colonne collassate distinguono il contenuto reale da una cella vuota; gli indicatori Auto Stop per cella sono portati a 10pt.
 
