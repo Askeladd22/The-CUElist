@@ -62,6 +62,7 @@ MainComponent::MainComponent(bool startAudio) {
         cueHeaders.repaint();
         columnHeaders.repaint();
         cueMetrics.repaint();
+        cueMetrics.syncBpmEditor();
         utilities.syncScroll(viewport.getViewPositionX());
         positionInlineNameEditor();
     };
@@ -1255,6 +1256,7 @@ void MainComponent::resized() {
     collapseAllButton.setBounds(cueHeaders.getX()+CueGrid::nameWidth-84,
                                 cueHeaders.getY()+9,77,24);
     cueMetrics.setBounds(geometry.metrics);
+    cueMetrics.syncBpmEditor();
     cueMetrics.toFront(false);
     collapseAllButton.toFront(false);
     cuelistMoveLeft.toFront(false);
