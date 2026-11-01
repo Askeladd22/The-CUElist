@@ -298,7 +298,9 @@ void cueGridN3VisualTests() {
         const int beforeNext=ui.nextCueIndex();
         const int y=CueGridGeometry::rowTop(0);
         const auto sample=[&] {
-            const auto image=metrics->createComponentSnapshot({103,y+9,1,1});
+            // Probe the toggle hover surface, away from rounded corners
+            // and the painted switch itself (which must remain unchanged).
+            const auto image=metrics->createComponentSnapshot({104,y+20,1,1});
             check(image.isValid(),"Metrics hover paint failed");
             return image.getPixelAt(0,0);
         };
