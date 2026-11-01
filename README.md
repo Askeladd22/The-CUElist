@@ -27,6 +27,17 @@ pubbliche. La versione del progetto salvato `.cuelist` (**schema v10**)
 
 ## UI V2 — Implementazione JUCE progressiva
 
+**0.9.0-beta.12 — Audit menu N2.1:** tutti i comandi di
+configurazione del precedente Settings sono di nuovo
+direttamente raggiungibili dai menu JUCE appropriati
+(Devices e View). Nessuna doppia voce Pre-flight/Diagnostics,
+nessun duplicato MIDI/OSC Learn; conservate impostazioni
+di porte MIDI/OSC, intervallo fader e orologio.
+Vedi [inventario di parità funzionale](docs/UI_V2_NATIVE_MENU_AUDIT.md).
+Il Master Audio originale resta escluso dal redesign.
+
+## UI V2 — Implementazione JUCE progressiva
+
 La **0.9.0-beta.11 (fase N2)** elimina dalla sidebar
 i comandi duplicati New/Open/Save, Settings/Preferences
 e Control Mapping, già disponibili tramite i menu JUCE
