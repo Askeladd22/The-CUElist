@@ -1,4 +1,16 @@
-# The CUElist — Redesign V2.2: parità funzionale obbligatoria
+# The CUElist — Redesign V2.3: parità funzionale obbligatoria
+
+> **Rifinitura beta.9:** i canali MIDI/OSC/Control nella
+> preview sono rappresentati con dati pertinenti
+> (porta, host/porta, mute TX, priorità, Edit set)
+> senza inventare fader audio. Audio rappresenta
+> meter/fader, routing, PRE/POST, pan, mute,
+> polarità, send Master L/R. Il codice JUCE reale
+> rimane l'autorità per ogni callback e dispositivo.
+> Tutte le funzioni già presenti devono restare
+> raggiungibili dopo il futuro redesign nativo.
+>
+
 
 **Decisione:** il redesign cambia soltanto look, densità, disposizione e navigazione. **Nessuna funzione può essere eliminata, nascosta senza un percorso equivalente o trasformata in una simulazione nella GUI JUCE finale.** La prova HTML rimane non operativa e non modifica l'applicazione.
 
