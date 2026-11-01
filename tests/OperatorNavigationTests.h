@@ -130,9 +130,9 @@ void operatorNavigationTests() {
             check(t.clock.contains(t.timeText) &&
                   t.clock.contains(t.meridiemText) &&
                   t.timeText.getWidth()>=116 &&
-                  t.timeText.getHeight()>=40 &&
+                  t.timeText.getHeight()>=38 &&
                   t.clock.getRight()<t.usage.getX() &&
-                  t.meridiemText.getY()>=t.timeText.getY() &&
+                  t.meridiemText.getY()>=t.timeText.getBottom() &&
                   t.timeText.getBottom()<=t.clock.getBottom() &&
                   t.meridiemText.getBottom()<=t.clock.getBottom(),
                   "Larger clock text or 12h AM/PM lost the fixed header bounds");
