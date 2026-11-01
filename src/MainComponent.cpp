@@ -550,7 +550,10 @@ void MainComponent::paint(juce::Graphics& g) {
         g.setColour(i==1 ? palette::teal : palette::text);
         g.fillRoundedRectangle(17.0f,12.0f+i*7,23.0f-i*4,3,1.5f);
     }
-    label(g,"The CUElist",{53,7,142,32},19,palette::text,true);
+    // Product wordmark: neutral "The" plus the restrained teal CUElist
+    // accent from the approved reference (no font or icon replacement).
+    label(g,"The",{53,7,38,32},19,palette::text,true);
+    label(g,"CUElist",{91,7,105,32},19,palette::teal,true);
     // Keep the left half free for cue-list tabs. Telemetry panels are
     // fixed to the right and never cover the source/utility workspace.
     g.setColour(palette::teal); g.fillRect(190,70,122,2);
