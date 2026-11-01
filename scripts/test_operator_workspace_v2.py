@@ -226,6 +226,10 @@ class OperatorWorkspacePrototypeTests(unittest.TestCase):
         self.assertNotIn('>⊞ &nbsp; Control Mapping</button>', html)
         self.assertIn('aria-expanded', html)
         self.assertIn('menuPopover.hidden=false', js)
+        self.assertNotIn('.menu{display:none}', html,
+                         'Top menus cannot disappear at 1280px')
+        self.assertIn('@media(max-width:1280px)', html)
+        self.assertIn('.menu{display:flex;gap:0}', html)
 
     def test_top_workspace_and_reversible_panel_controls(self):
         src = self.parsed.script
