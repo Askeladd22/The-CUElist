@@ -472,7 +472,8 @@ void CueGrid::mouseDown(const juce::MouseEvent& e) {
     if (!e.mods.isLeftButtonDown()) return;
     owner.grabKeyboardFocus();
     if (e.x<0 || e.y<0) return;
-    const int addCueY=headerHeight+(int)owner.show.rows.size()*rowHeight+7;
+    const int addCueY=CueGridGeometry::rowTop(
+        (int)owner.show.rows.size())+7;
     if (e.y>=addCueY && e.y<addCueY+29 &&
         e.x>=nameWidth/2-18 && e.x<nameWidth/2+18) {
         owner.addCue();
@@ -608,16 +609,15 @@ void PinnedCueHeaders::mouseDown(const juce::MouseEvent& e) {
     // A row scrolled behind the fixed header must never receive input.
     if (e.y<CueGrid::headerHeight) return;
     const int y=e.y+owner.viewport.getViewPositionY();
-    const int row=y>=CueGrid::headerHeight ?
-        (y-CueGrid::headerHeight)/CueGrid::rowHeight : -1;
+    const int row=CueGridGeometry::rowAt(y);
     if (e.mods.isPopupMenu()) {
         if (row>=0 && row<(int)owner.show.rows.size())
             owner.grid.showRowMenu(row,e.getScreenPosition());
         return;
     }
     if (!e.mods.isLeftButtonDown()) return;
-    const int addCueY=CueGrid::headerHeight+
-        (int)owner.show.rows.size()*CueGrid::rowHeight+7;
+    const int addCueY=CueGridGeometry::rowTop(
+        (int)owner.show.rows.size())+7;
     if (y>=addCueY && y<addCueY+29 &&
         e.x>=CueGrid::nameWidth/2-18 && e.x<CueGrid::nameWidth/2+18) {
         owner.addCue(); return;
@@ -636,8 +636,7 @@ void PinnedCueHeaders::mouseDrag(const juce::MouseEvent& e) {
         e.getDistanceFromDragStart()<6) return;
     draggingCue=true;
     const int y=e.y+owner.viewport.getViewPositionY();
-    const int target=y>=CueGrid::headerHeight ?
-        (y-CueGrid::headerHeight)/CueGrid::rowHeight : -1;
+    const int target=CueGridGeometry::rowAt(y);
     dropCueRow=juce::jlimit(0,(int)owner.show.rows.size()-1,target);
     repaint();
 }
@@ -660,8 +659,7 @@ void PinnedCueHeaders::mouseDoubleClick(const juce::MouseEvent& e) {
         return;
     }
     const int y=e.y+owner.viewport.getViewPositionY();
-    const int row=y>=CueGrid::headerHeight ?
-        (y-CueGrid::headerHeight)/CueGrid::rowHeight : -1;
+    const int row=CueGridGeometry::rowAt(y);
     if (row>=0 && row<(int)owner.show.rows.size() &&
         e.x>=107 && e.x<CueGrid::rowPlayBounds(0).getX()-4)
         owner.renameTitle(false,row);
