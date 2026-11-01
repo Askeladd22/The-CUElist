@@ -589,7 +589,8 @@ void MainComponent::paint(juce::Graphics& g) {
     const bool clock12=appPreferences &&
         appPreferences->getBoolValue("clock12Hour",false);
     label(g,now.formatted(clock12?"%I:%M:%S":"%H:%M:%S"),
-          telemetry.timeText,30,palette::text,true,
+          clock12 ? telemetry.timeText : telemetry.clock.reduced(4,9),
+          30,palette::text,true,
           juce::Justification::centred);
     if (clock12)
         label(g,now.formatted("%p"),telemetry.meridiemText,11,
