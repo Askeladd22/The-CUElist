@@ -13,6 +13,23 @@ certifichino tutte le milestone riportate**; le etichette storiche
 indicano versioni di sviluppo presenti nei commit, non distribuzioni
 pubbliche. I particolari di ogni intervento sono nell'appendice.
 
+## [0.9.0-beta.17] - 2026-11-01
+
+**Tipo:** redesign nativo V2 / N3.4 — BPM e Auto Stop fissi, allineati alle righe N3.3.
+
+### Interfaccia JUCE
+- La fascia fissa da **184 px** segue la stessa alternanza Midnight Slate, selezione a tutta larghezza, evidenziazione NEXT e playback reale delle cue; i separatori orizzontali sono sincronizzati con i 62 px delle righe native.
+- Header fisso da **72 px** coerente con N3.2, titolo contestuale `CUE METRICS`, etichette BPM/Auto Stop, divider leggero e binario teal continuo da 3 px.
+- BPM sempre modificabile tramite l'editor corrente; sotto il valore appare una piccola indicazione `NEXT`, `LIVE`, `PAUSED` o `EDIT BPM` derivata dallo stato effettivo.
+- I tre controlli restano indipendenti: area BPM 91×62, switch Auto Stop 78×26 e disclosure CELLS 68×20. I rettangoli sono ora **condivisi fra painting, hover e mouseDown**, senza introdurre dati persistiti né pulsanti simulati.
+- Hover discreto e indicazione del cursore soltanto su zone attive, senza selezionare la cue o cambiare il trasporto; intestazione e binario sono ridisegnati dopo le righe scrollabili.
+
+### Regressioni e salvaguardie
+- Test nativi JUCE di geometrie, corrispondenza cromatica della riga selezionata fra griglia e fascia fissa, azioni Auto Stop/CELLS con scroll X/Y e hover che non muta lo show.
+- Preservati editor BPM, toggle Auto Stop di riga e cella, scroll singolo JUCE, 13 cue/11 colonne e viste 1280×720, 1647×895, 1920×1080 e 3840×1080.
+- **Master Audio e tutti i suoi controlli invariati.** Nessun cambiamento a `ColumnUtilities.cpp`, Inspector, Timeline, mixer, editor, motori, routing/mapping, dati `.cuelist` v10 o pacchetti portable.
+- N3.5 sarà la verifica integrata visuale/operativa e la stabilizzazione su Windows/DPI; merge subordinato a CI Windows/CTest e revisione.
+
 ## [0.9.0-beta.16] - 2026-11-01
 
 **Tipo:** redesign nativo V2 / N3.3 — righe, celle e stati della Cue Grid, senza riscrivere la logica operativa.

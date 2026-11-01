@@ -217,4 +217,103 @@ void cueGridN3VisualTests() {
               "Hidden disabled Stop region prevented empty cell selection");
     });
 
+    test("N3.4 BPM, Auto Stop and CELLS share non-overlapping hit targets",[] {
+        using namespace cuelist;
+        const auto bpm=CueMetricsOverlay::bpmEditBounds(0);
+        const auto toggle=CueMetricsOverlay::autoStopToggleBounds(0);
+        const auto disclosure=CueMetricsOverlay::cellDetailsBounds(0);
+        check(CueMetricsOverlay::width==184 && bpm==juce::Rectangle<int>(0,0,91,62) &&
+              toggle==juce::Rectangle<int>(102,8,78,26) &&
+              disclosure==juce::Rectangle<int>(108,36,68,20) &&
+              !bpm.intersects(toggle) && !bpm.intersects(disclosure) &&
+              !toggle.intersects(disclosure) &&
+              toggle.getRight()<=CueMetricsOverlay::width &&
+              disclosure.getBottom()<=CueGrid::rowHeight,
+              "N3.4 fixed metrics hitboxes overlap or shrink from N3.1");
+    });
+
+    test("N3.4 selected metric row matches the continuous CueGrid surface",[] {
+        using namespace cuelist;
+        MainComponent ui(false);
+        addRow(ui.show,"Second");
+        addColumn(ui.show,ColumnType::midi,"MIDI");
+        ui.setSize(1920,1080);
+        auto* metrics=cueViewFixtures::find<CueMetricsOverlay>(ui);
+        auto* grid=cueViewFixtures::find<CueGrid>(ui);
+        check(metrics && grid,"Metrics overlay or native grid missing");
+        ui.select(1,0);
+        const int rowY=CueGridGeometry::rowTop(1)+57;
+        const int gridX=grid->columnX((int)ui.show.columns.size())+12;
+        const auto cellImage=grid->createComponentSnapshot({gridX,rowY,1,1});
+        const auto metricImage=metrics->createComponentSnapshot({84,rowY,1,1});
+        check(cellImage.isValid() && metricImage.isValid() &&
+              cellImage.getPixelAt(0,0)==metricImage.getPixelAt(0,0),
+              "N3.4 fixed row fill differs from the N3.3 selected/NEXT surface");
+    });
+
+    test("N3.4 fixed toggle and CELLS target the correct vertically scrolled row",[] {
+        using namespace cuelist;
+        MainComponent ui(false);
+        for (int r=1;r<13;++r) addRow(ui.show,"Scrolled cue");
+        for (int c=1;c<11;++c)
+            addColumn(ui.show,c%2==0?ColumnType::midi:ColumnType::osc,"Data");
+        ui.setSize(1280,820);
+        auto* metrics=cueViewFixtures::find<CueMetricsOverlay>(ui);
+        auto* grid=cueViewFixtures::find<CueGrid>(ui);
+        juce::Viewport* view=nullptr;
+        for (auto* child:ui.getChildren())
+            if (auto* candidate=dynamic_cast<juce::Viewport*>(child)) {
+                view=candidate;break;
+            }
+        check(metrics && grid && view,"N3.4 scroll fixture incomplete");
+        const int fixedX=metrics->getX();
+        view->setViewPosition(200,115);
+        check(metrics->getX()==fixedX &&
+              view->getViewPositionY()==115,
+              "Fixed metrics moved when columns or rows scrolled");
+        const int rowIndex=4;
+        const int y=CueGridGeometry::overlayRowTop(rowIndex,115);
+        const auto rowId=ui.show.rows[(size_t)rowIndex].id;
+        const bool before=ui.show.rows[(size_t)rowIndex].stopOnNext;
+        const bool neighbor=ui.show.rows[(size_t)rowIndex+1].stopOnNext;
+        cueViewFixtures::click(*metrics,118.0f,(float)y+17.0f);
+        check(ui.show.rows[(size_t)rowIndex].stopOnNext!=before &&
+              ui.show.rows[(size_t)rowIndex+1].stopOnNext==neighbor,
+              "Auto Stop changed the wrong row after Y scroll");
+        const bool wasExpanded=grid->autoStopDetailsVisible(rowId);
+        cueViewFixtures::click(*metrics,121.0f,(float)y+46.0f);
+        check(grid->autoStopDetailsVisible(rowId)!=wasExpanded &&
+              ui.show.rows[(size_t)rowIndex].stopOnNext!=before,
+              "CELLS disclosure failed or accidentally toggled row Auto Stop");
+    });
+
+    test("N3.4 metric hover is visual only and restores when pointer exits",[] {
+        using namespace cuelist;
+        MainComponent ui(false);
+        ui.setSize(1440,900);
+        auto* metrics=cueViewFixtures::find<CueMetricsOverlay>(ui);
+        check(metrics!=nullptr,"Fixed metrics overlay missing");
+        const auto beforeShow=encodeShow(ui.show);
+        const int beforeSelection=ui.selectedRow;
+        const int beforeNext=ui.nextCueIndex();
+        const int y=CueGridGeometry::rowTop(0);
+        const auto sample=[&] {
+            // Probe the toggle hover surface, away from rounded corners
+            // and the painted switch itself (which must remain unchanged).
+            const auto image=metrics->createComponentSnapshot({104,y+20,1,1});
+            check(image.isValid(),"Metrics hover paint failed");
+            return image.getPixelAt(0,0);
+        };
+        const auto idle=sample();
+        const juce::Point<float> cursor{118.f,(float)y+16.f};
+        metrics->mouseMove(cueViewFixtures::event(*metrics,cursor,cursor));
+        check(sample()!=idle,"Auto Stop hover is not visible");
+        metrics->mouseExit(cueViewFixtures::event(*metrics,cursor,cursor));
+        check(sample()==idle,"Metrics hover survived after mouse exit");
+        check(encodeShow(ui.show)==beforeShow &&
+              ui.selectedRow==beforeSelection &&
+              ui.nextCueIndex()==beforeNext,
+              "Hover altered the cue document or playback selection");
+    });
+
 }
