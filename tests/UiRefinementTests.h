@@ -5,6 +5,7 @@
 #include "OperatorTextPrompt.h"
 #include "OscEditor.h"
 #include "HeaderTelemetry.h"
+#include "MasterAudioLayout.h"
 void uiRefinementTests() {
     using namespace cueViewFixtures;
     test("Cuelist renames directly on header/tab with Enter, Escape and validation",[] {
