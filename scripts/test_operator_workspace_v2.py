@@ -173,39 +173,49 @@ class OperatorWorkspacePrototypeTests(unittest.TestCase):
         self.assertIn('id="go"', source)
         self.assertIn('id="panic"', source)
 
-    def test_full_native_master_control_inventory_is_present_in_preview(self):
-        src = self.parsed.script
-        html = self.source
-        # These map one-to-one to JUCE's actual MainComponent/ColumnUtilities.
-        for control in (
-            'masterGain', 'masterPan', 'masterMute', 'masterOutput',
-            'masterLimiter', 'masterLearnToggle',
-        ):
-            self.assertIn(control, src, "Missing native feature: " + control)
-        # JS creates the three learn IDs at runtime from a grounded list;
-        # do not require the assembled names to appear as static strings.
-        self.assertIn('for(const name of ["Gain","Pan","Limiter"])', src)
-        self.assertIn('target.id="masterLearn"+name', src)
-        self.assertIn('master-peak left', src)
-        self.assertIn('master-peak right', src)
-        self.assertIn('Gain, Pan and Limiter', html)
-        self.assertIn('Master Bus only', src)
-        self.assertIn('LIMIT · -1 dBFS', src)
-        self.assertIn('GR 0.0 dB', src)
-        native_main = (ROOT / "src" / "MainComponent.cpp").read_text(encoding="utf-8")
-        native_strips = (ROOT / "src" / "ColumnUtilities.cpp").read_text(encoding="utf-8")
+    def test_native_master_excluded_from_redesign_and_preserved(self):
+        src, html = self.parsed.script, self.source
+        # Do not build an alternative interactive Master: keep the native
+        # ColumnUtilities component untouched and show only a static guide.
+        self.assertIn('master.dataset.preserveNativeMaster="true"', src)
+        self.assertIn('master-original-layout', src)
+        self.assertIn('MASTER AUDIO', src)
+        self.assertIn('MAIN OUT', src)
+        self.assertIn('Limit', src)
+        self.assertIn('PAN', src)
+        self.assertIn('MUTE', src)
+        self.assertIn('0.0 dB', src)
+        self.assertIn('master.appendChild(nativeCard);panel.appendChild(master)', src)
+        self.assertNotIn('gain.id="masterGain"', src)
+        self.assertNotIn('pan.id="masterPan"', src)
+        self.assertNotIn('limiter.id="masterLimiter"', src)
+        self.assertNotIn('const learn=node("div","master-learn")', src)
+        self.assertIn('static illustration has NO independent handlers', html)
+        self.assertIn('Native ColumnUtilities::paint/resized', html)
+        self.assertIn('mixer-master', html)
+
+        # The real production controls must exist and remain the authority:
+        native_main = (ROOT / "src" / "MainComponent.cpp").read_text(
+            encoding="utf-8"
+        )
+        native_strips = (ROOT / "src" / "ColumnUtilities.cpp").read_text(
+            encoding="utf-8"
+        )
         for native_name in (
             "masterSlider", "masterPan", "masterMute", "masterOutput",
             "safetyLimiter", "masterGainLearnHotspot",
             "masterPanLearnHotspot", "masterLimiterLearnHotspot",
         ):
             self.assertIn(native_name, native_main,
-                          "Native feature inventory changed: " + native_name)
-        self.assertIn("setStereoPeaks", native_strips)
-        self.assertIn("setGainReduction", native_strips)
-        self.assertIn('gain.min="-60"', src)
-        self.assertNotIn('master.appendChild(audioControls(true))', src,
-                         "Master cannot be reduced to a generic audio strip")
+                          "A native Master feature must not be removed: " + native_name)
+        for native_paint in (
+            "void ColumnUtilities::paint", "void ColumnUtilities::resized",
+            "owner.masterSlider.setBounds", "owner.masterPan.setBounds",
+            "owner.masterMute.setBounds", "owner.masterOutput.setBounds",
+            "owner.safetyLimiter.setBounds", "setStereoPeaks",
+            "setGainReduction"
+        ):
+            self.assertIn(native_paint, native_strips)
 
     def test_no_duplicate_sidebar_routes_and_no_lost_navigation(self):
         html, js = self.source, self.parsed.script
