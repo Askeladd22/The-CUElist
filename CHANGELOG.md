@@ -13,6 +13,43 @@ certifichino tutte le milestone riportate**; le etichette storiche
 indicano versioni di sviluppo presenti nei commit, non distribuzioni
 pubbliche. I particolari di ogni intervento sono nell'appendice.
 
+## [0.9.0-beta.8] - 2026-11-01
+
+**Tipo:** concept UI V2.2 e gate di parità funzionale — soltanto design, documentazione e test, nessuna modifica ai sorgenti JUCE.
+
+### Corretto
+- Rimossa la doppia navigazione dalla sidebar della preview: lo show
+  attivo, NEXT, GO e PANIC restano visibili a sinistra; File,
+  Edit, Show, Cuelists, Devices, View e Guide espongono le voci
+  organizzate in menu superiori dimostrativi, inclusi Settings,
+  Preferences, Project info e Control Mapping.
+- Sostituito il Master generico a due controlli con la rappresentazione
+  delle funzioni verificate nel codice nativo: gain e peak L/R,
+  pan, mute audio, selezione Main Out, limiter di sicurezza
+  -1 dBFS, gain reduction e tre target Quick Learn
+  (gain, pan, limiter).
+- Master mantenuto sotto la cue label nella fascia mixer integrata;
+  la parte superiore della cue matrix resta invariata.
+
+### Parità funzionale obbligatoria
+- `docs/UI_V2_FEATURE_PARITY.md`: inventario Master proveniente da
+  `MainComponent.cpp` e `ColumnUtilities.cpp`, vincoli per Audio,
+  MIDI, OSC, Control, inspector, timeline, trasporto, mapping,
+  tab, salvataggi e dispositivi. Il redesign nativo richiederà
+  una corrispondenza verificabile per ogni funzione preesistente.
+- Estesi i test della preview per rilevare omissioni nel Master
+  o accessi duplicati e per confrontarli con il codice JUCE reale.
+
+### Limiti
+- Nessuna modifica a `src/`, eventi, audio/MIDI/OSC/Control,
+  routing, mapping, motori, cue, progetto `.cuelist`
+  (schema v10) o GUI attualmente utilizzata.
+- I controlli HTML rimangono **preview non operativa**.
+  Il limiter, i meter e le opzioni di routing reali saranno
+  ancora quelli dei componenti JUCE nativi; la preview
+  serve solo a definire la futura posizione dei controlli.
+- QA visuale Windows e implementazione JUCE native successive.
+
 ## [0.9.0-beta.7] - 2026-11-01
 
 **Tipo:** fase P0 del redesign strutturale UI V2 — studio e prototipo autonomo, senza cambiamenti alla GUI operativa.

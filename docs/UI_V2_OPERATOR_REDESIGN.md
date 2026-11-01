@@ -1,4 +1,12 @@
 # The CUElist — Operator Workspace V2
+
+> **Aggiornamento V2.2 / 0.9.0-beta.8:** Master integrale secondo
+> il codice JUCE esistente e navigazione senza duplicazioni.
+> Ogni funzione deve restare disponibile: vedere
+> [inventario e gate di parità funzionale](UI_V2_FEATURE_PARITY.md).
+> La cue matrix superiore già approvata non viene ridisegnata.
+>
+
 **Stato:** concept V2.1 esplorativo, non ancora interfaccia di produzione.  
 **Feedback confermato:** parte superiore approvata; mixer integrato nella stessa geometria delle colonne cue.  
 **Baseline:** `main` alla versione `0.9.0-beta.6`, screenshot operatore a 1647×895: 12 cue list, 13 cue, 11 colonne Audio/MIDI/OSC/Control, Inspector aperto.  

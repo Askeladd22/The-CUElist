@@ -83,7 +83,7 @@ class OperatorWorkspacePrototypeTests(unittest.TestCase):
 
     def test_no_production_or_external_execution(self):
         src = self.source
-        self.assertIn("CONCEPT V2.1 — NON OPERATIVO", src)
+        self.assertIn("CONCEPT V2.2 — NON OPERATIVO", src)
         self.assertIn("GO disabilitato", src)
         self.assertIn("PANIC non operativo", src)
         for forbidden in (
@@ -130,13 +130,67 @@ class OperatorWorkspacePrototypeTests(unittest.TestCase):
         )
         self.assertIn('top:calc(52px + 13 * var(--rowh))', source)
 
+    def test_full_native_master_control_inventory_is_present_in_preview(self):
+        src = self.parsed.script
+        html = self.source
+        # These map one-to-one to JUCE's actual MainComponent/ColumnUtilities.
+        for control in (
+            'masterGain', 'masterPan', 'masterMute', 'masterOutput',
+            'masterLimiter', 'masterLearnToggle',
+        ):
+            self.assertIn(control, src, "Missing native feature: " + control)
+        # JS creates the three learn IDs at runtime from a grounded list;
+        # do not require the assembled names to appear as static strings.
+        self.assertIn('for(const name of ["Gain","Pan","Limiter"])', src)
+        self.assertIn('target.id="masterLearn"+name', src)
+        self.assertIn('master-peak left', src)
+        self.assertIn('master-peak right', src)
+        self.assertIn('Gain, Pan and Limiter', html)
+        self.assertIn('Master Bus only', src)
+        self.assertIn('LIMIT · -1 dBFS', src)
+        self.assertIn('GR 0.0 dB', src)
+        native_main = (ROOT / "src" / "MainComponent.cpp").read_text(encoding="utf-8")
+        native_strips = (ROOT / "src" / "ColumnUtilities.cpp").read_text(encoding="utf-8")
+        for native_name in (
+            "masterSlider", "masterPan", "masterMute", "masterOutput",
+            "safetyLimiter", "masterGainLearnHotspot",
+            "masterPanLearnHotspot", "masterLimiterLearnHotspot",
+        ):
+            self.assertIn(native_name, native_main,
+                          "Native feature inventory changed: " + native_name)
+        self.assertIn("setStereoPeaks", native_strips)
+        self.assertIn("setGainReduction", native_strips)
+        self.assertIn('gain.min="-60"', src)
+        self.assertNotIn('master.appendChild(audioControls(true))', src,
+                         "Master cannot be reduced to a generic audio strip")
+
+    def test_no_duplicate_sidebar_routes_and_no_lost_navigation(self):
+        html, js = self.source, self.parsed.script
+        self.assertIn('id="menuPopover" role="menu"', html)
+        for category in (
+            "File", "Edit", "Show", "Cuelists", "Devices", "View", "Guide",
+        ):
+            self.assertIn('data-menu="' + category + '"', html)
+        for command in (
+            "Settings", "Preferences", "Project info", "Control Mapping",
+            "Audio devices", "MIDI routing", "OSC routing", "New cuelist",
+            "Rename cuelist", "Monitor messages", "User guide", "About",
+        ):
+            self.assertIn('"' + command + '"', js)
+        self.assertNotIn('Show</div><button>Settings</button>', html)
+        self.assertNotIn('>▤ &nbsp; Cuelists</button>', html)
+        self.assertNotIn('>◧ &nbsp; Devices</button>', html)
+        self.assertNotIn('>⊞ &nbsp; Control Mapping</button>', html)
+        self.assertIn('aria-expanded', html)
+        self.assertIn('menuPopover.hidden=false', js)
+
     def test_top_workspace_and_reversible_panel_controls(self):
         src = self.parsed.script
         self.assertIn('classList.add("hide")', src)
         self.assertIn('classList.toggle("collapsed")', src)
         self.assertIn('--rowh",active?"31px":"37px"', src)
         self.assertIn('aria-pressed', src)
-        self.assertIn("CONCEPT V2.1 — NON OPERATIVO", self.source)
+        self.assertIn("CONCEPT V2.2 — NON OPERATIVO", self.source)
         self.assertNotIn("setInterval(", src)
 
 
