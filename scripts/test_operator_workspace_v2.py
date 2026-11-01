@@ -123,6 +123,12 @@ class OperatorWorkspacePrototypeTests(unittest.TestCase):
         self.assertNotIn('class="dock-content"', source)
         self.assertNotIn('class="strip"', source)
         self.assertNotIn('dock-top', source)
+        self.assertIn(
+            ".matrix::after{left:var(--cue);right:0;"
+            "background:repeating-linear-gradient", source,
+            "The empty workspace must visually continue the same channel lanes"
+        )
+        self.assertIn('top:calc(52px + 13 * var(--rowh))', source)
 
     def test_top_workspace_and_reversible_panel_controls(self):
         src = self.parsed.script
