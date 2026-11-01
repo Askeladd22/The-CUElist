@@ -2,6 +2,7 @@
 #include "OperatorTextPrompt.h"
 #include "ShowEditOperations.h"
 #include <algorithm>
+#include <cmath>
 #include <sstream>
 #include <set>
 
