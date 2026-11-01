@@ -27,6 +27,16 @@ pubbliche. La versione del progetto salvato `.cuelist` (**schema v10**)
 
 ## UI V2 — Implementazione JUCE progressiva
 
+**0.9.0-beta.14 — N3.2 Cue Grid:** disegno JUCE
+nativo delle [intestazioni e della colonna Cue/Transport](docs/UI_V2_NATIVE_PHASE_N3_2.md)
+con regole per tipo, gerarchia del testo, pulsanti
+secondari discreti, tooltip con nomi completi.
+Sono conservati tutti gli hit target di GO/Stop,
+rinomina, spostamento, editor e collasso. Il Master
+Audio originale non viene ridisegnato.
+
+## UI V2 — Implementazione JUCE progressiva
+
 **0.9.0-beta.13 — N3.1 Cue Grid:** iniziata l'integrazione
 nativa della matrice con [geometrie condivise JUCE](docs/UI_V2_NATIVE_PHASE_N3_1.md)
 per righe, colonne (anche collassate), overlay BPM/Auto Stop,
