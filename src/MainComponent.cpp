@@ -569,81 +569,80 @@ void MainComponent::paint(juce::Graphics& g) {
     // accent from the approved reference (no font or icon replacement).
     label(g,"The",{53,7,38,32},19,palette::text,true);
     label(g,"CUElist",{91,7,105,32},19,palette::teal,true);
-    // One coherent monitoring surface instead of three heavy cards. The
-    // clock, CPU/RAM, I/O and audio values still use their tested positions.
+    // A single enlarged monitoring console, responsive in X only.
+    // All positions (including real Learn buttons) originate from one
+    // geometry contract; the 72px global header remains unchanged.
     const auto telemetry=HeaderTelemetryLayout::atWidth(w);
     const auto monitorStrip=juce::Rectangle<float>(
-        (float)telemetry.clock.getX(),7.f,
-        (float)(w-telemetry.clock.getX()-10),58.f);
-    g.setColour(palette::panel.withAlpha(.93f));
-    g.fillRoundedRectangle(monitorStrip,5.f);
-    g.setColour(palette::line.withAlpha(.45f));
-    g.drawRoundedRectangle(monitorStrip,5.f,.8f);
-    g.setColour(palette::line.withAlpha(.55f));
-    g.drawVerticalLine(telemetry.usage.getX()-7,13.f,58.f);
-    g.drawVerticalLine(w-375,13.f,58.f);
-    // A large operator clock that remains readable without enlarging the
-    // global 72px header or overlapping CPU, RAM, MIDI/OSC and Audio.
-    // In 12h mode show AM/PM separately instead of shrinking all digits.
+        (float)telemetry.clock.getX(),5.f,
+        (float)(w-telemetry.clock.getX()-10),61.f);
+    g.setColour(palette::panel.withAlpha(.94f));
+    g.fillRoundedRectangle(monitorStrip,6.f);
+    g.setColour(palette::line.withAlpha(.49f));
+    g.drawRoundedRectangle(monitorStrip,6.f,.8f);
+    g.setColour(palette::line.withAlpha(.50f));
+    for (const int x:{telemetry.usage.getX(),telemetry.activity.getX(),
+                     telemetry.audio.getX()})
+        g.drawVerticalLine(x-5,13.f,59.f);
+
+    // Original 12h/24h system-clock preference and one-second refresh.
     const auto clockTime=juce::Time::getCurrentTime();
     const bool clock12=appPreferences &&
         appPreferences->getBoolValue("clock12Hour",false);
+    const float timeSize=(float)(telemetry.clock.getWidth()>=160?35:
+                                 telemetry.clock.getWidth()>=150?33:30);
     label(g,clockTime.formatted(clock12?"%I:%M:%S":"%H:%M:%S"),
           clock12 ? telemetry.timeText : telemetry.clock.reduced(4,9),
-          30,palette::text,true,
-          juce::Justification::centred);
+          timeSize,palette::text,true,juce::Justification::centred);
     if (clock12)
-        label(g,clockTime.formatted("%p"),telemetry.meridiemText,11,
+        label(g,clockTime.formatted("%p"),telemetry.meridiemText,12,
               palette::teal,true,juce::Justification::centredRight);
-    // Two balanced CPU/RAM rows, with one decimal only for CPU.
-    label(g,"CPU",telemetry.cpuLabel,11,palette::text,true);
+
+    // Real measured CPU/RAM values and meters are unchanged; only their
+    // typography and available horizontal room have increased.
+    label(g,"CPU",telemetry.cpuLabel,14,palette::text,true);
     label(g,HeaderTelemetryLayout::percentage(systemCpuPercent,true),
-          telemetry.cpuValue,11,palette::text,true,
+          telemetry.cpuValue,14,palette::text,true,
           juce::Justification::centredRight);
-    label(g,"RAM",telemetry.ramLabel,11,palette::text,true);
+    label(g,"RAM",telemetry.ramLabel,14,palette::text,true);
     label(g,HeaderTelemetryLayout::percentage(systemRamPercent,false),
-          telemetry.ramValue,11,palette::text,true,
+          telemetry.ramValue,14,palette::text,true,
           juce::Justification::centredRight);
     const auto meter=[&](juce::Rectangle<float> bounds,float percentage,
                          juce::Colour colour) {
         g.setColour(palette::line);
-        g.fillRoundedRectangle(bounds,2.5f);
+        g.fillRoundedRectangle(bounds,3.f);
         if (std::isfinite(percentage) && percentage>=0) {
             g.setColour(colour);
             g.fillRoundedRectangle(bounds.withWidth(
                 bounds.getWidth()*juce::jlimit(0.0f,1.0f,
-                                              percentage/100.0f)),2.5f);
+                                              percentage/100.0f)),3.f);
         }
     };
     meter(telemetry.cpuMeter,systemCpuPercent,palette::teal);
     meter(telemetry.ramMeter,systemRamPercent,palette::amber);
 
-    // A compact but prominent shared signal monitor: 2x2 traffic
-    // indicators and independent audio availability, all inside one card.
-    // The values are real counters (OSC RX stays inactive: no listener).
-    const int statusX=w-365;
-    g.setColour(palette::line.withAlpha(.55f));
-    g.drawVerticalLine(w-153,13.f,58.f);
-    label(g,"I/O ACTIVITY",{statusX+10,11,82,14},
-          10,palette::muted,true);
+    label(g,"I/O ACTIVITY",telemetry.activityHeading,12,palette::muted,true);
     const double now=juce::Time::getMillisecondCounterHiRes();
-    const auto activity=[&](int x,int y,const juce::String& title,bool active) {
-        g.setColour(active ? palette::teal : palette::line.brighter(.22f));
-        g.fillEllipse((float)x,(float)y+4.0f,8.0f,8.0f);
-        label(g,title,{x+14,y,83,17},11,
-              active ? palette::text : palette::muted,true);
-    };
-    activity(statusX+12,30,"MIDI RX",now<midiRxUntil);
-    activity(statusX+112,30,"MIDI TX",now<midiTxUntil);
-    activity(statusX+12,47,"OSC RX",now<oscRxUntil);
-    activity(statusX+112,47,"OSC TX",now<oscTxUntil);
+    const std::array<juce::String,4> activityNames{{
+        "MIDI RX","MIDI TX","OSC RX","OSC TX"}};
+    const std::array<bool,4> activityStates{{
+        now<midiRxUntil,now<midiTxUntil,now<oscRxUntil,now<oscTxUntil}};
+    for (int i=0;i<4;++i) {
+        g.setColour(activityStates[(size_t)i] ?
+                    palette::teal : palette::line.brighter(.22f));
+        g.fillEllipse(telemetry.activityDots[(size_t)i].toFloat());
+        label(g,activityNames[(size_t)i],
+              telemetry.activityLabels[(size_t)i],12,
+              activityStates[(size_t)i] ? palette::text : palette::muted,true);
+    }
+    // Independent Audio engine availability, no inferred state.
     const bool audioConnected=engine.connected.load();
-    label(g,"AUDIO",{w-137,13,119,16},10,palette::muted,true);
-    g.setColour(audioConnected ? palette::teal : palette::red);
-    g.fillEllipse((float)w-139,37.0f,9.0f,9.0f);
-    label(g,audioConnected ? "AVAILABLE" : "UNAVAILABLE",
-          {w-125,30,108,24},11,
-          audioConnected ? palette::teal : palette::red,true);
+    label(g,"AUDIO",telemetry.audioHeading,12,palette::muted,true);
+    g.setColour(audioConnected?palette::teal:palette::red);
+    g.fillEllipse((float)telemetry.audioStatus.getX()-17.f,39.f,11.f,11.f);
+    label(g,audioConnected?"AVAILABLE":"UNAVAILABLE",
+          telemetry.audioStatus,14,audioConnected?palette::teal:palette::red,true);
     // N2: one editable Show identity instead of two redundant Show/Project
     // cards. File, Settings and Control Mapping are in genuine JUCE menus.
     label(g,"WORKSPACE",{20,91,140,17},11,palette::muted,true);
@@ -837,7 +836,10 @@ void MainComponent::refreshCuelistTabs() {
     const int count=(int)show.cuelists.size();
     // Stop tabs before the fixed clock/CPU panels. This gives nine real tabs
     // at 1647px, three at 1180px, and overflows only when space runs out.
-    const int available=std::max(150,getWidth()-650-8-left);
+    // Tab overflow follows the same monitor boundary as the top menus.
+    // Enlarging the telemetry must never overlay a Cuelist tab.
+    const int available=std::max(150,
+        HeaderTelemetryLayout::atWidth(getWidth()).clock.getX()-left-16);
     const int plusWidth=count<12 ? 32 : 0;
     const bool overflow=count*slot+plusWidth>available;
     const int overflowWidth=overflow ? 42 : 0;
@@ -1140,10 +1142,9 @@ void MainComponent::resized() {
     helpButton.setVisible(false);
     undoButton.setVisible(false);
     redoButton.setVisible(false);
-    const int activityX=getWidth()-365;
-    // Leave separation from the I/O ACTIVITY caption and the audio card.
-    globalMidiLearn.setBounds(activityX+95,10,58,20);
-    globalOscLearn.setBounds(activityX+154,10,58,20);
+    const auto telemetryLayout=HeaderTelemetryLayout::atWidth(getWidth());
+    globalMidiLearn.setBounds(telemetryLayout.midiLearn);
+    globalOscLearn.setBounds(telemetryLayout.oscLearn);
     // Collapse-all follows the pinned header after JUCE has computed the
     // actual left scrollbar inset (see placement below).
     const bool allCollapsed=std::all_of(show.columns.begin(),show.columns.end(),
