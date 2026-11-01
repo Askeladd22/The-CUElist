@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>The CUElist — Operator Workspace V2.1 · Integrated Mixer Concept</title>
+<style>
+/* Standalone design prototype: no JUCE runtime, network, assets or actual audio transport. */
+:root{color-scheme:dark;--bg:#071521;--top:#0e2030;--surface:#102638;--raised:#183346;--line:#294559;--muted:#9eb5c4;--text:#e7f1f5;--teal:#39c4b4;--amber:#d6ac5a;--purple:#ad89dc;--blue:#79acd5;--danger:#d56b7b;--sidebar:160px;--inspector:272px;--cue:280px;--cell:109px;--metric:128px;--rowh:37px;--small:12px;font:13px/1.3 "Segoe UI",sans-serif}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);height:100vh;overflow:hidden}button,input{font:inherit}button{cursor:pointer;color:inherit;background:transparent;border:0}button:focus-visible,input:focus-visible{outline:2px solid var(--teal);outline-offset:1px}button[aria-pressed="true"]{background:#174947;color:#c8fff5}.app{display:grid;grid-template-rows:52px minmax(0,1fr);height:100vh;min-height:640px}header{display:flex;align-items:center;gap:18px;background:var(--top);padding:0 15px;border-bottom:1px solid var(--line);white-space:nowrap}.brand{display:flex;align-items:center;gap:11px;font-size:19px;font-weight:750;min-width:170px}.brand-mark{width:29px;height:29px;border:1px solid var(--teal);border-radius:7px;display:grid;place-items:center;color:var(--teal);font-weight:800;letter-spacing:1px}.brand b{color:var(--teal)}.menu{display:flex;gap:4px}.menu button,.tool button,.tabs button,.panel-toggle,.sidebar button,.iconbtn{border-radius:5px;padding:8px 10px}.menu button:hover,.sidebar button:hover,.tool button:hover,.tabs button:hover,.iconbtn:hover{background:var(--raised)}.top-status{margin-left:auto;display:flex;align-items:center;gap:13px;color:var(--muted);font-size:var(--small)}.clock{font-size:17px;color:var(--text);font-variant-numeric:tabular-nums}.status{color:var(--teal);border:1px solid #2d5b56;background:#103534;padding:5px 8px;border-radius:5px}.workspace{display:grid;grid-template-columns:var(--sidebar) minmax(0,1fr) var(--inspector);min-height:0}.workspace.hide-inspector{grid-template-columns:var(--sidebar) minmax(0,1fr) 28px}.sidebar{background:#0d2233;border-right:1px solid var(--line);padding:13px 10px;display:flex;flex-direction:column;gap:10px;min-width:0}.eyebrow{font-size:11px;color:var(--muted);font-weight:700;letter-spacing:.06em;text-transform:uppercase}.sidebar button{text-align:left;display:block;width:100%;font-size:12px}.sidebar .selected{background:#164745;border-left:3px solid var(--teal);font-weight:700}.sidebar nav{border-bottom:1px solid var(--line);padding-bottom:15px;display:grid;gap:3px}.sidebar .control{margin-top:auto;display:grid;gap:9px}.on-deck{background:var(--raised);padding:9px;border-radius:6px;font-size:12px}.on-deck strong{display:block;font-size:15px;margin-top:3px}.sidebar .go,.sidebar .panic{padding:12px 7px;text-align:center;font-weight:750;font-size:14px;border-radius:6px}.sidebar .go{background:#0c716a}.sidebar .panic{background:#713746}.center{display:flex;flex-direction:column;min-width:0;min-height:0}.tabs{display:flex;align-items:center;gap:2px;overflow-x:auto;scrollbar-width:thin;min-height:41px;background:#0b1e2d;border-bottom:1px solid var(--line);padding:4px 8px}.tabs button{white-space:nowrap;padding:8px 11px;font-size:12px;flex-shrink:0;color:var(--muted)}.tabs button.active{color:var(--text);background:#1b3547;box-shadow:inset 0 -2px var(--teal)}.tabs button span{margin-left:6px;opacity:.65}.tool{display:flex;align-items:center;gap:9px;min-height:51px;padding:6px 12px;background:var(--surface);border-bottom:1px solid var(--line)}.tool h1{font-size:16px;margin:0;font-weight:700}.meta{font-size:12px;color:var(--muted)}.tool .end{margin-left:auto;display:flex;align-items:center;gap:5px}.tool button,.panel-toggle{background:#183447;border:1px solid #315064;font-size:12px;padding:7px 10px}.tool button[aria-pressed="true"],.panel-toggle[aria-pressed="true"]{background:#1b4947;border-color:var(--teal)}.cue-area{display:grid;grid-template-columns:minmax(0,1fr) var(--metric);flex:1;min-height:0;background:var(--bg)}.scroller{overflow:auto;min-width:0;scrollbar-color:#416175 transparent}.matrix{width:calc(var(--cue) + 11 * var(--cell));min-width:100%;min-height:100%;position:relative}
+/* Continue the same faint vertical channel guides through empty rows:
+   without these the aligned mixer would still look detached below a void. */
+.matrix::before,.matrix::after{content:"";position:absolute;top:calc(52px + 13 * var(--rowh));bottom:0;pointer-events:none}
+.matrix::before{left:0;width:var(--cue);background:#102638}
+.matrix::after{left:var(--cue);right:0;background:repeating-linear-gradient(to right,transparent 0 calc(var(--cell) - 1px),#183245 calc(var(--cell) - 1px) var(--cell))}.matrix-row{display:grid;grid-template-columns:var(--cue) repeat(11,var(--cell));height:var(--rowh);border-bottom:1px solid #1f3444;position:relative}.matrix-row.heading{height:52px;position:sticky;top:0;z-index:8;background:#173044}.cue-heading,.cue-fixed{position:sticky;left:0;z-index:3;background:#102638;box-shadow:1px 0 #345265}.cue-heading{z-index:10;background:#183347;padding:8px 12px;font-size:12px}.cue-fixed{display:flex;gap:8px;align-items:center;padding:0 8px;font-size:12px}.matrix-row:nth-child(2n+1) .cue-fixed{background:#142b3b}.cue-index{width:27px;text-align:right;color:#b9c9d3;font-variant-numeric:tabular-nums}.cue-description{min-width:0;flex:1;display:flex;flex-direction:column;gap:1px}.cue-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:650}.cue-state{color:var(--muted);font-size:10px;letter-spacing:.02em}.mini-btn{padding:4px 7px;font-size:11px;border-radius:4px;background:#1d3c4e;color:#b7d0dd}.mini-btn:hover{background:#28566b}.mini-btn.action{background:#165d57;color:#bcfff3;font-weight:700}.mini-btn.stop{color:#e3a4af}.matrix-row .cell{display:flex;align-items:center;padding:0 7px;min-width:0;border-right:1px solid #294152;color:#8eaabe;font-size:11px}.cell-content{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%}.cell.empty{color:#5c7e92}.matrix-row .cell:hover{background:#19394c}.column-head{padding:6px 7px 5px;background:#192f41;border-right:1px solid var(--line);display:flex;flex-direction:column;gap:5px;font-size:12px}.column-head .small{font-size:10px;color:var(--muted)}.column-head.audio{border-top:3px solid var(--teal)}.column-head.midi{border-top:3px solid var(--amber)}.column-head.osc{border-top:3px solid var(--purple)}.column-head.control{border-top:3px solid var(--blue)}.matrix-row.selected{background:#12393c;box-shadow:inset 0 1px #278d84,inset 0 -1px #278d84}.matrix-row.selected .cue-fixed{background:#174947;border-left:3px solid var(--teal);padding-left:5px}.matrix-row.selected .cell{background:#12383b}.matrix-row.ondeck:not(.selected) .cue-fixed{border-left:3px solid var(--amber);padding-left:5px}.metrics{border-left:2px solid var(--teal);min-width:0;background:#102638;display:flex;flex-direction:column}.metrics-head{height:52px;min-height:52px;display:grid;grid-template-columns:45px 1fr;align-items:center;gap:4px;padding:6px;font-size:10px;font-weight:700;color:#bdcdd8;background:#193347}.metrics-scroll{overflow:hidden;flex:1}.metric-row{height:var(--rowh);display:grid;grid-template-columns:45px 1fr;align-items:center;gap:4px;padding:0 6px;border-bottom:1px solid #1f3444;font-size:11px;font-variant-numeric:tabular-nums}.metric-row.selected{background:#174947}.switch{height:16px;width:28px;border-radius:20px;background:var(--teal);display:inline-flex;align-items:center;justify-content:flex-end;padding:2px}.switch::after{content:"";background:#e9fbf7;height:12px;width:12px;border-radius:50%}/* Mixer V2.1: real continuation of the cue-column grid, not a second dock of cards.
+   --cue and --cell are shared by the matrix and mixer for pixel-exact alignment.
+   One x-scroll owner (matrixScroll) drives both layers. BPM/Auto Stop stay pinned. */
+.mixer-band{display:grid;grid-template-columns:minmax(0,1fr) var(--metric);flex:0 0 150px;min-height:0;background:var(--bg);border-top:1px solid #334c5b;border-bottom:1px solid var(--line)}
+.mixer-band.collapsed{flex-basis:30px}
+.mixer-scroller{min-width:0;overflow:hidden}
+.mixer-grid{display:grid;grid-template-columns:var(--cue) repeat(11,var(--cell));width:calc(var(--cue) + 11 * var(--cell));min-width:100%;height:100%}
+.mixer-master,.mixer-channel{min-width:0;display:flex;flex-direction:column;gap:8px;padding:9px 8px;border-right:1px solid #294152;background:#0b1c2a}
+.mixer-master{position:sticky;left:0;z-index:4;background:#102638;box-shadow:1px 0 #345265;padding:9px 12px}
+.mixer-channel.audio{box-shadow:inset 0 2px var(--teal)}.mixer-channel.midi{box-shadow:inset 0 2px var(--amber)}.mixer-channel.osc{box-shadow:inset 0 2px var(--purple)}.mixer-channel.control{box-shadow:inset 0 2px var(--blue)}
+.channel-head{display:flex;gap:4px;align-items:center;justify-content:space-between;font-size:11px;font-weight:650;overflow:hidden;white-space:nowrap;min-height:16px}
+.channel-head span:first-child{overflow:hidden;text-overflow:ellipsis}
+.channel-kind{font-size:10px;color:var(--muted);font-weight:400}
+.channel-body{display:flex;align-items:center;gap:10px;min-height:0;flex:1}
+.master-body{display:flex;align-items:center;gap:15px;min-height:0;flex:1}
+.meter{height:59px;width:7px;min-width:7px;border-radius:3px;background:#294255;overflow:hidden;display:flex;align-items:flex-end}
+.meter:after{content:"";background:var(--teal);height:45%;width:100%}
+.fader-track{height:59px;width:10px;min-width:10px;position:relative;border-radius:3px;background:linear-gradient(90deg,#2a4759 2px,transparent 2px 7px,#2a4759 7px)}
+.fader-track:after{content:"";position:absolute;left:-4px;right:-4px;top:16px;height:5px;background:#d7e5ed;border:1px solid #7e9bb1;border-radius:2px}
+.channel-metrics{display:flex;flex-direction:column;gap:8px;min-width:0;flex:1;font-size:10px;color:var(--muted);line-height:1.2}
+.channel-metrics strong{font-size:11px;color:var(--text);font-weight:650}
+.mixer-actions{display:flex;gap:6px}
+.mixer-actions button{border:1px solid #35576b;border-radius:3px;min-width:23px;height:23px;font-size:11px}
+.mixer-actions button:hover{background:#25485b}
+.control-readout{display:flex;flex-direction:column;gap:7px;font-size:10px;color:var(--muted);min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.control-readout strong{color:var(--text);font-size:11px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.activity-dot{display:inline-block;width:5px;height:5px;border-radius:50%;background:#688b9b;margin-right:4px}
+.mixer-metrics{border-left:2px solid var(--teal);background:#102638;display:flex;flex-direction:column;gap:6px;padding:11px 8px;color:var(--muted);font-size:10px}
+.mixer-metrics strong{font-size:11px;color:var(--text)}
+.mixer-band.collapsed .mixer-channel,.mixer-band.collapsed .mixer-master{padding:5px 8px;gap:0}
+.mixer-band.collapsed .channel-body,.mixer-band.collapsed .master-body,.mixer-band.collapsed .mixer-metrics span,.mixer-band.collapsed .channel-kind{display:none}
+.mixer-band.collapsed .mixer-metrics{padding:6px 8px}
+.mixer-band.collapsed .mixer-metrics strong{font-size:10px}
+.timeline{flex:0 0 75px;background:#0f2434;border-bottom:1px solid var(--line)}.timeline.collapsed{flex-basis:29px}.timeline-top{height:29px;display:flex;gap:12px;align-items:center;padding:0 10px;font-size:11px}.timeline-top button{font-size:11px;background:#183447;border-radius:4px;padding:3px 8px}.ruler{margin:0 8px;position:relative;height:33px;background:repeating-linear-gradient(to right,#244052 0 1px,transparent 1px 54px);border-top:1px solid #314b5e}.ruler::before{content:"00:00.0                   00:02.5                   00:05.0                   00:07.5";color:#95acb9;font-size:9px;letter-spacing:1px}.timeline.collapsed .ruler{display:none}.footer{flex:0 0 22px;background:#0b1b29;color:#6f93a9;font-size:10px;padding:4px 10px}.inspector{min-width:0;display:flex;flex-direction:column;background:#0e2232;border-left:1px solid var(--line);padding:10px;gap:13px}.inspector .heading{display:flex;justify-content:space-between;align-items:center;color:var(--teal);font-weight:750;font-size:12px;border-left:3px solid var(--teal);padding-left:9px}.inspector h2{font-size:18px;margin:0}.field{display:grid;gap:6px;font-size:11px}.field span{color:var(--muted)}.field input{width:100%;height:32px;background:#0a1c2a;border:1px solid #39576a;border-radius:4px;padding:6px 9px;color:var(--text)}.property{padding-top:11px;border-top:1px solid var(--line);display:grid;gap:10px}.property b{font-size:11px;color:var(--purple);letter-spacing:.05em}.property .row{display:flex;align-items:center;justify-content:space-between;font-size:11px}.inspector .notes{margin-top:auto}.inspector .notes .field input{height:46px}.inspector .hint{font-size:11px;color:var(--muted);line-height:1.6}.inspector.hide{padding:5px}.inspector.hide>*:not(.open-rail){display:none}.open-rail{display:none}.inspector.hide .open-rail{display:block;writing-mode:vertical-rl;padding:12px 3px;color:var(--teal)}.prototype-label{font-size:10px;color:#f6cb79;border:1px solid #79633f;border-radius:4px;padding:4px 6px}
+@media(max-width:1280px){:root{--sidebar:132px;--inspector:235px;--cue:254px;--cell:101px;--metric:112px}.menu{display:none}.top-status{gap:6px}.sidebar{padding:10px 6px}.top-status .status:nth-last-child(n+2){display:none}}
+</style>
+</head>
+<body>
+<div class="app">
+<header><div class="brand"><div class="brand-mark">▥</div><span>The <b>CUElist</b></span></div><nav class="menu" aria-label="Menu globale"><button>File</button><button>Edit</button><button>Show</button><button>Cuelists</button><button>Devices</button><button>View</button><button>Guide</button></nav><div class="top-status"><span class="prototype-label">CONCEPT V2.1 — NON OPERATIVO</span><span class="clock">12:07:48</span><span>CPU 7% · RAM 35%</span><span class="status">MIDI ✓</span><span class="status">OSC ✓</span></div></header>
+<div class="workspace" id="workspace">
+<aside class="sidebar" aria-label="Navigazione e trasporto"><div class="eyebrow">Workspace</div><nav><button class="selected">▣ &nbsp; Show 001</button><button>▤ &nbsp; Cuelists</button><button>◧ &nbsp; Devices</button><button>⊞ &nbsp; Control Mapping</button></nav><div class="eyebrow">Show</div><button>Settings</button><button>Project info</button><div class="control"><div class="on-deck"><span class="eyebrow">ON DECK</span><strong id="onDeck">NEXT / 13</strong></div><button class="go" id="go">▶ &nbsp; GO / Space</button><button class="panic" id="panic">■ &nbsp; PANIC / Esc</button></div></aside>
+<main class="center">
+<div class="tabs" id="tabs" role="tablist" aria-label="Cue list"></div>
+<div class="tool"><div><h1 id="current-title">Cuelist 12</h1><div class="meta">13 cues / 11 colonne</div></div><div class="end"><button id="density" aria-pressed="false">Densità: standard</button><button id="dock-toggle" aria-pressed="true">Mixer ▾</button><button id="timeline-toggle" aria-pressed="true">Timeline ▾</button></div></div>
+<section class="cue-area" aria-label="Matrice cue"><div class="scroller" id="matrixScroll"><div class="matrix" id="matrix"></div></div><div class="metrics"><div class="metrics-head"><span>BPM</span><span>AUTO STOP</span></div><div class="metrics-scroll" id="metricScroll"><div id="metricRows"></div></div></div></section>
+<section class="mixer-band" id="dock" aria-label="Mixer integrato con le colonne della matrice"><div class="mixer-scroller" id="mixerScroll"><div class="mixer-grid" id="strips"></div></div><div class="mixer-metrics"><strong>BPM / AUTO STOP</strong><span>Controlli globali fissi</span></div></section>
+<section class="timeline" id="timeline"><div class="timeline-top"><strong>TIMELINE</strong><button>Grid ON</button><button>1/16</button><button>Snap ON</button><button>1/16</button></div><div class="ruler"></div></section>
+<div class="footer" id="statusText" role="status">Prototipo visuale isolato — nessun comando Audio, MIDI o OSC viene eseguito.</div>
+</main>
+<aside class="inspector" id="inspector"><div class="heading"><span>INSPECTOR</span><button class="iconbtn" id="closeInspector" aria-label="Nascondi Inspector">›</button></div><button class="open-rail" id="openInspector">INSPECTOR ‹</button><h2 id="inspectorTitle">CUE 13</h2><div class="field"><span>Nome cue</span><input id="cueName" value="Chiusura"></div><div class="field"><span>BPM iniziale</span><input value="120.0" readonly></div><div class="property"><b>CUE / OSC</b><div class="row"><span>Include in row GO</span><span style="color:var(--teal)">✓</span></div><div class="row"><span>Loop playback</span><span>○</span></div><div class="field"><span>Destinazione</span><input value="/show/close" readonly></div><div class="field"><span>Argomenti</span><input value="int 1" readonly></div><div class="hint">Proprietà dimostrative. In JUCE saranno legate all'Inspector esistente, senza toccare i dati dello show.</div></div><div class="notes field"><span>NOTE / CUE</span><input value="Chiusura spettacolo e reset dispositivi." readonly></div></aside>
+</div>
+</div>
+<script>
+"use strict";
+// Presentation-only sample. No networking, files, live transport or persistence.
+(function(){
+ const names=["Intro","Apertura","Scena 1","Transizione","Scena 2","Effetto luci","Video","Scena 3","Atmosfera","Crescendo","Finale","Blackout","Chiusura"];
+ const types=["audio","midi","midi","osc","control","control","midi","audio","osc","audio","osc"];
+ const labels=["Audio 1","MIDI 1","MIDI 2","OSC 1","Control 1","Control 2","MIDI 3","Audio 2","OSC 2","Audio 3","OSC 3"];
+ const ids={tabs:document.getElementById("tabs"),matrix:document.getElementById("matrix"),metrics:document.getElementById("metricRows"),inspector:document.getElementById("inspector")};
+ let current=12,selected=13,next=13;
+ function node(tag,classes,text){const el=document.createElement(tag);if(classes)el.className=classes;if(text!==undefined)el.textContent=text;return el}
+ function btn(label,className,handler){const b=node("button",className,label);b.type="button";if(handler)b.addEventListener("click",handler);return b}
+ function selectCue(i){selected=i;renderRows();document.getElementById("inspectorTitle").textContent="CUE "+i;document.getElementById("cueName").value=names[i-1];document.getElementById("statusText").textContent="Selezione demo: Cue "+i+" — nessuna operazione di trasporto."}
+ function renderTabs(){ids.tabs.replaceChildren();for(let i=1;i<=12;i++){const b=btn("Cuelist "+i+"  ×",""+(i===current?"active":""),function(){current=i;document.getElementById("current-title").textContent="Cuelist "+current;renderTabs()});b.setAttribute("role","tab");b.setAttribute("aria-selected",String(i===current));ids.tabs.appendChild(b)}}
+ function renderRows(){
+  ids.matrix.replaceChildren();ids.metrics.replaceChildren();
+  const h=node("div","matrix-row heading"),cue=node("div","cue-heading","CUE · NAME / TRANSPORT");
+  h.appendChild(cue);
+  for(let k=0;k<11;k++){const c=node("div","column-head "+types[k]);c.appendChild(node("strong","",types[k].toUpperCase()));c.appendChild(node("span","small",labels[k]));h.appendChild(c)}
+  ids.matrix.appendChild(h);
+  for(let i=1;i<=13;i++){
+   const row=node("div","matrix-row"+(i===selected?" selected":"")+(i===next?" ondeck":""));
+   row.dataset.cue=String(i);
+   const head=node("div","cue-fixed");
+   head.appendChild(node("span","cue-index",String(i).padStart(2,"0")));
+   const label=node("div","cue-description");label.appendChild(node("span","cue-name",names[i-1]));label.appendChild(node("span","cue-state",i===next?"READY":"STANDBY"));head.appendChild(label);
+   head.appendChild(btn("GO","mini-btn action",function(ev){ev.stopPropagation();document.getElementById("statusText").textContent="GO disabilitato: questo è solo un concept grafico."}));
+   head.appendChild(btn("▶","mini-btn",function(ev){ev.stopPropagation()}));head.appendChild(btn("■","mini-btn stop",function(ev){ev.stopPropagation()}));
+   head.addEventListener("click",function(){selectCue(i)});row.appendChild(head);
+   for(let k=0;k<11;k++){const type=types[k];const active=(i===13&&k===10)||(i===1&&k===0)||(i===6&&k===3);const val=active?(type==="audio"?"▸ WAV / MP3":type==="midi"?"▸ MIDI clip":type==="osc"?"OSC /show/close":"Control map"):(type==="control"?"Control map":"— "+type.toUpperCase()+" —");const cell=node("div","cell"+(active?"":" empty"));cell.appendChild(node("span","cell-content",val));cell.addEventListener("click",function(){selectCue(i)});row.appendChild(cell)}
+   ids.matrix.appendChild(row);
+   const m=node("div","metric-row"+(i===selected?" selected":""));m.appendChild(node("span","",i===13?"120.0":"120.0"));m.appendChild(node("span","switch"));ids.metrics.appendChild(m);
+  }
+ }
+ function renderMixer(){
+  const panel=document.getElementById("strips");panel.replaceChildren();
+  // Master shares the frozen cue-name column; all remaining strips follow
+  // the exact live order, type and width of the 11 matrix columns.
+  function audioControls(master){
+   const body=node("div",master?"master-body":"channel-body");
+   body.appendChild(node("div","meter"));body.appendChild(node("div","fader-track"));
+   const metrics=node("div","channel-metrics");
+   metrics.appendChild(node("strong","","0.0 dB"));
+   metrics.appendChild(node("span","",master?"MAIN OUT":"PAN · L/R"));
+   const actions=node("div","mixer-actions");
+   actions.appendChild(btn("M","",function(){document.getElementById("statusText").textContent="Anteprima: Mute non operativo."}));
+   if(!master)actions.appendChild(btn("S","",function(){document.getElementById("statusText").textContent="Anteprima: Solo non operativo."}));
+   metrics.appendChild(actions);body.appendChild(metrics);
+   return body;
+  }
+  const master=node("div","mixer-master audio");
+  const masterHeading=node("div","channel-head");masterHeading.appendChild(node("span","","MASTER AUDIO"));masterHeading.appendChild(node("span","channel-kind","OUTPUT"));
+  master.appendChild(masterHeading);master.appendChild(audioControls(true));panel.appendChild(master);
+  for(let i=0;i<labels.length;i++){
+   const type=types[i],channel=node("div","mixer-channel "+type);
+   channel.dataset.columnIndex=String(i);
+   const heading=node("div","channel-head");
+   heading.appendChild(node("span","",labels[i]));
+   heading.appendChild(node("span","channel-kind",type.toUpperCase()));
+   channel.appendChild(heading);
+   if(type==="audio"){
+    channel.appendChild(audioControls(false));
+   }else{
+    const body=node("div","channel-body");
+    const status=node("div","control-readout");
+    const destination=type==="midi"?"MIDI OUT":type==="osc"?"127.0.0.1:9000":"CONTROL SET";
+    status.appendChild(node("strong","",destination));
+    status.appendChild(node("span","",type==="control"?"Mapping · Medium":"● TX · Standby"));
+    const actions=node("div","mixer-actions");
+    actions.appendChild(btn("M","",function(){document.getElementById("statusText").textContent="Anteprima: stato canale non operativo."}));
+    status.appendChild(actions);body.appendChild(status);channel.appendChild(body);
+   }
+   panel.appendChild(channel);
+  }
+ }
+ renderTabs();renderRows();renderMixer();
+ document.getElementById("matrixScroll").addEventListener("scroll",function(e){const grid=e.currentTarget;document.getElementById("metricScroll").scrollTop=grid.scrollTop;document.getElementById("mixerScroll").scrollLeft=grid.scrollLeft});
+ document.getElementById("closeInspector").addEventListener("click",function(){ids.inspector.classList.add("hide");document.getElementById("workspace").classList.add("hide-inspector")});
+ document.getElementById("openInspector").addEventListener("click",function(){ids.inspector.classList.remove("hide");document.getElementById("workspace").classList.remove("hide-inspector")});
+ document.getElementById("dock-toggle").addEventListener("click",function(){const d=document.getElementById("dock"),on=!d.classList.toggle("collapsed");this.setAttribute("aria-pressed",String(on));this.textContent=on?"Mixer ▾":"Mixer ▸"});
+ document.getElementById("timeline-toggle").addEventListener("click",function(){const d=document.getElementById("timeline"),on=!d.classList.toggle("collapsed");this.setAttribute("aria-pressed",String(on))});
+ document.getElementById("density").addEventListener("click",function(){const active=this.getAttribute("aria-pressed")!=="true";this.setAttribute("aria-pressed",String(active));this.textContent="Densità: "+(active?"compatta":"standard");document.documentElement.style.setProperty("--rowh",active?"31px":"37px")});
+ document.getElementById("cueName").addEventListener("input",function(){document.getElementById("statusText").textContent="Anteprima: modifica del nome non salvata nello show."});
+ document.getElementById("go").addEventListener("click",function(){document.getElementById("statusText").textContent="GO non operativo in questo concept. Nessun cue è stato eseguito."});
+ document.getElementById("panic").addEventListener("click",function(){document.getElementById("statusText").textContent="PANIC non operativo in questo concept. Nessun motore è collegato."});
+})();
+</script>
+</body>
+</html>
