@@ -235,16 +235,40 @@ void CueGrid::paint(juce::Graphics& g) {
             playing=playing||state.playing;paused=paused||state.paused;
         }
         const auto custom=cueColour(row.colour);
-        g.setColour(selected ? palette::raised : playing ? palette::teal.withAlpha(.17f)
-                    : next ? palette::amber.withAlpha(.12f) : palette::panel);
+        // One continuous row surface; subtle alternating luminance and
+        // independent selection, NEXT and actual playback signals.
+        const auto base=(r&1)==0 ? palette::panel :
+            palette::panel.interpolatedWith(palette::raised,.10f);
+        g.setColour(selected ? palette::raised.interpolatedWith(palette::panel,.20f) : base);
         g.fillRect(0,y,getWidth(),rowHeight);
-        if (row.colour>0) {
-            g.setColour(custom.withAlpha(.28f));
+        if (playing) {
+            g.setColour(palette::teal.withAlpha(selected?.08f:.10f));
             g.fillRect(0,y,getWidth(),rowHeight);
         }
-        if (next||playing||selected||row.colour>0) {
-            g.setColour(row.colour>0?custom:playing?palette::teal:next?palette::amber:palette::muted);
-            g.fillRect(0,y,5,rowHeight);
+        if (next) {
+            g.setColour(palette::amber.withAlpha(selected?.08f:.10f));
+            g.fillRect(0,y,getWidth(),rowHeight);
+        }
+        if (row.colour>0) {
+            g.setColour(custom.withAlpha(.13f));
+            g.fillRect(0,y,getWidth(),rowHeight);
+        }
+        // Parallel status rails remain unambiguous for selected NEXT cues.
+        if (selected) {
+            g.setColour(palette::text.withAlpha(.78f));
+            g.fillRect(0,y,2,rowHeight);
+        }
+        if (next) {
+            g.setColour(palette::amber);
+            g.fillRect(selected?2:0,y,3,rowHeight);
+        }
+        if (playing) {
+            g.setColour(palette::teal);
+            g.fillRect(selected?(next?5:2):(next?3:0),y,2,rowHeight);
+        }
+        if (row.colour>0 && !next && !playing) {
+            g.setColour(custom.withAlpha(.88f));
+            g.fillRect(selected?2:0,y,2,rowHeight);
         }
         g.saveState();
         g.addTransform(juce::AffineTransform::translation(0.f,(float)rowContentInset));
@@ -279,23 +303,52 @@ void CueGrid::paint(juce::Graphics& g) {
             const bool loaded=owner.hasClip(r,c) || assigned;
             const bool missing=cell.file.isNotEmpty()&&!loaded;
             const auto tone=missing?palette::red:palette::type((int)column.type);
+            const bool selectedCell=selected && c==owner.selectedColumn;
+            const bool hovered=hoverRow==r && hoverColumn==c;
+            const bool drop=dragging && dropRow==r && dropColumn==c;
             if (column.collapsed) {
-                g.setColour(loaded?tone.withAlpha(.37f):palette::background.withAlpha(.66f));
-                g.fillRoundedRectangle((float)x+5,(float)y+7,(float)w-10,39.f,5.f);
-                g.setColour(tone.withAlpha(.85f));
-                g.drawRoundedRectangle((float)x+5,(float)y+7,(float)w-10,39.f,5.f,1.f);
-                if (loaded) g.fillEllipse((float)x+w/2-4,(float)y+21,8.f,8.f);
-                else label(g,"-",{x+8,y+13,w-16,20},12,palette::muted,true,juce::Justification::centred);
+                // Empty collapsed lanes are not false clip buttons.
+                if (loaded) {
+                    g.setColour(tone.withAlpha(.13f));
+                    g.fillRoundedRectangle((float)x+5,(float)y+7,(float)w-10,39.f,4.f);
+                    g.setColour(tone);
+                    g.fillEllipse((float)x+w/2-4,(float)y+21,8.f,8.f);
+                } else {
+                    label(g,"-",{x+8,y+13,w-16,20},12,
+                          palette::muted.withAlpha(.72f),true,juce::Justification::centred);
+                }
                 if(!cell.followsRow) {g.setColour(palette::red);g.fillEllipse((float)x+6,(float)y+8,3.f,3.f);}
                 if(cell.loop) drawLoopIcon(g,{x+w-19,y+8,13,15},palette::amber);
                 continue;
             }
             const auto box=juce::Rectangle<float>((float)x+4,(float)y+3,(float)w-8,49.f);
-            g.setColour(loaded?tone.withAlpha(.20f):palette::background.withAlpha(.55f));
-            g.fillRoundedRectangle(box,6.f);
-            const bool drop=dragging && dropRow==r && dropColumn==c;
-            g.setColour(drop?palette::amber:(selected&&c==owner.selectedColumn?tone:palette::line));
-            g.drawRoundedRectangle(box,6.f,drop||selected&&c==owner.selectedColumn?1.8f:1.f);
+            // Empty slots share the row surface. Only actual content,
+            // missing media, hover, selection and drag require a surface.
+            if (loaded) {
+                g.setColour(tone.withAlpha(.11f));
+                g.fillRoundedRectangle(box,3.f);
+                g.setColour(tone.withAlpha(.72f));
+                g.fillRect(x+5,y+9,2,34);
+            } else if (missing) {
+                g.setColour(palette::red.withAlpha(.12f));
+                g.fillRoundedRectangle(box,3.f);
+                g.setColour(palette::red);
+                g.fillRect(x+5,y+9,2,34);
+            } else if (hovered) {
+                g.setColour(palette::raised.withAlpha(.32f));
+                g.fillRoundedRectangle(box,3.f);
+            }
+            if (selectedCell || drop) {
+                const bool focused=owner.hasKeyboardFocus(true);
+                g.setColour(drop ? palette::amber :
+                    tone.withAlpha(focused ? .92f : .63f));
+                g.drawRoundedRectangle(box.reduced(1.f),3.f,
+                                       drop || focused ? 1.65f : 1.1f);
+            } else if (loaded) {
+                // Keep real media recognizable without outlining every slot.
+                g.setColour(tone.withAlpha(.25f));
+                g.drawRoundedRectangle(box,3.f,.65f);
+            }
             if (column.type==ColumnType::control) {
                 const ControlSet* set=column.controlLocked?&column.controlDefaultSet:
                     (cell.controlSet?&*cell.controlSet:nullptr);
@@ -322,16 +375,30 @@ void CueGrid::paint(juce::Graphics& g) {
                     juce::File(cell.file).getFileNameWithoutExtension();
                 label(g,name,{x+9,y+4,w-70,21},12,palette::text,true);
                 const auto seconds=owner.clipDuration(r,c);
-                label(g,playback.waiting?"WAITING":timeText(playback.positionSeconds)+" / "+timeText(seconds),
-                     {x+9,y+26,w-74,16},10,tone);
+                // Runtime-driven dot; never infer playback from loaded media.
+                const bool active=playback.playing || playback.paused || playback.waiting;
+                if (active) {
+                    g.setColour(playback.playing?palette::teal:palette::amber);
+                    g.fillEllipse((float)x+10,(float)y+31,5.f,5.f);
+                }
+                // Preserve numeric position/duration while paused; the
+                // amber activity dot and row status already say PAUSED.
+                label(g,playback.waiting?"WAITING":
+                        timeText(playback.positionSeconds)+" / "+timeText(seconds),
+                     {x+(active?19:9),y+26,w-(active?84:74),16},10,
+                     playback.playing?palette::teal:
+                     playback.paused||playback.waiting?palette::amber:tone);
                 const auto progress=seconds>0?juce::jlimit(0.,1.,playback.positionSeconds/seconds):0.;
                 g.setColour(palette::line);g.fillRect(x+7,y+45,w-14,3);
                 g.setColour(playback.waiting||playback.paused?palette::amber:tone);
                 g.fillRect((float)x+7,(float)y+45,(float)((w-14)*progress),3.f);
-            } else label(g,missing?"! Media missing":column.type==ColumnType::audio?"+ WAV/MP3":
-                          column.type==ColumnType::midi?"+ MIDI":"+ OSC",
-                          {x+8,y+11,w-16,20},11,missing?palette::red:palette::muted,
-                          false,juce::Justification::centred);
+            } else label(g,missing?"MEDIA MISSING":
+                           column.type==ColumnType::audio?"+ WAV/MP3":
+                           column.type==ColumnType::midi?"+ MIDI":
+                           column.type==ColumnType::osc?"+ OSC":"+ CONTROL",
+                           {x+8,y+11,w-16,20},11,
+                           missing?palette::red:palette::muted.withAlpha(hovered?.96f:.78f),
+                           false,juce::Justification::centred);
             if(!cell.followsRow) {
                 g.setColour(palette::red);g.fillEllipse((float)x+7,(float)y+6,3.f,3.f);
             }
@@ -342,20 +409,24 @@ void CueGrid::paint(juce::Graphics& g) {
                 const bool active=row.stopOnNext&&cell.stopOnNext;
                 g.setColour(active?palette::teal.withAlpha(.27f):palette::amber.withAlpha(.16f));
                 g.fillRoundedRectangle((float)x+w-41,(float)y+4,34.f,16.f,3.f);
-                label(g,cell.stopOnNext?"AS":"OFF",{x+w-41,y+4,34,16},9,
+                label(g,cell.stopOnNext?"AS":"OFF",{x+w-41,y+4,34,16},10,
                       active?palette::teal:palette::amber,true,juce::Justification::centred);
             }
-            if (column.type!=ColumnType::control) {
-                // Visual transport buttons are smaller, but their original
-                // 24x23 hit targets and 8px separation are unchanged.
+            if (column.type!=ColumnType::control && loaded) {
+                // Transport remains identical for usable clips. Disabled
+                // buttons are not painted over empty or missing-media slots.
                 transportButton(g,cellButtonVisualBounds(cellPlayBounds(x,w,y)),
-                                false,loaded,15.0f);
+                                false,true,15.0f);
                 transportButton(g,cellButtonVisualBounds(cellStopBounds(x,w,y)),
-                                true,loaded,15.0f);
+                                true,true,15.0f);
             }
         }
         g.restoreState();
-        g.setColour(palette::line.withAlpha(.66f));
+        // Thin dividers use the same collapsed-column positions as hit tests.
+        g.setColour(palette::line.withAlpha(.25f));
+        for (int c=0;c<(int)show.columns.size();++c)
+            g.drawVerticalLine(columnX(c),y,(float)(y+rowHeight));
+        g.setColour(palette::line.withAlpha(.43f));
         g.drawHorizontalLine(y+rowHeight-1,0,(float)getWidth());
     }
     // The add-cue button is part of the scrolled grid and is always last.
@@ -492,6 +563,29 @@ void CueGrid::doubleClickColumnHeader(int gridX,int y) {
         gridX-columnX(column)<columnWidthAt(column)-28)
         owner.renameTitle(true,column);
 }
+void CueGrid::mouseMove(const juce::MouseEvent& e) {
+    const int row=CueGridGeometry::rowAt(e.y);
+    const int column=columnAt(e.x);
+    const int nextRow=row>=0 && row<(int)owner.show.rows.size() &&
+        column>=0 && !owner.show.columns[(size_t)column].collapsed ? row : -1;
+    const int nextColumn=nextRow>=0 ? column : -1;
+    if (hoverRow==nextRow && hoverColumn==nextColumn) return;
+    const auto repaintCell=[this](int r,int c) {
+        if (r>=0 && c>=0)
+            repaint(columnX(c),CueGridGeometry::rowTop(r),
+                    columnWidthAt(c),rowHeight);
+    };
+    repaintCell(hoverRow,hoverColumn);
+    hoverRow=nextRow;
+    hoverColumn=nextColumn;
+    repaintCell(hoverRow,hoverColumn);
+}
+void CueGrid::mouseExit(const juce::MouseEvent&) {
+    if (hoverRow>=0 && hoverColumn>=0)
+        repaint(columnX(hoverColumn),CueGridGeometry::rowTop(hoverRow),
+                columnWidthAt(hoverColumn),rowHeight);
+    hoverRow=hoverColumn=-1;
+}
 void CueGrid::mouseDown(const juce::MouseEvent& e) {
     dragRow=dragColumn=dropRow=dropColumn=-1;dragging=false;
     const int row=CueGridGeometry::rowAt(e.y);
@@ -535,13 +629,15 @@ void CueGrid::mouseDown(const juce::MouseEvent& e) {
             owner.setCellAutoStop(row,column,!owner.show.rows[(size_t)row].cells[(size_t)column].stopOnNext);
         return;
     }
-    if (col.type!=ColumnType::control) {
+    if (col.type!=ColumnType::control && owner.hasClip(row,column)) {
+        // Invisible disabled transport targets must not block selection of
+        // an empty cell. Loaded clips retain their exact safe hitboxes.
         if (cellPlayBounds(0,w,0).contains(localX,localY)) {
-            if (e.getNumberOfClicks()==1 && owner.hasClip(row,column)) owner.triggerCellAt(row,column);
+            if (e.getNumberOfClicks()==1) owner.triggerCellAt(row,column);
             return;
         }
         if (cellStopBounds(0,w,0).contains(localX,localY)) {
-            if (e.getNumberOfClicks()==1 && owner.hasClip(row,column)) owner.stopCellAt(row,column);
+            if (e.getNumberOfClicks()==1) owner.stopCellAt(row,column);
             return;
         }
     }
