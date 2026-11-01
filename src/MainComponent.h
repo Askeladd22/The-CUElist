@@ -242,7 +242,7 @@ public:
         return {102,rowTop+8,78,26};
     }
 private:
-    void finishBpmEdit(bool accept);
+    void finishBpmEdit(bool accept,bool forceClose=false);
     juce::TextEditor bpmEditor;
     int editingRowId=0;
     bool closingBpmEditor=false;
