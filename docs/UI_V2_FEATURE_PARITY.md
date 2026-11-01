@@ -41,7 +41,7 @@ Il concept V2.2 espone menu dimostrativi con percorsi espliciti:
 
 Questa tabella riguarda la collocazione, non una modifica del codice di esecuzione. L'elenco non sostituisce un audit completo delle azioni dell'app: prima di spostare i menu nativi bisogna confrontare **tutte** le action ID effettive e le scorciatoie da tastiera.
 
-## Master Audio: inventario reale verificato nei sorgenti
+## Master Audio: inventario nativo vincolante (nessun redesign)
 
 Verificato in `src/MainComponent.cpp`, `src/ColumnUtilities.cpp` e nei componenti JUCE del mixer:
 
@@ -60,7 +60,7 @@ Verificato in `src/MainComponent.cpp`, `src/ColumnUtilities.cpp` e nei component
 
 Il Master è **solo audio**; il suo mute e limiter non devono influire su MIDI e OSC. `Main Out` non deve alterare le uscite audio Direct. In produzione le opzioni del menu Main Out devono provenire **dal dispositivo audio reale** e segnalare coppie non disponibili; i quattro valori fissi del prototipo sono dati fittizi. La modalità Quick Learn deve rimanere integrata con il mapping effettivo, non deve essere sostituita dai pulsanti fittizi.
 
-La disponibilità di questi controlli nella demo **non prova ancora** che un layout nativo di 280 × 190 px li contenga con sufficiente leggibilità: adottare misure elastiche, priorità e ridimensionamento del Master, ma mai eliminazione delle funzioni.
+Il Master del prototipo è **soltanto una sagoma statica illustrativa**. Non si deve creare un nuovo layout nativo da 280 × 190 px, né ridimensionare o reinterpretare il Master: riutilizzare le geometrie, il componente e tutti i controlli JUCE originali.
 
 ## Altri canali: parità di comportamento
 
