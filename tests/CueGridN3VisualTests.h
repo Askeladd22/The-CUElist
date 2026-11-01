@@ -110,4 +110,92 @@ void cueGridN3VisualTests() {
               "Inline rename must still commit after the two-tier change");
     });
 
+    test("N3.3 selected row spans empty columns and trailing grid",[] {
+        using namespace cuelist;
+        MainComponent ui(false);
+        addRow(ui.show,"Standby");
+        addColumn(ui.show,ColumnType::midi,"MIDI 1");
+        ui.setSize(1647,895);
+        ui.refresh();
+        auto* grid=cueViewFixtures::find<CueGrid>(ui);
+        check(grid!=nullptr,"Native CueGrid is missing");
+        const int sampleX=grid->columnX(2)+12; // after both lanes
+        const int sampleY=CueGridGeometry::rowTop(0)+51;
+        const auto before=grid->createComponentSnapshot(
+            {sampleX,sampleY,1,1});
+        check(before.isValid(),"Cannot inspect selected row background");
+        const auto colourBefore=before.getPixelAt(0,0);
+        ui.select(1,0);
+        const auto after=grid->createComponentSnapshot(
+            {sampleX,sampleY,1,1});
+        check(after.isValid() && colourBefore!=after.getPixelAt(0,0),
+              "Selection did not extend across full grid width");
+    });
+
+    test("N3.3 empty slot hover changes paint but never show or transport",[] {
+        using namespace cuelist;
+        MainComponent ui(false);
+        addRow(ui.show,"Second");
+        addColumn(ui.show,ColumnType::osc,"OSC");
+        ui.setSize(1647,895);
+        ui.refresh();
+        auto* grid=cueViewFixtures::find<CueGrid>(ui);
+        check(grid!=nullptr,"CueGrid is missing");
+        const int cellX=grid->columnX(1);
+        const int cellY=CueGridGeometry::rowTop(1);
+        auto sample=[&] {
+            const auto bitmap=grid->createComponentSnapshot(
+                {cellX+12,cellY+14,1,1});
+            check(bitmap.isValid(),"Cell snapshot could not be rendered");
+            return bitmap.getPixelAt(0,0);
+        };
+        const auto modelBefore=encodeShow(ui.show);
+        const int beforeNext=ui.nextCueIndex();
+        const int beforeSelected=ui.selectedRow;
+        const auto idle=sample();
+        const juce::Point<float> cursor{(float)cellX+12,(float)cellY+14};
+        grid->mouseMove(cueViewFixtures::event(*grid,cursor,cursor));
+        const auto hover=sample();
+        check(hover!=idle,"Empty-cell hover is not visually distinguishable");
+        grid->mouseExit(cueViewFixtures::event(*grid,cursor,cursor));
+        check(sample()==idle,"Empty cell hover persisted after leaving");
+        check(encodeShow(ui.show)==modelBefore &&
+              ui.nextCueIndex()==beforeNext &&
+              ui.selectedRow==beforeSelected,
+              "Purely visual hover modified the show, selection or transport");
+    });
+
+    test("N3.3 real media accent and missing-media warning stay visible",[] {
+        using namespace cuelist;
+        MainComponent ui(false);
+        addRow(ui.show,"Second");
+        ui.setSize(1647,895);
+        auto* grid=cueViewFixtures::find<CueGrid>(ui);
+        check(grid!=nullptr,"CueGrid is missing");
+        // A missing file must produce a visible error without creating a clip.
+        ui.show.rows[1].cells[0].file="C:/missing-production-media.wav";
+        ui.refresh();
+        const int x=grid->columnX(0);
+        const int y=CueGridGeometry::rowTop(1)+CueGrid::rowContentInset;
+        auto pixel=[&](int cellX,int cellY) {
+            const auto bitmap=grid->createComponentSnapshot(
+                {cellX,cellY,1,1});
+            check(bitmap.isValid(),"Cell preview unavailable");
+            return bitmap.getPixelAt(0,0);
+        };
+        const auto errorMark=pixel(x+5,y+21);
+        check(errorMark.getRed()>errorMark.getGreen(),
+              "Missing media lost its red error marker");
+        ui.show.rows[1].cells[0].file.clear();
+        auto pcm=std::make_shared<AudioClip>();
+        pcm->sampleRate=48000;
+        pcm->samples.setSize(1,64);
+        pcm->samples.clear();
+        ui.clips[ui.show.rows[1].cells[0].id]=pcm;
+        ui.refresh();
+        const auto loadedMark=pixel(x+5,y+21);
+        check(loadedMark.getGreen()>loadedMark.getRed(),
+              "Loaded audio lost its type-colour cue");
+    });
+
 }
