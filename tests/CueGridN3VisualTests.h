@@ -217,19 +217,16 @@ void cueGridN3VisualTests() {
               "Hidden disabled Stop region prevented empty cell selection");
     });
 
-    test("N3.4 BPM, Auto Stop and CELLS share non-overlapping hit targets",[] {
+    test("N3.4 keeps only BPM and cue Auto Stop non-overlapping hit targets",[] {
         using namespace cuelist;
         const auto bpm=CueMetricsOverlay::bpmEditBounds(0);
         const auto toggle=CueMetricsOverlay::autoStopToggleBounds(0);
-        const auto disclosure=CueMetricsOverlay::cellDetailsBounds(0);
-        check(CueMetricsOverlay::width==184 && bpm==juce::Rectangle<int>(0,0,91,62) &&
+        check(CueMetricsOverlay::width==184 &&
+              bpm==juce::Rectangle<int>(0,0,91,62) &&
               toggle==juce::Rectangle<int>(102,8,78,26) &&
-              disclosure==juce::Rectangle<int>(108,36,68,20) &&
-              !bpm.intersects(toggle) && !bpm.intersects(disclosure) &&
-              !toggle.intersects(disclosure) &&
-              toggle.getRight()<=CueMetricsOverlay::width &&
-              disclosure.getBottom()<=CueGrid::rowHeight,
-              "N3.4 fixed metrics hitboxes overlap or shrink from N3.1");
+              !bpm.intersects(toggle) &&
+              toggle.getRight()<=CueMetricsOverlay::width,
+              "N3.4 fixed metrics shrank or lost its independent controls");
     });
 
     test("N3.4 selected metric row matches the continuous CueGrid surface",[] {
@@ -251,7 +248,7 @@ void cueGridN3VisualTests() {
               "N3.4 fixed row fill differs from the N3.3 selected/NEXT surface");
     });
 
-    test("N3.4 fixed toggle and CELLS target the correct vertically scrolled row",[] {
+    test("N3.4 fixed Auto Stop targets only the correct scrolled cue",[] {
         using namespace cuelist;
         MainComponent ui(false);
         for (int r=1;r<13;++r) addRow(ui.show,"Scrolled cue");
@@ -259,13 +256,12 @@ void cueGridN3VisualTests() {
             addColumn(ui.show,c%2==0?ColumnType::midi:ColumnType::osc,"Data");
         ui.setSize(1280,820);
         auto* metrics=cueViewFixtures::find<CueMetricsOverlay>(ui);
-        auto* grid=cueViewFixtures::find<CueGrid>(ui);
         juce::Viewport* view=nullptr;
         for (auto* child:ui.getChildren())
             if (auto* candidate=dynamic_cast<juce::Viewport*>(child)) {
                 view=candidate;break;
             }
-        check(metrics && grid && view,"N3.4 scroll fixture incomplete");
+        check(metrics && view,"N3.4 scroll fixture incomplete");
         const int fixedX=metrics->getX();
         view->setViewPosition(200,115);
         check(metrics->getX()==fixedX &&
@@ -273,18 +269,18 @@ void cueGridN3VisualTests() {
               "Fixed metrics moved when columns or rows scrolled");
         const int rowIndex=4;
         const int y=CueGridGeometry::overlayRowTop(rowIndex,115);
-        const auto rowId=ui.show.rows[(size_t)rowIndex].id;
         const bool before=ui.show.rows[(size_t)rowIndex].stopOnNext;
         const bool neighbor=ui.show.rows[(size_t)rowIndex+1].stopOnNext;
         cueViewFixtures::click(*metrics,118.0f,(float)y+17.0f);
         check(ui.show.rows[(size_t)rowIndex].stopOnNext!=before &&
               ui.show.rows[(size_t)rowIndex+1].stopOnNext==neighbor,
-              "Auto Stop changed the wrong row after Y scroll");
-        const bool wasExpanded=grid->autoStopDetailsVisible(rowId);
+              "Auto Stop toggled the wrong row after Y scroll");
+        const auto changed=encodeShow(ui.show);
+        // This used to expand CELLS. It must now be visually and
+        // functionally inert; edit exceptions via cell context menus.
         cueViewFixtures::click(*metrics,121.0f,(float)y+46.0f);
-        check(grid->autoStopDetailsVisible(rowId)!=wasExpanded &&
-              ui.show.rows[(size_t)rowIndex].stopOnNext!=before,
-              "CELLS disclosure failed or accidentally toggled row Auto Stop");
+        check(encodeShow(ui.show)==changed,
+              "Removed CELLS area still performs a hidden action");
     });
 
     test("N3.4 metric hover is visual only and restores when pointer exits",[] {
@@ -314,6 +310,73 @@ void cueGridN3VisualTests() {
               ui.selectedRow==beforeSelection &&
               ui.nextCueIndex()==beforeNext,
               "Hover altered the cue document or playback selection");
+    });
+
+    test("N3.4B CONT. appears only for excluded Audio and Control cells",[] {
+        using namespace cuelist;
+        MainComponent ui(false);
+        addColumn(ui.show,ColumnType::control,"Control");
+        ui.setSize(1647,895);
+        auto* grid=cueViewFixtures::find<CueGrid>(ui);
+        check(grid!=nullptr,"CueGrid missing");
+        const int y=CueGridGeometry::rowTop(0)+CueGrid::rowContentInset;
+        const auto badge=CueGrid::cellContinueBadgeBounds(
+            grid->columnX(0),grid->columnWidthAt(0),y);
+        auto sample=[&] {
+            const auto image=grid->createComponentSnapshot(
+                {badge.getX()+2,badge.getY()+8,1,1});
+            check(image.isValid(),"Native cell exception snapshot invalid");
+            return image.getPixelAt(0,0);
+        };
+        const auto defaultPixel=sample();
+        ui.setCellAutoStop(0,0,false);
+        ui.setCellAutoStop(0,1,false);
+        check(sample()!=defaultPixel,
+              "CONT. marker not painted for cell excluded from Auto Stop");
+        const auto cursor=badge.toFloat().getCentre();
+        grid->mouseMove(cueViewFixtures::event(*grid,cursor,cursor));
+        check(grid->getTooltip().contains("Auto Stop"),
+              "CONT. badge has no explanation on hover");
+        const juce::Point<float> elsewhere{
+            (float)grid->columnX(0)+20.f,(float)y+30.f};
+        grid->mouseMove(cueViewFixtures::event(*grid,elsewhere,elsewhere));
+        check(grid->getTooltip().isEmpty(),
+              "CONT. tooltip leaked outside its own indicator");
+        cuelist::Show loaded;
+        check(decodeShow(encodeShow(ui.show),loaded).wasOk() &&
+              !loaded.rows[0].cells[0].stopOnNext &&
+              !loaded.rows[0].cells[1].stopOnNext,
+              "Cell Auto Stop exceptions no longer persist in existing show schema");
+        ui.setCellAutoStop(0,0,true);
+        check(sample()==defaultPixel &&
+              !ui.show.rows[0].cells[1].stopOnNext,
+              "Restoring one cell's default affected other cell exceptions");
+    });
+
+    test("N3.4B compressed cells keep exception visible without CELLS mode",[] {
+        using namespace cuelist;
+        MainComponent ui(false);
+        ui.show.columns[0].collapsed=true;
+        ui.setSize(1647,895);
+        auto* grid=cueViewFixtures::find<CueGrid>(ui);
+        check(grid && grid->columnWidthAt(0)==48,
+              "Collapsed cue lane contract changed");
+        const int x=grid->columnX(0)+grid->columnWidthAt(0)-7;
+        const int y=CueGridGeometry::rowTop(0)+CueGrid::rowContentInset+36;
+        const auto sample=[&] {
+            const auto image=grid->createComponentSnapshot({x,y,1,1});
+            check(image.isValid(),"Collapsed exception snapshot invalid");
+            return image.getPixelAt(0,0);
+        };
+        const auto before=sample();
+        ui.setCellAutoStop(0,0,false);
+        const auto after=sample();
+        check(before!=after && after.getRed()>after.getBlue(),
+              "Collapsed cell lost its amber Auto Stop exception marker");
+        const juce::Point<float> cursor{(float)x,(float)y};
+        grid->mouseMove(cueViewFixtures::event(*grid,cursor,cursor));
+        check(grid->getTooltip().contains("Auto Stop"),
+              "Collapsed cell exception is unexplained");
     });
 
 }

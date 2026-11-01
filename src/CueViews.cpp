@@ -159,13 +159,6 @@ juce::Colour CueGrid::cueColour(int id) {
         default:return juce::Colour();
     }
 }
-void CueGrid::toggleAutoStopDetails(int row) {
-    if (row<0 || row>=(int)owner.show.rows.size()) return;
-    const int id=owner.show.rows[(size_t)row].id;
-    if (autoStopVisibleRows.count(id)) autoStopVisibleRows.erase(id);
-    else autoStopVisibleRows.insert(id);
-    repaint();
-}
 void CueGrid::paint(juce::Graphics& g) {
     g.fillAll(palette::background);
     // A continuous 72px pinned header, preserving the N3.1 coordinates.
@@ -319,6 +312,12 @@ void CueGrid::paint(juce::Graphics& g) {
                 }
                 if(!cell.followsRow) {g.setColour(palette::red);g.fillEllipse((float)x+6,(float)y+8,3.f,3.f);}
                 if(cell.loop) drawLoopIcon(g,{x+w-19,y+8,13,15},palette::amber);
+                // Compressed columns cannot fit text, but a muted amber
+                // marker preserves visibility of the Auto Stop exception.
+                if (!cell.stopOnNext) {
+                    g.setColour(palette::amber);
+                    g.fillRoundedRectangle((float)x+w-8,(float)y+29,3.f,15.f,1.5f);
+                }
                 continue;
             }
             const auto box=juce::Rectangle<float>((float)x+4,(float)y+3,(float)w-8,49.f);
@@ -363,7 +362,8 @@ void CueGrid::paint(juce::Graphics& g) {
                 label(g,column.controlLocked?"DEFAULT / LOCKED":
                         mapTitle.isNotEmpty()?mapTitle:
                         assigned?"CONTROL MAP":" + Control Map",
-                      {x+8,y+6,w-16,18},11,assigned?tone:palette::muted,true);
+                      {x+8,y+6,w-(cell.stopOnNext?16:67),18},
+                      11,assigned?tone:palette::muted,true);
                 if (assigned)
                     label(g,count>0 ? juce::String(count)+" mappings" : "Empty map",
                           {x+8,y+26,w-16,16},10, count>0?palette::text:palette::muted);
@@ -373,7 +373,8 @@ void CueGrid::paint(juce::Graphics& g) {
                     playback.playing=playback.paused=playback.waiting=false;
                 const auto name=cell.name.isNotEmpty()?cell.name:cell.midi?"MIDI":cell.osc?"OSC":
                     juce::File(cell.file).getFileNameWithoutExtension();
-                label(g,name,{x+9,y+4,w-70,21},12,palette::text,true);
+                label(g,name,{x+9,y+4,w-(cell.loop&&!cell.stopOnNext?86:70),21},
+                      12,palette::text,true);
                 const auto seconds=owner.clipDuration(r,c);
                 // Runtime-driven dot; never infer playback from loaded media.
                 const bool active=playback.playing || playback.paused || playback.waiting;
@@ -396,21 +397,25 @@ void CueGrid::paint(juce::Graphics& g) {
                            column.type==ColumnType::audio?"+ WAV/MP3":
                            column.type==ColumnType::midi?"+ MIDI":
                            column.type==ColumnType::osc?"+ OSC":"+ CONTROL",
-                           {x+8,y+11,w-16,20},11,
+                           {x+8,y+11,w-(cell.stopOnNext?16:60),20},11,
                            missing?palette::red:palette::muted.withAlpha(hovered?.96f:.78f),
                            false,juce::Justification::centred);
             if(!cell.followsRow) {
                 g.setColour(palette::red);g.fillEllipse((float)x+7,(float)y+6,3.f,3.f);
             }
             if(cell.loop)
-                drawLoopIcon(g,{autoStopVisibleRows.count(row.id) ? x+w-59 : x+w-19,
-                    y+5,15,15},palette::amber);
-            if (autoStopVisibleRows.count(row.id)) {
-                const bool active=row.stopOnNext&&cell.stopOnNext;
-                g.setColour(active?palette::teal.withAlpha(.27f):palette::amber.withAlpha(.16f));
-                g.fillRoundedRectangle((float)x+w-41,(float)y+4,34.f,16.f,3.f);
-                label(g,cell.stopOnNext?"AS":"OFF",{x+w-41,y+4,34,16},10,
-                      active?palette::teal:palette::amber,true,juce::Justification::centred);
+                drawLoopIcon(g,{x+w-(cell.stopOnNext?19:72),y+5,15,15},palette::amber);
+            if (!cell.stopOnNext) {
+                // Read-only exception: editing happens through the cell menu
+                // or the existing Inspector. The indicator must never act as
+                // a transport or per-row disclosure control.
+                const auto badge=cellContinueBadgeBounds(x,w,y);
+                g.setColour(palette::amber.withAlpha(.19f));
+                g.fillRoundedRectangle(badge.toFloat(),3.f);
+                g.setColour(palette::amber.withAlpha(.85f));
+                g.drawRoundedRectangle(badge.toFloat(),3.f,.7f);
+                label(g,"CONT.",badge,10,palette::amber,true,
+                      juce::Justification::centred);
             }
             if (column.type!=ColumnType::control && loaded) {
                 // Transport remains identical for usable clips. Disabled
@@ -452,6 +457,8 @@ void CueGrid::showCellMenu(int row,int column,juce::Point<int> screenPoint) {
     menu.addSeparator();
     menu.addItem(5,"Loop Playback",!locked,cell.loop);
     menu.addItem(6,"Include in Row GO",!locked,cell.followsRow);
+    menu.addSeparator();
+    menu.addItem(7,"Includi nell'Auto Stop",true,cell.stopOnNext);
     auto safe=juce::Component::SafePointer<MainComponent>(&owner);
     menu.showMenuAsync(juce::PopupMenu::Options().withTargetScreenArea(
         {screenPoint.x,screenPoint.y,1,1}),[safe,rowId,columnId](int choice) {
@@ -469,6 +476,7 @@ void CueGrid::showCellMenu(int row,int column,juce::Point<int> screenPoint) {
             case 4:safe->pasteSelectedCell();break;
             case 5:safe->setCellLoop(r,c,!safe->show.rows[(size_t)r].cells[(size_t)c].loop);break;
             case 6:safe->setCellFollowsRow(r,c,!safe->show.rows[(size_t)r].cells[(size_t)c].followsRow);break;
+            case 7:safe->setCellAutoStop(r,c,!safe->show.rows[(size_t)r].cells[(size_t)c].stopOnNext);break;
         }
     });
 }
@@ -566,9 +574,22 @@ void CueGrid::doubleClickColumnHeader(int gridX,int y) {
 void CueGrid::mouseMove(const juce::MouseEvent& e) {
     const int row=CueGridGeometry::rowAt(e.y);
     const int column=columnAt(e.x);
-    const int nextRow=row>=0 && row<(int)owner.show.rows.size() &&
-        column>=0 && !owner.show.columns[(size_t)column].collapsed ? row : -1;
+    const bool valid=row>=0 && row<(int)owner.show.rows.size() &&
+                     column>=0;
+    const bool collapsed=valid && owner.show.columns[(size_t)column].collapsed;
+    const int nextRow=valid && !collapsed ? row : -1;
     const int nextColumn=nextRow>=0 ? column : -1;
+    juce::String tooltip;
+    if (valid && !owner.show.rows[(size_t)row].cells[(size_t)column].stopOnNext) {
+        const int x=columnX(column),w=columnWidthAt(column);
+        const int y=CueGridGeometry::rowTop(row)+rowContentInset;
+        const bool overMarker=collapsed ?
+            juce::Rectangle<int>(x+w-12,y+26,12,21).contains(e.getPosition()) :
+            cellContinueBadgeBounds(x,w,y).contains(e.getPosition());
+        if (overMarker)
+            tooltip="Esclusa dall'Auto Stop: continua dopo il prossimo GO quando l'Auto Stop della cue è attivo. Tasto destro per includerla.";
+    }
+    setTooltip(tooltip);
     if (hoverRow==nextRow && hoverColumn==nextColumn) return;
     const auto repaintCell=[this](int r,int c) {
         if (r>=0 && c>=0)
@@ -585,6 +606,7 @@ void CueGrid::mouseExit(const juce::MouseEvent&) {
         repaint(columnX(hoverColumn),CueGridGeometry::rowTop(hoverRow),
                 columnWidthAt(hoverColumn),rowHeight);
     hoverRow=hoverColumn=-1;
+    setTooltip({});
 }
 void CueGrid::mouseDown(const juce::MouseEvent& e) {
     dragRow=dragColumn=dropRow=dropColumn=-1;dragging=false;
@@ -623,12 +645,6 @@ void CueGrid::mouseDown(const juce::MouseEvent& e) {
     if (column<0 || owner.show.columns[(size_t)column].collapsed) return;
     const int localX=e.x-columnX(column),w=columnWidthAt(column);
     const auto& col=owner.show.columns[(size_t)column];
-    if (autoStopVisibleRows.count(owner.show.rows[(size_t)row].id) &&
-        localY>=4 && localY<20 && localX>=w-41 && localX<w-7) {
-        if (e.getNumberOfClicks()==1)
-            owner.setCellAutoStop(row,column,!owner.show.rows[(size_t)row].cells[(size_t)column].stopOnNext);
-        return;
-    }
     if (col.type!=ColumnType::control && owner.hasClip(row,column)) {
         // Invisible disabled transport targets must not block selection of
         // an empty cell. Loaded clips retain their exact safe hitboxes.
@@ -942,7 +958,6 @@ void CueMetricsOverlay::paint(juce::Graphics& g) {
 
         const bool bpmHover=hoverRow==r && hoverTarget==HoverTarget::bpm;
         const bool toggleHover=hoverRow==r && hoverTarget==HoverTarget::autoStop;
-        const bool detailHover=hoverRow==r && hoverTarget==HoverTarget::cellDetails;
         if (bpmHover) {
             g.setColour(palette::raised.withAlpha(.32f));
             g.fillRoundedRectangle(juce::Rectangle<float>(13.f,(float)y+6.f,77.f,49.f),4.f);
@@ -972,19 +987,6 @@ void CueMetricsOverlay::paint(juce::Graphics& g) {
         label(g,row.stopOnNext?"ON":"OFF",
               {toggle.getX()+39,toggle.getY()+1,36,21},10,
               row.stopOnNext?palette::teal:palette::muted,true);
-
-        const bool details=owner.grid.autoStopDetailsVisible(row.id);
-        const auto disclosure=cellDetailsBounds(y);
-        drawIconButtonSurface(g,disclosure.toFloat(),palette::amber,
-            IconButtonState{true,detailHover,false,details,false},4.f);
-        g.setColour(details?palette::amber:palette::text);
-        const float cx=(float)disclosure.getX()+13.f;
-        const float cy=(float)disclosure.getCentreY();
-        g.drawLine(cx-4.f,cy,cx+4.f,cy,1.8f);
-        if (!details) g.drawLine(cx,cy-4.f,cx,cy+4.f,1.8f);
-        label(g,"CELLS",
-              {disclosure.getX()+26,disclosure.getY()+1,39,18},10,
-              details?palette::amber:palette::muted,true);
 
         // The 94px separator corresponds to the same original two zones.
         g.setColour(palette::line.withAlpha(.28f));
@@ -1026,12 +1028,10 @@ void CueMetricsOverlay::mouseDown(const juce::MouseEvent& e) {
     }
     if (!e.mods.isLeftButtonDown()) return;
     const int localY=CueGridGeometry::rowLocalY(e.y+scroll);
-    // Exact same rectangles as paint/hover. Keep independent click actions:
-    // BPM editor, Auto Stop toggle, and CELLS disclosure.
+    // The fixed strip has only BPM and cue-level Auto Stop. Cell exceptions
+    // are edited in their own context menu, not an expansion mode.
     if (bpmEditBounds(0).contains(e.x,localY))
         owner.editRowBpm(row);
-    else if (cellDetailsBounds(0).contains(e.x,localY))
-        owner.grid.toggleAutoStopDetails(row);
     else if (autoStopToggleBounds(0).contains(e.x,localY))
         owner.setAutoStop(row,!owner.show.rows[(size_t)row].stopOnNext);
     repaint();
@@ -1045,8 +1045,6 @@ void CueMetricsOverlay::mouseMove(const juce::MouseEvent& e) {
     if (row>=0 && row<(int)owner.show.rows.size()) {
         if (bpmEditBounds(0).contains(e.x,localY))
             target=HoverTarget::bpm;
-        else if (cellDetailsBounds(0).contains(e.x,localY))
-            target=HoverTarget::cellDetails;
         else if (autoStopToggleBounds(0).contains(e.x,localY))
             target=HoverTarget::autoStop;
     }

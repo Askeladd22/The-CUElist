@@ -101,7 +101,8 @@ public:
 private:
     bool pressing=false,wasDragged=false;
 };
-class CueGrid final : public juce::Component, public juce::FileDragAndDropTarget {
+class CueGrid final : public juce::Component, public juce::FileDragAndDropTarget,
+                      public juce::SettableTooltipClient {
 public:
     explicit CueGrid(MainComponent& parent) : owner(parent) {}
     void paint(juce::Graphics&) override;
@@ -117,12 +118,10 @@ public:
     int columnWidthAt(int index) const;
     int columnAt(int x) const;
     int totalColumnsWidth() const;
-    void toggleAutoStopDetails(int row);
     void clickRowHeader(int row,int x,int localY,int clicks,juce::Point<int> screen);
     // Shared by the scrolled grid and the fixed column-header overlay.
     void clickColumnHeader(int gridX,int y,int clicks,juce::Point<int> screen);
     void doubleClickColumnHeader(int gridX,int y);
-    bool autoStopDetailsVisible(int rowId) const { return autoStopVisibleRows.count(rowId)>0; }
     static juce::Colour cueColour(int id);
     bool isInterestedInFileDrag(const juce::StringArray&) override;
     void filesDropped(const juce::StringArray&,int,int) override;
@@ -152,6 +151,11 @@ public:
     static juce::Rectangle<int> cellStopBounds(int x,int width,int y) {
         return {x+width-32,y+23,24,23};
     }
+    // A compact read-only marker; Auto Stop membership is edited through the
+    // cell context menu or Inspector rather than an inline disclosure mode.
+    static juce::Rectangle<int> cellContinueBadgeBounds(int x,int width,int y) {
+        return {x+width-53,y+4,45,16};
+    }
     // Small on-screen buttons; keep larger 24x23 mouse hit rectangles.
     static juce::Rectangle<int> cellButtonVisualBounds(juce::Rectangle<int> hit) {
         return hit.reduced(2,1);
@@ -161,7 +165,6 @@ private:
     MainComponent& owner;
     int dragRow=-1, dragColumn=-1, dropRow=-1, dropColumn=-1;
     int hoverRow=-1, hoverColumn=-1; // visual only; never activates a cue
-    std::set<int> autoStopVisibleRows;
     bool dragging=false;
 };
 // Stays outside the horizontally scrolled content, but follows its vertical
@@ -215,11 +218,8 @@ public:
     static juce::Rectangle<int> autoStopToggleBounds(int rowTop) {
         return {102,rowTop+8,78,26};
     }
-    static juce::Rectangle<int> cellDetailsBounds(int rowTop) {
-        return {108,rowTop+36,68,20};
-    }
 private:
-    enum class HoverTarget { none, bpm, autoStop, cellDetails };
+    enum class HoverTarget { none, bpm, autoStop };
     int hoverRow=-1;
     HoverTarget hoverTarget=HoverTarget::none;
     MainComponent& owner;
