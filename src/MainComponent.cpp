@@ -908,13 +908,17 @@ void MainComponent::showOperatorMenu(int index) {
             m.addItem(base+2,"Pre-flight...");
             m.addItem(base+3,"Diagnostics...");
             break;
-        case 3:
+        case 3: // Do not clutter a one-Cuelist project with inert actions.
             m.addItem(base+1,"New Cuelist",show.cuelists.size()<12);
             m.addItem(base+2,"Rename active Cuelist");
-            m.addItem(base+3,"Move active Cuelist left",show.activeCuelist>0);
-            m.addItem(base+4,"Move active Cuelist right",
-                show.activeCuelist+1<(int)show.cuelists.size());
-            m.addItem(base+5,"Delete active Cuelist...",show.cuelists.size()>1);
+            if (show.cuelists.size()>1) {
+                m.addSeparator();
+                if (show.activeCuelist>0)
+                    m.addItem(base+3,"Move active Cuelist left");
+                if (show.activeCuelist+1<(int)show.cuelists.size())
+                    m.addItem(base+4,"Move active Cuelist right");
+                m.addItem(base+5,"Delete active Cuelist...");
+            }
             break;
         case 4: { // Devices: full legacy MIDI/OSC controls, not "Settings".
             m.addItem(base+1,"Audio Devices...");
