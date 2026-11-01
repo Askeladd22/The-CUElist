@@ -27,14 +27,17 @@ void cueGridN3VisualTests() {
               midiRule.getRed()>midiRule.getGreen() &&
               oscRule.getBlue()>oscRule.getGreen(),
               "Cue/header type accent colours have lost their distinctions");
+        const auto title=CueGrid::rowNameBounds(0);
+        const auto play=CueGrid::rowPlayBounds(0);
+        const auto stop=CueGrid::rowStopBounds(0);
+        const auto menu=CueGrid::rowMenuBounds(0);
         check(grid->columnX(0)==CueGridGeometry::nameWidth &&
-              CueGrid::rowPlayBounds(0)==juce::Rectangle<int>(
-                  CueGrid::nameWidth-114,11,29,26) &&
-              CueGrid::rowStopBounds(0)==juce::Rectangle<int>(
-                  CueGrid::nameWidth-80,11,29,26) &&
-              CueGrid::rowMenuBounds(0)==juce::Rectangle<int>(
-                  CueGrid::nameWidth-46,11,29,26),
-              "N3.2 moved the protected Cue/Transport hitboxes");
+              title.getWidth()==196 && !title.intersects(play) &&
+              !title.intersects(stop) && !title.intersects(menu) &&
+              play==juce::Rectangle<int>(CueGrid::nameWidth-114,31,29,24) &&
+              stop==juce::Rectangle<int>(CueGrid::nameWidth-80,31,29,24) &&
+              menu==juce::Rectangle<int>(CueGrid::nameWidth-46,31,29,24),
+              "The extended cue title overlaps the relocated transport targets");
     });
     test("N3.2 pinned title hover reveals untruncated cue and column names",[] {
         using namespace cuelist;
@@ -78,4 +81,33 @@ void cueGridN3VisualTests() {
               ui.show.rows.size()==2,
               "Click on Cue Name must only select, never start or delete a cue");
     });
+    test("N3.2 follow-up selects the extended cue title without GO and renames inline",[] {
+        using namespace cuelist;
+        MainComponent ui(false);
+        addRow(ui.show,"Second cue");
+        auto* pinned=cueViewFixtures::find<PinnedCueHeaders>(ui);
+        auto* editor=dynamic_cast<juce::TextEditor*>(
+            controlsV3::named(ui,"inlineNameEditor"));
+        check(pinned!=nullptr && editor!=nullptr,
+              "Pinned Cue header or native inline rename editor missing");
+        ui.select(1,0);
+        const auto title=CueGrid::rowNameBounds(0);
+        const float x=(float)title.getRight()-8.0f;
+        const float y=(float)(CueGrid::headerHeight+
+            CueGrid::rowContentInset+title.getCentreY());
+        cueViewFixtures::click(*pinned,x,y);
+        check(ui.selectedRow==0 && ui.nextCueIndex()==0,
+              "Click on newly expanded title triggered GO or selected wrong cue");
+        pinned->mouseDoubleClick(cueViewFixtures::event(
+            *pinned,{x,y},{x,y},2));
+        check(editor->isVisible() &&
+              editor->getWidth()==title.getWidth() &&
+              editor->getHeight()==title.getHeight(),
+              "Inline rename editor is not aligned to the new title bounds");
+        editor->setText("New cue name",juce::dontSendNotification);
+        editor->onReturnKey();
+        check(ui.show.rows[0].name=="New cue name" && !editor->isVisible(),
+              "Inline rename must still commit after the two-tier change");
+    });
+
 }

@@ -125,6 +125,13 @@ void transportButton(juce::Graphics& g,juce::Rectangle<int> box,bool stop,
     if (stop) g.fillRect(x-4,y-4,8.0f,8.0f);
     else { juce::Path triangle; triangle.addTriangle(x-3,y-5,x-3,y+5,x+5,y); g.fillPath(triangle); }
 }
+juce::String clippedCueName(const Show& show,int row) {
+    if (row<0 || row>=(int)show.rows.size()) return {};
+    const auto& name=show.rows[(size_t)row].name;
+    const auto visible=name.isEmpty()?juce::String("Untitled cue"):name;
+    return juce::GlyphArrangement::getStringWidth(font(15.0f,true),visible) >
+        (float)CueGrid::rowNameBounds(0).getWidth() ? visible : juce::String{};
+}
 }
 
 
@@ -246,19 +253,20 @@ void CueGrid::paint(juce::Graphics& g) {
                     r+1<(int)show.rows.size(),false,true);
         smallButton(g,"x",{27,y+13,18,20},true,true,true);
         g.setColour(next ? palette::amber : palette::teal);
-        g.fillRoundedRectangle(56.f,(float)y+9,42.f,32.f,5.f);
-        label(g,"GO",{56,y+9,42,32},13,palette::background,true,juce::Justification::centred);
-        // Cue name and status remain inside the original transport-safe
-        // text lane. Only their typographic hierarchy has been refined.
+        g.fillRoundedRectangle(rowGoBounds(y).toFloat(),5.f);
+        label(g,"GO",rowGoBounds(y),13,palette::background,true,
+              juce::Justification::centred);
+        // The title occupies its own first tier, with the three compact
+        // transport targets below it. Both tiers remain inside the 62px row.
         label(g,row.name.isEmpty()?"Untitled cue":row.name,
-            {107,y+4,nameWidth-224,24},15,palette::text,true);
+              rowNameBounds(y),15,palette::text,true);
         const auto state=playing?"PLAYING":paused?"PAUSED":
                          next?"NEXT CUE":row.muted?"MUTED":"STANDBY";
         const auto stateInk=playing ? palette::teal :
                             paused || next ? palette::amber :
                             row.muted ? palette::red : palette::muted;
         label(g,juce::String(r+1).paddedLeft('0',2)+" / "+state,
-            {107,y+29,nameWidth-224,18},10,stateInk,true);
+              rowStatusBounds(y),10,stateInk,true);
         playPauseIcon(g,rowPlayBounds(y),playing);
         transportButton(g,rowStopBounds(y),true,true);
         smallButton(g,"...",rowMenuBounds(y),true,false,true);
@@ -447,7 +455,7 @@ void CueGrid::clickRowHeader(int row,int x,int localY,int clicks,juce::Point<int
         if (localY>=6 && localY<24 && x>=5 && x<23) owner.reorderRow(row,-1);
         else if (localY>=27 && localY<45 && x>=5 && x<23) owner.reorderRow(row,1);
         else if (localY>=13 && localY<33 && x>=27 && x<45) owner.deleteRow(row);
-        else if (x>=56 && x<98 && localY>=9 && localY<41) owner.triggerRow(row);
+        else if (rowGoBounds(0).contains(x,localY)) owner.triggerRow(row);
         else owner.select(row,owner.selectedColumn);
         return;
 }
@@ -577,7 +585,9 @@ void CueGrid::mouseDoubleClick(const juce::MouseEvent& e) {
     }
     const int row=CueGridGeometry::rowAt(e.y);
     if (row<0 || row>=(int)owner.show.rows.size()) return;
-    if (e.x>=107 && e.x<rowPlayBounds(0).getX()-4) owner.renameTitle(false,row);
+    const int localY=CueGridGeometry::rowLocalY(e.y)-rowContentInset;
+    if (e.x<nameWidth && rowTitleHit(e.x,localY))
+        owner.renameTitle(false,row);
     else if (column>=0 && !owner.show.columns[(size_t)column].collapsed) {
         const int localX=e.x-columnX(column),localY=(e.y-headerHeight)%rowHeight-rowContentInset;
         if (cellPlayBounds(0,columnWidthAt(column),0).contains(localX,localY) ||
@@ -652,8 +662,8 @@ void PinnedCueHeaders::mouseDown(const juce::MouseEvent& e) {
         owner.addCue(); return;
     }
     if (row<0 || row>=(int)owner.show.rows.size()) return;
-    if (e.x>=107 && e.x<CueGrid::rowPlayBounds(0).getX()-4 &&
-        e.getNumberOfClicks()==1)
+    const int localY=CueGridGeometry::rowLocalY(y)-CueGrid::rowContentInset;
+    if (CueGrid::rowTitleHit(e.x,localY) && e.getNumberOfClicks()==1)
         dragCueId=owner.show.rows[(size_t)row].id;
     owner.grabKeyboardFocus();
     owner.grid.clickRowHeader(row,e.x,
@@ -689,8 +699,9 @@ void PinnedCueHeaders::mouseDoubleClick(const juce::MouseEvent& e) {
     }
     const int y=e.y+owner.viewport.getViewPositionY();
     const int row=CueGridGeometry::rowAt(y);
+    const int localY=CueGridGeometry::rowLocalY(y)-CueGrid::rowContentInset;
     if (row>=0 && row<(int)owner.show.rows.size() &&
-        e.x>=107 && e.x<CueGrid::rowPlayBounds(0).getX()-4)
+        CueGrid::rowTitleHit(e.x,localY))
         owner.renameTitle(false,row);
 }
 void PinnedCueHeaders::mouseMove(const juce::MouseEvent& e) {
@@ -699,14 +710,12 @@ void PinnedCueHeaders::mouseMove(const juce::MouseEvent& e) {
     // row selection/drag/transport interaction.
     const int gridY=e.y+owner.viewport.getViewPositionY();
     const int row=CueGridGeometry::rowAt(gridY);
+    const int localY=CueGridGeometry::rowLocalY(gridY)-CueGrid::rowContentInset;
     if (e.y>=CueGrid::headerHeight &&
-        e.x>=107 && e.x<CueGrid::rowPlayBounds(0).getX()-4 &&
-        row>=0 && row<(int)owner.show.rows.size()) {
-        const auto& name=owner.show.rows[(size_t)row].name;
-        setTooltip(name.isEmpty() ? "Untitled cue" : name);
-    } else {
+        CueGrid::rowNameBounds(0).contains(e.x,localY))
+        setTooltip(clippedCueName(owner.show,row));
+    else
         setTooltip({});
-    }
 }
 void PinnedCueHeaders::mouseWheelMove(const juce::MouseEvent& e,
                                       const juce::MouseWheelDetails& wheel) {
