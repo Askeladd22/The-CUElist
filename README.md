@@ -35,7 +35,12 @@ offline](design/operator-workspace-v2.html) permette di valutare
 gerarchia, densità e collasso dei pannelli. La GUI di produzione,
 l'esecuzione di cue e il formato show v10 sono **invariati**.
 La preview non invia comandi audio, MIDI o OSC e non costituisce
-una nuova build del programma.
+una nuova build del programma. **V2.1:** dopo il primo feedback,
+la parte superiore della demo rimane invariata e il mixer è
+stato integrato sotto le stesse 11 colonne della cue matrix,
+con scroll orizzontale condiviso, Master allineato alla zona cue
+e BPM/Auto Stop ancora fissi. Vedere la
+[specifica del mixer integrato](docs/UI_V2_INTEGRATED_MIXER_SPEC.md).
 
 ## Capabilities
 
