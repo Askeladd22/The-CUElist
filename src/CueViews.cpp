@@ -362,7 +362,8 @@ void CueGrid::paint(juce::Graphics& g) {
                 label(g,column.controlLocked?"DEFAULT / LOCKED":
                         mapTitle.isNotEmpty()?mapTitle:
                         assigned?"CONTROL MAP":" + Control Map",
-                      {x+8,y+6,w-16,18},11,assigned?tone:palette::muted,true);
+                      {x+8,y+6,w-(cell.stopOnNext?16:67),18},
+                      11,assigned?tone:palette::muted,true);
                 if (assigned)
                     label(g,count>0 ? juce::String(count)+" mappings" : "Empty map",
                           {x+8,y+26,w-16,16},10, count>0?palette::text:palette::muted);
@@ -396,7 +397,7 @@ void CueGrid::paint(juce::Graphics& g) {
                            column.type==ColumnType::audio?"+ WAV/MP3":
                            column.type==ColumnType::midi?"+ MIDI":
                            column.type==ColumnType::osc?"+ OSC":"+ CONTROL",
-                           {x+8,y+11,w-16,20},11,
+                           {x+8,y+11,w-(cell.stopOnNext?16:60),20},11,
                            missing?palette::red:palette::muted.withAlpha(hovered?.96f:.78f),
                            false,juce::Justification::centred);
             if(!cell.followsRow) {
