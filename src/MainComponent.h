@@ -6,6 +6,7 @@
 #include "GainMeterFader.h"
 #include "MixerControls.h"
 #include "WorkspaceLayout.h"
+#include "CueGridGeometry.h"
 #include "OperatorNavigation.h"
 #include "MidiInputManager.h"
 #include "OscControlInput.h"
@@ -125,7 +126,11 @@ public:
     void filesDropped(const juce::StringArray&,int,int) override;
     // Wider title/transport lane gives operators distinct Play, Stop and
     // actions targets without increasing cue row height.
-    static constexpr int rowHeight=62, headerHeight=72, nameWidth=318, columnWidth=152, compressedWidth=48;
+    static constexpr int rowHeight=CueGridGeometry::rowHeight;
+    static constexpr int headerHeight=CueGridGeometry::headerHeight;
+    static constexpr int nameWidth=CueGridGeometry::nameWidth;
+    static constexpr int columnWidth=CueGridGeometry::columnWidth;
+    static constexpr int compressedWidth=CueGridGeometry::compressedWidth;
     // Compact the cue row actions to consistent 5px gaps.
     static juce::Rectangle<int> rowPlayBounds(int y) { return {nameWidth-114,y+11,29,26}; }
     static juce::Rectangle<int> rowStopBounds(int y) { return {nameWidth-80,y+11,29,26}; }
@@ -141,7 +146,7 @@ public:
     static juce::Rectangle<int> cellButtonVisualBounds(juce::Rectangle<int> hit) {
         return hit.reduced(2,1);
     }
-    static constexpr int rowContentInset=4; // visual padding, used by both paint and hit-testing
+    static constexpr int rowContentInset=CueGridGeometry::rowContentInset; // shared paint/input offset
 private:
     MainComponent& owner;
     int dragRow=-1, dragColumn=-1, dropRow=-1, dropColumn=-1;
@@ -183,7 +188,7 @@ public:
     void paint(juce::Graphics&) override;
     void mouseDown(const juce::MouseEvent&) override;
     void mouseWheelMove(const juce::MouseEvent&,const juce::MouseWheelDetails&) override;
-    static constexpr int width=184;
+    static constexpr int width=CueGridGeometry::pinnedMetricsWidth;
     // Single geometry source for both drawing and hit-testing the cell
     // Auto Stop disclosure within the fixed BPM/AUTO STOP strip.
     static juce::Rectangle<int> cellDetailsBounds(int rowTop) {
