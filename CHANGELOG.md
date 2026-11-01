@@ -34,6 +34,9 @@ pubbliche. I particolari di ogni intervento sono nell'appendice.
   rimane nel cue header anziché apparire anche in View.
 - I menu MIDI usano i device ID rilevati all'apertura, evitando
   associazioni errate se l'enumerazione cambia durante il popup.
+- Il menu Cuelists mostra spostamento/eliminazione soltanto
+  quando l'operazione è effettivamente possibile, evitando
+  voci disabilitate inutili con un solo elenco.
 
 ### Verifiche e garanzie
 - Nuovo test `test_native_operator_menu_parity.py` eseguito
