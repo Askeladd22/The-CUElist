@@ -288,9 +288,11 @@ void cuelistGuiMockupTests() {
                   toggle->getY()>=headers->getY() &&
                   toggle->getBottom()<=headers->getY()+CueGrid::headerHeight,
                   "Collapse-all escaped the Cue List header");
-            check(mapping->isVisible() && mapping->getX()>=0 &&
-                  mapping->getRight()<=180,
-                  "Control Mapping overlapped the show toolbar");
+            auto* devices=controlsV3::named(ui,"operatorMenuDevices");
+            auto* more=controlsV3::named(ui,"operatorMenuMore");
+            check(!mapping->isVisible() && devices && more &&
+                  (devices->isVisible() || more->isVisible()),
+                  "Control Mapping must be in Devices/More, not a duplicate sidebar button");
             check(notes->getHeight()>=38 && notes->getRight()<=window.x &&
                   notes->getBottom()<window.y-30,
                   "Cue notes escaped the Inspector on a compact window");
