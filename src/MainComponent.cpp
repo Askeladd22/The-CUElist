@@ -582,12 +582,18 @@ void MainComponent::paint(juce::Graphics& g) {
     g.setColour(palette::line.withAlpha(.55f));
     g.drawVerticalLine(telemetry.usage.getX()-7,13.f,58.f);
     g.drawVerticalLine(w-375,13.f,58.f);
-    // Only the centred 24-hour time, no redundant CLOCK / 24H heading.
-    label(g,juce::Time::getCurrentTime().formatted(
-              appPreferences && appPreferences->getBoolValue("clock12Hour",false) ?
-              "%I:%M:%S %p" : "%H:%M:%S"),
-          telemetry.timeText,23,palette::text,true,
+    // A large operator clock that remains readable without enlarging the
+    // global 72px header or overlapping CPU, RAM, MIDI/OSC and Audio.
+    // In 12h mode show AM/PM separately instead of shrinking all digits.
+    const auto now=juce::Time::getCurrentTime();
+    const bool clock12=appPreferences &&
+        appPreferences->getBoolValue("clock12Hour",false);
+    label(g,now.formatted(clock12?"%I:%M:%S":"%H:%M:%S"),
+          telemetry.timeText,30,palette::text,true,
           juce::Justification::centred);
+    if (clock12)
+        label(g,now.formatted("%p"),telemetry.meridiemText,11,
+              palette::teal,true,juce::Justification::centredRight);
     // Two balanced CPU/RAM rows, with one decimal only for CPU.
     label(g,"CPU",telemetry.cpuLabel,11,palette::text,true);
     label(g,HeaderTelemetryLayout::percentage(systemCpuPercent,true),
