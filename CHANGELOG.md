@@ -13,6 +13,39 @@ certifichino tutte le milestone riportate**; le etichette storiche
 indicano versioni di sviluppo presenti nei commit, non distribuzioni
 pubbliche. I particolari di ogni intervento sono nell'appendice.
 
+## [0.9.0-beta.14] - 2026-11-01
+
+**Tipo:** fase N3.2 del redesign nativo Cue Grid: intestazioni e Cue/Transport.
+
+### Grafica JUCE
+- Intestazioni della matrice in Midnight Slate continuo:
+  superfici meno stratificate, regole di tipo sottili da 3px,
+  separatori verticali e etichette Audio/MIDI/OSC/Control
+  identificate anche testualmente.
+- Gerarchia migliorata per nome Cuelist, contatore cue/clip,
+  titoli delle colonne e nomi/stati Cue; gli stati PLAYING,
+  PAUSED, NEXT CUE e MUTED sono distinti senza affidarsi
+  soltanto al colore.
+- Frecce, pulsanti di gestione, collasso e menu contestuale
+  visualmente più leggeri, senza restringere la relativa
+  superficie interattiva.
+- Tooltip con titolo completo sulle intestazioni cue e
+  colonna pinned, che seguono gli offset reali del viewport.
+
+### Regressioni e perimetro
+- Test nativi in `tests/CueGridN3VisualTests.h`: paint
+  dello header tramite screenshot JUCE, accenti cromatici,
+  hitbox Play/Stop/Menu, tooltip di nomi lunghi e selezione
+  senza GO accidentale. Restano le suite precedenti.
+- `docs/UI_V2_NATIVE_PHASE_N3_2.md` documenta scope e
+  verifiche della fase.
+- Non è ancora una riduzione delle righe a 36–40px:
+  dimensioni originali, celle, motori, layout Inspector,
+  Timeline, menu, mix e formato show JSON v10 invariati.
+- **Master Audio non modificato**: nessun intervento al
+  componente JUCE originale o alle sue funzionalità.
+- Nessuna build portable.
+
 ## [0.9.0-beta.13] - 2026-11-01
 
 **Tipo:** prima implementazione JUCE della fase N3 (N3.1 — fondazioni geometriche della Cue Grid), senza ancora cambiare la grafica.
