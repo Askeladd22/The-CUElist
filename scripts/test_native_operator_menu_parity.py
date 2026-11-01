@@ -57,7 +57,11 @@ class NativeOperatorMenuParity(unittest.TestCase):
         for item in ('"Rename show..."', '"Pre-flight..."',
                      '"Diagnostics..."'):
             self.assertIn(item, show)
-        self.assertIn('"Rename active Cuelist"', menu_case(3))
+        cuelists = menu_case(3)
+        self.assertIn('"Rename active Cuelist"', cuelists)
+        self.assertIn('if (show.cuelists.size()>1)', cuelists)
+        self.assertIn('if (show.activeCuelist>0)', cuelists)
+        self.assertIn('m.addItem(base+5,"Delete active Cuelist...")', cuelists)
         self.assertIn('10000', device)
         self.assertIn('10001+i', device)
         self.assertIn('11001+i', device)
