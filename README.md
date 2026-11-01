@@ -27,6 +27,17 @@ pubbliche. La versione del progetto salvato `.cuelist` (**schema v10**)
 
 ## UI V2 — Operator workspace design study
 
+**V2.3 / `0.9.0-beta.9`:** rifinito il prototipo di
+[Operator Workspace](design/operator-workspace-v2.html):
+strip Audio, MIDI, OSC e Control chiaramente differenziate,
+testo più leggibile e sidebar senza note provvisorie.
+La cue matrix, il Master completo e lo scroll condiviso
+del mixer restano invariati. Tutte le funzioni operative
+devono continuare a essere disponibili nella GUI nativa:
+vedi [parità funzionale](docs/UI_V2_FEATURE_PARITY.md).
+Il prototipo resta offline e non operativo.
+
+
 **V2.2 / `0.9.0-beta.8`:** il Master nel prototipo di
 [Operator Workspace](design/operator-workspace-v2.html)
 rappresenta tutte le funzioni che il programma ha già in
