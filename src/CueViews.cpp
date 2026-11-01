@@ -8,10 +8,20 @@ juce::String timeText(double seconds) {
     const auto whole=(int)seconds;
     return juce::String(whole/60).paddedLeft('0',2)+":"+juce::String(whole%60).paddedLeft('0',2);
 }
-void smallButton(juce::Graphics& g, const juce::String& text, juce::Rectangle<int> box, bool enabled, bool danger=false) {
+void smallButton(juce::Graphics& g, const juce::String& text,
+                 juce::Rectangle<int> box, bool enabled, bool danger=false,
+                 bool understated=false) {
     const auto colour=danger ? palette::red : palette::muted;
     const IconButtonState state{enabled,false,false,false,false};
-    drawIconButtonSurface(g,box.toFloat(),colour,state);
+    // Secondary grid controls are visually quiet, but retain the exact
+    // paint rectangles and original independent mouse hit targets.
+    if (understated) {
+        g.setColour((danger ? palette::red : palette::raised)
+                       .withAlpha(enabled ? .22f : .10f));
+        g.fillRoundedRectangle(box.toFloat().reduced(.75f),3.0f);
+    } else {
+        drawIconButtonSurface(g,box.toFloat(),colour,state);
+    }
     const auto ink=iconButtonInk(colour,state);
     if (text=="^" || text=="v" || text=="<" || text==">") {
         // Unicode directional symbols are rendered in embedded Noto Sans
@@ -151,25 +161,35 @@ void CueGrid::toggleAutoStopDetails(int row) {
 }
 void CueGrid::paint(juce::Graphics& g) {
     g.fillAll(palette::background);
-    g.setColour(palette::raised);g.fillRect(0,0,getWidth(),headerHeight);
-    g.setColour(palette::line);g.drawHorizontalLine(headerHeight-1,0,(float)getWidth());
-    g.setColour(palette::teal);g.fillRoundedRectangle(10.f,8.f,3.f,49.f,1.5f);
+    // A continuous 72px pinned header, preserving the N3.1 coordinates.
+    g.setColour(palette::panel);g.fillRect(0,0,getWidth(),headerHeight);
+    g.setColour(palette::line.withAlpha(.72f));
+    g.drawHorizontalLine(headerHeight-1,0,(float)getWidth());
+    g.setColour(palette::teal);
+    g.fillRect(0,0,nameWidth-1,3);
+    g.setColour(palette::teal.withAlpha(.76f));
+    g.fillRect(10,12,2,44);
     const auto& show=owner.show;
     const auto activeName=show.cuelists.empty()
         ? juce::String("Cuelist 1")
         : show.cuelists[(size_t)show.activeCuelist].name;
     label(g,activeName,{22,8,nameWidth-170,23},
-          13,palette::teal,true);
+          14,palette::text,true);
     label(g,juce::String((int)show.rows.size())+" cues  /  "+
           juce::String(owner.visibleClipCount)+" clips",
           {22,35,nameWidth-40,20},11,palette::muted,true);
+    label(g,"CUE / TRANSPORT",{22,56,nameWidth-40,14},
+          10,palette::teal.withAlpha(.85f),true);
     for (int c=0;c<(int)show.columns.size();++c) {
         const auto& col=show.columns[(size_t)c];
         const int x=columnX(c),w=columnWidthAt(c);
         const auto tone=palette::type((int)col.type);
-        g.setColour(tone);g.fillRect(x,0,w-1,4);
-        g.setColour(tone.withAlpha(col.collapsed ? .15f : .08f));
-        g.fillRect(x,4,w-1,headerHeight-5);
+        // Type stays identifiable by colour AND label without a bright
+        // full-column block, including when a column is collapsed.
+        g.setColour(palette::raised.withAlpha(.25f));
+        g.fillRect(x+1,3,w-2,headerHeight-4);
+        g.setColour(tone.withAlpha(.94f));
+        g.fillRect(x+1,0,w-2,3);
         if (col.collapsed) {
             label(g,"+",{x+7,9,w-14,23},17,tone,true,juce::Justification::centred);
             const auto shortName=col.type==ColumnType::audio ? "A" :
@@ -177,18 +197,20 @@ void CueGrid::paint(juce::Graphics& g) {
             label(g,shortName,{x+7,39,w-14,20},12,palette::muted,true,juce::Justification::centred);
         } else {
             label(g,columnTypeName(col.type),{x+7,9,w-68,20},11,tone,true);
-            smallButton(g,"<",{x+w-61,10,18,19},c>0);
-            smallButton(g,">",{x+w-41,10,18,19},c+1<(int)show.columns.size());
-            smallButton(g,"x",{x+w-21,10,18,19},true,true);
+            smallButton(g,"<",{x+w-61,10,18,19},c>0,false,true);
+            smallButton(g,">",{x+w-41,10,18,19},
+                        c+1<(int)show.columns.size(),false,true);
+            smallButton(g,"x",{x+w-21,10,18,19},true,true,true);
             int ordinal=0;
             for (int i=0;i<=c;++i) if (show.columns[(size_t)i].type==col.type) ++ordinal;
             const auto defaultName=col.type==ColumnType::audio ? "Audio" :
                 col.type==ColumnType::midi ? "MIDI" : col.type==ColumnType::osc ? "OSC" : "Control";
             const auto name=col.name.isEmpty()? juce::String(defaultName)+" "+juce::String(ordinal) : col.name;
-            label(g,name,{x+8,35,w-38,25},13,palette::text,true);
-            smallButton(g,"-",{x+w-26,38,19,20},true);
+            label(g,name,{x+8,35,w-38,25},14,palette::text,true);
+            smallButton(g,"-",{x+w-26,38,19,20},true,false,true);
         }
-        g.setColour(palette::line);g.drawVerticalLine(x,0,(float)getHeight());
+        g.setColour(palette::line.withAlpha(.54f));
+        g.drawVerticalLine(x,0,(float)getHeight());
     }
     // Contextual add-column control follows the rightmost column, including
     // after reordering or when all preceding columns are compressed.
@@ -219,20 +241,27 @@ void CueGrid::paint(juce::Graphics& g) {
         }
         g.saveState();
         g.addTransform(juce::AffineTransform::translation(0.f,(float)rowContentInset));
-        smallButton(g,"^",{5,y+6,18,18},r>0);
-        smallButton(g,"v",{5,y+27,18,18},r+1<(int)show.rows.size());
-        smallButton(g,"x",{27,y+13,18,20},true,true);
+        smallButton(g,"^",{5,y+6,18,18},r>0,false,true);
+        smallButton(g,"v",{5,y+27,18,18},
+                    r+1<(int)show.rows.size(),false,true);
+        smallButton(g,"x",{27,y+13,18,20},true,true,true);
         g.setColour(next ? palette::amber : palette::teal);
         g.fillRoundedRectangle(56.f,(float)y+9,42.f,32.f,5.f);
         label(g,"GO",{56,y+9,42,32},13,palette::background,true,juce::Justification::centred);
+        // Cue name and status remain inside the original transport-safe
+        // text lane. Only their typographic hierarchy has been refined.
         label(g,row.name.isEmpty()?"Untitled cue":row.name,
-            {107,y+4,nameWidth-224,24},14,palette::text,true);
-        const auto state=playing?"PLAYING":paused?"PAUSED":next?"NEXT CUE":row.muted?"MUTED":"STANDBY";
+            {107,y+4,nameWidth-224,24},15,palette::text,true);
+        const auto state=playing?"PLAYING":paused?"PAUSED":
+                         next?"NEXT CUE":row.muted?"MUTED":"STANDBY";
+        const auto stateInk=playing ? palette::teal :
+                            paused || next ? palette::amber :
+                            row.muted ? palette::red : palette::muted;
         label(g,juce::String(r+1).paddedLeft('0',2)+" / "+state,
-            {107,y+29,nameWidth-224,18},10,playing?palette::teal:next?palette::amber:palette::muted,true);
+            {107,y+29,nameWidth-224,18},10,stateInk,true);
         playPauseIcon(g,rowPlayBounds(y),playing);
         transportButton(g,rowStopBounds(y),true,true);
-        smallButton(g,"...",rowMenuBounds(y),true);
+        smallButton(g,"...",rowMenuBounds(y),true,false,true);
         for (int c=0;c<(int)show.columns.size();++c) {
             const auto& column=show.columns[(size_t)c];
             const auto& cell=row.cells[(size_t)c];
