@@ -116,7 +116,7 @@ void cueGridN3VisualTests() {
         addRow(ui.show,"Standby");
         addColumn(ui.show,ColumnType::midi,"MIDI 1");
         ui.setSize(1647,895);
-        ui.refresh();
+        ui.resized();
         auto* grid=cueViewFixtures::find<CueGrid>(ui);
         check(grid!=nullptr,"Native CueGrid is missing");
         const int sampleX=grid->columnX(2)+12; // after both lanes
@@ -138,7 +138,7 @@ void cueGridN3VisualTests() {
         addRow(ui.show,"Second");
         addColumn(ui.show,ColumnType::osc,"OSC");
         ui.setSize(1647,895);
-        ui.refresh();
+        ui.resized();
         auto* grid=cueViewFixtures::find<CueGrid>(ui);
         check(grid!=nullptr,"CueGrid is missing");
         const int cellX=grid->columnX(1);
@@ -174,7 +174,7 @@ void cueGridN3VisualTests() {
         check(grid!=nullptr,"CueGrid is missing");
         // A missing file must produce a visible error without creating a clip.
         ui.show.rows[1].cells[0].file="C:/missing-production-media.wav";
-        ui.refresh();
+        ui.resized();
         const int x=grid->columnX(0);
         const int y=CueGridGeometry::rowTop(1)+CueGrid::rowContentInset;
         auto pixel=[&](int cellX,int cellY) {
@@ -192,7 +192,7 @@ void cueGridN3VisualTests() {
         pcm->samples.setSize(1,64);
         pcm->samples.clear();
         ui.clips[ui.show.rows[1].cells[0].id]=pcm;
-        ui.refresh();
+        ui.resized();
         const auto loadedMark=pixel(x+5,y+21);
         check(loadedMark.getGreen()>loadedMark.getRed(),
               "Loaded audio lost its type-colour cue");
