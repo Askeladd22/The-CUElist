@@ -883,8 +883,9 @@ void PinnedColumnHeaders::mouseWheelMove(
         owner.viewport.setViewPosition(x,y-(int)(wheel.deltaY*100));
 }
 void CueMetricsOverlay::paint(juce::Graphics& g) {
-    g.fillAll(palette::raised);
-    // Paint BPM and Auto Stop rows strictly below the pinned heading.
+    // The metrics lane is fixed: only row contents use the viewport's Y,
+    // while the 72px heading, 3px rail and controls keep local coordinates.
+    g.fillAll(palette::panel);
     g.saveState();
     g.reduceClipRegion(getLocalBounds().withTrimmedTop(CueGrid::headerHeight));
     const int scroll=owner.viewport.getViewPositionY();
@@ -894,69 +895,183 @@ void CueMetricsOverlay::paint(juce::Graphics& g) {
     for (int r=first;r<last;++r) {
         const auto& row=owner.show.rows[(size_t)r];
         const int y=CueGridGeometry::overlayRowTop(r,scroll);
-        g.setColour(r==owner.selectedRow?palette::panel:palette::background.withAlpha(.55f));
+        const bool selected=r==owner.selectedRow;
+        const bool next=r==owner.nextCueIndex();
+        bool playing=false,paused=false;
+        if (owner.engine.connected.load()) for (const auto& cell:row.cells) {
+            const auto state=owner.engine.getCellPlayback(cell.id);
+            playing=playing||state.playing;
+            paused=paused||state.paused;
+        }
+        // Match the N3.3 CueGrid row surface exactly: the persistent
+        // 3px teal pinned-edge rail is painted over all rows at the end.
+        const auto base=(r&1)==0 ? palette::panel :
+            palette::panel.interpolatedWith(palette::raised,.10f);
+        g.setColour(selected ? palette::raised.interpolatedWith(palette::panel,.20f) : base);
         g.fillRect(3,y,getWidth()-3,CueGrid::rowHeight);
+        if (playing) {
+            g.setColour(palette::teal.withAlpha(selected?.08f:.10f));
+            g.fillRect(3,y,getWidth()-3,CueGrid::rowHeight);
+        }
+        if (next) {
+            g.setColour(palette::amber.withAlpha(selected?.08f:.10f));
+            g.fillRect(3,y,getWidth()-3,CueGrid::rowHeight);
+        }
         const auto cueTone=CueGrid::cueColour(row.colour);
         if (row.colour>0) {
-            g.setColour(cueTone.withAlpha(.28f));g.fillRect(3,y,getWidth()-3,CueGrid::rowHeight);
+            g.setColour(cueTone.withAlpha(.13f));
+            g.fillRect(3,y,getWidth()-3,CueGrid::rowHeight);
         }
-        label(g,juce::String(row.tempo.front().bpm,1),{22,y+14,65,24},14,palette::text,true);
-        // Separate the master toggle from cell-level disclosure within
-        // the 62px row. The disclosure looks actionable even when collapsed.
-        g.setColour(row.stopOnNext?palette::teal.withAlpha(.3f):palette::muted.withAlpha(.2f));
-        g.fillRoundedRectangle(105.f,(float)y+10,31.f,19.f,9.f);
+        // Narrow independent status signals; keep BPM and toggles readable.
+        if (selected) {
+            g.setColour(palette::text.withAlpha(.78f));
+            g.fillRect(4,y,2,CueGrid::rowHeight);
+        }
+        if (next) {
+            g.setColour(palette::amber);
+            g.fillRect(6,y,2,CueGrid::rowHeight);
+        }
+        if (playing) {
+            g.setColour(palette::teal);
+            g.fillRect(9,y,2,CueGrid::rowHeight);
+        }
+        if (row.colour>0 && !next && !playing) {
+            g.setColour(cueTone.withAlpha(.88f));
+            g.fillRect(6,y,2,CueGrid::rowHeight);
+        }
+
+        const bool bpmHover=hoverRow==r && hoverTarget==HoverTarget::bpm;
+        const bool toggleHover=hoverRow==r && hoverTarget==HoverTarget::autoStop;
+        const bool detailHover=hoverRow==r && hoverTarget==HoverTarget::cellDetails;
+        if (bpmHover) {
+            g.setColour(palette::raised.withAlpha(.32f));
+            g.fillRoundedRectangle(juce::Rectangle<float>(13.f,(float)y+6.f,77.f,49.f),4.f);
+        }
+        // Tempo remains a direct-edit field with its original full-lane
+        // hit target, not a decorative value or a secondary inspector field.
+        label(g,juce::String(row.tempo.front().bpm,1),
+              {22,y+11,66,25},14,palette::text,true);
+        const auto tempoState=next?"NEXT":playing?"LIVE":paused?"PAUSED":"EDIT BPM";
+        label(g,tempoState,{22,y+39,66,16},10,
+              next?palette::amber:playing?palette::teal:
+              paused?palette::amber:palette::muted,true);
+
+        const auto toggle=autoStopToggleBounds(y);
+        if (toggleHover) {
+            g.setColour(palette::raised.withAlpha(.48f));
+            g.fillRoundedRectangle(toggle.toFloat(),4.f);
+        }
+        // Preserve the original binary Auto Stop behavior and switch geometry.
+        g.setColour(row.stopOnNext?palette::teal.withAlpha(.30f):
+                   palette::muted.withAlpha(.20f));
+        g.fillRoundedRectangle((float)toggle.getX()+3.f,
+                               (float)toggle.getY()+2.f,31.f,19.f,9.f);
         g.setColour(row.stopOnNext?palette::teal:palette::muted);
-        g.fillEllipse(row.stopOnNext?121.f:108.f,(float)y+13,13.f,13.f);
-        label(g,row.stopOnNext?"ON":"OFF",{141,y+9,36,21},10,
+        g.fillEllipse((float)toggle.getX()+(row.stopOnNext?19.f:6.f),
+                      (float)toggle.getY()+5.f,13.f,13.f);
+        label(g,row.stopOnNext?"ON":"OFF",
+              {toggle.getX()+39,toggle.getY()+1,36,21},10,
               row.stopOnNext?palette::teal:palette::muted,true);
+
         const bool details=owner.grid.autoStopDetailsVisible(row.id);
-        const auto disclose=cellDetailsBounds(y).toFloat();
-        drawIconButtonSurface(g,disclose,palette::amber,
-            IconButtonState{true,false,false,details,false},4.0f);
+        const auto disclosure=cellDetailsBounds(y);
+        drawIconButtonSurface(g,disclosure.toFloat(),palette::amber,
+            IconButtonState{true,detailHover,false,details,false},4.f);
         g.setColour(details?palette::amber:palette::text);
-        const float cx=121.f,cy=(float)y+46;
+        const float cx=(float)disclosure.getX()+13.f;
+        const float cy=(float)disclosure.getCentreY();
         g.drawLine(cx-4.f,cy,cx+4.f,cy,1.8f);
         if (!details) g.drawLine(cx,cy-4.f,cx,cy+4.f,1.8f);
-        label(g,"CELLS",{134,y+37,39,18},10,
+        label(g,"CELLS",
+              {disclosure.getX()+26,disclosure.getY()+1,39,18},10,
               details?palette::amber:palette::muted,true);
-        // The left 3px is reserved for an unbroken accent rail.
-        g.setColour(palette::line);
-        g.drawHorizontalLine(y+CueGrid::rowHeight-1,4.0f,(float)getWidth());
+
+        // The 94px separator corresponds to the same original two zones.
+        g.setColour(palette::line.withAlpha(.28f));
+        g.drawVerticalLine(94,(float)y,(float)(y+CueGrid::rowHeight));
+        g.setColour(palette::line.withAlpha(.43f));
+        g.drawHorizontalLine(y+CueGrid::rowHeight-1,4.f,(float)getWidth());
     }
     g.restoreState();
-    // Paint the heading last and restore its divider, so no scrolling row
-    // (including partially visible toggles) can appear above the boundary.
-    g.setColour(palette::raised);
+
+    // Draw the pinned header after scrolling content so partial row buttons
+    // can never bleed through it; match the native N3.2 header's palette.
+    g.setColour(palette::panel);
     g.fillRect(0,0,getWidth(),CueGrid::headerHeight);
-    label(g,"BPM",{22,18,61,23},11,palette::text,true);
-    label(g,"AUTO STOP",{100,18,78,23},10,palette::text,true);
+    g.setColour(palette::teal.withAlpha(.76f));
+    g.fillRect(3,0,getWidth()-3,3);
+    label(g,"CUE METRICS",{17,10,154,19},10,palette::muted,true);
+    label(g,"BPM",{22,37,66,22},12,palette::text,true);
+    label(g,"AUTO STOP",{102,37,77,22},11,palette::text,true);
+    g.setColour(palette::line.withAlpha(.38f));
+    g.drawVerticalLine(94,3.f,(float)CueGrid::headerHeight-1);
+    g.setColour(palette::line.withAlpha(.72f));
+    g.drawHorizontalLine(CueGrid::headerHeight-1,4.f,(float)getWidth());
+
+    // Native contract: this 3px teal line is continuous across the whole
+    // pinned surface, including between rows and underneath the heading.
+    g.setColour(palette::teal);
+    g.fillRect(0,0,3,getHeight());
     g.setColour(palette::line);
-    g.drawHorizontalLine(CueGrid::headerHeight-1,4.0f,(float)getWidth());
-    // Draw the accent after every horizontal rule: no one-pixel gaps.
-    g.setColour(palette::teal);g.fillRect(0,0,3,getHeight());
-    g.setColour(palette::line);
-    g.drawVerticalLine(3,0.0f,(float)getHeight());
+    g.drawVerticalLine(3,0.f,(float)getHeight());
 }
 void CueMetricsOverlay::mouseDown(const juce::MouseEvent& e) {
     if (e.y<CueGrid::headerHeight) return;
+    const int scroll=owner.viewport.getViewPositionY();
+    const int row=CueGridGeometry::overlayRowAt(e.y,scroll);
+    if (row<0 || row>=(int)owner.show.rows.size()) return;
     if (e.mods.isPopupMenu()) {
-        const int scroll=owner.viewport.getViewPositionY();
-        const int row=CueGridGeometry::overlayRowAt(e.y,scroll);
         owner.grid.showRowMenu(row,e.getScreenPosition());
         return;
     }
     if (!e.mods.isLeftButtonDown()) return;
-    const int scroll=owner.viewport.getViewPositionY();
-
-    const int row=CueGridGeometry::overlayRowAt(e.y,scroll);
-    if (row<0 || row>=(int)owner.show.rows.size()) return;
     const int localY=CueGridGeometry::rowLocalY(e.y+scroll);
-    if (e.x<91) owner.editRowBpm(row);
+    // Exact same rectangles as paint/hover. Keep independent click actions:
+    // BPM editor, Auto Stop toggle, and CELLS disclosure.
+    if (bpmEditBounds(0).contains(e.x,localY))
+        owner.editRowBpm(row);
     else if (cellDetailsBounds(0).contains(e.x,localY))
         owner.grid.toggleAutoStopDetails(row);
-    else if (e.x>=102 && e.x<180 && localY>=8 && localY<34)
+    else if (autoStopToggleBounds(0).contains(e.x,localY))
         owner.setAutoStop(row,!owner.show.rows[(size_t)row].stopOnNext);
     repaint();
+}
+void CueMetricsOverlay::mouseMove(const juce::MouseEvent& e) {
+    const int scroll=owner.viewport.getViewPositionY();
+    const int row=e.y>=CueGrid::headerHeight ?
+        CueGridGeometry::overlayRowAt(e.y,scroll) : -1;
+    const int localY=CueGridGeometry::rowLocalY(e.y+scroll);
+    HoverTarget target=HoverTarget::none;
+    if (row>=0 && row<(int)owner.show.rows.size()) {
+        if (bpmEditBounds(0).contains(e.x,localY))
+            target=HoverTarget::bpm;
+        else if (cellDetailsBounds(0).contains(e.x,localY))
+            target=HoverTarget::cellDetails;
+        else if (autoStopToggleBounds(0).contains(e.x,localY))
+            target=HoverTarget::autoStop;
+    }
+    const int nextRow=target!=HoverTarget::none?row:-1;
+    if (nextRow==hoverRow && target==hoverTarget) return;
+    const auto repaintRow=[this,scroll](int index) {
+        if (index>=0)
+            repaint(0,CueGridGeometry::overlayRowTop(index,scroll),
+                    getWidth(),CueGrid::rowHeight);
+    };
+    repaintRow(hoverRow);
+    hoverRow=nextRow;
+    hoverTarget=target;
+    repaintRow(hoverRow);
+    setMouseCursor(target==HoverTarget::none ?
+        juce::MouseCursor::NormalCursor : juce::MouseCursor::PointingHandCursor);
+}
+void CueMetricsOverlay::mouseExit(const juce::MouseEvent&) {
+    if (hoverRow>=0)
+        repaint(0,CueGridGeometry::overlayRowTop(
+                    hoverRow,owner.viewport.getViewPositionY()),
+                getWidth(),CueGrid::rowHeight);
+    hoverRow=-1;
+    hoverTarget=HoverTarget::none;
+    setMouseCursor(juce::MouseCursor::NormalCursor);
 }
 void CueMetricsOverlay::mouseWheelMove(const juce::MouseEvent& e,const juce::MouseWheelDetails& wheel) {
     const int x=owner.viewport.getViewPositionX(),y=owner.viewport.getViewPositionY();
