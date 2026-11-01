@@ -585,15 +585,15 @@ void MainComponent::paint(juce::Graphics& g) {
     // A large operator clock that remains readable without enlarging the
     // global 72px header or overlapping CPU, RAM, MIDI/OSC and Audio.
     // In 12h mode show AM/PM separately instead of shrinking all digits.
-    const auto now=juce::Time::getCurrentTime();
+    const auto clockTime=juce::Time::getCurrentTime();
     const bool clock12=appPreferences &&
         appPreferences->getBoolValue("clock12Hour",false);
-    label(g,now.formatted(clock12?"%I:%M:%S":"%H:%M:%S"),
+    label(g,clockTime.formatted(clock12?"%I:%M:%S":"%H:%M:%S"),
           clock12 ? telemetry.timeText : telemetry.clock.reduced(4,9),
           30,palette::text,true,
           juce::Justification::centred);
     if (clock12)
-        label(g,now.formatted("%p"),telemetry.meridiemText,11,
+        label(g,clockTime.formatted("%p"),telemetry.meridiemText,11,
               palette::teal,true,juce::Justification::centredRight);
     // Two balanced CPU/RAM rows, with one decimal only for CPU.
     label(g,"CPU",telemetry.cpuLabel,11,palette::text,true);
