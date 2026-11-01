@@ -13,6 +13,22 @@ certifichino tutte le milestone riportate**; le etichette storiche
 indicano versioni di sviluppo presenti nei commit, non distribuzioni
 pubbliche. I particolari di ogni intervento sono nell'appendice.
 
+## [0.9.0-beta.14] - 2026-11-01
+
+**Tipo:** fase N3.2 — primo redesign JUCE delle intestazioni e della lane Cue Name/Transport, sulla geometria condivisa N3.1.
+
+### Modificato
+- Intestazioni di colonna sulla stessa superficie Midnight Slate, con accento per AUDIO/MIDI/OSC/CONTROL limitato a una sottile fascia superiore; sono conservate tutte le posizioni di riordino, cancellazione, collasso e rinomina.
+- Nome cue su prima fascia da 196 px (in precedenza circa 94 px); stato e pulsanti Play, Stop, More su seconda fascia nella stessa riga da 62 px. GO rimane distinto e non si attiva con la selezione.
+- Tooltip JUCE per i nomi cue realmente troncati, tanto sulla lane fissa quanto sullo scroller, senza dipendere da caratteri Unicode.
+- Hit testing di selezione, drag e doppio click allineato ai nuovi rettangoli condivisi; l'editor di rinomina inline segue la posizione reale anche con scroll verticale.
+
+### Test e limiti
+- Estesi i test nativi di hitbox e delle operazioni di rinomina; test di selezione da un punto della nuova fascia titolo distinto dall'attivazione GO.
+- **Non modificate** le dimensioni della Grid (62/72/318/152/48/184 px), gli editor, il mixer, l'Inspector, il Master Audio, i motori o il formato show JSON v10.
+- N3.3–N3.5 (righe/celle, stati, rifinitura BPM e stress/DPI) non sono inclusi; CI Windows e verifica visiva/hardware da confermare sulla PR, non presunte.
+- Nessuna build portable.
+
 ## [0.9.0-beta.13] - 2026-11-01
 
 **Tipo:** prima implementazione JUCE della fase N3 (N3.1 — fondazioni geometriche della Cue Grid), senza ancora cambiare la grafica.
