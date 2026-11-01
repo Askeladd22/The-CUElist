@@ -348,6 +348,10 @@ void cueGridN3VisualTests() {
               !loaded.rows[0].cells[1].stopOnNext,
               "Cell Auto Stop exceptions no longer persist in existing show schema");
         ui.setCellAutoStop(0,0,true);
+        // Sampling while the pointer remains in the same cell observes the
+        // hovered surface, not the original idle surface. Exit the cell
+        // before comparing identical visual states.
+        grid->mouseExit(cueViewFixtures::event(*grid,elsewhere,elsewhere));
         check(sample()==defaultPixel &&
               !ui.show.rows[0].cells[1].stopOnNext,
               "Restoring one cell's default affected other cell exceptions");
