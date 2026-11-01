@@ -742,7 +742,8 @@ void uiRefinementTests() {
         check(utilities && grid && view && fader && output && pan && mute && limiter,
               "Master Audio or its real five controls are missing");
         for (const auto dimensions:std::initializer_list<juce::Point<int>>{
-            {1280,820},{1440,900},{1647,895},{1920,1080},{3840,1080}}) {
+            {1280,768},{1280,820},{1440,900},{1647,895},
+            {1920,1080},{3840,1080}}) {
             ui.setSize(dimensions.x,dimensions.y);
             ui.resized();
             utilities->refresh();
@@ -764,6 +765,11 @@ void uiRefinementTests() {
                   expected.muteButton.getRight()<=CueGrid::nameWidth &&
                   expected.output.getRight()<=CueGrid::nameWidth &&
                   expected.limiter.getRight()<=CueGrid::nameWidth &&
+                  expected.card.contains(expected.fader) &&
+                  expected.card.contains(expected.output) &&
+                  expected.card.contains(expected.panKnob) &&
+                  expected.card.contains(expected.muteButton) &&
+                  expected.card.contains(expected.limiter) &&
                   expected.fader.getBottom()<=utilities->getHeight() &&
                   expected.muteButton.getBottom()<=utilities->getHeight(),
                   "Master control left the pinned Cuelist lane or became clipped");
