@@ -88,6 +88,8 @@ void MainComponent::showControlCellMenu(int row,int column,
         menu.addItem(2,"Save map for reuse...");
         menu.addItem(3,"Remove map assignment (inherit Default Map)");
     }
+    menu.addSeparator();
+    menu.addItem(4,"Includi nell'Auto Stop",true,selectedCell.stopOnNext);
     auto safe=juce::Component::SafePointer<MainComponent>(this);
     menu.showMenuAsync(juce::PopupMenu::Options().withTargetScreenArea(
         {screenPosition.x,screenPosition.y,1,1}),
@@ -100,7 +102,10 @@ void MainComponent::showControlCellMenu(int row,int column,
                 if (safe->show.columns[(size_t)i].id==columnId) c=i;
             if (r<0 || c<0 || safe->show.columns[(size_t)c].type!=ColumnType::control ||
                 safe->show.columns[(size_t)c].controlLocked) return;
-            if (choice==1) {
+            if (choice==4) {
+                const auto enabled=safe->show.rows[(size_t)r].cells[(size_t)c].stopOnNext;
+                safe->setCellAutoStop(r,c,!enabled);
+            } else if (choice==1) {
                 if (safe->createEmptyControlSet(r,c)) safe->editControlSet(r,c);
             } else if (choice==2) {
                 if (!safe->show.rows[(size_t)r].cells[(size_t)c].controlSet) return;
