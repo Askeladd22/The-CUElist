@@ -289,7 +289,13 @@ MainComponent::MainComponent(bool startAudio) {
         menu.addSeparator();
         menu.addItem(5,"Rename active Cuelist");
         auto safe=juce::Component::SafePointer<MainComponent>(this);
-        menu.showMenuAsync(juce::PopupMenu::Options().withTargetComponent(&preferencesButton),
+        // The original Settings button is retained only as an action source.
+        // Anchor its unchanged native settings popup to the visible
+        // operator Show menu after removing the duplicate sidebar button.
+        auto* anchor=preferencesButton.isVisible()
+            ? static_cast<juce::Component*>(&preferencesButton)
+            : static_cast<juce::Component*>(operatorMenus[2].get());
+        menu.showMenuAsync(juce::PopupMenu::Options().withTargetComponent(anchor),
         [safe,inputs,outputs](int choice) {
             if (!safe) return;
             if(choice==1) safe->showPreflight();
