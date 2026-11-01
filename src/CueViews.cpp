@@ -693,6 +693,21 @@ void PinnedCueHeaders::mouseDoubleClick(const juce::MouseEvent& e) {
         e.x>=107 && e.x<CueGrid::rowPlayBounds(0).getX()-4)
         owner.renameTitle(false,row);
 }
+void PinnedCueHeaders::mouseMove(const juce::MouseEvent& e) {
+    // The pinned cue lane overlays the scrolled CueGrid. Query the actual
+    // scroll position and show the untruncated title, without changing any
+    // row selection/drag/transport interaction.
+    const int gridY=e.y+owner.viewport.getViewPositionY();
+    const int row=CueGridGeometry::rowAt(gridY);
+    if (e.y>=CueGrid::headerHeight &&
+        e.x>=107 && e.x<CueGrid::rowPlayBounds(0).getX()-4 &&
+        row>=0 && row<(int)owner.show.rows.size()) {
+        const auto& name=owner.show.rows[(size_t)row].name;
+        setTooltip(name.isEmpty() ? "Untitled cue" : name);
+    } else {
+        setTooltip({});
+    }
+}
 void PinnedCueHeaders::mouseWheelMove(const juce::MouseEvent& e,
                                       const juce::MouseWheelDetails& wheel) {
     const int x=owner.viewport.getViewPositionX();
@@ -729,6 +744,29 @@ void PinnedColumnHeaders::mouseDown(const juce::MouseEvent& e) {
 void PinnedColumnHeaders::mouseDoubleClick(const juce::MouseEvent& e) {
     if (e.mods.isLeftButtonDown() && !e.mods.isPopupMenu())
         owner.grid.doubleClickColumnHeader(gridXAt(e.x),e.y);
+}
+void PinnedColumnHeaders::mouseMove(const juce::MouseEvent& e) {
+    if (e.y<0 || e.y>=CueGrid::headerHeight) {
+        setTooltip({});
+        return;
+    }
+    const int column=owner.grid.columnAt(gridXAt(e.x));
+    if (column<0 || column>=(int)owner.show.columns.size()) {
+        setTooltip({});
+        return;
+    }
+    const auto& col=owner.show.columns[(size_t)column];
+    if (col.name.isNotEmpty()) {
+        setTooltip(col.name);
+        return;
+    }
+    int ordinal=0;
+    for (int i=0;i<=column;++i)
+        if (owner.show.columns[(size_t)i].type==col.type) ++ordinal;
+    const auto defaultName=col.type==ColumnType::audio ? "Audio" :
+        col.type==ColumnType::midi ? "MIDI" :
+        col.type==ColumnType::osc ? "OSC" : "Control";
+    setTooltip(juce::String(defaultName)+" "+juce::String(ordinal));
 }
 void PinnedColumnHeaders::mouseWheelMove(
         const juce::MouseEvent& e,const juce::MouseWheelDetails& wheel) {
