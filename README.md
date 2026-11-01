@@ -27,6 +27,16 @@ pubbliche. La versione del progetto salvato `.cuelist` (**schema v10**)
 
 ## UI V2 — Implementazione JUCE progressiva
 
+**0.9.0-beta.13 — N3.1 Cue Grid:** iniziata l'integrazione
+nativa della matrice con [geometrie condivise JUCE](docs/UI_V2_NATIVE_PHASE_N3_1.md)
+per righe, colonne (anche collassate), overlay BPM/Auto Stop,
+intestazioni fisse e scorrimento. Test su 13 cue, 11 colonne
+e quattro risoluzioni. Le dimensioni e le hitbox originali
+restano invariati finché non saranno aggiornati insieme
+al rendering nella fase successiva. **Master Audio non ridisegnato**.
+
+## UI V2 — Implementazione JUCE progressiva
+
 **0.9.0-beta.12 — Audit menu N2.1:** tutti i comandi di
 configurazione del precedente Settings sono di nuovo
 direttamente raggiungibili dai menu JUCE appropriati
