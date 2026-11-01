@@ -106,4 +106,61 @@ void cueGridGeometryTests() {
                   "Viewport no longer contains all 13 rows / 11 columns");
         }
     });
+    test("N3.2 cue name and transport stay independent in a 62px lane",[] {
+        const auto title=CueGrid::rowNameBounds(0);
+        const auto state=CueGrid::rowStatusBounds(0);
+        const auto go=CueGrid::rowGoBounds(0);
+        const auto play=CueGrid::rowPlayBounds(0);
+        const auto stop=CueGrid::rowStopBounds(0);
+        const auto menu=CueGrid::rowMenuBounds(0);
+        check(title.getWidth()==196 &&
+              title.getRight()<=CueGrid::nameWidth &&
+              CueGrid::rowContentInset+title.getBottom()<=CueGrid::rowHeight,
+              "Wider cue title has no room within the unchanged Master lane");
+        for (auto control:{go,play,stop,menu}) {
+            check(!title.intersects(control) &&
+                  CueGrid::rowContentInset+control.getBottom()<=CueGrid::rowHeight,
+                  "Cue title overlaps an active transport target");
+        }
+        check(!state.intersects(play) && !state.intersects(stop) &&
+              !state.intersects(menu) && !go.intersects(state),
+              "State text overlaps cue controls");
+        check(!play.intersects(stop) && !play.intersects(menu) &&
+              !stop.intersects(menu) && !go.intersects(play),
+              "GO, Play, Stop and context menu must be disjoint");
+        check(CueGrid::rowTitleHit(title.getRight()-2,title.getCentreY()) &&
+              !CueGrid::rowTitleHit(play.getCentreX(),play.getCentreY()) &&
+              !CueGrid::rowTitleHit(stop.getCentreX(),stop.getCentreY()) &&
+              !CueGrid::rowTitleHit(go.getCentreX(),go.getCentreY()),
+              "Rename/drag region includes an action button");
+    });
+
+    test("N3.2 clicking the extended name selects, never executes GO",[] {
+        MainComponent ui(false);
+        addRow(ui.show,"Second cue");
+        auto* pinned=cueViewFixtures::find<PinnedCueHeaders>(ui);
+        auto* editor=dynamic_cast<juce::TextEditor*>(
+            controlsV3::named(ui,"inlineNameEditor"));
+        check(pinned!=nullptr && editor!=nullptr,
+              "Pinned cue headers or inline editor missing");
+        ui.select(1,0);
+        const auto title=CueGrid::rowNameBounds(0);
+        const float x=(float)(title.getRight()-8);
+        const float y=(float)(CueGrid::headerHeight+
+            CueGrid::rowContentInset+title.getCentreY());
+        cueViewFixtures::click(*pinned,x,y);
+        check(ui.selectedRow==0 && ui.nextCueIndex()==0,
+              "Extended title click triggered GO or selected the wrong cue");
+        pinned->mouseDoubleClick(cueViewFixtures::event(
+            *pinned,{x,y},{x,y},2));
+        check(editor->isVisible() &&
+              editor->getWidth()==title.getWidth() &&
+              editor->getHeight()==title.getHeight(),
+              "Double-click failed to position the inline editor over the wider title");
+        editor->setText("Revised cue",juce::dontSendNotification);
+        editor->onReturnKey();
+        check(ui.show.rows[0].name=="Revised cue" &&
+              !editor->isVisible(),"Inline rename no longer persists");
+    });
+
 }
